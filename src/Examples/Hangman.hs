@@ -8,6 +8,7 @@ import IOtt
 
 import Data.List (nub,permutations)
 
+-- this Spec is slightly to loose
 hangmanSpec :: [Int] -> Spec
 hangmanSpec word =
   let letters = nub word
