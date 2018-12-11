@@ -1,0 +1,54 @@
+name:                IOTest
+version:             0.0.1.0
+github:              "owestphal/IOTest"
+license:             BSD3
+author:              "Oliver Westphal"
+maintainer:          "oliver.westphal@uni-due.de"
+copyright:           "2018 Oliver Westphal"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+category:            Testing
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/githubuser/IOTest#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- template-haskell
+- mtl
+- QuickCheck
+
+library:
+  source-dirs: src
+  ghc-options:
+  - -Wall
+
+executables:
+  IOTest-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -Wall
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - IOTest
+
+tests:
+  IOTest-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - IOTest
