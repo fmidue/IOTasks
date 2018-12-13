@@ -10,13 +10,9 @@ import Test.QuickCheck
 
 test :: IOtt() -> Spec -> IO ()
 test solution spec = do
-  let paths = getPaths spec
-      gens = inputGenerator . getCore <$> paths
-      tests = testWithProto solution <$> paths
-      props = zipWith forAll gens tests
   res <- quickCheckWithResult
          stdArgs{chatty = False}
-         (disjoin props)
+         (specProperty spec solution)
   case res of
     Success{..} -> Prelude.putStr output
     GaveUp{..} -> Prelude.putStr output
@@ -27,6 +23,14 @@ test solution spec = do
       let (l1:l2:ls) = lines output
       let r = read :: String -> [(String, Int)]
       Prelude.putStr . unlines $ (l1 : show (fst <$> r l2) : ls)
+
+specProperty :: Spec -> IOtt () -> Property
+specProperty spec solution =
+  let paths = getPaths spec
+      gens = inputGenerator . getCore <$> paths
+      tests = testWithProto solution <$> paths
+      props = zipWith forAll gens tests
+  in disjoin props
 
 testWithProto :: IOtt () -> PathSpec -> [(String,Int)] -> Property
 testWithProto prog path inputs =
