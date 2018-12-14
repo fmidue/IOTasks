@@ -26,7 +26,7 @@ doNothing :: Interaction
 doNothing = OnInput Nothing Nothing Nothing
 
 displayValue :: Interaction
-displayValue = OnOutput $ Just (Must, Template $ Hole Nil)
+displayValue = OnOutput $ Just (Must, matchValue)
 
 displayWithPrefix :: String -> Interaction
-displayWithPrefix xs = OnOutput $ Just (Must, Template $ Fixed xs $ Hole Nil)
+displayWithPrefix xs = OnOutput $ Just (Must, Template $ Fixed xs $ Parameter Nil)

@@ -7,7 +7,7 @@ import Interaction
 import IOtt
 import Types
 
-import Control.Monad (replicateM)
+import Control.Monad (replicateM,replicateM_)
 
 -- read natural number n, then read n integers and sum them
 task1 :: Spec
@@ -40,6 +40,15 @@ solution1 = do
   xs <- replicateM n $ read @Int <$> getLine
   putStrLn $ "Result: " ++ show (sum xs)
   --print $ sum xs
+
+wrongSolution1 :: IOtt ()
+wrongSolution1 = do
+  putStrLn "> "
+  n <- read @Int <$> getLine
+  putStrLn $ "You entered " ++ show n
+  replicateM_ n $ read @Int <$> getLine
+  putStrLn "Result: 17"
+
 
 solution2 :: IOtt ()
 solution2 = go [] Nothing Nothing where

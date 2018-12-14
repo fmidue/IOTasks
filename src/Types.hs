@@ -49,22 +49,28 @@ data Matcher
 
 data PartialString
   = Fixed String PartialString
-  | Hole PartialString
+  | Parameter PartialString
+  | WhiteSpace PartialString
+  | DontCare PartialString
   | Nil
   deriving Show
 
 matchValue :: Matcher
-matchValue = Template $ Hole Nil
+matchValue = Template $ Parameter Nil
 
 printTemplate :: PartialString -> String
 printTemplate (Fixed xs r) = xs ++ printTemplate r
-printTemplate (Hole r) = "_" ++ printTemplate r
+printTemplate (DontCare r) = "?" ++ printTemplate r
+printTemplate (Parameter r) = "_" ++ printTemplate r
+printTemplate (WhiteSpace r) = " " ++ printTemplate r
 printTemplate Nil = ""
 
-fillTemplate :: Show a => PartialString -> a -> String
-fillTemplate (Fixed xs r) a = xs ++ fillTemplate r a
-fillTemplate (Hole r) a = " " ++ show a ++ " " ++ fillTemplate r a
-fillTemplate Nil _ = ""
+fillTemplate :: Show a => PartialString -> a -> PartialString
+fillTemplate (Fixed xs r) a = Fixed xs $ fillTemplate r a
+fillTemplate (Parameter r) a = WhiteSpace $ Fixed (show a) $ WhiteSpace $ fillTemplate r a
+fillTemplate (DontCare r) a = DontCare $ fillTemplate r a
+fillTemplate (WhiteSpace r) a = WhiteSpace $ fillTemplate r a
+fillTemplate Nil _ = Nil
 
 match :: Matcher -> String -> Bool
 match (MatchExactly xs) ys = xs == ys
@@ -75,7 +81,9 @@ match (Template t) ys =
 
 parseTemplate :: PartialString -> Parser ()
 parseTemplate (Fixed xs r) = string xs >> parseTemplate r
-parseTemplate (Hole r) = between (try $ optional space) (try $ optional space) (many1 (char '-' <|> alphaNum)) >> parseTemplate r
+parseTemplate (WhiteSpace r) = spaces >> parseTemplate r
+parseTemplate (DontCare r) = many1 (char '-' <|> alphaNum) >> parseTemplate r
+parseTemplate (Parameter _) = fail "unknown parameter"
 parseTemplate Nil = eof
 
 outputForm :: Matcher -> String

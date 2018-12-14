@@ -42,18 +42,18 @@ buildPTrace' (x:xs) ys =
       listHelper name optB optF optA i
     -- output
     (Out ((SZ,v),[]), OnOutput d) -> do
-      let action = applyOpt d
+      let action = applyOpt d v
       Step Must action <$> buildPTrace' xs ys
     (Out ((Unary,f),[name]), OnOutput d) -> do
       (Just v) <- gets $ lookup name
       let output = f v
-          action = applyOpt d
+          action = applyOpt d output
       Step Must action <$> buildPTrace' xs ys
     (Out ((Binary,f),[name1,name2]), OnOutput d) -> do
       (Just v1) <- gets $ lookup name1
       (Just v2) <- gets $ lookup name2
       let output = f v1 v2
-          action = applyOpt d
+          action = applyOpt d output
       Step Must action <$> buildPTrace' xs ys
     -- fallback
     _ -> error $ "ill-formed spec!\n" ++ show x
@@ -83,10 +83,12 @@ optOutput (Just (Must, xs)) = Step Must (Output xs)
 optOutput (Just (May, xs)) = Step May (Output xs)
 optOutput Nothing = id
 
-applyOpt :: Opt Matcher -> Action
-applyOpt (Just (Must, m)) = Output m
-applyOpt (Just (May, m)) = OneOf [Output matchValue, Output m]
-applyOpt Nothing = Output matchValue
+applyOpt :: Show a => Opt Matcher -> a -> Action
+applyOpt (Just (Must, MatchExactly xs)) _ = Output $ MatchExactly xs
+applyOpt (Just (Must, Template t)) a = Output $ Template $ fillTemplate t a
+applyOpt (Just (May, MatchExactly xs)) _ = OneOf [Output matchValue, Output $ MatchExactly xs]
+applyOpt (Just (May, Template t)) a = OneOf [Output matchValue, Output $ Template $ fillTemplate t a]
+applyOpt Nothing a = Output $ MatchExactly $ show a
 
 checkAgainstProto :: Output () -> ProtoTrace -> (Bool, String)
 checkAgainstProto o t =

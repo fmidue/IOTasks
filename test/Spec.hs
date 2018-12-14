@@ -11,6 +11,8 @@ main :: IO ()
 main = hspec $ do
   it "Testing solution1 against task1" $
     specProperty task1 solution1
+  it "Testing wrongSolution1 against task1" $
+    expectFailure $ specProperty task1 wrongSolution1
   it "Testing solution2 against task2" $
     specProperty task2 solution2
   it "Testing solution3 against task3" $
@@ -18,7 +20,7 @@ main = hspec $ do
   it"Testing solution1 against (task1 ∨ task3)" $
     specProperty (Choice [task1,task3]) solution1
   it "Testing solution2 against (task1 ∨ task3)" $
-    expectFailure (specProperty (Choice [task1,task3]) solution2)
+    expectFailure $ specProperty (Choice [task1,task3]) solution2
   it "Testing solution3 against (task1 ∨ task3)" $
     specProperty (Choice [task1,task3]) solution3
   it "Testing hangman" $
