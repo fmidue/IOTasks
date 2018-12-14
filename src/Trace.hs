@@ -10,7 +10,6 @@ import Control.Monad.State
 
 import Data.List
 import Data.Maybe
-import           Debug.Trace
 
 data ProtoTrace
   = Step OptTy Action ProtoTrace
@@ -126,4 +125,4 @@ checkOutput :: String -> Matcher -> (Bool, String) -> (Bool,String)
 checkOutput s s' (b,xs) =
   if match s' s
   then (b,xs)
-  else  trace (show (s,s')) $ (False,"Expected output of form '" ++ outputForm s' ++ "', but got '" ++ s ++ "'.")
+  else (False,"Expected output of form '" ++ outputForm s' ++ "', but got '" ++ s ++ "'.")
