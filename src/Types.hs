@@ -10,6 +10,8 @@
 module Types where
 
 import Test.QuickCheck.Gen (Gen)
+import Text.Parsec
+import Text.Parsec.String
 
 data Spec
   = StepSpecs PathSpec
@@ -40,12 +42,52 @@ instance Show AtomicSpec where
 type Opt a = Maybe (OptTy,a)
 data OptTy = Must | May deriving Show
 
+data Matcher
+  = MatchExactly String
+  | Template PartialString
+  deriving Show
+
+data PartialString
+  = Fixed String PartialString
+  | Hole PartialString
+  | Nil
+  deriving Show
+
+matchValue :: Matcher
+matchValue = Template $ Hole Nil
+
+printTemplate :: PartialString -> String
+printTemplate (Fixed xs r) = xs ++ printTemplate r
+printTemplate (Hole r) = "_" ++ printTemplate r
+printTemplate Nil = ""
+
+fillTemplate :: Show a => PartialString -> a -> String
+fillTemplate (Fixed xs r) a = xs ++ fillTemplate r a
+fillTemplate (Hole r) a = " " ++ show a ++ " " ++ fillTemplate r a
+fillTemplate Nil _ = ""
+
+match :: Matcher -> String -> Bool
+match (MatchExactly xs) ys = xs == ys
+match (Template t) ys =
+  case parse (parseTemplate t) undefined ys of
+    Left _ -> False
+    Right _ -> True
+
+parseTemplate :: PartialString -> Parser ()
+parseTemplate (Fixed xs r) = string xs >> parseTemplate r
+parseTemplate (Hole r) = between (try $ optional space) (try $ optional space) (many1 (char '-' <|> alphaNum)) >> parseTemplate r
+parseTemplate Nil = eof
+
+outputForm :: Matcher -> String
+outputForm (MatchExactly xs) = "String: " ++ show xs
+outputForm (Template t) = "String: " ++ printTemplate t
+
 data Interaction
-  = OnInput { before :: Opt String
-            , feedback :: Opt (Value -> String)
-            , after :: Opt String
+  = OnInput { before :: Opt Matcher
+            , feedback :: Opt (Value -> Matcher)
+            , after :: Opt Matcher
             }
-  | OnOutput { decorate :: Opt (Value -> String)
+  | OnOutput { decorate :: Opt Matcher
              }
 
 instance Show Interaction where

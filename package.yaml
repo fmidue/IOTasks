@@ -24,6 +24,7 @@ dependencies:
 - template-haskell
 - mtl
 - QuickCheck
+- parsec
 
 library:
   source-dirs: src

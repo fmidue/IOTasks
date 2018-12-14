@@ -13,9 +13,9 @@ import Control.Monad (replicateM)
 task1 :: Spec
 task1 = StepSpecs
   [ (In ("n",NatTy)       , prompt "> "
-                            <& mayReactWith (\v -> "You entered "++ show v))
+                            <& mayReactWith (\v -> MatchExactly $ "You entered "++ show v))
   , (In ("xs", SListTy IntTy "n"), doNothing)
-  , (Out (sumOf,["xs"])   , displayValueWith (\v -> "Result: " ++ show v))
+  , (Out (sumOf,["xs"])   , displayWithPrefix "Result:")
   ]
 
 -- read till last two numbers sum to 0 than count positive numbers divisible by 3

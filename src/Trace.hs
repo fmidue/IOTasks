@@ -10,6 +10,7 @@ import Control.Monad.State
 
 import Data.List
 import Data.Maybe
+import           Debug.Trace
 
 data ProtoTrace
   = Step OptTy Action ProtoTrace
@@ -18,7 +19,7 @@ data ProtoTrace
 
 data Action
   = Input
-  | Output String
+  | Output Matcher
   | OneOf [Action]
   deriving Show
 
@@ -42,18 +43,18 @@ buildPTrace' (x:xs) ys =
       listHelper name optB optF optA i
     -- output
     (Out ((SZ,v),[]), OnOutput d) -> do
-      let action = applyOpt d v
+      let action = applyOpt d
       Step Must action <$> buildPTrace' xs ys
     (Out ((Unary,f),[name]), OnOutput d) -> do
       (Just v) <- gets $ lookup name
       let output = f v
-          action = applyOpt d output
+          action = applyOpt d
       Step Must action <$> buildPTrace' xs ys
     (Out ((Binary,f),[name1,name2]), OnOutput d) -> do
       (Just v1) <- gets $ lookup name1
       (Just v2) <- gets $ lookup name2
       let output = f v1 v2
-          action = applyOpt d output
+          action = applyOpt d
       Step Must action <$> buildPTrace' xs ys
     -- fallback
     _ -> error $ "ill-formed spec!\n" ++ show x
@@ -78,15 +79,15 @@ buildPTrace' (x:xs) ys =
         modify ((name,ListVal list):)
         ins <$> buildPTrace' xs (drop i ys)
 
-optOutput :: Opt String -> (ProtoTrace -> ProtoTrace)
+optOutput :: Opt Matcher -> (ProtoTrace -> ProtoTrace)
 optOutput (Just (Must, xs)) = Step Must (Output xs)
 optOutput (Just (May, xs)) = Step May (Output xs)
 optOutput Nothing = id
 
-applyOpt :: Show a => Opt (a -> String) -> a -> Action
-applyOpt (Just (Must, f)) = Output . f
-applyOpt (Just (May, f)) = OneOf . ([Output . show, Output . f] <*>) . pure
-applyOpt Nothing = Output . show
+applyOpt :: Opt Matcher -> Action
+applyOpt (Just (Must, m)) = Output m
+applyOpt (Just (May, m)) = OneOf [Output matchValue, Output m]
+applyOpt Nothing = Output matchValue
 
 checkAgainstProto :: Output () -> ProtoTrace -> (Bool, String)
 checkAgainstProto o t =
@@ -103,7 +104,7 @@ checkAgainstProto' :: Output () -> ProtoTrace -> [(Bool,String)]
 checkAgainstProto' (Read x) (Step Must Input y) = checkAgainstProto' x y
 checkAgainstProto' (Read x) (Step May Input y) = checkAgainstProto' x y ++ checkAgainstProto' (Read x) y
 checkAgainstProto' (Read x) (Step May (Output _) y) = checkAgainstProto' (Read x) y
-checkAgainstProto' (Read _) (Step Must (Output s) _) = [(False,"Expected output '"++ s ++"', but program reads input")]
+checkAgainstProto' (Read _) (Step Must (Output s) _) = [(False,"Expected output of form '"++ outputForm s ++"', but program reads input")]
 checkAgainstProto' (Read x) (Step Must (OneOf as) y) = concatMap (checkAgainstProto' (Read x) . (\a -> Step Must a y)) as
 checkAgainstProto' (Read x) (Step May (OneOf as) y) = concatMap (checkAgainstProto' (Read x) . (\a -> Step May a y)) as
 checkAgainstProto' (Read _) End = [(False,"Expected termination, but program reads input")]
@@ -121,8 +122,8 @@ checkAgainstProto' (Finish _) _ = [(False,"Expected more steps, but program ende
 -- OutOfInputs cases
 checkAgainstProto' OutOfInputs _ = [(False,"To much reads! No more inputs left")]
 
-checkOutput :: String -> String -> (Bool, String) -> (Bool,String)
+checkOutput :: String -> Matcher -> (Bool, String) -> (Bool,String)
 checkOutput s s' (b,xs) =
-  if s==s'
+  if match s' s
   then (b,xs)
-  else (False,"Expected output '" ++ s' ++ "', but got '" ++ s ++ "'.")
+  else  trace (show (s,s')) $ (False,"Expected output of form '" ++ outputForm s' ++ "', but got '" ++ s ++ "'.")
