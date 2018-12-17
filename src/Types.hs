@@ -76,7 +76,7 @@ fillTemplate Nil _ = Nil
 match :: Matcher -> String -> Bool
 match (MatchExactly xs) ys = xs == ys
 match (Template t) ys =
-  isRIght $ parse (parseTemplate t) undefined ys
+  isRight $ parse (parseTemplate t) undefined ys
 
 parseTemplate :: PartialString -> Parser ()
 parseTemplate (Fixed xs r) = string xs >> parseTemplate r
