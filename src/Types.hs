@@ -80,7 +80,7 @@ match (Template t) ys =
 parseTemplate :: PartialString -> Parser ()
 parseTemplate (Fixed xs r) = P.string xs >> parseTemplate r
 parseTemplate (WhiteSpace r) = spaces >> parseTemplate r
-parseTemplate (DontCare r) = many1 (char '-' <|> alphaNum) >> parseTemplate r
+parseTemplate (DontCare r) = many1 (oneOf "+-*/!?.,; " <|> alphaNum) >> parseTemplate r
 parseTemplate (Parameter _) = fail "unknown parameter"
 parseTemplate Nil = eof
 
