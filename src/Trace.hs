@@ -30,9 +30,9 @@ buildPTrace' [] _ = return End
 buildPTrace' (x:xs) ys =
   case x of
     -- single values
-    (In (name, IntTy), OnInput optB optF optA) -> noListHelper name optB optF optA
-    (In (name, NatTy), OnInput optB optF optA) -> noListHelper name optB optF optA
-    (In (name, Neg _), OnInput optB optF optA) -> noListHelper name optB optF optA
+    (In (name, Base NumTy), OnInput optB optF optA) -> noListHelper name optB optF optA
+    (In (name, (SPred NumTy p)), OnInput optB optF optA) -> noListHelper name optB optF optA
+    (In (name, (DPred NumTy f vname)), OnInput optB optF optA) -> noListHelper name optB optF optA
     -- list values
     (In (name, SListTy _ n), OnInput optB optF optA) -> do
       (Just (IntVal i)) <- gets $ lookup n
@@ -75,7 +75,7 @@ buildPTrace' (x:xs) ys =
               Nothing -> id
             step k = optOutput optB . Step Must Input . react k . optOutput optA
             ins = foldr (\k g -> step k . g) id [0..i-1]
-        modify ((name,ListVal list):)
+        modify ((name,IListVal list):)
         ins <$> buildPTrace' xs (drop i ys)
 
 optOutput :: Opt Matcher -> (ProtoTrace -> ProtoTrace)

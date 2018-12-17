@@ -25,32 +25,29 @@ inputGenerator' spec =
   in evalStateT act []
 
 atomicGenerator :: AtomicSpec -> GenEnvM (Maybe [(Int,Int)])
-atomicGenerator (In (n,IntTy)) = do
+atomicGenerator (In (n,Base NumTy)) = do
   i <- lift intGen
   modify ((n,IntVal i):)
   return $ Just [(i,1)]
-atomicGenerator (In (n,Neg name)) = do
+atomicGenerator (In (n,DPred NumTy f name)) = do
   (Just (IntVal iOrig)) <- gets $ lookup name
-  let i = negate iOrig
+  let i = f iOrig
   modify ((n,IntVal i):)
   return $ Just [(i,1)]
-atomicGenerator (In (n,Exact x)) = do
-  modify ((n,IntVal x):)
-  return $ Just [(x,1)]
-atomicGenerator (In (n,NatTy)) = do
-  i <- lift natGen
+atomicGenerator (In (n,SPred NumTy p)) = do
+  i <- lift $ intGen `suchThat` p
   modify ((n,IntVal i):)
   return $ Just [(i,1)]
 atomicGenerator (In (xs,SListTy ty n)) = do
   (Just (IntVal i)) <- gets $ lookup n
   list <- listGen ty i
-  modify ((xs,ListVal list):)
+  modify ((xs,IListVal list):)
   return . Just $ zip list [i,i-1..0]
 atomicGenerator (In (xs,DListTy ty cond)) = do
   env <- get
   i <- lift $ choose (length cond,10)
-  list <- listGen' (\vs -> hasType env (ListVal vs) (DListTy ty cond)) ty i
-  modify ((xs,ListVal list):)
+  list <- listGen' (\vs -> hasType env (IListVal vs) (DListTy ty cond)) ty i
+  modify ((xs,IListVal list):)
   return . Just $ zip list [i,i-1..0]
 atomicGenerator (Out _) = return Nothing
 
@@ -60,13 +57,12 @@ intGen = choose (-10,10)
 natGen :: Gen Int
 natGen = choose (0,10)
 
-listGen :: InputType 'NonList -> Int -> GenEnvM [Int]
+listGen :: InputType a -> Int -> GenEnvM [Int]
 listGen = listGen' (const True)
 
-listGen' :: ([Int] -> Bool) -> InputType 'NonList -> Int -> GenEnvM [Int]
-listGen' p IntTy n = lift $ vectorOf n intGen `suchThat` p
-listGen' p NatTy n = lift $ vectorOf n natGen `suchThat` p
-listGen' p (Exact x) n = lift $ vectorOf n (elements [x]) `suchThat` p
-listGen' p (Neg i) n = do
-  (Just (IntVal z)) <- gets $ lookup i
-  lift $ vectorOf n (elements [z]) `suchThat` p
+listGen' :: ([Int] -> Bool) -> InputType a -> Int -> GenEnvM [Int]
+listGen' p (Base NumTy) n = lift $ vectorOf n intGen `suchThat` p
+listGen' p (SPred NumTy q) n = lift $ vectorOf n (intGen `suchThat` q) `suchThat` p
+listGen' p (DPred NumTy f vname) n = do
+  (Just (IntVal z)) <- gets $ lookup vname
+  lift $ vectorOf n (elements [f z]) `suchThat` p

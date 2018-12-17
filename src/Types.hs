@@ -9,7 +9,6 @@
 {-# OPTIONS_GHC -fno-warn-missing-pattern-synonym-signatures #-}
 module Types where
 
-import Test.QuickCheck.Gen (Gen)
 import Text.Parsec
 import Text.Parsec.String
 import Data.Either
@@ -104,60 +103,99 @@ type VarName = String
 
 data Kind = NonList | List
 
-data InputType (p :: Kind) where
-  IntTy :: InputType 'NonList
-  NatTy :: InputType 'NonList
-  Neg :: VarName -> InputType 'NonList
-  Exact :: Int -> InputType 'NonList
+data BaseType a where
+  NumTy :: BaseType Int
+  StringTy :: BaseType String
+
+deriving instance Show (BaseType a)
+
+data InputType (p::Kind) where
+  Base :: BaseType a -> InputType 'NonList
+  SPred :: BaseType a -> (a -> Bool) -> InputType 'NonList
+  DPred :: BaseType a -> (a -> a) -> VarName -> InputType 'NonList
   SListTy :: InputType 'NonList -> VarName -> InputType 'List
   DListTy :: InputType 'NonList -> [(VarName,InputType 'NonList)] -> InputType 'List
 
-deriving instance Show (InputType p)
+instance Show (InputType p) where
+  show _ = "TODO: implement show for InputType"
 
-type family InputType' (a :: Nat) = r | r -> a where
-  InputType' 'Z = Gen Value
-  InputType' ('S a) = Value -> InputType' a
+intTy :: InputType 'NonList
+intTy = Base NumTy
+
+natTy :: InputType 'NonList
+natTy = SPred NumTy (>=0)
+
+exact :: Int -> InputType 'NonList
+exact n = SPred NumTy (==n)
+
+neg :: VarName -> InputType 'NonList
+neg = DPred NumTy negate
 
 data Value
   = IntVal Int
-  | ListVal [Int]
+  | IListVal [Int]
   | Line String
+  | SListVal [String]
 
 valueToList :: Value -> [Int]
 valueToList (IntVal n) = [n]
-valueToList (ListVal xs) = xs
+valueToList (IListVal xs) = xs
+valueToList (SListVal _) = error "FIX: change valueToList to handle strings!"
 valueToList (Line _) = error "FIX: change valueToList to handle strings!"
 
 fromIntVal :: Value -> Maybe Int
 fromIntVal (IntVal i) = Just i
 fromIntVal _ = Nothing
 
+fromStringVal :: Value -> Maybe String
+fromStringVal (Line xs) = Just xs
+fromStringVal _ = Nothing
+
 lookupIntValue :: VarName -> Env -> Maybe Int
 lookupIntValue v e = lookup v e >>= fromIntVal
 
+lookupStringValue :: VarName -> Env -> Maybe String
+lookupStringValue v e = lookup v e >>= fromStringVal
+
 instance Show Value where
   show (IntVal n) = show n
-  show (ListVal xs) = show xs
+  show (IListVal xs) = show xs
+  show (SListVal xs) = show xs
   show (Line xs) = xs
 
-hasType :: Env -> Value -> InputType p -> Bool
-hasType _ (IntVal _) IntTy = True
-hasType _ (IntVal i) NatTy = i >= 0
-hasType _ (IntVal i) (Exact x) = i == x
-hasType env (IntVal i) (Neg vname) =
-  lookupIntValue vname env == Just (negate i)
-hasType env (ListVal xs) (SListTy ty vname) =
+hasType :: Env -> Value -> InputType a -> Bool
+-- integers
+hasType _ (IntVal _) (Base NumTy) = True
+hasType _ (IntVal i) (SPred NumTy p) = p i
+hasType env (IntVal i) (DPred NumTy p vname) =
+  lookupIntValue vname env == Just (p i)
+hasType env (IListVal xs) (SListTy ty vname) =
   let len = lookupIntValue vname env
       correctLen = Just (length xs) == len
       correctType = map (\x -> hasType env (IntVal x) ty) xs
   in and $ correctLen : correctType
-hasType env (ListVal xs) (DListTy ty tys) =
+hasType env (IListVal xs) (DListTy ty tys) =
   let correctType = map (\x -> hasType env (IntVal x) ty) xs
       checkSubseq = map (uncurry $ checkSeq env) (slidePattern (IntVal <$> xs) tys)
   in and $ correctType ++ (not <$> init checkSubseq) ++ [last checkSubseq]
+-- strings
+hasType _ (Line _) (Base StringTy) = True
+hasType _ (Line xs) (SPred StringTy p) = p xs
+hasType env (Line xs) (DPred StringTy p vname) =
+  lookupStringValue vname env == Just (p xs)
+hasType env (SListVal xs) (SListTy ty vname) =
+  let len = lookupIntValue vname env
+      correctLen = Just (length xs) == len
+      correctType = map (\x -> hasType env (Line x) ty) xs
+  in and $ correctLen : correctType
+hasType env (SListVal xs) (DListTy ty tys) =
+  let correctType = map (\x -> hasType env (Line x) ty) xs
+      checkSubseq = map (uncurry $ checkSeq env) (slidePattern (Line <$> xs) tys)
+  in and $ correctType ++ (not <$> init checkSubseq) ++ [last checkSubseq]
+-- fallback
 hasType _ _ _ = False
 
-checkSeq :: Env -> [Value] -> [(VarName, InputType 'NonList)] -> Bool
+checkSeq :: Env -> [Value] -> [(VarName, InputType a)] -> Bool
 checkSeq _ [] [] = True
 checkSeq _ _ [] = False
 checkSeq _ [] _ = False
@@ -198,7 +236,7 @@ sumOf :: UnaryOutputType
 sumOf = (Unary, IntVal . sum . valueToList)
 
 append :: BinaryOutputType
-append = (Binary,\v1 v2 -> ListVal $ valueToList v1 ++ valueToList v2)
+append = (Binary,\v1 v2 -> IListVal $ valueToList v1 ++ valueToList v2)
 
 lengthOf :: UnaryOutputType
 lengthOf = (Unary, IntVal . length . valueToList)

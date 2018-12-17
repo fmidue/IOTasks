@@ -17,7 +17,7 @@ hangmanSpec word =
 
 permutationPath :: [Int] -> Spec
 permutationPath xs = StepSpecs $ go xs ++ [(Out (line "Correct", []),displayValue)] where
-  go = map (\x -> (In ("xs", DListTy IntTy [("", Exact x)]), doNothing))
+  go = map (\x -> (In ("xs", DListTy intTy [("", exact x)]), doNothing))
 
 -- TODO: improve Specs, so that the comments can be used for real
 hangmanProg :: [Int] -> IOtt ()

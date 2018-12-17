@@ -12,23 +12,23 @@ import Control.Monad (replicateM,replicateM_)
 -- read natural number n, then read n integers and sum them
 task1 :: Spec
 task1 = StepSpecs
-  [ (In ("n",NatTy)       , prompt "> "
+  [ (In ("n",natTy)       , prompt "> "
                             <& mayReactWith (\v -> MatchExactly $ "You entered "++ show v))
-  , (In ("xs", SListTy IntTy "n"), doNothing)
+  , (In ("xs", SListTy intTy "n"), doNothing)
   , (Out (sumOf,["xs"])   , displayWithPrefix "Result:")
   ]
 
 -- read till last two numbers sum to 0 than count positive numbers divisible by 3
 task2 :: Spec
 task2 = StepSpecs
-  [ (In ("xs", DListTy IntTy [("x",IntTy),("y",Neg "x")]), doNothing)
+  [ (In ("xs", DListTy intTy [("x",intTy),("y",neg "x")]), doNothing)
   , (Out (count (\(IntVal x) ->  x > 0 && x `mod` 3 == 0), ["xs"]), displayValue)
   ]
 
 -- read till zero then sum
 task3 :: Spec
 task3 = StepSpecs
-  [ (In ("xs", DListTy IntTy [("",Exact 0)]), doNothing)
+  [ (In ("xs", DListTy intTy [("",exact 0)]), doNothing)
   , (Out (sumOf, ["xs"]), displayValue)
   ]
 
