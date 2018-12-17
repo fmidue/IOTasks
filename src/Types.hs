@@ -12,6 +12,7 @@ module Types where
 import Test.QuickCheck.Gen (Gen)
 import Text.Parsec
 import Text.Parsec.String
+import Data.Either
 
 data Spec
   = StepSpecs PathSpec
@@ -75,9 +76,7 @@ fillTemplate Nil _ = Nil
 match :: Matcher -> String -> Bool
 match (MatchExactly xs) ys = xs == ys
 match (Template t) ys =
-  case parse (parseTemplate t) undefined ys of
-    Left _ -> False
-    Right _ -> True
+  isRIght $ parse (parseTemplate t) undefined ys
 
 parseTemplate :: PartialString -> Parser ()
 parseTemplate (Fixed xs r) = string xs >> parseTemplate r
