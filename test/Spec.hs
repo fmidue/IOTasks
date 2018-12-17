@@ -23,5 +23,9 @@ main = hspec $ do
     expectFailure $ specProperty (Choice [task1,task3]) solution2
   it "Testing solution3 against (task1 ∨ task3)" $
     specProperty (Choice [task1,task3]) solution3
+  it "Testing solution4 against task4" $
+    specProperty task4 solution4
+  it "Testing wrongsolution4 against task4" $
+    expectFailure $ specProperty task4 wrongSolution4
   it "Testing hangman" $
     specProperty (hangmanSpec [2,7,1,4,2,1]) (hangmanProg [2,7,1,4,2,1])

@@ -18,20 +18,6 @@ task1 = StepSpecs
   , (Out (sumOf,["xs"])   , displayWithPrefix "Result:")
   ]
 
--- read till last two numbers sum to 0 than count positive numbers divisible by 3
-task2 :: Spec
-task2 = StepSpecs
-  [ (In ("xs", DListTy intTy [("x",intTy),("y",neg "x")]), doNothing)
-  , (Out (count (\(IntVal x) ->  x > 0 && x `mod` 3 == 0), ["xs"]), displayValue)
-  ]
-
--- read till zero then sum
-task3 :: Spec
-task3 = StepSpecs
-  [ (In ("xs", DListTy intTy [("",exact 0)]), doNothing)
-  , (Out (sumOf, ["xs"]), displayValue)
-  ]
-
 solution1 :: IOtt ()
 solution1 = do
   putStrLn "> "
@@ -50,6 +36,13 @@ wrongSolution1 = do
   putStrLn "Result: 17"
 
 
+-- read till last two numbers sum to 0 than count positive numbers divisible by 3
+task2 :: Spec
+task2 = StepSpecs
+  [ (In ("xs", DListTy intTy [("x",intTy),("y",neg "x")]), doNothing)
+  , (Out (count (\(IntVal x) ->  x > 0 && x `mod` 3 == 0), ["xs"]), displayValue)
+  ]
+
 solution2 :: IOtt ()
 solution2 = go [] Nothing Nothing where
   go ns mX mY =
@@ -60,6 +53,13 @@ solution2 = go [] Nothing Nothing where
         n <- read @Int <$> getLine
         go (n:ns) (Just n) mX
 
+-- read till zero then sum
+task3 :: Spec
+task3 = StepSpecs
+  [ (In ("xs", DListTy intTy [("",exact 0)]), doNothing)
+  , (Out (sumOf, ["xs"]), displayValue)
+  ]
+
 solution3 :: IOtt ()
 solution3 = go [] where
   go xs = do
@@ -67,3 +67,16 @@ solution3 = go [] where
     if n == 0
       then print $ sum xs
       else go $ n:xs
+
+-- read and reverse
+task4 :: Spec
+task4 = StepSpecs
+  [ (In ("line", line), doNothing)
+  , (Out (reverseLine, ["line"]) , displayValue)
+  ]
+
+solution4 :: IOtt ()
+solution4 = (reverse <$> getLine) >>= putStrLn
+
+wrongSolution4 :: IOtt ()
+wrongSolution4 = getLine >>= putStrLn

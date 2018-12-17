@@ -9,7 +9,7 @@
 {-# OPTIONS_GHC -fno-warn-missing-pattern-synonym-signatures #-}
 module Types where
 
-import Text.Parsec
+import Text.Parsec as P
 import Text.Parsec.String
 import Data.Either
 
@@ -32,12 +32,12 @@ getCore = fmap fst
 
 type CoreSpec = [AtomicSpec]
 data AtomicSpec where
-  In :: (VarName, InputType a) -> AtomicSpec
+  In :: (VarName, InputType p q) -> AtomicSpec
   Out :: (OutputType a,[VarName]) -> AtomicSpec
 
 instance Show AtomicSpec where
   show (In (name, ty)) = mconcat ["In (\"",name,"\",",show ty,")"]
-  show (Out (_, xs)) = mconcat ["Out (?, ", show xs, ")"]
+  show (Out (_, xs)) = mconcat ["Out (?oTy, ", show xs, ")"]
 
 type Opt a = Maybe (OptTy,a)
 data OptTy = Must | May deriving Show
@@ -78,7 +78,7 @@ match (Template t) ys =
   isRight $ parse (parseTemplate t) undefined ys
 
 parseTemplate :: PartialString -> Parser ()
-parseTemplate (Fixed xs r) = string xs >> parseTemplate r
+parseTemplate (Fixed xs r) = P.string xs >> parseTemplate r
 parseTemplate (WhiteSpace r) = spaces >> parseTemplate r
 parseTemplate (DontCare r) = many1 (char '-' <|> alphaNum) >> parseTemplate r
 parseTemplate (Parameter _) = fail "unknown parameter"
@@ -109,27 +109,45 @@ data BaseType a where
 
 deriving instance Show (BaseType a)
 
-data InputType (p::Kind) where
-  Base :: BaseType a -> InputType 'NonList
-  SPred :: BaseType a -> (a -> Bool) -> InputType 'NonList
-  DPred :: BaseType a -> (a -> a) -> VarName -> InputType 'NonList
-  SListTy :: InputType 'NonList -> VarName -> InputType 'List
-  DListTy :: InputType 'NonList -> [(VarName,InputType 'NonList)] -> InputType 'List
+data InputType (p::Kind) q where
+  Base :: BaseType a -> InputType 'NonList a
+  SPred :: BaseType a -> (a -> Bool) -> InputType 'NonList a
+  DPred :: BaseType a -> (a -> a) -> VarName -> InputType 'NonList a
+  SListTy :: InputType 'NonList a -> VarName -> InputType 'List a
+  DListTy :: InputType 'NonList a -> [(VarName,InputType 'NonList a)] -> InputType 'List a
 
-instance Show (InputType p) where
+instance Show (InputType p q) where
   show _ = "TODO: implement show for InputType"
 
-intTy :: InputType 'NonList
+intTy :: InputType 'NonList Int
 intTy = Base NumTy
 
-natTy :: InputType 'NonList
+natTy :: InputType 'NonList Int
 natTy = SPred NumTy (>=0)
 
-exact :: Int -> InputType 'NonList
+exact :: Int -> InputType 'NonList Int
 exact n = SPred NumTy (==n)
 
-neg :: VarName -> InputType 'NonList
+neg :: VarName -> InputType 'NonList Int
 neg = DPred NumTy negate
+
+line :: InputType 'NonList String
+line = Base StringTy
+
+baseType :: InputType p q -> BaseType q
+baseType (Base ty) = ty
+baseType (SPred ty _) = ty
+baseType (DPred ty _ _) = ty
+baseType (SListTy ty _) = baseType ty
+baseType (DListTy ty _) = baseType ty
+
+valueConstr :: BaseType p -> p -> Value
+valueConstr NumTy = IntVal
+valueConstr StringTy = Line
+
+listConstr :: BaseType p -> [p] -> Value
+listConstr NumTy = IListVal
+listConstr StringTy = SListVal
 
 data Value
   = IntVal Int
@@ -163,7 +181,7 @@ instance Show Value where
   show (SListVal xs) = show xs
   show (Line xs) = xs
 
-hasType :: Env -> Value -> InputType a -> Bool
+hasType :: Env -> Value -> InputType p q -> Bool
 -- integers
 hasType _ (IntVal _) (Base NumTy) = True
 hasType _ (IntVal i) (SPred NumTy p) = p i
@@ -195,7 +213,7 @@ hasType env (SListVal xs) (DListTy ty tys) =
 -- fallback
 hasType _ _ _ = False
 
-checkSeq :: Env -> [Value] -> [(VarName, InputType a)] -> Bool
+checkSeq :: Env -> [Value] -> [(VarName, InputType p q)] -> Bool
 checkSeq _ [] [] = True
 checkSeq _ _ [] = False
 checkSeq _ [] _ = False
@@ -244,7 +262,12 @@ lengthOf = (Unary, IntVal . length . valueToList)
 count :: (Value -> Bool) -> UnaryOutputType
 count p = (Unary,\v -> IntVal $ length [ IntVal x | x <- valueToList v, p (IntVal x)])
 
-line :: String -> OutputType 'Z
-line xs = (SZ, Line xs)
+string :: String -> OutputType 'Z
+string xs = (SZ, Line xs)
+
+reverseLine :: UnaryOutputType
+reverseLine = (Unary, f) where
+  f (Line xs) = Line $ reverse xs
+  f _ = error "type error in spec"
 
 type Env = [(VarName, Value)]

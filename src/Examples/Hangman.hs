@@ -16,7 +16,7 @@ hangmanSpec word =
   in Choice $ permutationPath <$> perms
 
 permutationPath :: [Int] -> Spec
-permutationPath xs = StepSpecs $ go xs ++ [(Out (line "Correct", []),displayValue)] where
+permutationPath xs = StepSpecs $ go xs ++ [(Out (string "Correct", []),displayValue)] where
   go = map (\x -> (In ("xs", DListTy intTy [("", exact x)]), doNothing))
 
 -- TODO: improve Specs, so that the comments can be used for real

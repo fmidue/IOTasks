@@ -1,5 +1,6 @@
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 module Trace where
 
 import Interaction()
@@ -30,9 +31,9 @@ buildPTrace' [] _ = return End
 buildPTrace' (x:xs) ys =
   case x of
     -- single values
-    (In (name, Base NumTy), OnInput optB optF optA) -> noListHelper name optB optF optA
-    (In (name, (SPred NumTy p)), OnInput optB optF optA) -> noListHelper name optB optF optA
-    (In (name, (DPred NumTy f vname)), OnInput optB optF optA) -> noListHelper name optB optF optA
+    (In (name, Base ty), OnInput optB optF optA) -> noListHelper name optB optF optA ty
+    (In (name, SPred ty _), OnInput optB optF optA) -> noListHelper name optB optF optA ty
+    (In (name, DPred ty _ _), OnInput optB optF optA) -> noListHelper name optB optF optA ty
     -- list values
     (In (name, SListTy _ n), OnInput optB optF optA) -> do
       (Just (IntVal i)) <- gets $ lookup n
@@ -55,16 +56,22 @@ buildPTrace' (x:xs) ys =
       let output = f v1 v2
           action = applyOpt d output
       Step Must action <$> buildPTrace' xs ys
-    -- fallback
+    -- errors
+    (In _, OnOutput _) -> error $ "ill-formed spec!\n" ++ show x
+    (Out _, OnInput{}) -> error $ "ill-formed spec!\n" ++ show x
     _ -> error $ "ill-formed spec!\n" ++ show x
     where
-      noListHelper name optB optF optA = do
-          let i = read . fst $ head ys
+      noListHelper :: VarName -> Opt Matcher -> Opt (Value -> Matcher) -> Opt Matcher -> BaseType p -> State Env ProtoTrace
+      noListHelper name optB optF optA ty = do
+          let i = case ty of
+                NumTy -> read @Int . fst $ head ys
+                StringTy -> fst $ head ys
+              constr = valueConstr ty
               react = case optF of
-                Just (Must, f) -> Step Must (Output . f $ IntVal i)
-                Just (May, f) -> Step May (Output . f $ IntVal i)
+                Just (Must, f) -> Step Must (Output . f $ constr i)
+                Just (May, f) -> Step May (Output . f $ constr i)
                 Nothing -> id
-          modify ((name,IntVal i):)
+          modify ((name,constr i):)
           optOutput optB . Step Must Input . react . optOutput optA <$> buildPTrace' xs (tail ys)
 
       listHelper name optB optF optA i = do
