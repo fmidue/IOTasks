@@ -26,14 +26,11 @@ inputGenerator' spec =
   in evalStateT act []
 
 atomicGenerator :: AtomicSpec -> GenEnvM (Maybe [(Value,Int)])
-atomicGenerator (In (n,Base NumTy)) = do
-  i <- lift intGen
-  let v = IntVal i
-  modify ((n,v):)
-  return $ Just [(v,1)]
-atomicGenerator (In (n,Base StringTy)) = do
-  xs <- lift lineGen
-  let v = Line xs
+atomicGenerator (In (n,Base ty)) = do
+  x <- lift $ case ty of
+    NumTy -> intGen
+    StringTy -> lineGen
+  let v = valueConstr ty x
   modify ((n,v):)
   return $ Just [(v,1)]
 atomicGenerator (In (n,DPred NumTy f name)) = do
