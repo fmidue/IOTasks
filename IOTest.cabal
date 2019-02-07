@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5c6963e6862c72f680632dfa080ee71fed9f446a5eff62e33547887206f15a24
+-- hash: d72694d284272744ea21f9a78f89096ab8fbeb4adf05db6c13ff3120f28f3e09
 
 name:           IOTest
 version:        0.0.1.0
@@ -28,14 +28,12 @@ source-repository head
 
 library
   exposed-modules:
-      Core
       Examples.Hangman
       Examples.Tasks
-      Interaction
       IOtt
+      Matching
       Testing
-      Trace
-      Types
+      Type
   other-modules:
       Paths_IOTest
   hs-source-dirs:
@@ -44,6 +42,9 @@ library
   build-depends:
       QuickCheck >=2.11 && <2.12
     , base >=4.7 && <5
+    , bifunctors
+    , bound
+    , deriving-compat
     , mtl
     , parsec
     , template-haskell
@@ -60,6 +61,9 @@ executable IOTest-exe
       IOTest
     , QuickCheck >=2.11 && <2.12
     , base >=4.7 && <5
+    , bifunctors
+    , bound
+    , deriving-compat
     , mtl
     , parsec
     , template-haskell
@@ -77,6 +81,9 @@ test-suite IOTest-test
       IOTest
     , QuickCheck >=2.11 && <2.12
     , base >=4.7 && <5
+    , bifunctors
+    , bound
+    , deriving-compat
     , hspec
     , hspec-core
     , mtl

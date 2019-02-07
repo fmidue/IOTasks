@@ -1,11 +1,13 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
 module IOtt where
 
 import Prelude hiding (getLine, putStrLn, print)
 
 import Control.Monad ((>=>),ap)
+import Data.Bifunctor.TH
 
 data IOtt' t a where
   ReadLine :: (t -> IOtt' t a) -> IOtt' t a
@@ -39,17 +41,19 @@ maybePrint :: Show a => Maybe a -> IOtt ()
 maybePrint Nothing = return ()
 maybePrint (Just xs) = print xs
 
-type Output = Output' String
+type Trace = Trace' String
 
-data Output' t a
-  = Read (Output' t a)
-  | Write t (Output' t a)
+data Trace' t a
+  = ProgRead t (Trace' t a)
+  | ProgWrite t (Trace' t a)
   | Finish a
   | OutOfInputs
   deriving (Eq, Show)
 
-runtt :: IOtt' t a -> [t] -> Output' t a
+$(deriveBifunctor ''Trace')
+
+runtt :: IOtt' t a -> [t] -> Trace' t a
 runtt (Return a) _ = Finish a
-runtt (ReadLine f) (x:xs) = Read (runtt (f x) xs)
+runtt (ReadLine f) (x:xs) = ProgRead x (runtt (f x) xs)
 runtt (ReadLine _) [] = OutOfInputs
-runtt (WriteLine x p) xs = Write x $ runtt p xs
+runtt (WriteLine x p) xs = ProgWrite x $ runtt p xs

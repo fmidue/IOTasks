@@ -25,6 +25,9 @@ dependencies:
 - mtl
 - QuickCheck >= 2.11 && < 2.12
 - parsec
+- bound
+- deriving-compat
+- bifunctors
 
 library:
   source-dirs: src
