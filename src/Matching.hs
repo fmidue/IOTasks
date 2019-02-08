@@ -1,7 +1,7 @@
 module Matching where
 
 import Type
-import IOtt (Trace'(..))
+import IOtt
 
 import Bound.Scope
 import Data.Either
@@ -13,7 +13,9 @@ matches t s = matches' t (unsugarT s)
 matches' :: Trace' Int () -> Spec VarName -> Either String ()
 matches' (Finish ()) Nop = Right ()
 matches' (ProgRead v t') (Read xs s') =
-  let s'' = instantiateEither (f v xs) s'
+  let s'' = instantiateEither sigma s'
+      sigma (Left ()) = Lit v
+      sigma (Right ys) = if xs == ys then Cons (Lit v) (V xs) else V ys
   in t' `matches'` s''
 matches' (ProgWrite v t') (Write t s') =
   if v /= termVal t
@@ -25,11 +27,6 @@ matches' t (TillT s s') = t `matches'` andThen s (JumpPoint s s')
 matches' t (InternalT (JumpPoint _ s')) = t `matches'` s'
 matches' t (JumpPoint s s') = t `matches'` andThen s (JumpPoint s s')
 matches' t s = Left $ "Got stuck with trace " ++ show t ++ "\nAnd spec " ++ show s
-
--- TODO rename and merge into matches function
-f :: Int -> VarName -> Either () VarName -> Term VarName
-f v _ (Left ()) = Lit v
-f v xs (Right ys) = if xs == ys then Cons (Lit v) (V xs) else V ys
 
 predVal :: Predicate VarName -> Bool
 predVal p = fromMaybe (error "not a predicate") (predVal' p)

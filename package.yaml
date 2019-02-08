@@ -23,11 +23,13 @@ dependencies:
 - base >= 4.7 && < 5
 - template-haskell
 - mtl
-- QuickCheck >= 2.11 && < 2.12
+- QuickCheck
 - parsec
 - bound
 - deriving-compat
 - bifunctors
+- recursion-schemes > 5.1
+- free
 
 library:
   source-dirs: src

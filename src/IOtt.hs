@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -6,8 +7,11 @@ module IOtt where
 
 import Prelude hiding (getLine, putStrLn, print)
 
-import Control.Monad ((>=>),ap)
-import Data.Bifunctor.TH
+import Control.Monad
+import Data.Functor.Foldable
+import Control.Monad.Free
+import qualified Control.Monad.Trans.Free as CMTF
+import Data.Deriving (deriveShow1)
 
 data IOtt' t a where
   ReadLine :: (t -> IOtt' t a) -> IOtt' t a
@@ -41,19 +45,56 @@ maybePrint :: Show a => Maybe a -> IOtt ()
 maybePrint Nothing = return ()
 maybePrint (Just xs) = print xs
 
-type Trace = Trace' String
+type Trace' t a = Fix (TraceF t a)
+data TraceF t a f
+  = ProgReadF t f
+  | ProgWriteF t f
+  | FinishF a
+  | OutOfInputsF
+  deriving (Eq, Show,Functor)
 
-data Trace' t a
-  = ProgRead t (Trace' t a)
-  | ProgWrite t (Trace' t a)
-  | Finish a
-  | OutOfInputs
-  deriving (Eq, Show)
+changeCarrier :: (t -> t') -> Trace' t a -> Trace' t' a
+changeCarrier f = cata phi where
+  phi (FinishF a) = Finish a
+  phi (ProgReadF t x) = ProgRead (f t) x
+  phi (ProgWriteF t x) = ProgWrite (f t) x
+  phi OutOfInputsF = OutOfInputs
 
-$(deriveBifunctor ''Trace')
+pattern ProgRead :: t -> Fix (TraceF t a) -> Fix (TraceF t a)
+pattern ProgRead t p = Fix (ProgReadF t p)
+pattern ProgWrite :: t -> Fix (TraceF t a) -> Fix (TraceF t a)
+pattern ProgWrite t p = Fix (ProgWriteF t p)
+pattern Finish :: a -> Fix (TraceF t a)
+pattern Finish a = Fix (FinishF a)
+pattern OutOfInputs :: Fix (TraceF t a)
+pattern OutOfInputs = Fix OutOfInputsF
+
+$(deriveShow1 ''TraceF)
+
+type PartialTrace t a = Free (TraceF t a) (IOtt' t a)
+
+-- build the trace for the given input and program as far as possible
+stepTrace :: t -> IOtt' t a -> PartialTrace t a
+stepTrace t prog =
+  expandTillRead prog >>= stepWith t >>= expandTillRead
+  where
+    stepWith :: t -> IOtt' t a -> PartialTrace t a
+    stepWith x (ReadLine f) = Free $ ProgReadF x $ Pure (f x)
+    stepWith _ _ = error "impossible"
+
+expandTillRead :: IOtt' t a -> PartialTrace t a
+expandTillRead (ReadLine f) = Pure $ ReadLine f
+expandTillRead (WriteLine x p) = Free $ ProgWriteF x $ expandTillRead p
+expandTillRead (Return a) = Free $ FinishF a
 
 runtt :: IOtt' t a -> [t] -> Trace' t a
-runtt (Return a) _ = Finish a
-runtt (ReadLine f) (x:xs) = ProgRead x (runtt (f x) xs)
-runtt (ReadLine _) [] = OutOfInputs
-runtt (WriteLine x p) xs = ProgWrite x $ runtt p xs
+runtt prog ts =
+  let steps = stepTrace <$> ts
+      partial = foldM (\p step -> step p) prog steps
+  in fromPartial partial
+
+fromPartial :: PartialTrace t a -> Trace' t a
+fromPartial = hoist f where
+  f :: CMTF.FreeF (TraceF t a) (IOtt' t a) a1 -> TraceF t a a1
+  f (CMTF.Pure _) = OutOfInputsF -- if there is a program fragment left the inputs were not enough
+  f (CMTF.Free fb) = fb

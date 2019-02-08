@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d72694d284272744ea21f9a78f89096ab8fbeb4adf05db6c13ff3120f28f3e09
+-- hash: 8378afb44ed294a287fecaccd6ffbc1415063902958e0f8cbfd9face0c0c6a49
 
 name:           IOTest
 version:        0.0.1.0
@@ -40,13 +40,15 @@ library
       src
   ghc-options: -Wall
   build-depends:
-      QuickCheck >=2.11 && <2.12
+      QuickCheck
     , base >=4.7 && <5
     , bifunctors
     , bound
     , deriving-compat
+    , free
     , mtl
     , parsec
+    , recursion-schemes >5.1
     , template-haskell
   default-language: Haskell2010
 
@@ -59,13 +61,15 @@ executable IOTest-exe
   ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       IOTest
-    , QuickCheck >=2.11 && <2.12
+    , QuickCheck
     , base >=4.7 && <5
     , bifunctors
     , bound
     , deriving-compat
+    , free
     , mtl
     , parsec
+    , recursion-schemes >5.1
     , template-haskell
   default-language: Haskell2010
 
@@ -79,14 +83,16 @@ test-suite IOTest-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       IOTest
-    , QuickCheck >=2.11 && <2.12
+    , QuickCheck
     , base >=4.7 && <5
     , bifunctors
     , bound
     , deriving-compat
+    , free
     , hspec
     , hspec-core
     , mtl
     , parsec
+    , recursion-schemes >5.1
     , template-haskell
   default-language: Haskell2010
