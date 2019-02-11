@@ -18,6 +18,9 @@ data IOtt' t a where
   WriteLine :: t -> IOtt' t a -> IOtt' t a
   Return :: a -> IOtt' t a
 
+instance Show (IOtt' t a) where
+  show _ = "TODO: implement Show (IOtt' t a)"
+
 deriving instance Functor (IOtt' t)
 
 instance Applicative (IOtt' t) where
@@ -53,25 +56,32 @@ data TraceF t a f
   | OutOfInputsF
   deriving (Eq, Show,Functor)
 
-changeCarrier :: (t -> t') -> Trace' t a -> Trace' t' a
+type PartialTrace t a = Free (TraceF t a) (IOtt' t a)
+
+changeCarrier :: (Recursive f, Base f ~ TraceF t a) => (t -> t') -> f -> Trace' t' a
 changeCarrier f = cata phi where
   phi (FinishF a) = Finish a
   phi (ProgReadF t x) = ProgRead (f t) x
   phi (ProgWriteF t x) = ProgWrite (f t) x
   phi OutOfInputsF = OutOfInputs
 
-pattern ProgRead :: t -> Fix (TraceF t a) -> Fix (TraceF t a)
+pattern ProgRead :: t -> Trace' t a -> Trace' t a
+pattern ProgWrite :: t -> Trace' t a -> Trace' t a
+pattern Finish :: a -> Trace' t a
+pattern OutOfInputs :: Trace' t a
 pattern ProgRead t p = Fix (ProgReadF t p)
-pattern ProgWrite :: t -> Fix (TraceF t a) -> Fix (TraceF t a)
 pattern ProgWrite t p = Fix (ProgWriteF t p)
-pattern Finish :: a -> Fix (TraceF t a)
 pattern Finish a = Fix (FinishF a)
-pattern OutOfInputs :: Fix (TraceF t a)
 pattern OutOfInputs = Fix OutOfInputsF
 
-$(deriveShow1 ''TraceF)
-
-type PartialTrace t a = Free (TraceF t a) (IOtt' t a)
+pattern ProgRead' :: t -> PartialTrace t a -> PartialTrace t a
+pattern ProgWrite' :: t -> PartialTrace t a -> PartialTrace t a
+pattern Finish' :: a -> PartialTrace t a
+pattern OutOfInputs' :: PartialTrace t a
+pattern ProgRead' t p = Free (ProgReadF t p)
+pattern ProgWrite' t p = Free (ProgWriteF t p)
+pattern Finish' a = Free (FinishF a)
+pattern OutOfInputs' = Free OutOfInputsF
 
 -- build the trace for the given input and program as far as possible
 stepTrace :: t -> IOtt' t a -> PartialTrace t a
@@ -98,3 +108,5 @@ fromPartial = hoist f where
   f :: CMTF.FreeF (TraceF t a) (IOtt' t a) a1 -> TraceF t a a1
   f (CMTF.Pure _) = OutOfInputsF -- if there is a program fragment left the inputs were not enough
   f (CMTF.Free fb) = fb
+
+$(deriveShow1 ''TraceF)

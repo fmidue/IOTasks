@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.31.0.
+-- This file has been generated from package.yaml by hpack version 0.31.1.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8378afb44ed294a287fecaccd6ffbc1415063902958e0f8cbfd9face0c0c6a49
+-- hash: 6690caf725f6cd7ad9d800f6cd575dd79bf7f44d7f3806bbc7d00de2b11d665b
 
 name:           IOTest
 version:        0.0.1.0
@@ -50,6 +50,7 @@ library
     , parsec
     , recursion-schemes >5.1
     , template-haskell
+    , transformers
   default-language: Haskell2010
 
 executable IOTest-exe
@@ -71,6 +72,7 @@ executable IOTest-exe
     , parsec
     , recursion-schemes >5.1
     , template-haskell
+    , transformers
   default-language: Haskell2010
 
 test-suite IOTest-test
@@ -91,8 +93,10 @@ test-suite IOTest-test
     , free
     , hspec
     , hspec-core
+    , hspec-expectations
     , mtl
     , parsec
     , recursion-schemes >5.1
     , template-haskell
+    , transformers
   default-language: Haskell2010

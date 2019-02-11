@@ -30,6 +30,7 @@ dependencies:
 - bifunctors
 - recursion-schemes > 5.1
 - free
+- transformers
 
 library:
   source-dirs: src
@@ -60,3 +61,4 @@ tests:
     - IOTest
     - hspec
     - hspec-core
+    - hspec-expectations

@@ -6,27 +6,61 @@ import IOtt
 import Bound.Scope
 import Data.Either
 import Data.Maybe
+import Control.Monad.Free
+import Control.Monad.Trans.Writer
+import Control.Monad.Trans.Class (lift)
+import Test.QuickCheck
 
-matches :: Trace' Int () -> Spec VarName -> Either String ()
-matches t s = matches' t (unsugarT s)
+-- matching against full Traces
+matchesFull :: Trace' Int () -> Spec VarName -> Either String ()
+matchesFull t s = matchesFull' t (unsugarT s)
 
-matches' :: Trace' Int () -> Spec VarName -> Either String ()
-matches' (Finish ()) Nop = Right ()
-matches' (ProgRead v t') (Read xs s') =
+matchesFull' :: Trace' Int () -> Spec VarName -> Either String ()
+matchesFull' (Finish ()) Nop = Right ()
+matchesFull' (ProgRead v t') (Read xs s') =
   let s'' = instantiateEither sigma s'
       sigma (Left ()) = Lit v
       sigma (Right ys) = if xs == ys then Cons (Lit v) (V xs) else V ys
-  in t' `matches'` s''
-matches' (ProgWrite v t') (Write t s') =
+  in t' `matchesFull'` s''
+matchesFull' (ProgWrite v t') (Write t s') =
   if v /= termVal t
     then Left ("Equaltiy test failed " ++ show v ++ " =/= " ++ show t)
-    else t' `matches'` s'
-matches' t (Choice s11 s12 s2) = either (\_msg -> t `matches'` andThen s12 s2) Right (t `matches'` andThen s11 s2)
-matches' t (CondChoice p s11 s12 s2) = if predVal p then t `matches'` andThen s12 s2 else t `matches'` andThen s11 s2
-matches' t (TillT s s') = t `matches'` andThen s (JumpPoint s s')
-matches' t (InternalT (JumpPoint _ s')) = t `matches'` s'
-matches' t (JumpPoint s s') = t `matches'` andThen s (JumpPoint s s')
-matches' t s = Left $ "Got stuck with trace " ++ show t ++ "\nAnd spec " ++ show s
+    else t' `matchesFull'` s'
+matchesFull' t (Choice s11 s12 s2) = either (\_msg -> t `matchesFull'` andThen s12 s2) Right (t `matchesFull'` andThen s11 s2)
+matchesFull' t (CondChoice p s11 s12 s2) = if predVal p then t `matchesFull'` andThen s12 s2 else t `matchesFull'` andThen s11 s2
+matchesFull' t (TillT s s') = t `matchesFull'` andThen s (JumpPoint s s')
+matchesFull' t (InternalT (JumpPoint _ s')) = t `matchesFull'` s'
+matchesFull' t (JumpPoint s s') = t `matchesFull'` andThen s (JumpPoint s s')
+matchesFull' t s = Left $ "Got stuck with trace " ++ show t ++ "\nAnd spec " ++ show s
+
+type MatchM = WriterT [Int] IO (Either String ())
+
+-- matching against partial traces with on demand extension
+matchesPartial :: Gen Int -> PartialTrace String () -> Spec VarName -> MatchM
+matchesPartial gen partial spec = matchesPartial' partial (unsugarT spec)
+  where
+  matchesPartial' :: PartialTrace String () -> Spec VarName -> MatchM
+  matchesPartial' (Finish' ()) Nop = return $ Right ()
+  matchesPartial' (Pure frag) s = do
+    t <- lift $ generate gen
+    let trace = stepTrace (show t) frag
+    tell [t] -- record generated value for feedback
+    matchesPartial' trace s
+  matchesPartial' (ProgRead' v t') (Read xs s') =
+    let s'' = instantiateEither sigma s'
+        sigma (Left ()) = Lit (read v)
+        sigma (Right ys) = if xs == ys then Cons (Lit $ read v) (V xs) else V ys
+    in t' `matchesPartial'` s''
+  matchesPartial' (ProgWrite' v t') (Write t s') =
+    if read v /= termVal t
+      then return $ Left ("Equaltiy test failed " ++ v ++ " =/= " ++ show t ++ " == " ++ show (termVal t))
+      else t' `matchesPartial'` s'
+  matchesPartial' t (Choice s11 s12 s2) = (t `matchesPartial'` andThen s11 s2) >>= either (\_msg -> t `matchesPartial'` andThen s12 s2) (return . Right)
+  matchesPartial' t (CondChoice p s11 s12 s2) = if predVal p then t `matchesPartial'` andThen s12 s2 else t `matchesPartial'` andThen s11 s2
+  matchesPartial' t (TillT s s') = t `matchesPartial'` andThen s (JumpPoint s s')
+  matchesPartial' t (InternalT (JumpPoint _ s')) = t `matchesPartial'` s'
+  matchesPartial' t (JumpPoint s s') = t `matchesPartial'` andThen s (JumpPoint s s')
+  matchesPartial' t s = return $ Left $ "Got stuck with trace " ++ show t ++ "\nAnd spec " ++ show s
 
 predVal :: Predicate VarName -> Bool
 predVal p = fromMaybe (error "not a predicate") (predVal' p)
