@@ -22,12 +22,20 @@ type GlobalV = Everything
 
 type VarName = String
 
+data NumType = IntTy | NatTy | Positive | Negative | Zero deriving (Eq,Ord,Read,Show)
+matchesType :: NumType -> Int -> Bool
+matchesType IntTy = const True
+matchesType NatTy = (>= 0)
+matchesType Positive = (> 0)
+matchesType Negative = (< 0)
+matchesType Zero = (== 0)
+
 data Everything a
   -- Variables
   = V a
   -- Spec
   -- first parameter is the name of the global accumulator
-  | Read VarName (Scope () Everything a)
+  | Read VarName NumType (Scope () Everything a)
   | Write (Term a) (Spec a)
   | TillT (Spec a) (Spec a)
   | Choice (Spec a) (Spec a) (Spec a)
@@ -55,8 +63,8 @@ data Everything a
   | Less (Term a) (Term a)
   deriving (Functor, Foldable, Traversable)
 
-readInput :: VarName -> VarName -> Spec VarName -> Spec VarName
-readInput x xs s' = Read xs $ abstract1 x s'
+readInput :: VarName -> NumType -> VarName -> Spec VarName -> Spec VarName
+readInput x ty xs s' = Read xs ty $ abstract1 x s'
 
 writeOutput :: Term a -> Spec a -> Spec a
 writeOutput = Write
@@ -65,9 +73,9 @@ tillT :: Spec a -> Spec a -> Spec a
 tillT = TillT
 
 andThen :: Spec a -> Spec a -> Spec a
-andThen (Read s1 s2) s' =
+andThen (Read xs ty s2) s' =
   let s2' = toScope (fromScope s2 `andThen` (F <$> s'))
-  in Read s1 s2'
+  in Read xs ty s2'
 andThen (Write s1 s2) s' = Write s1 $ s2 `andThen` s'
 andThen (TillT s1 s2) s' = TillT s1 $ s2 `andThen` s'
 andThen (Choice s11 s12 s2) s' = Choice s11 s12 $ s2 `andThen` s'
@@ -80,9 +88,9 @@ andThen _ _ = error "Not a spec"
 
 unsugarT :: Spec a -> Spec a
 unsugarT T = InternalT Nop
-unsugarT (Read s1 s2) =
+unsugarT (Read xs ty s2) =
   let s2' = toScope $ unsugarT $ fromScope s2
-  in Read s1 s2'
+  in Read xs ty s2'
 unsugarT (Write t s2) = Write t $ unsugarT s2
 unsugarT (TillT s s') = TillT (unsugarT s) (unsugarT s')
 unsugarT (Choice s1 s2 s3) = Choice (unsugarT s1) (unsugarT s2) (unsugarT s3)
@@ -102,7 +110,7 @@ instance Monad Everything where
   InternalT s >>= f = InternalT (s >>= f)
   Nop >>= _ = Nop
   Write t s >>= f = Write (t >>= f) (s >>= f)
-  Read acc s >>= f = Read acc (s >>>= f)
+  Read acc ty s >>= f = Read acc ty (s >>>= f)
   Choice s11 s12 s2 >>= f = Choice (s11 >>= f) (s12 >>= f) (s2 >>= f)
   CondChoice p s11 s12 s2 >>= f = CondChoice (p >>= f) (s11 >>= f) (s12 >>= f) (s2 >>= f)
   TillT s s' >>= f = TillT (s >>= f) (s' >>= f)

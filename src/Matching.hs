@@ -17,7 +17,7 @@ matchesFull t s = matchesFull' t (unsugarT s)
 
 matchesFull' :: Trace' Int () -> Spec VarName -> Either String ()
 matchesFull' (Finish ()) Nop = Right ()
-matchesFull' (ProgRead v t') (Read xs s') =
+matchesFull' (ProgRead v t') (Read xs _ s') = -- for a full match the type information should be used during input generation
   let s'' = instantiateEither sigma s'
       sigma (Left ()) = Lit v
       sigma (Right ys) = if xs == ys then Cons (Lit v) (V xs) else V ys
@@ -41,12 +41,12 @@ matchesPartial gen partial spec = matchesPartial' partial (unsugarT spec)
   where
   matchesPartial' :: PartialTrace String () -> Spec VarName -> MatchM
   matchesPartial' (Finish' ()) Nop = return $ Right ()
-  matchesPartial' (Pure frag) s = do
-    t <- lift $ generate gen
+  matchesPartial' (Pure frag) s@(Read _ ty _) = do -- TODO: check whether s always has to be a Read and if it is a problem if it is not
+    t <- lift $ generate $ gen `suchThat` matchesType ty
     let trace = stepTrace (show t) frag
     tell [t] -- record generated value for feedback
     matchesPartial' trace s
-  matchesPartial' (ProgRead' v t') (Read xs s') =
+  matchesPartial' (ProgRead' v t') (Read xs _ s') =
     let s'' = instantiateEither sigma s'
         sigma (Left ()) = Lit (read v)
         sigma (Right ys) = if xs == ys then Cons (Lit $ read v) (V xs) else V ys
