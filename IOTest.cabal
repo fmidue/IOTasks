@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 6690caf725f6cd7ad9d800f6cd575dd79bf7f44d7f3806bbc7d00de2b11d665b
+-- hash: f7fe84525eab9fc441a8f6096265480c4c291552e073292f36f97bdfc2308551
 
 name:           IOTest
 version:        0.0.1.0
@@ -31,8 +31,9 @@ library
       Examples.Hangman
       Examples.Tasks
       IOtt
-      Matching
       Testing
+      Trace
+      TraceSet
       Type
   other-modules:
       Paths_IOTest
@@ -42,15 +43,11 @@ library
   build-depends:
       QuickCheck
     , base >=4.7 && <5
-    , bifunctors
     , bound
     , deriving-compat
-    , free
     , mtl
     , parsec
-    , recursion-schemes >5.1
     , template-haskell
-    , transformers
   default-language: Haskell2010
 
 executable IOTest-exe
@@ -64,15 +61,11 @@ executable IOTest-exe
       IOTest
     , QuickCheck
     , base >=4.7 && <5
-    , bifunctors
     , bound
     , deriving-compat
-    , free
     , mtl
     , parsec
-    , recursion-schemes >5.1
     , template-haskell
-    , transformers
   default-language: Haskell2010
 
 test-suite IOTest-test
@@ -87,16 +80,12 @@ test-suite IOTest-test
       IOTest
     , QuickCheck
     , base >=4.7 && <5
-    , bifunctors
     , bound
     , deriving-compat
-    , free
     , hspec
     , hspec-core
     , hspec-expectations
     , mtl
     , parsec
-    , recursion-schemes >5.1
     , template-haskell
-    , transformers
   default-language: Haskell2010

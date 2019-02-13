@@ -27,10 +27,6 @@ dependencies:
 - parsec
 - bound
 - deriving-compat
-- bifunctors
-- recursion-schemes > 5.1
-- free
-- transformers
 
 library:
   source-dirs: src

@@ -18,7 +18,7 @@ task1 :: Spec VarName
 task1 =
   readInput "n" NatTy "" $
   readFixedLengthList "n" IntTy "xs" $
-  writeOutput (Sum (V "xs"))
+  writeOutput [Sum (V "xs")]
   Nop
 
 solution1 :: IOtt ()
@@ -39,14 +39,15 @@ wrongSolution1 = do
   replicateM_ n $ read @Int <$> getLine
   putStrLn "17"
   --putStrLn "Result: 17"
---
---
+
+-- dList :: VarName -> [NumType] -> Specification -> Specification
+-- dList xs tys = TillT (match tys) where
+--   match [] = T
+--   match (t:ts) = Choice (readInput "<x>" t xs $ match ts) (readInput "<x>" (Not t) xs Nop) Nop
+
 -- -- read till last two numbers sum to 0 than count positive numbers divisible by 3
--- task2 :: Spec
--- task2 = StepSpecs
---   [ (In ("xs", DListTy intTy [("x",intTy),("y",neg "x")]), doNothing)
---   , (Out (count (\(IntVal x) ->  x > 0 && x `mod` 3 == 0), ["xs"]), displayValue)
---   ]
+-- task2 :: Specification
+-- task2 = _
 --
 -- solution2 :: IOtt ()
 -- solution2 = go [] Nothing Nothing where
@@ -57,14 +58,19 @@ wrongSolution1 = do
 --       else do
 --         n <- read @Int <$> getLine
 --         go (n:ns) (Just n) mX
---
+
 -- read till zero then sum
 task3 :: Specification
 task3 =
   tillT (
     readInput "x" IntTy "xs" $
-    CondChoice (V "x" `Eq` Lit 0) Nop (writeOutput (Sum $ V "xs") T) Nop
+    CondChoice (V "x" `Eq` Lit 0) Nop (writeOutput [Sum $ V "xs"] T) Nop
   ) Nop
+
+-- task3' :: Specification
+-- task3' =
+--   dList "xs" [Zero] $
+--   writeOutput [Sum $ V "xs"] Nop
 
 solution3 :: IOtt ()
 solution3 = go [] where
