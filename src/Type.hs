@@ -39,8 +39,7 @@ data Everything a
   | Read VarName NumType (Scope () Everything a)
   | Write [Term a] (Spec a)
   | TillT (Spec a) (Spec a)
-  | Choice (Spec a) (Spec a) (Spec a)
-  | CondChoice (Predicate a) (Spec a) (Spec a) (Spec a)
+  | Branch (Predicate a) (Spec a) (Spec a) (Spec a)
   | T
   | InternalT (Spec a)
   | Nop
@@ -79,8 +78,7 @@ andThen (Read xs ty s2) s' =
   in Read xs ty s2'
 andThen (Write s1 s2) s' = Write s1 $ s2 `andThen` s'
 andThen (TillT s1 s2) s' = TillT s1 $ s2 `andThen` s'
-andThen (Choice s11 s12 s2) s' = Choice s11 s12 $ s2 `andThen` s'
-andThen (CondChoice p s11 s12 s2) s' = CondChoice p s11 s12 $ s2 `andThen` s'
+andThen (Branch p s11 s12 s2) s' = Branch p s11 s12 $ s2 `andThen` s'
 andThen T _ = T
 andThen (InternalT s) s' = InternalT $ s `andThen` s'
 andThen Nop s' = s'
@@ -94,8 +92,7 @@ unsugarT (Read xs ty s2) =
   in Read xs ty s2'
 unsugarT (Write t s2) = Write t $ unsugarT s2
 unsugarT (TillT s s') = TillT (unsugarT s) (unsugarT s')
-unsugarT (Choice s1 s2 s3) = Choice (unsugarT s1) (unsugarT s2) (unsugarT s3)
-unsugarT (CondChoice p s1 s2 s3) = CondChoice p (unsugarT s1) (unsugarT s2) (unsugarT s3)
+unsugarT (Branch p s1 s2 s3) = Branch p (unsugarT s1) (unsugarT s2) (unsugarT s3)
 unsugarT (InternalT s) = InternalT $ unsugarT s
 unsugarT Nop = Nop
 unsugarT (JumpPoint s1 s2) = JumpPoint (unsugarT s1) (unsugarT s2)
@@ -112,8 +109,7 @@ instance Monad Everything where
   Nop >>= _ = Nop
   Write t s >>= f = Write ((>>= f) <$> t) (s >>= f)
   Read acc ty s >>= f = Read acc ty (s >>>= f)
-  Choice s11 s12 s2 >>= f = Choice (s11 >>= f) (s12 >>= f) (s2 >>= f)
-  CondChoice p s11 s12 s2 >>= f = CondChoice (p >>= f) (s11 >>= f) (s12 >>= f) (s2 >>= f)
+  Branch p s11 s12 s2 >>= f = Branch (p >>= f) (s11 >>= f) (s12 >>= f) (s2 >>= f)
   TillT s s' >>= f = TillT (s >>= f) (s' >>= f)
   JumpPoint s s' >>= f = JumpPoint (s >>= f) (s' >>= f)
   -- Terms

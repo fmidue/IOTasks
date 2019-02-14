@@ -11,7 +11,7 @@ import Control.Monad (replicateM,replicateM_)
 type Specification = Spec VarName
 
 readFixedLengthList :: VarName -> NumType -> VarName -> Specification -> Specification
-readFixedLengthList n ty xs = tillT $ CondChoice (Eq (Len $ V xs) (V n)) (readInput "<doNotGuessThis>" ty xs Nop) T Nop
+readFixedLengthList n ty xs = tillT $ Branch (Eq (Len $ V xs) (V n)) (readInput "<doNotGuessThis>" ty xs Nop) T Nop
 
 -- read natural number n, then read n integers and sum them
 task1 :: Spec VarName
@@ -64,7 +64,7 @@ task3 :: Specification
 task3 =
   tillT (
     readInput "x" IntTy "xs" $
-    CondChoice (V "x" `Eq` Lit 0) Nop (writeOutput [Sum $ V "xs"] T) Nop
+    Branch (V "x" `Eq` Lit 0) Nop (writeOutput [Sum $ V "xs"] T) Nop
   ) Nop
 
 -- task3' :: Specification

@@ -25,7 +25,7 @@ traceGen' spec = sized $ \size ->
       t' <- traceGen' s'
       return $ ProgWrite (termVal <$> v) t'
     (TillT s s') -> traceGen' (andThen s (JumpPoint s s'))
-    (CondChoice p s11 s12 s2) ->
+    (Branch p s11 s12 s2) ->
       if predVal p
         then traceGen' $ andThen s12 s2
         else traceGen' $ andThen s11 s2
