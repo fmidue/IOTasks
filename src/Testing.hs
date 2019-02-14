@@ -8,6 +8,7 @@ import TraceSet
 import Control.Arrow
 
 import Test.QuickCheck
+import           Data.Maybe
 
 (...) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
 (...) = (.) . (.)
@@ -21,5 +22,8 @@ specProperty spec program =
       prop t = testTrace ((id &&& inputs) t) program
   in forAll gen prop
 
-testTrace :: (Trace, [Int]) -> IOtt () -> Bool
-testTrace (t,i) p = runProgram (show <$> i) p `lessGeneralThan` (show <$> t)
+testTrace :: (Trace, [Int]) -> IOtt () -> Property
+testTrace (t,i) p =
+  let result = runProgram (show <$> i) p `lessGeneralThan'` (show <$> t)
+      msg = fromMaybe "" result
+  in counterexample msg (isNothing result)

@@ -2,6 +2,7 @@
 module Trace where
 
 import Data.List
+import           Data.Maybe
 
 data Trace' a
   = ProgRead a (Trace' a)
@@ -18,11 +19,23 @@ instance Show a => Show (Trace' a) where
   show Stop = "stop"
   show OutOfInputs = "<out of inputs>"
 
-lessGeneralThan :: Eq a => Trace' a -> Trace' a -> Bool
-ProgRead v1 t1 `lessGeneralThan` ProgRead v2 t2 = v1 == v2 && t1 `lessGeneralThan` t2
-ProgWrite v1 t1 `lessGeneralThan` ProgWrite v2 t2 = (v1 `union` v2) == v2  && t1 `lessGeneralThan` t2
-Stop `lessGeneralThan` Stop = True
-_ `lessGeneralThan` _ = False
+lessGeneralThan :: (Show a, Eq a) => Trace' a -> Trace' a -> Bool
+lessGeneralThan t t' = isNothing $ lessGeneralThan' t t'
+
+lessGeneralThan' :: (Show a, Eq a) => Trace' a -> Trace' a -> Maybe String
+ProgRead v1 t1 `lessGeneralThan'` ProgRead v2 t2 =
+  if v1 == v2 then t1 `lessGeneralThan'` t2 else Just "Traces don't line up"
+ProgWrite v1 t1 `lessGeneralThan'` ProgWrite v2 t2 =
+  if (v1 `union` v2) == v2
+    then t1 `lessGeneralThan'` t2
+    else Just $ ppOutputMismatch v1 v2
+Stop `lessGeneralThan'` Stop = Nothing
+_ `lessGeneralThan'` _ = Just "Traces don't line up"
+
+ppOutputMismatch :: Show a => [a] -> [a] -> String
+ppOutputMismatch [v1] [v2] = "Output mismatch: Expected " ++ show v2 ++ ". But got " ++ show v1
+ppOutputMismatch [v1] v2 = "Output mismatch: Expected one of " ++ show v2 ++ ". But got " ++ show v1
+ppOutputMismatch v1 v2 = "Output mismatch: Expected subset of " ++ show v2 ++ ". But got " ++ show v1
 
 inputs :: Trace' a -> [a]
 inputs (ProgRead v t) = v : inputs t
