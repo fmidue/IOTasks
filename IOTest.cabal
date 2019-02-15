@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f7fe84525eab9fc441a8f6096265480c4c291552e073292f36f97bdfc2308551
+-- hash: a1e07437f06c7dea3b07f930f75b0e61ef64af6a9ba256127abb53a2d1f520c4
 
 name:           IOTest
 version:        0.0.1.0
@@ -45,9 +45,6 @@ library
     , base >=4.7 && <5
     , bound
     , deriving-compat
-    , mtl
-    , parsec
-    , template-haskell
   default-language: Haskell2010
 
 executable IOTest-exe
@@ -63,9 +60,6 @@ executable IOTest-exe
     , base >=4.7 && <5
     , bound
     , deriving-compat
-    , mtl
-    , parsec
-    , template-haskell
   default-language: Haskell2010
 
 test-suite IOTest-test
@@ -83,9 +77,4 @@ test-suite IOTest-test
     , bound
     , deriving-compat
     , hspec
-    , hspec-core
-    , hspec-expectations
-    , mtl
-    , parsec
-    , template-haskell
   default-language: Haskell2010

@@ -21,10 +21,7 @@ description:         Please see the README on GitHub at <https://github.com/owes
 
 dependencies:
 - base >= 4.7 && < 5
-- template-haskell
-- mtl
 - QuickCheck
-- parsec
 - bound
 - deriving-compat
 
@@ -56,5 +53,3 @@ tests:
     dependencies:
     - IOTest
     - hspec
-    - hspec-core
-    - hspec-expectations
