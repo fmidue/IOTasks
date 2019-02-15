@@ -1,7 +1,7 @@
 module Testing where
 
 import IOtt (IOtt, runProgram)
-import Type
+import Language
 import Trace
 import TraceSet
 
@@ -13,10 +13,10 @@ import           Data.Maybe
 (...) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
 (...) = (.) . (.)
 
-test :: IOtt () -> Spec VarName -> IO ()
+test :: IOtt () -> Specification -> IO ()
 test = quickCheck ... flip specProperty
 
-specProperty :: Spec VarName -> IOtt () -> Property
+specProperty :: Specification -> IOtt () -> Property
 specProperty spec program =
   let gen = traceGen spec
       prop t = testTrace ((id &&& inputs) t) program

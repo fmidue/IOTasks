@@ -4,22 +4,19 @@ module Examples.Tasks where
 import Prelude hiding (putStrLn, getLine, print)
 
 import IOtt
-import Type
+import Language
 
 import Control.Monad (replicateM,replicateM_)
 
-type Specification = Spec VarName
-
-readFixedLengthList :: VarName -> NumType -> VarName -> Specification -> Specification
-readFixedLengthList n ty xs = tillT $ Branch (Eq (Len $ V xs) (V n)) (readInput "<doNotGuessThis>" ty xs Nop) T Nop
+readFixedLengthList :: VarName -> NumType -> VarName -> Specification
+readFixedLengthList n ty xs = TillT $ Branch (MixedP (\ys m -> length ys == m) (xs,n)) (ReadInput "<doNotGuessThis>" ty xs) T
 
 -- read natural number n, then read n integers and sum them
-task1 :: Spec VarName
+task1 :: Specification
 task1 =
-  readInput "n" NatTy "" $
-  readFixedLengthList "n" IntTy "xs" $
-  writeOutput [Sum (V "xs")]
-  Nop
+  ReadInput "n" NatTy "" <>
+  readFixedLengthList "n" IntTy "xs" <>
+  WriteOutput [UListF sum "xs"]
 
 solution1 :: IOtt ()
 solution1 = do
@@ -40,37 +37,41 @@ wrongSolution1 = do
   putStrLn "17"
   --putStrLn "Result: 17"
 
--- dList :: VarName -> [NumType] -> Specification -> Specification
--- dList xs tys = TillT (match tys) where
---   match [] = T
---   match (t:ts) = Choice (readInput "<x>" t xs $ match ts) (readInput "<x>" (Not t) xs Nop) Nop
+dList :: VarName -> ([Int] -> Bool) -> Specification
+dList xs p =
+  TillT $
+    ReadInput "x" IntTy xs <>
+    Branch (UListP p xs)
+      Nop
+      T
 
--- -- read till last two numbers sum to 0 than count positive numbers divisible by 3
--- task2 :: Specification
--- task2 = _
---
--- solution2 :: IOtt ()
--- solution2 = go [] Nothing Nothing where
---   go ns mX mY =
---     if ((+) <$> mX <*> mY) == Just 0
---       then
---         print $ length [ x | x <- ns, x > 0, x `mod` 3 == 0 ]
---       else do
---         n <- read @Int <$> getLine
---         go (n:ns) (Just n) mX
+-- read till last two numbers sum to 0 than count positive numbers divisible by 3
+task2 :: Specification
+task2 =
+  dList "xs" (\xs -> length xs > 1 && last xs + last (init xs) == 0) <>
+  WriteOutput [UListF (\xs -> length [ x | x <- xs, x > 0, x `mod` 3 == 0]) "xs"]
+
+solution2 :: IOtt ()
+solution2 = go [] Nothing Nothing where
+  go ns mX mY =
+    if ((+) <$> mX <*> mY) == Just 0
+      then
+        print $ length [ x | x <- ns, x > 0, x `mod` 3 == 0 ]
+      else do
+        n <- read @Int <$> getLine
+        go (n:ns) (Just n) mX
 
 -- read till zero then sum
 task3 :: Specification
 task3 =
-  tillT (
-    readInput "x" IntTy "xs" $
-    Branch (V "x" `Eq` Lit 0) Nop (writeOutput [Sum $ V "xs"] T) Nop
-  ) Nop
+  TillT $
+    ReadInput "x" IntTy "xs" <>
+    Branch (UIntP (0 ==) "x") Nop (WriteOutput [UListF sum "xs"] <> T)
 
--- task3' :: Specification
--- task3' =
---   dList "xs" [Zero] $
---   writeOutput [Sum $ V "xs"] Nop
+task3' :: Specification
+task3' =
+  dList "xs" (\xs -> last xs == 0) <>
+  WriteOutput [UListF sum "xs"]
 
 solution3 :: IOtt ()
 solution3 = go [] where

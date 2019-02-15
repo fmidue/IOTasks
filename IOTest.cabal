@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a1e07437f06c7dea3b07f930f75b0e61ef64af6a9ba256127abb53a2d1f520c4
+-- hash: 964815dacf24db1bf443abafcc27d4a5a7ee0260a721c80082c19a3329c41564
 
 name:           IOTest
 version:        0.0.1.0
@@ -31,6 +31,7 @@ library
       Examples.Hangman
       Examples.Tasks
       IOtt
+      Language
       Testing
       Trace
       TraceSet
