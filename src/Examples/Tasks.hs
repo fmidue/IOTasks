@@ -9,12 +9,23 @@ import Language
 import Control.Monad (replicateM,replicateM_)
 
 readFixedLengthList :: VarName -> NumType -> VarName -> Specification
-readFixedLengthList n ty xs = TillT $ Branch (MixedP (\ys m -> length ys == m) (xs,n)) (ReadInput "<doNotGuessThis>" ty xs) T
+readFixedLengthList n ty xs =
+  TillT $
+    ReadInput "<doNotGuessThis>" ty xs <>
+    Branch (MixedP (\ys m -> length ys == m) (xs,n)) Nop T
 
 -- read natural number n, then read n integers and sum them
 task1 :: Specification
 task1 =
-  ReadInput "n" NatTy "" <>
+  ReadInput "n" Positive "" <> -- Positive should be Nat, but that does not work with readFixedLengthList since at least one read is performed
+  readFixedLengthList "n" IntTy "xs" <>
+  WriteOutput [UListF sum "xs"]
+
+-- optional output of the first number read
+task1' :: Specification
+task1' =
+  ReadInput "n" Positive "" <>
+  WriteOutput [Optional, UIntF id "n"] <>
   readFixedLengthList "n" IntTy "xs" <>
   WriteOutput [UListF sum "xs"]
 
@@ -27,6 +38,13 @@ solution1 = do
   --putStrLn $ "Result: " ++ show (sum xs)
   putStrLn $ show (sum xs)
   --print $ sum xs
+
+solution1' :: IOtt ()
+solution1' = do
+  n <- read @Int <$> getLine
+  putStrLn $ show n
+  xs <- replicateM n $ read @Int <$> getLine
+  putStrLn $ show (sum xs)
 
 wrongSolution1 :: IOtt ()
 wrongSolution1 = do

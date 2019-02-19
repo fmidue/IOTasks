@@ -6,9 +6,9 @@ import Trace
 import TraceSet
 
 import Control.Arrow
+import           Control.Monad.Trans.Writer.Lazy
 
 import Test.QuickCheck
-import           Data.Maybe
 
 (...) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
 (...) = (.) . (.)
@@ -22,8 +22,8 @@ specProperty spec program =
       prop t = testTrace ((id &&& inputs) t) program
   in forAll gen prop
 
-testTrace :: (Trace, [Int]) -> IOtt () -> Property
+testTrace :: (GTrace Int, [Int]) -> IOtt () -> Property
 testTrace (t,i) p =
-  let result = runProgram (show <$> i) p `lessGeneralThan'` (show <$> t)
-      msg = fromMaybe "" result
-  in counterexample msg (isNothing result)
+  let w = (show <$> t) `covers` runProgram (show <$> i) p
+      (result,msg) = runWriter w
+  in counterexample msg result

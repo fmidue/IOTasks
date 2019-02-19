@@ -1,43 +1,69 @@
 {-# LANGUAGE DeriveFunctor #-}
 module Trace where
 
-import Data.List
-import           Data.Maybe
+import Data.Functor.Identity
+import           Data.List (nub)
+import Control.Monad.Trans.Writer
 
-data Trace' a
-  = ProgRead a (Trace' a)
-  | ProgWrite [a] (Trace' a)
+data Trace' f a
+  = ProgRead a (Trace' f a)
+  | ProgWrite (f a) (Trace' f a)
   | Stop
   | OutOfInputs
   deriving (Functor)
 
-type Trace = Trace' Int
+type IntTrace = Trace Int
+type Trace a = Trace' Identity a
+type GTrace a = Trace' OList a
 
-instance Show a => Show (Trace' a) where
+data OList a
+  = Must [a]
+  | Can [a]
+  deriving (Functor,Show)
+
+union :: Eq a => OList a -> OList a -> OList a
+union (Must xs) (Must ys) = Must $ nub $ xs ++ ys
+union (Can xs) (Must ys) = Can $ nub $ xs ++ ys
+union (Must xs) (Can ys) = Can $ nub $ xs ++ ys
+union (Can xs) (Can ys) = Can $ nub $ xs ++ ys
+
+instance (Show (f a), Show a) => Show (Trace' f a) where
   show (ProgRead v t) = "?"++show v++" "++show t
   show (ProgWrite v t) = "!"++show v++" "++show t
   show Stop = "stop"
   show OutOfInputs = "<out of inputs>"
 
-lessGeneralThan :: (Show a, Eq a) => Trace' a -> Trace' a -> Bool
-lessGeneralThan t t' = isNothing $ lessGeneralThan' t t'
+similar :: Eq a => Trace' f a -> Trace' g a -> Bool
+similar x y = inputs x == inputs y
 
-lessGeneralThan' :: (Show a, Eq a) => Trace' a -> Trace' a -> Maybe String
-ProgRead v1 t1 `lessGeneralThan'` ProgRead v2 t2 =
-  if v1 == v2 then t1 `lessGeneralThan'` t2 else Just "Traces don't line up"
-ProgWrite v1 t1 `lessGeneralThan'` ProgWrite v2 t2 =
-  if (v1 `union` v2) == v2
-    then t1 `lessGeneralThan'` t2
-    else Just $ ppOutputMismatch v1 v2
-Stop `lessGeneralThan'` Stop = Nothing
-_ `lessGeneralThan'` _ = Just "Traces don't line up"
+covers :: (Show a, Eq a) => GTrace a -> Trace a -> Writer String Bool
+ProgRead x tg `covers` ProgRead y t =
+  if x == y
+    then tg `covers` t
+    else do
+      tell $ "Input mismatch: Expected " ++ show x ++ ". But got " ++ show y
+      return False
+ProgWrite (Must xs) tg `covers` ProgWrite (Identity y) t =
+  if y `elem` xs
+    then tg `covers` t
+    else do
+      tell $ ppOutputMismatch y xs
+      return False
+ProgWrite (Can xs) tg `covers` ProgWrite (Identity y) t =
+  if y `elem` xs
+    then tg `covers` t
+    else do
+      tell $ ppOutputMismatch y xs
+      tg `covers` ProgWrite (Identity y) t
+ProgWrite (Can _) tg `covers` t = tg `covers` t
+Stop `covers` Stop = return True
+_ `covers` _ = tell "traces dont line up" >> return False
 
-ppOutputMismatch :: Show a => [a] -> [a] -> String
-ppOutputMismatch [v1] [v2] = "Output mismatch: Expected " ++ show v2 ++ ". But got " ++ show v1
-ppOutputMismatch [v1] v2 = "Output mismatch: Expected one of " ++ show v2 ++ ". But got " ++ show v1
-ppOutputMismatch v1 v2 = "Output mismatch: Expected subset of " ++ show v2 ++ ". But got " ++ show v1
+ppOutputMismatch :: Show a => a -> [a] -> String
+ppOutputMismatch v1 [v2] = "Output mismatch: Expected " ++ show v2 ++ ". But got " ++ show v1
+ppOutputMismatch v1 v2 = "Output mismatch: Expected one of " ++ show v2 ++ ". But got " ++ show v1
 
-inputs :: Trace' a -> [a]
+inputs :: Trace' f a -> [a]
 inputs (ProgRead v t) = v : inputs t
 inputs (ProgWrite _ t) = inputs t
 inputs Stop = []

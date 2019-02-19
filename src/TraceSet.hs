@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module TraceSet where
 
 import Type
@@ -12,10 +13,10 @@ import           Data.Maybe
 import           Data.Bifunctor
 import           Control.Monad
 
-traceGen :: Surface.Specification -> Gen Trace
+traceGen :: Surface.Specification -> Gen (GTrace Int)
 traceGen = traceGen' . unsugar
 
-traceGen' :: Spec VarName -> Gen Trace
+traceGen' :: Spec VarName -> Gen (GTrace Int)
 traceGen' spec = sized $ \size ->
   case spec of
     (Read xs ty s') -> do
@@ -27,7 +28,8 @@ traceGen' spec = sized $ \size ->
       return $ ProgRead v t'
     (Write v s') -> do
       t' <- traceGen' s'
-      return $ ProgWrite (termVal <$> v) t'
+      let oList = (if isOptional v then Can else Must) (filterEpsilon v)
+      return $ ProgWrite (termVal <$> oList) t'
     (TillT s s') -> traceGen' (andThen s (JumpPoint s s'))
     (Branch p s11 s12 s2) ->
       if predVal p
@@ -37,6 +39,14 @@ traceGen' spec = sized $ \size ->
     Nop -> return Stop
     (JumpPoint s s') -> traceGen' $ andThen s (JumpPoint s s')
     _ -> error "not a valid spec"
+
+isOptional :: [Type.Fun a] -> Bool
+isOptional [] = False
+isOptional (DoNothing:_) = True
+isOptional (_:xs) = isOptional xs
+
+filterEpsilon :: [Type.Fun a] -> [Type.Fun a]
+filterEpsilon = filter (\case DoNothing -> False; _ -> True)
 
 genInt :: NumType -> Gen Int
 genInt IntTy = choose (-10,10)

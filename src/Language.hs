@@ -20,6 +20,7 @@ data Specification
   | TillT Specification
   | Branch Predicate  Specification  Specification
   | Seq Specification  Specification
+  deriving Show
 
 instance Semigroup Specification where
   (<>) = Seq
@@ -30,6 +31,7 @@ data Function
   | UListF ([Int] -> Int) VarName
   | BListF ([Int] -> [Int] -> Int) (VarName,VarName)
   | MixedF ([Int] -> Int -> Int) (VarName,VarName)
+  | Optional -- TODO: find a better way to encode epsilon
 
 data Predicate
   = UIntP (Int -> Bool) VarName
@@ -37,3 +39,18 @@ data Predicate
   | UListP ([Int] -> Bool) VarName
   | BListP ([Int] -> [Int] -> Bool) (VarName,VarName)
   | MixedP ([Int] -> Int -> Bool) (VarName,VarName)
+
+instance Show Function where
+  show (UIntF _ x)      = "*Int -> Int*(" ++ x ++ ")"
+  show (BIntF _ (x,y))  = "*Int -> Int -> Int*(" ++ x ++ "," ++ y ++ ")"
+  show (UListF _ x)     = "*[Int] -> Int*(" ++ x ++ ")"
+  show (BListF _(x,y))  = "*[Int] -> [Int] -> Int*(" ++ x ++ "," ++ y ++ ")"
+  show (MixedF _ (x,y)) = "*[Int] -> Int -> Int*(" ++ x ++ "," ++ y ++ ")"
+  show Optional = "\xceb5"
+
+instance Show Predicate where
+  show (UIntP _ x)      = "*Int -> Bool*(" ++ x ++ ")"
+  show (BIntP _ (x,y))  = "*Int -> Int -> Bool*(" ++ x ++ "," ++ y ++ ")"
+  show (UListP _ x)     = "*[Int] -> Bool*(" ++ x ++ ")"
+  show (BListP _ (x,y)) = "*[Int] -> [Int] -> Bool*(" ++ x ++ "," ++ y ++ ")"
+  show (MixedP _ (x,y)) = "*[Int] -> Int -> Bool*(" ++ x ++ "," ++ y ++ ")"

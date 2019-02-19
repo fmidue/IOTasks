@@ -43,6 +43,7 @@ data Everything a
   -- Function
   | UFun Function (Value a)
   | BFun Function (Value a) (Value a)
+  | DoNothing
   -- Predicates
   | UPred Predicate (Value a)
   | BPred Predicate (Value a) (Value a)
@@ -95,6 +96,7 @@ unsugarFunc (Surface.BIntF f (x,y)) = BFun (BIntF f) (V x) (V y)
 unsugarFunc (Surface.UListF f x) = UFun (UListF f) (V x)
 unsugarFunc (Surface.BListF f (x,y)) = BFun (BListF f) (V x) (V y)
 unsugarFunc (Surface.MixedF f (x,y)) = BFun (MixedF f) (V x) (V y)
+unsugarFunc Surface.Optional = DoNothing
 
 instance Applicative Everything where pure = V; (<*>) = ap
 instance Monad Everything where
@@ -118,6 +120,7 @@ instance Monad Everything where
   (BFun g x y) >>= f = BFun g (x >>= f) (y >>= f)
   (UPred p x) >>= f = UPred p $ x >>= f
   (BPred p x y) >>= f = BPred p (x >>= f) (y >>= f)
+  DoNothing >>= _ = DoNothing
 
 instance Show Function where
   show (UIntF _) = "*Int -> Int*"

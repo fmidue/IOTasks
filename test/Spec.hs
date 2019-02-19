@@ -12,7 +12,11 @@ main = hspec $ do
     specProperty task1 solution1
   it "wrongSolution1 does not match against task1" $
     expectFailure $ specProperty task1 wrongSolution1
-  it "Testing solution2 against task2" $
+  it "solution1 matches task1'" $
+    specProperty task1' solution1
+  it "solution1' matches task1'" $
+    specProperty task1' solution1'
+  it "solution2 matches task2" $
    specProperty task2 solution2
   it "solution3 matches task3" $
     specProperty task3 solution3

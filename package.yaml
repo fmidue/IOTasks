@@ -24,6 +24,7 @@ dependencies:
 - QuickCheck
 - bound
 - deriving-compat
+- transformers
 
 library:
   source-dirs: src
