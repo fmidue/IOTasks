@@ -49,13 +49,11 @@ ProgWrite (Must xs) tg `covers` ProgWrite (Identity y) t =
     else do
       tell $ ppOutputMismatch y xs
       return False
-ProgWrite (Can xs) tg `covers` ProgWrite (Identity y) t =
-  if y `elem` xs
-    then tg `covers` t
-    else do
-      tell $ ppOutputMismatch y xs
-      tg `covers` ProgWrite (Identity y) t
-ProgWrite (Can _) tg `covers` t = tg `covers` t
+ProgWrite (Can xs) tg `covers` t = do
+  r1 <- ProgWrite (Must xs) tg `covers` t
+  if r1 then return True else do
+    r2 <- tg `covers` t
+    return (r1 || r2)
 Stop `covers` Stop = return True
 _ `covers` _ = tell "traces dont line up" >> return False
 
