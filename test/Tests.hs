@@ -24,17 +24,21 @@ main = hspec $ do
     specProperty task3 solution3
   it "solution3 matches task3'" $
     specProperty task3' solution3
-  -- it"solution1 matches (task3 ∨ task1)" $
-  --   test solution1 (Choice task3 task1 Nop) `shouldReturn` True
-  --it "Testing solution2 against (task1 ∨ task3)" $
-  --  expectFailure $ specProperty (Choice [task1,task3]) solution2
-  -- it "solution3 matches (task1 ∨ task3)" $
-  --   test solution3 (Choice task1 task3 Nop) `shouldReturn` True
   --it "Testing solution4 against task4" $
   --  specProperty task4 solution4
   --it "Testing wrongsolution4 against task4" $
   --  expectFailure $ specProperty task4 wrongSolution4
   --it "Testing hangman" $
   --  specProperty (hangmanSpec [2,7,1,4,2,1]) (hangmanProg [2,7,1,4,2,1])
+  it "program generated from task1 matches task1" $
+    specProperty task1 (buildProgram task1)
+  it "program generated from task1' matches task1'" $
+    specProperty task1' (buildProgram task1')
+  it "program generated from task2 matches task2" $
+    specProperty task2 (buildProgram task2)
+  it "program generated from task3 matches task3" $
+    specProperty task3 (buildProgram task3)
+  it "program generated from task3' matches task3'" $
+    specProperty task3' (buildProgram task3')
   it "programs build from a simple spec (read and write only) satisfy that spec" $
-    forAll specGen (\s -> specProperty s (buildProgram s))
+    forAll specGen (\s -> test (buildProgram s) s)

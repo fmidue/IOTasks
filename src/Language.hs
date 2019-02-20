@@ -13,12 +13,12 @@ matchesType Zero = (== 0)
 matchesType (Not ty) = not . matchesType ty
 
 data Specification
-  = ReadInput VarName  NumType  VarName
+  = ReadInput VarName NumType VarName
   | WriteOutput [Function]
   | T
   | Nop
   | TillT Specification
-  | Branch Predicate  Specification  Specification
+  | Branch Predicate Specification Specification
   | Specification :<> Specification
   deriving Show
 

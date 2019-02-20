@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 module Testing where
 
 import IOtt (IOtt, runProgram)
@@ -14,7 +15,7 @@ import Test.QuickCheck
 (...) = (.) . (.)
 
 test :: IOtt () -> Specification -> IO ()
-test = quickCheck ... flip specProperty
+test = quickCheckWith stdArgs{chatty = False} ... flip specProperty
 
 specProperty :: Specification -> IOtt () -> Property
 specProperty spec program =
@@ -23,7 +24,8 @@ specProperty spec program =
   in forAll gen prop
 
 testTrace :: (GTrace Int, [Int]) -> IOtt () -> Property
-testTrace (t,i) p =
-  let w = (show <$> t) `covers` runProgram (show <$> i) p
+testTrace (tg,i) p =
+  let t = runProgram (show <$> i) p
+      w = (show <$> tg) `covers` t
       (result,msg) = runWriter w
-  in counterexample msg result
+  in counterexample (msg ++ "\n  program trace: " ++ show (read @Int <$> t)) result

@@ -44,7 +44,7 @@ newStore :: Specification -> Store
 newStore s = Store [] ((,[]) <$> globalVars s)
 
 updateStore :: Store -> Int -> VarName -> VarName -> Store
-updateStore (Store ls gs) i x xs = Store (update x i ls) (updateWith (:) pure xs i gs)
+updateStore (Store ls gs) i x xs = Store (update x i ls) (updateWith (flip (++).pure) pure xs i gs)
   where update = updateWith const id
         updateWith :: Eq k => (v1 -> v -> v) -> (v1 -> v) -> k -> v1 -> [(k,v)] -> [(k,v)]
         updateWith f g k v assoc = case foldr (go f k v) (False,[]) assoc of
