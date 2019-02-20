@@ -2,6 +2,8 @@ import Prelude hiding (getLine, putStrLn, print)
 import Examples.Tasks
 --import Examples.Hangman
 import Testing
+import SpecGen
+import Solution
 
 import Test.Hspec (hspec,it)
 import Test.QuickCheck
@@ -34,3 +36,5 @@ main = hspec $ do
   --  expectFailure $ specProperty task4 wrongSolution4
   --it "Testing hangman" $
   --  specProperty (hangmanSpec [2,7,1,4,2,1]) (hangmanProg [2,7,1,4,2,1])
+  it "programs build from a simple spec (read and write only) satisfy that spec" $
+    forAll specGen (\s -> specProperty s (buildProgram s))

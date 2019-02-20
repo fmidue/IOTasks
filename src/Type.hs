@@ -7,7 +7,7 @@
 module Type where
 
 import qualified Language as Surface
-import Language (VarName,NumType)
+import Language (VarName,NumType,Specification((:<>)))
 
 import Bound
 
@@ -78,17 +78,17 @@ andThen (JumpPoint s1 s2) s' = JumpPoint s1 $ s2 `andThen` s'
 andThen _ _ = error "Not a spec"
 
 unsugar :: Surface.Specification -> Spec VarName
-unsugar (Surface.Seq (Surface.ReadInput x ty xs) s') = Read xs ty $ abstract1 x (unsugar s')
-unsugar (Surface.Seq (Surface.WriteOutput fs) s') = Write (unsugarFunc <$> fs) (unsugar s')
-unsugar (Surface.Seq (Surface.TillT s) s') = TillT (unsugar s) (unsugar s')
-unsugar (Surface.Seq (Surface.Branch (Surface.UIntP p x) s1 s2) s') = Branch (UPred (UIntP p) (V x)) (unsugar s1) (unsugar s2) (unsugar s')
-unsugar (Surface.Seq (Surface.Branch (Surface.BIntP p (x,y)) s1 s2) s') = Branch (BPred (BIntP p) (V x) (V y)) (unsugar s1) (unsugar s2) (unsugar s')
-unsugar (Surface.Seq (Surface.Branch (Surface.UListP p x) s1 s2) s') = Branch (UPred (UListP p) (V x)) (unsugar s1) (unsugar s2) (unsugar s')
-unsugar (Surface.Seq (Surface.Branch (Surface.BListP p (x,y)) s1 s2) s') = Branch (BPred (BListP p) (V x) (V y)) (unsugar s1) (unsugar s2) (unsugar s')
-unsugar (Surface.Seq (Surface.Branch (Surface.MixedP p (x,y)) s1 s2) s') = Branch (BPred (MixedP p) (V x) (V y)) (unsugar s1) (unsugar s2) (unsugar s')
+unsugar (Surface.ReadInput x ty xs :<> s') = Read xs ty $ abstract1 x (unsugar s')
+unsugar (Surface.WriteOutput fs :<> s') = Write (unsugarFunc <$> fs) (unsugar s')
+unsugar (Surface.TillT s :<> s') = TillT (unsugar s) (unsugar s')
+unsugar (Surface.Branch (Surface.UIntP p x) s1 s2 :<> s') = Branch (UPred (UIntP p) (V x)) (unsugar s1) (unsugar s2) (unsugar s')
+unsugar (Surface.Branch (Surface.BIntP p (x,y)) s1 s2 :<> s') = Branch (BPred (BIntP p) (V x) (V y)) (unsugar s1) (unsugar s2) (unsugar s')
+unsugar (Surface.Branch (Surface.UListP p x) s1 s2 :<> s') = Branch (UPred (UListP p) (V x)) (unsugar s1) (unsugar s2) (unsugar s')
+unsugar (Surface.Branch (Surface.BListP p (x,y)) s1 s2 :<> s') = Branch (BPred (BListP p) (V x) (V y)) (unsugar s1) (unsugar s2) (unsugar s')
+unsugar (Surface.Branch (Surface.MixedP p (x,y)) s1 s2 :<> s') = Branch (BPred (MixedP p) (V x) (V y)) (unsugar s1) (unsugar s2) (unsugar s')
 unsugar Surface.T = InternalT Nop
 unsugar Surface.Nop = Nop
-unsugar x = unsugar $ Surface.Seq x Surface.Nop
+unsugar x = unsugar $ x :<> Surface.Nop
 
 unsugarFunc :: Surface.Function -> Fun VarName
 unsugarFunc (Surface.UIntF f x) = UFun (UIntF f) (V x)

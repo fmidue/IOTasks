@@ -19,11 +19,13 @@ data Specification
   | Nop
   | TillT Specification
   | Branch Predicate  Specification  Specification
-  | Seq Specification  Specification
+  | Specification :<> Specification
   deriving Show
 
+infixr 6 :<>
+
 instance Semigroup Specification where
-  (<>) = Seq
+  (<>) = (:<>)
 
 data Function
   = UIntF (Int -> Int) VarName

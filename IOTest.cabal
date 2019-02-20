@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5cf1e117927f9b2e8a4a3842f37738862897fc883929322e00523b432bbce90e
+-- hash: 7e477e2bf3438a7cd2d13e098c95094187c9e8ebf704f9b1605cc0cef4834c5d
 
 name:           IOTest
 version:        0.0.1.0
@@ -32,6 +32,7 @@ library
       Examples.Tasks
       IOtt
       Language
+      Solution
       Testing
       Trace
       TraceSet
@@ -67,8 +68,9 @@ executable IOTest-exe
 
 test-suite IOTest-test
   type: exitcode-stdio-1.0
-  main-is: Spec.hs
+  main-is: Tests.hs
   other-modules:
+      SpecGen
       Paths_IOTest
   hs-source-dirs:
       test
