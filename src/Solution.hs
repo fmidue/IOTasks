@@ -9,29 +9,32 @@ import Data.Maybe (fromMaybe)
 import Control.Monad (void)
 
 buildProgram :: Specification -> IOtt ()
-buildProgram s = void $ translate (newStore s) s
+buildProgram s = void $ translate s (newStore s)
 
-translate :: Store -> Specification -> IOtt (Store,LoopEnd)
-translate st (ReadInput x _ xs) = do
+translate :: Specification -> Store -> IOtt (Store,LoopEnd)
+translate (ReadInput x _ xs) st = do
   v <- read <$> getLine
   return (updateStore st v x xs, No)
-translate _ (WriteOutput []) = error "empty list of output options"
-translate st (WriteOutput (Optional:_)) = return (st,No)
-translate st (WriteOutput (f:_)) = do
+translate (WriteOutput []) _ = error "empty list of output options"
+translate (WriteOutput (Optional:_)) st = return (st,No)
+translate (WriteOutput (f:_)) st = do
   print $ fromMaybe (error "some variable is not is scope") $ evalF f st
   return (st, No)
-translate st T = return (st, Yes)
-translate st Nop = return (st, No)
-translate st (TillT s) = do
-  (st', end) <- translate st s
-  case end of
-      Yes -> return (st', No)
-      No -> translate st' (TillT s)
-translate st (Branch p s1 s2) =
+translate T st = return (st, Yes)
+translate Nop st = return (st, No)
+translate (TillT s) st =
+  let body = translate s
+      go st' = do
+        (st'', end) <- body st'
+        case end of
+          Yes -> return (st'', No)
+          No -> go st''
+  in go st
+translate (Branch p s1 s2) st =
   if fromMaybe (error "some variable is not in scope") (evalP p st)
-    then translate st s2
-    else translate st s1
-translate st (s1 :<> s2) = translate st s1 >>= (\(st',_) -> translate st' s2)
+    then translate s2 st
+    else translate s1 st
+translate (s1 :<> s2) st = translate s1 st >>= (\(st',_) -> translate s2 st')
 
 data LoopEnd = Yes | No
 
@@ -64,8 +67,6 @@ evalP (BIntP p (x,y)) st = p <$> lookup x (locals st) <*> lookup y (locals st)
 evalP (UListP p xs) st = p <$> lookup xs (globals st)
 evalP (BListP p (xs,ys)) st = p <$> lookup xs (globals st) <*> lookup ys (globals st)
 evalP (MixedP p (xs,y)) st = p <$> lookup xs (globals st) <*> lookup y (locals st)
-
-
 
 globalVars :: Specification -> [VarName]
 globalVars = nub . go where
