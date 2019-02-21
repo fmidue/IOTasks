@@ -12,11 +12,12 @@ import           Data.Either
 import           Data.Maybe
 import           Data.Bifunctor
 import           Control.Monad
+import qualified Data.Set as S
 
-traceGen :: Surface.Specification -> Gen (GTrace Int)
+traceGen :: Surface.Specification -> Gen (NTrace Int)
 traceGen = traceGen' . unsugar
 
-traceGen' :: Spec VarName -> Gen (GTrace Int)
+traceGen' :: Spec VarName -> Gen (NTrace Int)
 traceGen' spec = sized $ \size ->
   case spec of
     (Read xs ty s') -> do
@@ -25,18 +26,20 @@ traceGen' spec = sized $ \size ->
           sigma (Left ()) = Lit v
           sigma (Right ys) = if xs == ys then Cons (Lit v) (V xs) else V ys
       t' <- traceGen' s''
-      return $ ProgRead v t'
-    (Write v s') -> do
-      t' <- traceGen' s'
-      let oList = (if isOptional v then Can else Must) (filterEpsilon v)
-      return $ ProgWrite (termVal <$> oList) t'
+      return $ ProgWrite (S.singleton []) $ ProgRead v t'
+    (Write ts s') -> do
+      let v1 = S.fromList $ (if isOptional ts then ([]:) else id) $ pure . termVal <$> filterEpsilon ts
+      t <- traceGen' s'
+      let (ProgWrite v2 t') = t
+      let v = S.map (uncurry (++)) $ S.cartesianProduct v1 v2
+      return $ ProgWrite v t'
     (TillT s s') -> traceGen' (andThen s (JumpPoint s s'))
     (Branch p s11 s12 s2) ->
       if predVal p
         then traceGen' $ andThen s12 s2
         else traceGen' $ andThen s11 s2
     (InternalT (JumpPoint _ s')) -> traceGen' s'
-    Nop -> return Stop
+    Nop -> return $ ProgWrite (S.singleton []) Stop
     (JumpPoint s s') -> traceGen' $ andThen s (JumpPoint s s')
     _ -> error "not a valid spec"
 

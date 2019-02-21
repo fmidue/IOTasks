@@ -25,6 +25,7 @@ dependencies:
 - bound
 - deriving-compat
 - transformers
+- containers
 
 library:
   source-dirs: src

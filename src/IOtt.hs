@@ -8,7 +8,6 @@ import Prelude hiding (getLine, putStrLn, print)
 
 import Trace
 import Control.Monad
-import Data.Functor.Identity
 
 data IOtt' t a where
   ReadLine :: (t -> IOtt' t a) -> IOtt' t a
@@ -47,8 +46,8 @@ maybePrint :: Show a => Maybe a -> IOtt ()
 maybePrint Nothing = return ()
 maybePrint (Just xs) = print xs
 
-runProgram :: [t] -> IOtt' t () -> Trace' Identity t
+runProgram :: [t] -> IOtt' t () -> Trace' t t
 runProgram (x:xs) (ReadLine f) = ProgRead x $ runProgram xs $ f x
 runProgram [] (ReadLine _) = OutOfInputs
-runProgram xs (WriteLine v p) =  ProgWrite (Identity v) $ runProgram xs p
+runProgram xs (WriteLine v p) =  ProgWrite v $ runProgram xs p
 runProgram _ (Return _) =  Stop

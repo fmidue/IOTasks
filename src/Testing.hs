@@ -6,10 +6,12 @@ import Language
 import Trace
 import TraceSet
 
-import Control.Arrow
-import           Control.Monad.Trans.Writer.Lazy
-
+import Control.Arrow ((&&&))
+import Control.Monad.Trans.Writer.Lazy
 import Test.QuickCheck
+import Data.Bifunctor (bimap)
+
+import qualified Data.Set as S
 
 (...) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
 (...) = (.) . (.)
@@ -23,9 +25,9 @@ specProperty spec program =
       prop t = testTrace ((id &&& inputs) t) program
   in forAll gen prop
 
-testTrace :: (GTrace Int, [Int]) -> IOtt () -> Property
+testTrace :: (NTrace Int, [Int]) -> IOtt () -> Property
 testTrace (tg,i) p =
-  let t = runProgram (show <$> i) p
-      w = (show <$> tg) `covers` t
+  let t = normalize $ runProgram (show <$> i) p
+      w = bimap (S.map (fmap read)) read t `isCoveredBy` tg
       (result,msg) = runWriter w
-  in counterexample (msg ++ "\n  program trace: " ++ show (read @Int <$> t)) result
+  in counterexample (msg ++ "\n  program trace: " ++ showNTrace (bimap (S.map (fmap (read @Int))) (read @Int) t)) result
