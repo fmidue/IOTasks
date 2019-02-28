@@ -22,8 +22,6 @@ description:         Please see the README on GitHub at <https://github.com/owes
 dependencies:
 - base >= 4.7 && < 5
 - QuickCheck
-- bound
-- deriving-compat
 - transformers
 - containers
 

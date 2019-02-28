@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3280b540f4e0110d727fc1b57a8b832c24a9c203a676e9dea6c112c8615d415b
+-- hash: b48e06484a2be5a344a26a5a953b76ea550dce14d55046192350fa3ec1c85bb2
 
 name:           IOTest
 version:        0.0.1.0
@@ -28,6 +28,7 @@ source-repository head
 
 library
   exposed-modules:
+      Context
       Examples.Hangman
       Examples.Tasks
       IOtt
@@ -45,9 +46,7 @@ library
   build-depends:
       QuickCheck
     , base >=4.7 && <5
-    , bound
     , containers
-    , deriving-compat
     , transformers
   default-language: Haskell2010
 
@@ -62,9 +61,7 @@ executable IOTest-exe
       IOTest
     , QuickCheck
     , base >=4.7 && <5
-    , bound
     , containers
-    , deriving-compat
     , transformers
   default-language: Haskell2010
 
@@ -81,9 +78,7 @@ test-suite IOTest-test
       IOTest
     , QuickCheck
     , base >=4.7 && <5
-    , bound
     , containers
-    , deriving-compat
     , hspec
     , transformers
   default-language: Haskell2010

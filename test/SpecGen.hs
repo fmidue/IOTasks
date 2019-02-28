@@ -18,25 +18,24 @@ go n ss vs = do
   (s, vs') <- oneof [input vs, output vs]
   go (n-1) (s:ss) vs'
 
-data VarSet = VarSet { locals :: [VarName], globals :: [VarName]}
+newtype VarSet = VarSet [VarName]
 
 emptyVarSet :: VarSet
-emptyVarSet = VarSet [] []
+emptyVarSet = VarSet []
 
 input :: VarSet -> Gen (Specification, VarSet)
-input vs = do
+input (VarSet vs) = do
   x <- elements ["x","y","z"]
-  xs <- elements ["xs","ys","zs"]
-  return (ReadInput x IntTy xs, vs{locals = x:locals vs, globals=xs:globals vs})
+  return (ReadInput x IntTy, VarSet $ x:vs)
 
 output :: VarSet -> Gen (Specification, VarSet)
-output vs = oneof [unary, binary] where
+output (VarSet vs) = oneof [unary, binary] where
   unary = do
     f <- elements [sum, length]
-    xs <- elements $ globals vs
-    return (WriteOutput [UListF f xs],vs)
+    xs <- elements vs
+    return (WriteOutput [UListF f xs], VarSet vs)
   binary = do
     f <- elements [(+), (-), (*)]
-    x <- elements $ locals vs
-    y <- elements $ locals vs
-    return (WriteOutput [BIntF f (x,y)],vs)
+    x <- elements vs
+    y <- elements vs
+    return (WriteOutput [BIntF f (x,y)], VarSet vs)

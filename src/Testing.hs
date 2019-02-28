@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeApplications #-}
 module Testing where
 
 import IOtt (IOtt, runProgram)
@@ -28,6 +27,10 @@ specProperty spec program =
 testTrace :: (NTrace Int, [Int]) -> IOtt () -> Property
 testTrace (tg,i) p =
   let t = normalize $ runProgram (show <$> i) p
-      w = bimap (S.map (fmap read)) read t `isCoveredBy` tg
+      w = t `isCoveredBy` bimap (S.map (fmap show)) show tg
       (result,msg) = runWriter w
-  in counterexample (msg ++ "\n  program trace: " ++ showNTrace (bimap (S.map (fmap (read @Int))) (read @Int) t)) result
+  in counterexample (msg ++ "\n  program trace: " ++ show (bimap (S.map (fmap Wrap)) Wrap t)) result
+
+newtype StringWrapper = Wrap String deriving (Eq,Ord)
+instance Show StringWrapper where
+  show (Wrap s) = s

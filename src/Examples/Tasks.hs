@@ -11,19 +11,19 @@ import Control.Monad (replicateM,replicateM_)
 readFixedLengthList :: VarName -> NumType -> VarName -> Specification
 readFixedLengthList n ty xs =
   TillT $
-    Branch (MixedP (\ys m -> length ys == m) (xs,n)) (ReadInput "<doNotGuessThis>" ty xs) T
+    Branch (MixedP (\ys m -> length ys == m) (xs,n)) (ReadInput xs ty) T
 
 -- read natural number n, then read n integers and sum them
 task1 :: Specification
 task1 =
-  ReadInput "n" NatTy "" <>
+  ReadInput "n" NatTy <>
   readFixedLengthList "n" IntTy "xs" <>
   WriteOutput [UListF sum "xs"]
 
 -- optional output of the first number read
 task1' :: Specification
 task1' =
-  ReadInput "n" NatTy "" <>
+  ReadInput "n" NatTy <>
   WriteOutput [Optional, UIntF id "n"] <>
   readFixedLengthList "n" IntTy "xs" <>
   WriteOutput [UListF sum "xs"]
@@ -57,7 +57,7 @@ wrongSolution1 = do
 dList :: VarName -> ([Int] -> Bool) -> Specification
 dList xs p =
   TillT $
-    ReadInput "x" IntTy xs <>
+    ReadInput xs IntTy <>
     Branch (UListP p xs)
       Nop
       T
@@ -82,8 +82,8 @@ solution2 = go [] Nothing Nothing where
 task3 :: Specification
 task3 =
   TillT $
-    ReadInput "x" IntTy "xs" <>
-    Branch (UIntP (0 ==) "x") Nop (WriteOutput [UListF sum "xs"] <> T)
+    ReadInput "x" IntTy <>
+    Branch (UIntP (0 ==) "x") Nop (WriteOutput [UListF sum "x"] <> T)
 
 task3' :: Specification
 task3' =
@@ -110,3 +110,26 @@ solution3 = go [] where
 --
 -- wrongSolution4 :: IOtt ()
 -- wrongSolution4 = getLine >>= putStrLn
+
+scoping :: Specification
+scoping =
+  ReadInput "x" IntTy <>
+  (
+    ReadInput "x" IntTy <>
+    WriteOutput [UIntF id "x"]
+  ) <>
+  WriteOutput [UIntF id "x"]
+
+scopingRight :: IOtt ()
+scopingRight = do
+  _x <- read @Int <$> getLine
+  x <- read @Int <$> getLine
+  print x
+  print x
+
+scopingWrong :: IOtt ()
+scopingWrong = do
+  x <- read @Int <$> getLine
+  y <- read @Int <$> getLine
+  print y
+  print x

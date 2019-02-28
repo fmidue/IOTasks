@@ -6,7 +6,7 @@ import SpecGen
 import Solution
 
 import Test.Hspec (hspec,it)
-import Test.QuickCheck
+import Test.QuickCheck (forAll, expectFailure)
 
 main :: IO ()
 main = hspec $ do
@@ -24,12 +24,7 @@ main = hspec $ do
     specProperty task3 solution3
   it "solution3 matches task3'" $
     specProperty task3' solution3
-  --it "Testing solution4 against task4" $
-  --  specProperty task4 solution4
-  --it "Testing wrongsolution4 against task4" $
-  --  expectFailure $ specProperty task4 wrongSolution4
-  --it "Testing hangman" $
-  --  specProperty (hangmanSpec [2,7,1,4,2,1]) (hangmanProg [2,7,1,4,2,1])
+
   it "program generated from task1 matches task1" $
     specProperty task1 (buildProgram task1)
   it "program generated from task1' matches task1'" $
@@ -40,5 +35,18 @@ main = hspec $ do
     specProperty task3 (buildProgram task3)
   it "program generated from task3' matches task3'" $
     specProperty task3' (buildProgram task3')
+
   it "programs build from a simple spec (read and write only) satisfy that spec" $
     forAll specGen (\s -> test (buildProgram s) s)
+
+  it "correct handeling of scoping 1" $
+    specProperty scoping scopingRight
+  it "correct handeling of scoping 2" $
+    expectFailure (specProperty scoping scopingWrong)
+
+    --it "Testing solution4 against task4" $
+    --  specProperty task4 solution4
+    --it "Testing wrongsolution4 against task4" $
+    --  expectFailure $ specProperty task4 wrongSolution4
+    --it "Testing hangman" $
+    --  specProperty (hangmanSpec [2,7,1,4,2,1]) (hangmanProg [2,7,1,4,2,1])

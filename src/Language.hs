@@ -13,7 +13,7 @@ matchesType Zero = (== 0)
 matchesType (Not ty) = not . matchesType ty
 
 data Specification
-  = ReadInput VarName NumType VarName
+  = ReadInput VarName NumType
   | WriteOutput [Function]
   | T
   | Nop

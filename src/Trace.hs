@@ -5,7 +5,8 @@ module Trace where
 import Control.Monad.Trans.Writer
 
 import Data.Bifunctor
-import Data.Set as Set
+import Data.Set (Set)
+import qualified Data.Set as S
 import           Data.List
 
 data Trace' o i
@@ -28,9 +29,9 @@ type NTrace a = Trace' (Set [a]) a
 normalize :: Trace a -> NTrace a
 normalize = go [] where
   go w (ProgWrite v t') = go (w ++ [v]) t'
-  go w (ProgRead v t') = ProgWrite (singleton w) $ ProgRead v $ go [] t'
-  go w Stop = ProgWrite (singleton w) Stop
-  go w OutOfInputs = ProgWrite (singleton w) OutOfInputs
+  go w (ProgRead v t') = ProgWrite (S.singleton w) $ ProgRead v $ go [] t'
+  go w Stop = ProgWrite (S.singleton w) Stop
+  go w OutOfInputs = ProgWrite (S.singleton w) OutOfInputs
 
 instance (Show a) => Show (Trace' a a) where
   show (ProgRead v t) = "?"++show v++" "++show t
@@ -43,7 +44,9 @@ instance (Show a) => Show (Trace' (Set [a]) a) where
 
 showNTrace :: Show a => NTrace a -> String
 showNTrace (ProgRead v t) = "?"++show v++" "++showNTrace t
-showNTrace (ProgWrite v t) = let vs = (\x -> if x == "[]" then "e" else x). show <$> toList v in "!{"++ intercalate "," vs ++"} "++showNTrace t
+showNTrace (ProgWrite v t) =
+  let vs = (\x -> if x == "[]" then "e" else x) . show <$> S.toList v
+  in "!{"++ intercalate "," vs ++"} "++showNTrace t
 showNTrace Stop = "stop"
 showNTrace OutOfInputs = "<out of inputs>"
 
@@ -58,17 +61,22 @@ ProgRead x t1 `isCoveredBy` ProgRead y t2 =
       tell $ "Input mismatch: Expected " ++ show x ++ ". But got " ++ show y
       return False
 ProgWrite v1 t1' `isCoveredBy` ProgWrite v2 t2' =
-  if v1 `isSubsetOf` v2
+  if v1 `S.isSubsetOf` v2
     then t1' `isCoveredBy` t2'
     else do
-      tell $ ppOutputMismatch (toList v1) (toList v2)
+      tell $ ppOutputMismatch (S.toList v1) (S.toList v2)
       return False
 Stop `isCoveredBy` Stop = return True
 _ `isCoveredBy` _ = tell "traces dont line up" >> return False
 
 ppOutputMismatch :: Show a => [a] -> [a] -> String
-ppOutputMismatch v1 [v2] = "Output mismatch: Expected " ++ show v2 ++ ". But got " ++ show v1
-ppOutputMismatch v1 v2 = "Output mismatch: Expected one of " ++ show v2 ++ ". But got " ++ show v1
+ppOutputMismatch [v1] v2 =
+  let clean :: Show a => a -> String
+      clean = filter (`notElem` ['\\','\"']) . show
+  in case v2 of
+      [v2'] -> "Output mismatch: Expected " ++ clean v2' ++ ". But got " ++ clean v1
+      _ ->  "Output mismatch: Expected one of " ++ clean v2 ++ ". But got " ++ clean v1
+ppOutputMismatch _ _ = error "should not happen"
 
 inputs :: Trace' f a -> [a]
 inputs (ProgRead v t) = v : inputs t
