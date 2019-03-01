@@ -1,8 +1,11 @@
-module Solution where
+module Test.IOTest.Translation (
+  buildProgram
+) where
+
 import Prelude hiding (putStrLn,getLine,print)
-import Language
-import IOtt
-import Context
+import Test.IOTest.Language
+import Test.IOTest.IOtt
+import Test.IOTest.Context
 
 import Control.Monad (void)
 
@@ -18,9 +21,9 @@ translate (WriteOutput (Optional:_)) d = return (d,No)
 translate (WriteOutput (f:_)) d = do
   print $ evalF d f
   return (d, No)
-translate T d = return (d, Yes)
+translate E d = return (d, Yes)
 translate Nop d = return (d, No)
-translate (TillT s) d =
+translate (TillE s) d =
   let body = translate s
       go d' = do
         (d'', end) <- body d'

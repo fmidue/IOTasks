@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b48e06484a2be5a344a26a5a953b76ea550dce14d55046192350fa3ec1c85bb2
+-- hash: 3620fee3d41861e95a101bdca44af8d28e021198b9f5473626b4b071a8ec10b8
 
 name:           IOTest
-version:        0.0.1.0
+version:        0.0.2.0
 description:    Please see the README on GitHub at <https://github.com/owestphal/IOTest#readme>
 category:       Testing
 homepage:       https://github.com/owestphal/IOTest#readme
@@ -28,16 +28,17 @@ source-repository head
 
 library
   exposed-modules:
-      Context
-      Examples.Hangman
-      Examples.Tasks
-      IOtt
-      Language
-      Solution
-      Testing
-      Trace
-      TraceSet
-      Type
+      Test.IOTest
+      Test.IOTest.Context
+      Test.IOTest.Examples.Hangman
+      Test.IOTest.Examples.Tasks
+      Test.IOTest.IOProperty
+      Test.IOTest.IOtt
+      Test.IOTest.Language
+      Test.IOTest.Trace
+      Test.IOTest.TraceSet
+      Test.IOTest.Translation
+      Test.IOTest.Type
   other-modules:
       Paths_IOTest
   hs-source-dirs:
@@ -45,21 +46,6 @@ library
   ghc-options: -Wall
   build-depends:
       QuickCheck
-    , base >=4.7 && <5
-    , containers
-    , transformers
-  default-language: Haskell2010
-
-executable IOTest-exe
-  main-is: Main.hs
-  other-modules:
-      Paths_IOTest
-  hs-source-dirs:
-      app
-  ghc-options: -Wall -threaded -rtsopts -with-rtsopts=-N
-  build-depends:
-      IOTest
-    , QuickCheck
     , base >=4.7 && <5
     , containers
     , transformers

@@ -1,8 +1,16 @@
 {-# LANGUAGE TupleSections #-}
-module Context where
+module Test.IOTest.Context (
+  Context,
+  freshContext,
+  update,
+  getCurrent,
+  getAll,
+  evalP,
+  evalF
+) where
 
-import Language as L
-import Type as T
+import Test.IOTest.Language as L
+import Test.IOTest.Type as T
 
 import Data.List (nub)
 import Data.Maybe (fromJust)
@@ -35,6 +43,7 @@ evalF d (BIntF f (x,y)) = f (getCurrent x d) (getCurrent y d)
 evalF d (UListF f x) = f (getAll x d)
 evalF d (BListF f (x,y)) = f (getAll x d) (getAll y d)
 evalF d (MixedF f (x,y)) = f (getAll x d) (getCurrent y d)
+evalF _ (Const n) = n
 evalF _ Optional = error "can't evaluate epsilon"
 
 class HasVariables a where
@@ -44,18 +53,18 @@ instance HasVariables Specification where
   vars = nub . go where
     go (L.ReadInput x _) = [x]
     go (s1 :<> s2) = vars s1 ++ vars s2
-    go (L.TillT s) = vars s
+    go (L.TillE s) = vars s
     go (L.Branch _ s1 s2) = vars s1 ++ vars s2
     go (L.WriteOutput _) = []
     go L.Nop = []
-    go T = []
+    go E = []
 
 instance HasVariables Spec where
   vars = nub . go where
     go (Read x _ s) = x : vars s
-    go (T.TillT s s') = vars s ++ vars s'
+    go (T.TillE s s') = vars s ++ vars s'
     go (T.Branch _ s1 s2 s3) = vars s1 ++ vars s2 ++ vars s3
     go (Write _ s) = vars s
     go T.Nop = []
-    go (InternalT s) = vars s
+    go (InternalE s) = vars s
     go (JumpPoint s s') = vars s ++ vars s'

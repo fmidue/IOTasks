@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeApplications #-}
 module SpecGen where
 
-import Language
+import Test.IOTest.Language
 
 import Test.QuickCheck hiding (Positive,output)
 

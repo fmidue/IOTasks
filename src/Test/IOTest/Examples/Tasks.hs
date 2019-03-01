@@ -1,17 +1,19 @@
 {-# LANGUAGE TypeApplications #-}
-module Examples.Tasks where
+module Test.IOTest.Examples.Tasks where
 
 import Prelude hiding (putStrLn, getLine, print)
 
-import IOtt
-import Language
+import Test.IOTest.IOtt
+import Test.IOTest.Language
+
+import Test.QuickCheck as QC (Positive(..))
 
 import Control.Monad (replicateM,replicateM_)
 
 readFixedLengthList :: VarName -> NumType -> VarName -> Specification
 readFixedLengthList n ty xs =
-  TillT $
-    Branch (MixedP (\ys m -> length ys == m) (xs,n)) (ReadInput xs ty) T
+  TillE $
+    Branch (MixedP (\ys m -> length ys == m) (xs,n)) (ReadInput xs ty) E
 
 -- read natural number n, then read n integers and sum them
 task1 :: Specification
@@ -56,11 +58,11 @@ wrongSolution1 = do
 
 dList :: VarName -> ([Int] -> Bool) -> Specification
 dList xs p =
-  TillT $
+  TillE $
     ReadInput xs IntTy <>
     Branch (UListP p xs)
       Nop
-      T
+      E
 
 -- read till last two numbers sum to 0 than count positive numbers divisible by 3
 task2 :: Specification
@@ -81,9 +83,9 @@ solution2 = go [] Nothing Nothing where
 -- read till zero then sum
 task3 :: Specification
 task3 =
-  TillT $
+  TillE $
     ReadInput "x" IntTy <>
-    Branch (UIntP (0 ==) "x") Nop (WriteOutput [UListF sum "x"] <> T)
+    Branch (UIntP (0 ==) "x") Nop (WriteOutput [UListF sum "x"] <> E)
 
 task3' :: Specification
 task3' =
@@ -133,3 +135,12 @@ scopingWrong = do
   y <- read @Int <$> getLine
   print y
   print x
+
+printNSpec :: QC.Positive Int -> Int -> Specification
+printNSpec (QC.Positive 0)  _ = Nop
+printNSpec (QC.Positive n) x =
+  WriteOutput [Const x] <>
+  printNSpec (QC.Positive $ n-1) x
+
+printN :: Int -> Int -> IOtt ()
+printN n x = replicateM_ n $ print x

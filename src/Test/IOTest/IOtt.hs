@@ -2,11 +2,17 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE StandaloneDeriving #-}
-module IOtt where
+module Test.IOTest.IOtt (
+  IOtt,
+  getLine,
+  putStrLn,
+  print,
+  runProgram
+) where
 
 import Prelude hiding (getLine, putStrLn, print)
 
-import Trace
+import Test.IOTest.Trace
 import Control.Monad
 
 data IOtt' t a where
@@ -41,10 +47,6 @@ putStrLn s = WriteLine s $ Return ()
 
 print :: Show a => a -> IOtt ()
 print = putStrLn . show
-
-maybePrint :: Show a => Maybe a -> IOtt ()
-maybePrint Nothing = return ()
-maybePrint (Just xs) = print xs
 
 runProgram :: [t] -> IOtt' t () -> Trace' t t
 runProgram (x:xs) (ReadLine f) = ProgRead x $ runProgram xs $ f x

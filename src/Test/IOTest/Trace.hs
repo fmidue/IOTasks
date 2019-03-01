@@ -1,6 +1,15 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Trace where
+module Test.IOTest.Trace (
+  IntTrace,
+  NTrace,
+  Trace,
+  Trace'(..),
+  normalize,
+  isCoveredBy,
+  showNTrace,
+  inputs
+) where
 
 import Control.Monad.Trans.Writer
 

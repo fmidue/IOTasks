@@ -1,4 +1,11 @@
-module Language where
+module Test.IOTest.Language (
+  Specification(..),
+  Function(..),
+  Predicate(..),
+  VarName,
+  NumType(..),
+  matchesType
+) where
 
 type VarName = String
 
@@ -15,10 +22,10 @@ matchesType (Not ty) = not . matchesType ty
 data Specification
   = ReadInput VarName NumType
   | WriteOutput [Function]
-  | T
-  | Nop
-  | TillT Specification
   | Branch Predicate Specification Specification
+  | TillE Specification
+  | Nop
+  | E
   | Specification :<> Specification
   deriving Show
 
@@ -33,6 +40,7 @@ data Function
   | UListF ([Int] -> Int) VarName
   | BListF ([Int] -> [Int] -> Int) (VarName,VarName)
   | MixedF ([Int] -> Int -> Int) (VarName,VarName)
+  | Const Int
   | Optional -- TODO: find a better way to encode epsilon
 
 data Predicate
@@ -48,6 +56,7 @@ instance Show Function where
   show (UListF _ x)     = "*[Int] -> Int*(" ++ x ++ ")"
   show (BListF _(x,y))  = "*[Int] -> [Int] -> Int*(" ++ x ++ "," ++ y ++ ")"
   show (MixedF _ (x,y)) = "*[Int] -> Int -> Int*(" ++ x ++ "," ++ y ++ ")"
+  show (Const n) = show n
   show Optional = "\xceb5"
 
 instance Show Predicate where

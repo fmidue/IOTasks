@@ -1,4 +1,4 @@
-module Examples.Hangman where
+module Test.IOTest.Examples.Hangman where
 --
 -- import Prelude hiding (getLine, putStrLn, print)
 --

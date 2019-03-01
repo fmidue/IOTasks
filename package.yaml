@@ -1,5 +1,5 @@
 name:                IOTest
-version:             0.0.1.0
+version:             0.0.2.0
 github:              "owestphal/IOTest"
 license:             BSD3
 author:              "Oliver Westphal"
@@ -29,18 +29,6 @@ library:
   source-dirs: src
   ghc-options:
   - -Wall
-
-executables:
-  IOTest-exe:
-    main:                Main.hs
-    source-dirs:         app
-    ghc-options:
-    - -Wall
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - IOTest
 
 tests:
   IOTest-test:
