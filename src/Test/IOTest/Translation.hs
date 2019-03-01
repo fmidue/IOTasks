@@ -9,10 +9,10 @@ import Test.IOTest.Context
 
 import Control.Monad (void)
 
-buildProgram :: Specification -> IOtt ()
+buildProgram :: Specification VarName -> IOtt ()
 buildProgram s = void $ translate s (freshContext s)
 
-translate :: Specification -> Context -> IOtt (Context,LoopEnd)
+translate :: Specification VarName -> Context VarName -> IOtt (Context VarName,LoopEnd)
 translate (ReadInput x _) d = do
   v <- read <$> getLine
   return (update d x v, No)

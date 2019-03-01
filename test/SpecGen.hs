@@ -5,14 +5,14 @@ import Test.IOTest.Language
 
 import Test.QuickCheck hiding (Positive,output)
 
-specGen :: Gen Specification
+specGen :: Gen (Specification VarName)
 specGen = do
   (s,vs) <- input emptyVarSet
   n <- choose @Int (0, 10)
   ss <- go n [s] vs
   return $ foldr1 (<>) (reverse ss)
 
-go :: Int -> [Specification] -> VarSet -> Gen [Specification]
+go :: Int -> [Specification VarName] -> VarSet -> Gen [Specification VarName]
 go 0 ss _ = return ss
 go n ss vs = do
   (s, vs') <- oneof [input vs, output vs]
@@ -23,12 +23,12 @@ newtype VarSet = VarSet [VarName]
 emptyVarSet :: VarSet
 emptyVarSet = VarSet []
 
-input :: VarSet -> Gen (Specification, VarSet)
+input :: VarSet -> Gen (Specification VarName, VarSet)
 input (VarSet vs) = do
   x <- elements ["x","y","z"]
   return (ReadInput x IntTy, VarSet $ x:vs)
 
-output :: VarSet -> Gen (Specification, VarSet)
+output :: VarSet -> Gen (Specification VarName, VarSet)
 output (VarSet vs) = oneof [unary, binary] where
   unary = do
     f <- elements [sum, length]

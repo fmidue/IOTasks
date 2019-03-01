@@ -20,11 +20,11 @@ import Data.Bifunctor (bimap)
 
 import qualified Data.Set as S
 
-data IOProperty = Fulfills (IOtt ()) Specification | FulfillsNot (IOtt ()) Specification
+data IOProperty = Fulfills (IOtt ()) (Specification VarName) | FulfillsNot (IOtt ()) (Specification VarName)
 
-fulfills :: IOtt () -> Specification -> IOProperty
+fulfills :: IOtt () -> Specification VarName -> IOProperty
 fulfills = Fulfills
-fulfillsNot :: IOtt () -> Specification -> IOProperty
+fulfillsNot :: IOtt () -> Specification VarName -> IOProperty
 fulfillsNot = FulfillsNot
 
 instance Testable IOProperty where
@@ -34,20 +34,20 @@ instance Testable IOProperty where
 -- | Properties for programs and specifications with matching argument types.
 --   The 'Coercible' constraint allows for implict generator selection for example via types from "Test.QuickCheck.Modifiers"
 generalize2 :: Coercible a b =>
-                  (IOtt () -> Specification -> IOProperty)
+                  (IOtt () -> Specification VarName -> IOProperty)
                   -> (a -> IOtt ())
-                  -> (b -> Specification)
+                  -> (b -> Specification VarName)
                   -> b -> IOProperty
 generalize2 f g h x = f (g (coerce x)) (h x)
 
 generalize3 :: (Coercible a c, Coercible b d) =>
-                  (IOtt () -> Specification -> IOProperty)
+                  (IOtt () -> Specification VarName -> IOProperty)
                   -> (a -> b -> IOtt ())
-                  -> (c -> d -> Specification)
+                  -> (c -> d -> Specification VarName)
                   -> c -> d -> IOProperty
 generalize3 f g h x y = f (g (coerce x) (coerce y)) (h x y)
 
-specProperty :: Specification -> IOtt () -> Property
+specProperty :: Specification VarName -> IOtt () -> Property
 specProperty spec program =
   let gen = traceGen spec
       prop t = testTrace ((id &&& inputs) t) program

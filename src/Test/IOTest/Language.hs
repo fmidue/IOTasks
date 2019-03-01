@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 module Test.IOTest.Language (
   Specification(..),
   Function(..),
@@ -19,49 +20,49 @@ matchesType Negative = (< 0)
 matchesType Zero = (== 0)
 matchesType (Not ty) = not . matchesType ty
 
-data Specification
-  = ReadInput VarName NumType
-  | WriteOutput [Function]
-  | Branch Predicate Specification Specification
-  | TillE Specification
+data Specification x
+  = ReadInput x NumType
+  | WriteOutput [Function x]
+  | Branch (Predicate x) (Specification x) (Specification x)
+  | TillE (Specification x)
   | Nop
   | E
-  | Specification :<> Specification
+  | (:<>) (Specification x) (Specification x)
   deriving Show
 
 infixr 6 :<>
 
-instance Semigroup Specification where
+instance Semigroup (Specification x) where
   (<>) = (:<>)
 
-data Function
-  = UIntF (Int -> Int) VarName
-  | BIntF (Int -> Int -> Int) (VarName,VarName)
-  | UListF ([Int] -> Int) VarName
-  | BListF ([Int] -> [Int] -> Int) (VarName,VarName)
-  | MixedF ([Int] -> Int -> Int) (VarName,VarName)
+data Function x
+  = UIntF (Int -> Int) x
+  | BIntF (Int -> Int -> Int) (x,x)
+  | UListF ([Int] -> Int) x
+  | BListF ([Int] -> [Int] -> Int) (x,x)
+  | MixedF ([Int] -> Int -> Int) (x,x)
   | Const Int
   | Optional -- TODO: find a better way to encode epsilon
 
-data Predicate
-  = UIntP (Int -> Bool) VarName
-  | BIntP (Int -> Int -> Bool) (VarName,VarName)
-  | UListP ([Int] -> Bool) VarName
-  | BListP ([Int] -> [Int] -> Bool) (VarName,VarName)
-  | MixedP ([Int] -> Int -> Bool) (VarName,VarName)
+data Predicate x
+  = UIntP (Int -> Bool) x
+  | BIntP (Int -> Int -> Bool) (x,x)
+  | UListP ([Int] -> Bool) x
+  | BListP ([Int] -> [Int] -> Bool) (x,x)
+  | MixedP ([Int] -> Int -> Bool) (x,x)
 
-instance Show Function where
-  show (UIntF _ x)      = "*Int -> Int*(" ++ x ++ ")"
-  show (BIntF _ (x,y))  = "*Int -> Int -> Int*(" ++ x ++ "," ++ y ++ ")"
-  show (UListF _ x)     = "*[Int] -> Int*(" ++ x ++ ")"
-  show (BListF _(x,y))  = "*[Int] -> [Int] -> Int*(" ++ x ++ "," ++ y ++ ")"
-  show (MixedF _ (x,y)) = "*[Int] -> Int -> Int*(" ++ x ++ "," ++ y ++ ")"
+instance Show x => Show (Function x) where
+  show (UIntF _ x)      = "*Int -> Int*(" ++ show x ++ ")"
+  show (BIntF _ (x,y))  = "*Int -> Int -> Int*(" ++ show x ++ "," ++ show y ++ ")"
+  show (UListF _ x)     = "*[Int] -> Int*(" ++ show x ++ ")"
+  show (BListF _(x,y))  = "*[Int] -> [Int] -> Int*(" ++ show x ++ "," ++ show y ++ ")"
+  show (MixedF _ (x,y)) = "*[Int] -> Int -> Int*(" ++ show x ++ "," ++ show y ++ ")"
   show (Const n) = show n
   show Optional = "\xceb5"
 
-instance Show Predicate where
-  show (UIntP _ x)      = "*Int -> Bool*(" ++ x ++ ")"
-  show (BIntP _ (x,y))  = "*Int -> Int -> Bool*(" ++ x ++ "," ++ y ++ ")"
-  show (UListP _ x)     = "*[Int] -> Bool*(" ++ x ++ ")"
-  show (BListP _ (x,y)) = "*[Int] -> [Int] -> Bool*(" ++ x ++ "," ++ y ++ ")"
-  show (MixedP _ (x,y)) = "*[Int] -> Int -> Bool*(" ++ x ++ "," ++ y ++ ")"
+instance Show x => Show (Predicate x) where
+  show (UIntP _ x)      = "*Int -> Bool*(" ++ show x ++ ")"
+  show (BIntP _ (x,y))  = "*Int -> Int -> Bool*(" ++ show x ++ "," ++ show y ++ ")"
+  show (UListP _ x)     = "*[Int] -> Bool*(" ++ show x ++ ")"
+  show (BListP _ (x,y)) = "*[Int] -> [Int] -> Bool*(" ++ show x ++ "," ++ show y ++ ")"
+  show (MixedP _ (x,y)) = "*[Int] -> Int -> Bool*(" ++ show x ++ "," ++ show y ++ ")"

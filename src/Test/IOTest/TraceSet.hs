@@ -7,16 +7,16 @@ import Test.IOTest.Type
 import Test.IOTest.Trace
 import Test.IOTest.Context
 import qualified Test.IOTest.Language as Surface
-import Test.IOTest.Language (Function,NumType(..))
+import Test.IOTest.Language (Function,NumType(..),VarName)
 
 import Test.QuickCheck hiding (Positive,Function)
 import           Control.Arrow
 import qualified Data.Set as S
 
-traceGen :: Surface.Specification -> Gen (NTrace Int)
+traceGen :: Surface.Specification VarName -> Gen (NTrace Int)
 traceGen = uncurry traceGen' . (freshContext &&& id) . unsugar
 
-traceGen' :: Context -> Spec -> Gen (NTrace Int)
+traceGen' :: Context VarName -> Spec -> Gen (NTrace Int)
 traceGen' d spec = sized $ \size ->
   case spec of
     (Read x ty s') -> do
@@ -39,12 +39,12 @@ traceGen' d spec = sized $ \size ->
     (JumpPoint s s') -> traceGen' d $ andThen s (JumpPoint s s')
     _ -> error "not a valid spec"
 
-isOptional :: [Function] -> Bool
+isOptional :: [Function a] -> Bool
 isOptional [] = False
 isOptional (Surface.Optional:_) = True
 isOptional (_:xs) = isOptional xs
 
-filterEpsilon :: [Function] -> [Function]
+filterEpsilon :: [Function a] -> [Function a]
 filterEpsilon = filter (\case Surface.Optional -> False; _ -> True)
 
 genInt :: NumType -> Gen Int
