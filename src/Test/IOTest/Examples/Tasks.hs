@@ -124,8 +124,8 @@ scopingWrong = do
   print y
   print x
 
-printNSpec :: QC.Positive Int -> Int -> Specification a
-printNSpec (QC.Positive n) x = repeatSpec n $ WriteOutput [Const x]
+printNSpec :: QC.Positive Int -> Int -> Specification VarName
+printNSpec (QC.Positive n) x = repeatSpec n $ WriteOutput [pure x]
 
 printN :: Int -> Int -> IOtt ()
 printN n x = replicateM_ n $ print x
