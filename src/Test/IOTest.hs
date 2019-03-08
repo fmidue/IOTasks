@@ -3,8 +3,6 @@ module Test.IOTest (
   Specification(..),
   VarName,
   NumType,
-  Function(..),
-  Predicate(..),
   -- * Programs
   IOtt,
   IOtt.getLine,
@@ -14,8 +12,6 @@ module Test.IOTest (
   IOProperty,
   fulfills,
   fulfillsNot,
-  generalize2,
-  generalize3
 ) where
 
 import Test.IOTest.Language
