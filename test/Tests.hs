@@ -47,7 +47,7 @@ main = hspec $ do
     scopingWrong `fulfillsNot` scoping
 
   prop "multi parameter programs" $
-    generalize3 fulfills printN printNSpec
+    printN `fulfills` printNSpec
 
     --it "Testing solution4 against task4" $
     --  specProperty task4 solution4
