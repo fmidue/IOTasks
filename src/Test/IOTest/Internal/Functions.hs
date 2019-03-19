@@ -1,39 +1,7 @@
-{-# LANGUAGE FlexibleInstances #-}
-module Test.IOTest.Language (
-  Specification(..),
+module Test.IOTest.Internal.Functions (
   Function(..),
-  Predicate(..),
-  VarName,
-  NumType(..),
-  matchesType
+  Predicate(..)
 ) where
-
-type VarName = String
-
-data NumType = IntTy | NatTy | Positive | Negative | Zero | Not NumType deriving (Eq,Ord,Read,Show)
-
-matchesType :: NumType -> Int -> Bool
-matchesType IntTy = const True
-matchesType NatTy = (>= 0)
-matchesType Positive = (> 0)
-matchesType Negative = (< 0)
-matchesType Zero = (== 0)
-matchesType (Not ty) = not . matchesType ty
-
-data Specification x
-  = ReadInput x NumType
-  | WriteOutput [Function x]
-  | Branch (Predicate x) (Specification x) (Specification x)
-  | TillE (Specification x)
-  | Nop
-  | E
-  | (:<>) (Specification x) (Specification x)
-  deriving Show
-
-infixr 6 :<>
-
-instance Semigroup (Specification x) where
-  (<>) = (:<>)
 
 data Function x
   = UIntF (Int -> Int) x

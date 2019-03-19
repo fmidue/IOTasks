@@ -1,6 +1,6 @@
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Test.IOTest.Trace (
+{-# LANGUAGE DeriveFunctor #-}
+module Test.IOTest.Internal.Trace (
   IntTrace,
   NTrace,
   Trace,
@@ -8,8 +8,12 @@ module Test.IOTest.Trace (
   normalize,
   isCoveredBy,
   showNTrace,
-  inputs
+  inputs,
+  Normalizeable(..)
 ) where
+
+import Test.IOTest.Internal.Pattern
+import Test.IOTest.Utils
 
 import Control.Monad.Trans.Writer
 
@@ -17,6 +21,8 @@ import Data.Bifunctor
 import Data.Set (Set)
 import qualified Data.Set as S
 import           Data.List
+
+import Debug.Trace
 
 data Trace' o i
   = ProgRead i (Trace' o i)
@@ -33,23 +39,62 @@ instance Bifunctor Trace' where
 
 type IntTrace = Trace Int
 type Trace a = Trace' a a
-type NTrace a = Trace' (Set [a]) a
+type NTrace a = Trace' (Set [ConcretePattern a]) a
 
-normalize :: Trace a -> NTrace a
+class Normalizeable a where
+  toPattern :: a -> ConcretePattern a
+  leq :: Set [ConcretePattern a] -> Set [ConcretePattern a] -> Bool
+  ppMismatch :: Set [ConcretePattern a] -> Set [ConcretePattern a] -> String
+
+normalize :: Normalizeable a => Trace a -> NTrace a
 normalize = go [] where
-  go w (ProgWrite v t') = go (w ++ [v]) t'
+  go w (ProgWrite v t') = go (w ++ [toPattern v]) t'
   go w (ProgRead v t') = ProgWrite (S.singleton w) $ ProgRead v $ go [] t'
   go w Stop = ProgWrite (S.singleton w) Stop
   go w OutOfInputs = ProgWrite (S.singleton w) OutOfInputs
+
+isCoveredBy :: (Show a, Eq a, Normalizeable a) => NTrace a -> NTrace a -> Writer String Bool
+--isCoveredBy x y | trace ("coveredBy?\n" ++ show x ++ "\n\n" ++ show y) False = undefined
+ProgRead x t1 `isCoveredBy` ProgRead y t2 =
+  if x == y
+    then t1 `isCoveredBy` t2
+    else do
+      tell $ "Input mismatch: Expected " ++ show x ++ ". But got " ++ show y
+      return False
+ProgWrite v1 t1' `isCoveredBy` ProgWrite v2 t2' =
+  if v1 `leq` v2
+    then t1' `isCoveredBy` t2'
+    else do
+      tell $ ppMismatch v1 v2
+      return False
+Stop `isCoveredBy` Stop = return True
+_ `isCoveredBy` _ = tell "traces dont line up" >> return False
+
+instance Normalizeable Int where
+  toPattern n = ExactlyC n (show n)
+  leq = S.isSubsetOf
+  ppMismatch x y = ppOutputMismatch  (S.toList x) (S.toList y)
+
+instance Normalizeable String where
+  toPattern x = ExactlyC x x
+  x `leq` y = x == y || all (\vs -> any (match vs) (S.toList y)) (S.toList x)
+  ppMismatch xs ys = "Mismatch while comparing patterns: " ++ show (S.toList xs) ++ " is not covered by " ++ show (S.toList ys)
+
+match :: [ConcretePattern String] -> [ConcretePattern String] -> Bool
+--match xs ys | traceShow (xs,ys) False = undefined
+match xs ys =
+  length xs == length ys
+  &&
+  and (zipWith (\(ExactlyC v _) p -> check p v) xs ys)
+
+instance (Show a) => Show (NTrace a) where
+  show = showNTrace
 
 instance (Show a) => Show (Trace' a a) where
   show (ProgRead v t) = "?"++show v++" "++show t
   show (ProgWrite v t) = "!"++show v++" "++show t
   show Stop = "stop"
   show OutOfInputs = "<out of inputs>"
-
-instance (Show a) => Show (Trace' (Set [a]) a) where
-  show = showNTrace
 
 showNTrace :: Show a => NTrace a -> String
 showNTrace (ProgRead v t) = "?"++show v++" "++showNTrace t
@@ -61,22 +106,6 @@ showNTrace OutOfInputs = "<out of inputs>"
 
 similar :: Eq a => Trace' f a -> Trace' g a -> Bool
 similar x y = inputs x == inputs y
-
-isCoveredBy :: (Show a, Ord a) => NTrace a -> NTrace a -> Writer String Bool
-ProgRead x t1 `isCoveredBy` ProgRead y t2 =
-  if x == y
-    then t1 `isCoveredBy` t2
-    else do
-      tell $ "Input mismatch: Expected " ++ show x ++ ". But got " ++ show y
-      return False
-ProgWrite v1 t1' `isCoveredBy` ProgWrite v2 t2' =
-  if v1 `S.isSubsetOf` v2
-    then t1' `isCoveredBy` t2'
-    else do
-      tell $ ppOutputMismatch (S.toList v1) (S.toList v2)
-      return False
-Stop `isCoveredBy` Stop = return True
-_ `isCoveredBy` _ = tell "traces dont line up" >> return False
 
 ppOutputMismatch :: Show a => [a] -> [a] -> String
 ppOutputMismatch [v1] v2 =

@@ -12,7 +12,7 @@ module Test.IOTest.IOtt (
 
 import Prelude hiding (getLine, putStrLn, print)
 
-import Test.IOTest.Trace
+import Test.IOTest.Internal.Trace
 import Control.Monad
 
 data IOtt' t a where

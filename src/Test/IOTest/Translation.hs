@@ -1,26 +1,40 @@
+{-# LANGUAGE GADTs #-}
 module Test.IOTest.Translation (
   buildProgram
 ) where
 
+import Test.IOTest.Internal.Context
+import Test.IOTest.Internal.Pattern
+import Test.IOTest.Internal.Term hiding (update)
+import Test.IOTest.Utils
+
 import Prelude hiding (putStrLn,getLine,print)
-import Test.IOTest.Language
+import Test.IOTest.Internal.Specification
 import Test.IOTest.IOtt
-import Test.IOTest.Context
 
 import Control.Monad (void)
 
-buildProgram :: Specification VarName -> IOtt ()
+buildProgram :: StringRep a => Specification VarName a -> IOtt ()
 buildProgram s = void $ translate s (freshContext s)
 
-translate :: Specification VarName -> Context VarName -> IOtt (Context VarName,LoopEnd)
+translate :: StringRep a => Specification VarName a -> Context VarName a -> IOtt (Context VarName a,LoopEnd)
 translate (ReadInput x _) d = do
-  v <- read <$> getLine
+  v <- from <$> getLine
   return (update d x v, No)
 translate (WriteOutput []) _ = error "empty list of output options"
-translate (WriteOutput (Optional:_)) d = return (d,No)
+translate (WriteOutput (f: _)) d | isEpsilon f = return (d,No)
 translate (WriteOutput (f:_)) d = do
-  print $ evalF d f
+  putStrLn . to $ evalTerm f d
   return (d, No)
+translate (WriteOutputP []) _ = error "empty pattern set"
+translate (WriteOutputP (NoOutput : _ )) d = return (d,No)
+translate (WriteOutputP (Exactly t _ : _)) d = do
+  putStrLn $ show (evalTerm t d)
+  return (d, No)
+translate (WriteOutputP (Contains t _ : _)) d = do
+  putStrLn $ "<some string containing '" ++ show (evalTerm t d) ++ "'>"
+  return (d, No)
+translate (WriteOutputP (Everything : _)) d = putStrLn "<some string>" >> return (d, No)
 translate E d = return (d, Yes)
 translate Nop d = return (d, No)
 translate (TillE s) d =
@@ -32,7 +46,7 @@ translate (TillE s) d =
           No -> go d''
   in go d
 translate (Branch p s1 s2) d =
-  if evalP d p
+  if evalTerm p d
     then translate s2 d
     else translate s1 d
 translate (s1 :<> s2) d = translate s1 d >>= (\(d',_) -> translate s2 d')
