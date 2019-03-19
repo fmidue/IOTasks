@@ -1,5 +1,4 @@
 module Test.IOTest.Extended.Combinators
-  -- * Combinators
   ( readTillFixedLengthS, readTillFixedLengthI
   , readUntilS, readUntilI
   , readUntilS', readUntilI'

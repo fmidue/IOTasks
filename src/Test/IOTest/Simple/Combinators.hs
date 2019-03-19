@@ -1,6 +1,4 @@
 module Test.IOTest.Simple.Combinators (
-  -- * Combinators
-  -- $note
   readTillFixedLength,
   readUntil,
   readUntil1,
@@ -11,10 +9,6 @@ module Test.IOTest.Simple.Combinators (
 import Test.IOTest.Internal.Specification
 import Test.IOTest.Internal.Term
 import Control.Arrow
-
--- $intro
--- A combinator is abstract in the type of variables of the specification.
--- Thereby no combinator can introduce new variables or alter variable names passsed as inputs.
 
 repeatSpec :: Int -> Specification varName Int -> Specification varName Int
 repeatSpec 0 _ = Nop
