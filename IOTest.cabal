@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b57751f9fc9c9e612b7a3385c928794977ae90782a15f275d98d5c162efde0c0
+-- hash: e75df41ff6ceb6fa8b840f528be18cb5498cc1f717699c6947f188b6d6b71f06
 
 name:           IOTest
 version:        0.0.2.0
@@ -56,7 +56,6 @@ library
       QuickCheck
     , base >=4.7 && <5
     , containers
-    , contravariant
     , transformers
   default-language: Haskell2010
 
@@ -76,7 +75,6 @@ test-suite IOTest-test
     , QuickCheck
     , base >=4.7 && <5
     , containers
-    , contravariant
     , hspec
     , transformers
   default-language: Haskell2010
