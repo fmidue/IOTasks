@@ -13,7 +13,6 @@ module Test.IOTest.Internal.Trace (
 ) where
 
 import Test.IOTest.Internal.Pattern
-import Test.IOTest.Utils
 
 import Control.Monad.Trans.Writer
 
@@ -21,8 +20,6 @@ import Data.Bifunctor
 import Data.Set (Set)
 import qualified Data.Set as S
 import           Data.List
-
-import Debug.Trace
 
 data Trace' o i
   = ProgRead i (Trace' o i)

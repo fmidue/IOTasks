@@ -54,4 +54,4 @@ traceGen' d spec = sized $ \size ->
     (InternalE (JumpPoint _ s')) -> traceGen' d s'
     Nop -> return $ ProgWrite (S.singleton []) Stop
     (JumpPoint s s') -> traceGen' d $ andThen s (JumpPoint s s')
-    (InternalE _) -> error "not a valid spec"
+    (InternalE _) -> error "traceGen: called on invalid spec (no jump point after end marker)"

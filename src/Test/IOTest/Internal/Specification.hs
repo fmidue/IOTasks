@@ -1,9 +1,14 @@
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DataKinds #-}
 module Test.IOTest.Internal.Specification (
   Specification(..),
+  SpecificationF(..),
   VarName,
   Opt(..),
   NumType(..),
@@ -20,6 +25,7 @@ import Test.IOTest.Internal.Pattern
 import Test.QuickCheck hiding (Positive)
 
 import Data.List (nub)
+import Data.Functor.Foldable
 
 type VarName = String
 
@@ -45,6 +51,42 @@ data Specification v a where
 
 infixr 6 :<>
 
+data SpecificationF v a f where
+  ReadInputF :: v -> Restriction a -> SpecificationF v a f
+  WriteOutputF :: [Term v a a] -> SpecificationF v a f
+  WriteOutputPF :: [AbstractPattern v String String] -> SpecificationF v String f
+  BranchF :: Term v a Bool -> f -> f -> SpecificationF v a f
+  TillEF :: f -> SpecificationF v a f
+  NopF :: SpecificationF v a f
+  EF :: SpecificationF v a f
+  (:<>$) :: f -> f -> SpecificationF v a f
+
+deriving instance Functor (SpecificationF v a)
+deriving instance Foldable (SpecificationF v a)
+deriving instance Traversable (SpecificationF v a)
+
+type instance Base (Specification v a) = SpecificationF v a
+
+instance Recursive (Specification v a) where
+  project (ReadInput x r) = ReadInputF x r
+  project (WriteOutput ts) = WriteOutputF ts
+  project (WriteOutputP ts) = WriteOutputPF ts
+  project (Branch p s1 s2) = BranchF p s1 s2
+  project (TillE s) = TillEF s
+  project Nop = NopF
+  project E = EF
+  project (s1 :<> s2) = s1 :<>$ s2
+
+instance Corecursive (Specification v a) where
+  embed (ReadInputF x r) = ReadInput x r
+  embed (WriteOutputF ts) = WriteOutput ts
+  embed (WriteOutputPF ts) = WriteOutputP ts
+  embed (BranchF p s1 s2) = Branch p s1 s2
+  embed (TillEF s) = TillE s
+  embed NopF = Nop
+  embed EF = E
+  embed (s1 :<>$ s2) = s1 :<> s2
+
 -- move into Combinators ?
 optional :: Specification v a -> Specification v a
 optional (WriteOutput fs) = WriteOutput (epsilon : fs)
@@ -57,15 +99,15 @@ instance Semigroup (Specification v a) where
 data Opt = Can | Must
 
 instance HasVariables (Specification VarName a) where
-  vars = nub . go where
-    go (ReadInput v _) = [v]
-    go (s1 :<> s2) = vars s1 ++ vars s2
-    go (TillE s) = vars s
-    go (Branch _ s1 s2) = vars s1 ++ vars s2
-    go (WriteOutput _) = []
-    go (WriteOutputP _) = []
-    go Nop = []
-    go E = []
+  vars = nub . cata phi where
+    phi (ReadInputF v _) = [v]
+    phi (s1 :<>$ s2) = s1 ++ s2
+    phi (TillEF s) = s
+    phi (BranchF _ s1 s2) = s1 ++ s2
+    phi (WriteOutputF _) = []
+    phi (WriteOutputPF _) = []
+    phi NopF = []
+    phi EF = []
 
 instance Show (Specification v a) where
   show _ = "HACK"

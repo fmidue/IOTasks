@@ -1,4 +1,10 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Test.IOTest.Internal.InternalSpec (
   Spec (..),
   andThen,
@@ -13,6 +19,9 @@ import           Test.IOTest.Internal.Specification (Restriction,VarName,Specifi
 
 import           Data.List (nub)
 
+import Data.Functor.Foldable
+import Data.Functor.Foldable.TH
+
 data Spec a
   = Read VarName (Restriction a) (Spec a)
   | Write [Term VarName a a] (Spec a)
@@ -23,40 +32,47 @@ data Spec a
   | JumpPoint (Spec a) (Spec a)
   | Nop
 
+makeBaseFunctor ''Spec
+
 andThen :: Spec a -> Spec a -> Spec a
-andThen (Read xs ty s2) s' = Read xs ty (s2 `andThen` s')
-andThen (Write s1 s2) s' = Write s1 $ s2 `andThen` s'
-andThen (WriteP p s2) s' = WriteP p $ s2 `andThen` s'
-andThen (TillE s1 s2) s' = TillE s1 $ s2 `andThen` s'
-andThen (Branch p s11 s12 s2) s' = Branch p s11 s12 $ s2 `andThen` s'
-andThen (InternalE s) s' = InternalE $ s `andThen` s'
-andThen Nop s' = s'
-andThen (JumpPoint s1 s2) s' = JumpPoint s1 $ s2 `andThen` s'
+andThen s1 s2 = para phi s1 where
+  phi (ReadF x r (_,s)) = Read x r s
+  phi (WriteF ts (_,s)) = Write ts s
+  phi (WritePF ts (_,s)) = WriteP ts s
+  phi (BranchF p (s11,_) (s12,_) (_,s)) = Branch p s11 s12 s
+  phi (TillEF (s,_) (_,s')) = TillE s s'
+  phi (InternalEF (_,s)) = InternalE s
+  phi (JumpPointF (s,_) (_,s')) = JumpPoint s s'
+  phi NopF = s2
 
 unsugar :: Surface.Specification VarName a -> Spec a
-unsugar (Surface.ReadInput x ty :<> s') = Read x ty (unsugar s')
-unsugar (Surface.WriteOutput fs :<> s') = Write fs (unsugar s')
-unsugar (Surface.WriteOutputP p :<> s') = WriteP p (unsugar s')
-unsugar (Surface.TillE s :<> s') = TillE (unsugar s) (unsugar s')
-unsugar (Surface.Branch p s1 s2 :<> s') = Branch p (unsugar s1) (unsugar s2) (unsugar s')
-unsugar ((s11 :<> s12) :<> s2) =  unsugar $ s11 :<> (s12 :<> s2)
-unsugar Surface.E = InternalE Nop
-unsugar Surface.Nop = Nop
-unsugar s@Surface.ReadInput{} = unsugar $ s :<> Surface.Nop
-unsugar s@Surface.WriteOutput{} = unsugar $ s :<> Surface.Nop
-unsugar s@Surface.WriteOutputP{} = unsugar $ s :<> Surface.Nop
-unsugar s@Surface.TillE{} = unsugar $ s :<> Surface.Nop
-unsugar s@Surface.Branch{} = unsugar $ s :<> Surface.Nop
-unsugar (Surface.E :<> _) = InternalE Nop
-unsugar (Surface.Nop :<> s) = unsugar s
+unsugar = ana psi where
+  psi (Surface.ReadInput x ty :<> s') = ReadF x ty s'
+  psi (Surface.WriteOutput fs :<> s') = WriteF fs s'
+  psi (Surface.WriteOutputP p :<> s') = WritePF p s'
+  psi (Surface.TillE s :<> s') = TillEF s s'
+  psi (Surface.Branch p s1 s2 :<> s') = BranchF p s1 s2 s'
+  psi Surface.E = InternalEF nop
+  psi Surface.Nop = NopF
+  -- --normalizing rewrites
+  psi ((s11 :<> s12) :<> s2) = psi $ s11 :<> (s12 :<> s2)
+  psi (Surface.Nop :<> s) = psi s
+  psi (Surface.ReadInput x ty) = ReadF x ty nop
+  psi (Surface.WriteOutput ts) = WriteF ts nop
+  psi (Surface.WriteOutputP ts) = WritePF ts nop
+  psi (Surface.TillE s) = TillEF s nop
+  psi (Surface.Branch p s1 s2) = BranchF p s1 s2 nop
+  psi (Surface.E :<> _) = InternalEF nop
+  -- helper
+  nop = Surface.Nop
 
 instance HasVariables (Spec a) where
-  vars = nub . go where
-    go (Read x _ s) = x : vars s
-    go (TillE s s') = vars s ++ vars s'
-    go (Branch _ s1 s2 s3) = vars s1 ++ vars s2 ++ vars s3
-    go (Write _ s) = vars s
-    go (WriteP _ s) = vars s
-    go Nop = []
-    go (InternalE s) = vars s
-    go (JumpPoint s s') = vars s ++ vars s'
+  vars = nub . cata phi where
+    phi (TillEF s s') = s ++ s'
+    phi (ReadF x _ s) = x : s
+    phi (BranchF _ s1 s2 s3) = s1 ++ s2 ++ s3
+    phi (WriteF _ s) = s
+    phi (WritePF _ s) = s
+    phi NopF = []
+    phi (InternalEF s) = s
+    phi (JumpPointF s s') = s ++ s'
