@@ -14,7 +14,7 @@ testExtended :: Spec
 testExtended = describe "Testing extended implementation:" $ do
   prop "solution1 matches task1" $
     solution1 `fulfills` task1
-  prop "solution1' should not match task1" $
+  prop "solution1' does not match task1" $
     solution1' `fulfillsNot` task1
   prop "wrongSolution1 does not match against task1" $
     wrongSolution1 `fulfillsNot` task1

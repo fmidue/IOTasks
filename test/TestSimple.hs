@@ -1,6 +1,6 @@
 module TestSimple where
 
-import Prelude hiding (getLine, putStrLn, print)
+import Prelude
 
 import SpecGen
 
@@ -10,7 +10,7 @@ import Test.IOTest.Examples.Simple
 
 import Test.Hspec
 import Test.Hspec.QuickCheck (prop)
-import Test.QuickCheck (forAll, Positive(..))
+import Test.QuickCheck
 
 testSimple :: Spec
 testSimple = describe "Testing simple implementation:" $ do
@@ -22,6 +22,8 @@ testSimple = describe "Testing simple implementation:" $ do
     solution1 `fulfills` task1'
   prop "solution1' matches task1'" $
     solution1' `fulfills` task1'
+  prop "solution1' does not match task1" $
+    solution1' `fulfillsNot` task1
   prop "solution2 matches task2" $
    solution2 `fulfills` task2
   prop "solution3 matches task3" $
@@ -42,6 +44,14 @@ testSimple = describe "Testing simple implementation:" $ do
 
   prop "programs build from a simple spec (read and write only) satisfy that spec" $
     forAll specGen (\s -> buildProgram s `fulfills` s)
+
+  describe "programs build from a simple spec (read and write only) satisfy that spec (double negate)" $ do
+    result <- runIO $ quickCheckResult $ forAll specGen (\s -> buildProgram s `fulfillsNot` s)
+    it "does not fail" $ case result of
+      Failure{} -> False
+      Success{} -> False
+      GaveUp{} -> False
+      NoExpectedFailure{} -> True
 
   prop "correct handeling of scoping 1" $
     scopingRight `fulfills` scoping

@@ -22,8 +22,11 @@ task1 =
 task1' :: Specification
 task1' =
   readInput "n" NatTy <>
-  readTillFixedLength "n" IntTy "xs" <>
-  writeOutput [sum <$> getAll "xs"]
+  tillE (
+    branch ((\xs n -> length xs == n) <$> getAll "x" <*> getCurrent "n")
+      (optional (writeOutput [(\xs n -> n - length xs) <$> getAll "x" <*> getCurrent "n" ]) <> readInput "x" IntTy)
+      e) <>
+  writeOutput [sum <$> getAll "x"]
 
 solution1 :: IOtt ()
 solution1 = do
@@ -38,9 +41,13 @@ solution1 = do
 solution1' :: IOtt ()
 solution1' = do
   n <- read @Int <$> getLine
-  --putStrLn $ show n
-  xs <- replicateM n $ read @Int <$> getLine
-  putStrLn $ show (sum xs)
+  go n []
+  where
+    go 0 xs = print . sum $ reverse xs
+    go n xs = do
+      print n
+      x <- read @Int <$> getLine
+      go (n-1) (x:xs)
 
 wrongSolution1 :: IOtt ()
 wrongSolution1 = do
