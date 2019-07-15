@@ -29,7 +29,6 @@ data Spec a
   | Branch (Term VarName a Bool) (Spec a) (Spec a) (Spec a)
   | TillE (Spec a) (Spec a)
   | InternalE (Spec a)
-  | JumpPoint (Spec a) (Spec a)
   | Nop
 
 makeBaseFunctor ''Spec
@@ -42,7 +41,6 @@ andThen s1 s2 = para phi s1 where
   phi (BranchF p (s11,_) (s12,_) (_,s)) = Branch p s11 s12 s
   phi (TillEF (s,_) (_,s')) = TillE s s'
   phi (InternalEF (_,s)) = InternalE s
-  phi (JumpPointF (s,_) (_,s')) = JumpPoint s s'
   phi NopF = s2
 
 unsugar :: Surface.Specification VarName a -> Spec a
@@ -75,4 +73,3 @@ instance HasVariables (Spec a) where
     phi (WritePF _ s) = s
     phi NopF = []
     phi (InternalEF s) = s
-    phi (JumpPointF s s') = s ++ s'
