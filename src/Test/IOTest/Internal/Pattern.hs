@@ -1,36 +1,68 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE TypeApplications #-}
 module Test.IOTest.Internal.Pattern
-  ( AbstractPattern(..)
-  , ConcretePattern(..)
-  , check
-  , description
+  ( matches
+  , buildPattern
+  , LinearPattern
   ) where
 
-import Test.IOTest.Internal.Term
-import Test.IOTest.Utils
-import Data.List
+import           Test.QuickCheck
 
-data AbstractPattern v s a
-  = Exactly (Term v s a) String -- 1. term to "equal" the string 2. description of the term
-  | Contains (Term v s a) String -- 1. term to be contained in the string 2. description of the term
-  | Everything
-  | NoOutput
+import Data.String
 
-data ConcretePattern a
-  = ExactlyC a String -- 1. term to "equal" the string 2. description of the term
-  | ContainsC a String -- 1. term to be contained in the string 2. description of the term
-  | EverythingC
-  deriving (Eq,Ord,Functor)
+import Text.Regex.Posix
 
-instance Show a => Show (ConcretePattern a) where
-  show = description
+data LinearPattern
+  = Simple SimplePattern
+  | Sequence SimplePattern LinearPattern
 
-check :: StringRep a => ConcretePattern a -> String -> Bool
-check (ExactlyC t _) s = to t == s
-check (ContainsC t _) s = to t `isInfixOf` s
-check EverythingC _ = True
+data SimplePattern = Empty | WildCard | Literal String
 
-description :: ConcretePattern a -> String
-description (ExactlyC _ d) = d
-description (ContainsC _ d) = "a string containing " ++ d
-description EverythingC = "some string"
+instance Show LinearPattern where
+  show (Simple s) = show s
+  show (Sequence p1 p2) = show p1 ++ show p2
+
+instance Show SimplePattern where
+  show Empty = ""
+  show WildCard = "_"
+  show (Literal l) = l
+
+matches :: String -> LinearPattern -> Bool
+matches xs p = xs =~ ("^" ++ regexString p ++ "$")
+
+regexString :: LinearPattern -> String
+regexString (Simple s) = simpleRegexString s
+regexString (Sequence p1 p2) = simpleRegexString p1 ++ regexString p2
+
+simpleRegexString :: SimplePattern -> String
+simpleRegexString Empty = ""
+simpleRegexString WildCard = ".*"
+simpleRegexString (Literal p) = p
+
+buildPattern :: String -> LinearPattern
+buildPattern "" = Simple Empty
+buildPattern ['_'] = Simple WildCard
+buildPattern ('_':xs) = Sequence WildCard (buildPattern xs)
+buildPattern xs =
+  let (lit,rest) = span (/= '_') xs
+  in if null rest
+    then Simple (Literal lit)
+    else Sequence (Literal lit) (buildPattern rest)
+
+instance IsString LinearPattern where
+  fromString = buildPattern
+
+instance Semigroup LinearPattern where
+  Simple Empty        <> p                   = p
+  p                   <> Simple Empty        = p
+  Simple WildCard     <> Simple WildCard     = Simple WildCard
+  Simple (Literal l1) <> Simple (Literal l2) = Simple $ Literal (l1 <> l2)
+  Simple p1           <> Simple p2           = Sequence p1 (Simple p2)
+  Simple p1           <> Sequence p21 p22    = Sequence p1 (Sequence p21 p22)
+  Sequence p11 p12    <> p2                  = Sequence p11 (p12 <> p2)
+
+instance Monoid LinearPattern where
+  mempty = Simple Empty
+
+-- tests
+_test :: IO ()
+_test = quickCheck $ \xs -> show (fromString @LinearPattern xs) == xs
