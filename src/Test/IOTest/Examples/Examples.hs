@@ -46,6 +46,7 @@ task1' :: Specification
 task1' =
   optional (writeFixedOutput ["_"]) <>
   readInput "n" nats <>
+  optional (writeOutput ["_#0_"] [getCurrent @Int "n"] nonStringTerms) <>
   readTillFixedLength "n" ints "xs" <>
   writeOutput ["_#0_"] [sum <$> getAll @Int "xs"] nonStringTerms
 
@@ -53,18 +54,17 @@ solution1 :: IOtt ()
 solution1 = do
   putStrLn "> "
   n <- read @Int <$> getLine
-  --putStrLn $ "You entered " ++ show n
   xs <- replicateM n $ read @Int <$> getLine
-  --putStrLn $ "Result: " ++ show (sum xs)
-  putStrLn $ show (sum xs)
-  --print $ sum xs
+  print $ sum xs
 
 solution1' :: IOtt ()
 solution1' = do
+  putStrLn "> "
   n <- read @Int <$> getLine
-  --putStrLn $ show n
+  putStrLn $ "You entered " ++ show n
   xs <- replicateM n $ read @Int <$> getLine
-  putStrLn $ show (sum xs)
+  putStrLn "Result: "
+  print $ sum xs
 
 wrongSolution1 :: IOtt ()
 wrongSolution1 = do
@@ -73,11 +73,11 @@ wrongSolution1 = do
   --putStrLn $ "You entered " ++ show n
   replicateM_ n $ read @Int <$> getLine
   putStrLn "17"
-  --putStrLn "Result: 17"
 
 -- read till last two numbers sum to 0 than count positive numbers divisible by 3
 task2 :: Specification
 task2 =
+  repeatSpec 2 (readInput "xs" ints) <> --otherwise the condition will throw an exception
   readUntil "xs" ((\xs -> length xs > 1 && last xs + last (init xs) == 0 ) <$> getAll @Int "xs") ints <>
   writeOutput ["_#0_"] [count <$> getAll @Int "xs"] nonStringTerms
   where count xs = length [ x | x <- xs, x > 0, x `mod` 3 == 0]
@@ -102,6 +102,7 @@ task3 =
 
 task3' :: Specification
 task3' =
+  readInput "xs" ints <> --otherwise last will fail
   readUntil "xs" ((\xs -> last xs == 0) <$> getAll @Int "xs") ints <>
   writeOutput ["_#0_"] [sum <$> getAll @Int "xs"] nonStringTerms
 

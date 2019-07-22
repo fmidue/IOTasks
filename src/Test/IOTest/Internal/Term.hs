@@ -43,10 +43,15 @@ isEpsilon :: Term a -> Bool
 isEpsilon t = isNothing $ evalState (runMaybeT $ getTerm t) []
 
 getCurrent :: forall s a . (Typeable a, StringEmbedding s a) => Proxy s -> Varname -> Term a
-getCurrent p x = last <$> getAll p x
+getCurrent p x =
+  let vs = getAll p x
+  in if not . null $ evalState (runMaybeT $ getTerm vs) []
+    then last <$> vs
+    else error $ "getCurrent: no values stored for " <> x
 
 getAll :: forall s a . (Typeable a, StringEmbedding s a) => Proxy s -> Varname -> Term [a]
 getAll p x = Term . MaybeT $ Just <$> do
   mVs <- gets $ lookupNameAtType p x
-  let vs = fromMaybe (error "lookup failed!") mVs
-  return vs
+  case mVs of
+    Left e -> error $ show e
+    Right vs -> return vs

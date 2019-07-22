@@ -21,7 +21,7 @@ import Type.Reflection
 
 type Varname = String
 
-type Context = [(Varname,(SomeTypeRep,[Value]))]
+type Context = [ (Varname, Maybe (SomeTypeRep,[Value]) ) ]
 
 data Value where
   Value :: (Typeable a, StringEmbedding s a) => Proxy s -> a -> Value
@@ -38,23 +38,40 @@ fromValue _ (Value _ a) = fromDynamic (toDyn a)
 update :: Context -> Varname -> Value -> Maybe Context
 update vs x v = traverse (addValue x v) vs
   where
-    addValue x' v' (y,(tyRep,vs')) =
+    addValue x' v' (y,Nothing) =
       if y == x'
-        then if null vs' || tyRep == valueTypeRep v'
-          then Just (y,(valueTypeRep v',vs' ++ [v']))
+        then Just (y, Just (valueTypeRep v', [v']))
+        else Just (y,Nothing)
+    addValue x' v' (y,Just (tyRep,vs')) =
+      if y == x'
+        then if tyRep == valueTypeRep v'
+          then Just (y, Just (valueTypeRep v',vs' ++ [v']))
           else Nothing
-        else Just (y,(tyRep,vs'))
+        else Just (y,Just (tyRep,vs'))
 
 freshContext :: HasVariables a => a -> Context
-freshContext s = (,(undefined,[])) <$> vars s
+freshContext s = (,Nothing) <$> vars s
 
-lookupName :: Varname -> Context -> Maybe [Value]
-lookupName = fmap snd ... lookup
+data LookupError = NameNotFound String | WrongType String
 
-lookupNameAtType :: (Typeable a, StringEmbedding s a) => Proxy s -> Varname -> Context -> Maybe [a]
-lookupNameAtType p x c = do
-  vs <- snd <$> lookup x c
-  traverse (fromValue p) vs
+instance Show LookupError where
+  show (NameNotFound e) = "lookup error: name not found: " <> e
+  show (WrongType e) = "lookup error: wrong type: " <> e
+
+lookupName :: Varname -> Context -> Either LookupError [Value]
+lookupName x c =
+  case lookup x c of
+    Just Nothing -> Right []
+    Just (Just (_, vs)) -> Right vs
+    Nothing -> Left (NameNotFound $ x <> " in " <> show c)
+
+lookupNameAtType :: (Typeable a, StringEmbedding s a) => Proxy s -> Varname -> Context -> Either LookupError [a]
+lookupNameAtType p x c =
+  case lookupName x c of
+    Left e -> Left e
+    Right vs -> case traverse (fromValue p) vs of
+      Just typedVs -> Right typedVs
+      Nothing -> Left (WrongType $ x <> " in " <> show c)
 
 class HasVariables a where
   vars :: a -> [Varname]
