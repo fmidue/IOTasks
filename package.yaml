@@ -25,6 +25,10 @@ dependencies:
 - transformers
 - containers
 - recursion-schemes
+- regex-base
+- regex-posix
+- random
+- parsec
 
 library:
   source-dirs: src

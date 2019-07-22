@@ -1,30 +1,53 @@
 {-# LANGUAGE TypeApplications #-}
-module Test.IOTest.Examples.Extended where
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DataKinds #-}
+module Test.IOTest.Examples.Examples where
 
 import Prelude hiding (putStrLn, getLine, print)
 
 import Test.IOTest.IOtt
-import Test.IOTest.Extended.Language
-import Test.IOTest.Extended.Combinators
+import Test.IOTest.Language
+import Test.IOTest.Combinators
 
 import Test.QuickCheck as QC (Positive(..))
 
 import Control.Monad (replicateM,replicateM_)
 
+import Data.Proxy
+
+nats :: ValueSet
+nats = intValues [0..10]
+
+ints :: ValueSet
+ints = intValues [-10..10]
+
 -- read natural number n, then read n integers and sum them
 task1 :: Specification
 task1 =
-  writeOutputP [Everything] <>
-  readInputI "n" NatTy <>
-  readTillFixedLengthI "n" IntTy "xs" <>
-  writeOutputI [sum <$> getAllI "xs"]
+  writeFixedOutput ["_"] <>
+  readInput "n" (intValues [0..10]) <>
+  readTillFixedLength "n" (intValues [-10..10]) "xs" <>
+  writeOutput ["#0"] [sum <$> getAll @Int "xs"] nonStringTerms
+
+spec :: Specification
+spec =
+  writeFixedOutput ["_"] <>
+  readInput "n" (intValues [0..10]) <>
+  tillE (
+    branch ((\n xs -> length xs == n) <$> getCurrent "n" <*> getAll @Int "xs")
+     ( writeOutput ["_#0_"] [length <$> getAll @Int "xs"] nonStringTerms <>
+       readInput "xs" (intValues [-10..10])
+     )
+     e
+  ) <>
+  writeOutput ["_#0_"] [sum <$> getAll @Int "xs"] nonStringTerms
 
 task1' :: Specification
 task1' =
-  optional (writeOutputP [Everything]) <>
-  readInputI "n" NatTy <>
-  readTillFixedLengthI "n" IntTy "xs" <>
-  writeOutputI [sum <$> getAllI "xs"]
+  optional (writeFixedOutput ["_"]) <>
+  readInput "n" nats <>
+  readTillFixedLength "n" ints "xs" <>
+  writeOutput ["_#0_"] [sum <$> getAll @Int "xs"] nonStringTerms
 
 solution1 :: IOtt ()
 solution1 = do
@@ -55,8 +78,8 @@ wrongSolution1 = do
 -- read till last two numbers sum to 0 than count positive numbers divisible by 3
 task2 :: Specification
 task2 =
-  readUntilI' "xs" (\xs -> length xs > 1 && last xs + last (init xs) == 0) IntTy <>
-  writeOutputI [count <$> getAllI "xs"]
+  readUntil "xs" ((\xs -> length xs > 1 && last xs + last (init xs) == 0 ) <$> getAll @Int "xs") ints <>
+  writeOutput ["_#0_"] [count <$> getAll @Int "xs"] nonStringTerms
   where count xs = length [ x | x <- xs, x > 0, x `mod` 3 == 0]
 
 solution2 :: IOtt ()
@@ -73,14 +96,14 @@ solution2 = go [] Nothing Nothing where
 task3 :: Specification
 task3 =
   tillE $
-    readInputI "x" IntTy <>
-    when ((0==) <$> getCurrentI "x")
-      (writeOutputI [sum <$> getAllI "x"] <> e)
+    readInput "x" ints <>
+    when ((0==) <$> getCurrent @Int "x")
+      (writeOutput ["_#0_"] [sum <$> getAll @Int "x"] nonStringTerms <> e)
 
 task3' :: Specification
 task3' =
-  readUntilI' "xs" (\xs -> last xs == 0) IntTy <>
-  writeOutputI [sum <$> getAllI "xs"]
+  readUntil "xs" ((\xs -> last xs == 0) <$> getAll @Int "xs") ints <>
+  writeOutput ["_#0_"] [sum <$> getAll @Int "xs"] nonStringTerms
 
 solution3 :: IOtt ()
 solution3 = go [] where
@@ -93,8 +116,8 @@ solution3 = go [] where
 -- read and reverse
 task4 :: Specification
 task4 =
-  readInputS "line" <>
-  writeOutputS [reverse <$> getCurrentS "line"]
+  readInput "line" (ValueSet (Proxy @'True) ("_" :: LinearPattern)) <>
+  writeOutput ["_#0_"] [reverse <$> getCurrentS "line"] stringTerms
 
 solution4 :: IOtt ()
 solution4 = (reverse <$> getLine) >>= putStrLn
@@ -104,12 +127,12 @@ wrongSolution4 = getLine >>= putStrLn
 
 scoping :: Specification
 scoping =
-  readInputI "x" IntTy <>
+  readInput "x" ints <>
   (
-    readInputI "x" IntTy <>
-    writeOutputI [getCurrentI "x"]
+    readInput "x" ints <>
+    writeOutput ["#0"] [getCurrent @Int "x"] nonStringTerms
   ) <>
-  writeOutputI [getCurrentI "x"]
+  writeOutput ["#0"] [getCurrent @Int "x"] nonStringTerms
 
 scopingRight :: IOtt ()
 scopingRight = do
@@ -126,7 +149,7 @@ scopingWrong = do
   print x
 
 printNSpec :: QC.Positive Int -> Int -> Specification
-printNSpec (QC.Positive n) x = repeatSpec n $ writeOutputI [pure x]
+printNSpec (QC.Positive n) x = repeatSpec n $ writeFixedOutput [buildPattern (show x)]
 
 printN :: Int -> Int -> IOtt ()
 printN n x = replicateM_ n $ print x

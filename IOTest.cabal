@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c067891324183f6641decf0fc47c35659c4b3b1912940c02d9bb812e90b6e529
+-- hash: d14c88664855edfef8f6115ca234c873329136b8bd284d50bdeb4e0cee3e3395
 
 name:           IOTest
 version:        0.0.2.0
@@ -28,23 +28,20 @@ source-repository head
 
 library
   exposed-modules:
-      Test.IOTest.Examples.Extended
+      Test.IOTest.Combinators
+      Test.IOTest.Examples.Examples
       Test.IOTest.Examples.Hangman
-      Test.IOTest.Examples.Simple
-      Test.IOTest.Extended.Combinators
-      Test.IOTest.Extended.Language
       Test.IOTest.Internal.Context
-      Test.IOTest.Internal.Functions
       Test.IOTest.Internal.InternalSpec
       Test.IOTest.Internal.Pattern
       Test.IOTest.Internal.Specification
       Test.IOTest.Internal.Term
       Test.IOTest.Internal.Trace
       Test.IOTest.Internal.TraceSet
+      Test.IOTest.Internal.ValueSet
       Test.IOTest.IOProperty
       Test.IOTest.IOtt
-      Test.IOTest.Simple.Combinators
-      Test.IOTest.Simple.Language
+      Test.IOTest.Language
       Test.IOTest.Translation
       Test.IOTest.Utils
   other-modules:
@@ -56,7 +53,11 @@ library
       QuickCheck
     , base >=4.7 && <5
     , containers
+    , parsec
+    , random
     , recursion-schemes
+    , regex-base
+    , regex-posix
     , transformers
   default-language: Haskell2010
 
@@ -65,8 +66,7 @@ test-suite IOTest-test
   main-is: Tests.hs
   other-modules:
       SpecGen
-      TestExtended
-      TestSimple
+      TestExamples
       Paths_IOTest
   hs-source-dirs:
       test
@@ -77,6 +77,10 @@ test-suite IOTest-test
     , base >=4.7 && <5
     , containers
     , hspec
+    , parsec
+    , random
     , recursion-schemes
+    , regex-base
+    , regex-posix
     , transformers
   default-language: Haskell2010

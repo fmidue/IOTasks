@@ -1,12 +1,9 @@
-import TestSimple
-import TestExtended
+import TestExamples
 
 import Test.Hspec (hspec)
 
 main :: IO ()
-main = hspec $ do
-  testSimple
-  testExtended
+main = hspec testExamples
 
     --it "Testing hangman" $
     --  specProperty (hangmanSpec [2,7,1,4,2,1]) (hangmanProg [2,7,1,4,2,1])

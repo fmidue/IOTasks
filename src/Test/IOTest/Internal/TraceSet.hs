@@ -8,52 +8,43 @@ module Test.IOTest.Internal.TraceSet (
 import Test.IOTest.Internal.InternalSpec
 import Test.IOTest.Internal.Trace
 import Test.IOTest.Internal.Pattern
-import Test.IOTest.Internal.Term hiding (update)
+import Test.IOTest.Internal.Term
 import Test.IOTest.Internal.Context
+import Test.IOTest.Internal.ValueSet
 import qualified Test.IOTest.Internal.Specification as Surface
-import Test.IOTest.Internal.Specification (Restrictable(..),VarName)
 
 import Test.QuickCheck hiding (Positive,Function)
 import qualified Data.Set as S
+import           Data.Maybe
+import           System.Random
 
-traceGen :: (Ord a, Normalizeable a, Restrictable a) => Surface.Specification VarName a -> Gen (NTrace a)
+traceGen :: Surface.Specification -> Gen NTrace
 traceGen = (\s -> traceGen' s kI (freshContext s)) . unsugar
-  where kI Continue = const . return $ ProgWrite (S.singleton []) Stop
+  where kI Continue = const . return $ ProgWrite (S.singleton emptyPattern) Stop
         kI Exit = error "ill formed spec!"
-traceGen' :: (Ord a, Normalizeable a, Restrictable a)
+
+traceGen' ::
   -- specification
-  => Spec a
+     Spec
   -- contiuation
-  -> (Action -> Context VarName a -> Gen (NTrace a))
+  -> (Action -> Context -> Gen NTrace)
   -- variable context
-  -> Context VarName a
-  -> Gen (NTrace a)
+  -> Context
+  -> Gen NTrace
 traceGen' spec k d = sized $ \size ->
   case spec of
-    (Read x ty s') -> do
-      v <- restrict ty
-      t' <- traceGen' s' k (update d x v)
-      return $ ProgWrite (S.singleton []) $ ProgRead v t'
+    (Read x vs s') -> do
+      seed <- choose (minBound, maxBound)
+      let v = valueOf vs (mkStdGen seed) -- TODO: is there a better way of doing this?
+      t' <- traceGen' s' k (fromMaybe (error "type mismatch on context update") $ update d x v)
+      return $ ProgWrite (S.singleton emptyPattern) $ ProgRead (show v) t'
       -- FIXME: clean up according to paper definition?
-    (Write ts s') -> do
-      let v1 = S.fromList $ (\t -> if isEpsilon t then [] else pure . toPattern $ evalTerm t d) <$> ts
+    (Write pxy opt ps ts s') -> do
+      let v1 = S.fromList ((\p -> fillHoles pxy p ts d) <$> ps)
       t <- traceGen' s' k d
       let (ProgWrite v2 t') = t
-      let v = S.map (uncurry (++)) $ S.cartesianProduct v1 v2
-      return $ ProgWrite v t'
-    (WriteP p s') -> do
-      let cPs =
-            (\case
-              (Exactly t desc) -> [ExactlyC (evalTerm t d) desc]
-              (Contains t desc) -> [ContainsC (evalTerm t d) desc]
-              Everything -> [EverythingC]
-              NoOutput -> []
-            ) <$> p
-      let v1 = S.fromList cPs
-      t <- traceGen' s' k d
-      let (ProgWrite v2 t') = t
-      let v = S.mapMonotonic (uncurry (++)) $ S.cartesianProduct v1 v2
-      return $ ProgWrite v t'
+      let v = S.map (uncurry (<>)) $ S.cartesianProduct v1 v2
+      return $ ProgWrite (if opt then S.insert emptyPattern v else v) t'
     (TillE s s') ->
       let k' Continue = traceGen' s k'
           k' Exit = traceGen' s' k

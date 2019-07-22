@@ -1,46 +1,42 @@
 module Test.IOTest.Examples.Hangman where
---
--- import Prelude hiding (getLine, putStrLn, print)
---
--- import Types
--- import Interaction
--- import IOtt
---
--- import Data.List (nub,permutations,delete)
---
--- hangmanSpec :: [Int] -> Spec
+
+import Prelude hiding (getLine, putStrLn, print)
+
+import Test.IOTest.IOtt
+import Test.IOTest.Language
+
+-- hangmanSpec :: [Int] -> Specification
 -- hangmanSpec word =
---   let letters = nub word
---       perms = permutations letters
---   in Choice $ permutationPath <$> perms
+--   tillE (
+--        branch (winCondition <$> getAllI "guessed")
+--          nop
+--          (writeOutputP [Contains (pure "Correct") "Correct"] <> e)
+--     <> writeOutputP [Everything]
+--     <> readInputI "guessed" NatTy
+--     <> branch ((`elem` word) <$> getCurrentI "guessed")
+--          (optional $ writeOutputP [Contains (pure "wrong") "wrong"])
+--          (optional $ writeOutputP [Contains (pure "good Guess") "good Guess"])
+--     )
+--   where
+--     winCondition xs = all (`elem` filter (`elem` word) xs) word
 --
--- permutationPath :: [Int] -> Spec
--- permutationPath xs = StepSpecs $ go [] xs where
---   go _ [] = [(Out (string "Correct", []),displayValue)]
---   go is (y:ys) =
---     (In ("xs", DListTy (SPred NumTy (predicate is y)) [("", exact y)]), prompt "which number?" <& mayReactWith (\(IntVal z) -> if z == y then Template (DontCare Nil) else MatchExactly "wrong!"))
---     : go (y:is) ys
---   predicate is y i = i `elem` is || i `notElem` delete y xs
 --
 -- -- TODO: improve Specs, so that the comments can be used for real
 -- -- mainly multiline "prompts" is what's missing
--- hangmanProg :: [Int] -> IOtt ()
+-- hangmanProg :: TeletypeM m => [Int] -> m ()
 -- hangmanProg word = go [] where
 --   go guessed
 --     | all (`elem` guessed) word = putStrLn "Correct"
 --     | otherwise = do
---       --putStrLn ""
---       --putStrLn $ printWord word guessed
---       putStrLn "which number?"
---       x <- read <$> getLine
---       if x `elem` word && x `notElem` guessed
---         then do
---           putStrLn "good Guess!" -- this is optional
---           go (x:guessed)
---         else do
---           putStrLn "wrong!"
---           go guessed
+--         putStrLn $ "\n" ++ printWord word guessed ++ "\nwhich number?"
+--         x <- read <$> getLine
+--         if x `elem` word && x `notElem` guessed
+--           then do
+--             putStrLn "good Guess!" -- this is optional
+--             go (x:guessed)
+--           else do
+--             putStrLn "wrong!"
+--             go guessed
 --
 -- printWord :: (Eq a, Show a) => [a] -> [a] -> String
--- printWord xs guessed
---   = foldr (\x -> (++) (if x `elem` guessed then "x " else "_ ")) "" xs
+-- printWord xs guessed = foldr (\x -> (++) (if x `elem` guessed then show x ++ " " else "_ ")) "" xs

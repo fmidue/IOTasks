@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE GADTs #-}
@@ -5,7 +6,7 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
 module Test.IOTest.Internal.Term (
   Term,
-  update,
+  --update,
   getCurrent,
   getAll,
   evalTerm,
@@ -13,32 +14,39 @@ module Test.IOTest.Internal.Term (
   isEpsilon
 ) where
 
-import Test.IOTest.Internal.Context (Context)
+import Test.IOTest.Internal.Context
+import Test.IOTest.Utils
 
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Maybe
 
 import Data.Maybe
+import Data.Dynamic
+import Data.Proxy
 
-newtype Term v s a = Term { getTerm :: MaybeT (State (Context v s)) a }
-  deriving (Functor, Applicative) via (MaybeT (State (Context v s)))
+newtype Term a = Term { getTerm :: MaybeT (State Context) a }
+  deriving (Functor, Applicative) via (MaybeT (State Context))
 
-evalTerm :: Term v s a -> Context v s -> a
+evalTerm :: Term a -> Context -> a
 evalTerm t = fromMaybe (error "Can not evaluate epsilon!") . (evalState . runMaybeT $ getTerm t)
 
-update :: Eq v => v -> s -> Term v s ()
-update x v = Term $ MaybeT $ Just <$> modify (map (x `addValue` v))
-  where
-    addValue x' v' (y,vs') = if y == x' then (y,vs' ++ [v']) else (y,vs')
+--TODO: What is this good for?
+-- update :: Eq v => v -> s -> Term ()
+-- update x v = Term $ MaybeT $ Just <$> modify (map (x `addValue` v))
+--   where
+--     addValue x' v' (y,vs') = if y == x' then (y,vs' ++ [v']) else (y,vs')
 
-epsilon :: Term v s a
+epsilon :: Term a
 epsilon = Term $ MaybeT $ return Nothing
 
-isEpsilon :: Term v s a -> Bool
+isEpsilon :: Term a -> Bool
 isEpsilon t = isNothing $ evalState (runMaybeT $ getTerm t) []
 
-getCurrent :: Eq v => v -> Term v a a
-getCurrent x = last <$> getAll x
+getCurrent :: forall s a . (Typeable a, StringEmbedding s a) => Proxy s -> Varname -> Term a
+getCurrent p x = last <$> getAll p x
 
-getAll :: Eq v => v -> Term v a [a]
-getAll x = Term $ MaybeT $ Just <$> gets (fromMaybe (error "lookup failed!") . lookup x)
+getAll :: forall s a . (Typeable a, StringEmbedding s a) => Proxy s -> Varname -> Term [a]
+getAll p x = Term . MaybeT $ Just <$> do
+  mVs <- gets $ lookupNameAtType p x
+  let vs = fromMaybe (error "lookup failed!") mVs
+  return vs

@@ -1,29 +1,30 @@
-module TestSimple where
+module TestExamples where
 
-import Prelude
-
-import SpecGen
+import Prelude hiding (getLine, putStrLn, print)
 
 import Test.IOTest.IOProperty
 import Test.IOTest.Translation
-import Test.IOTest.Examples.Simple
+import Test.IOTest.Examples.Examples
 
 import Test.Hspec
 import Test.Hspec.QuickCheck (prop)
 import Test.QuickCheck
 
-testSimple :: Spec
-testSimple = describe "Testing simple implementation:" $ do
+import SpecGen
+
+testExamples :: Spec
+testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
   prop "solution1 matches task1" $
     solution1 `fulfills` task1
+  prop "solution1' does not match task1" $
+    solution1' `fulfillsNot` task1
   prop "wrongSolution1 does not match against task1" $
     wrongSolution1 `fulfillsNot` task1
   prop "solution1 matches task1'" $
     solution1 `fulfills` task1'
+
   prop "solution1' matches task1'" $
     solution1' `fulfills` task1'
-  prop "solution1' does not match task1" $
-    solution1' `fulfillsNot` task1
   prop "solution2 matches task2" $
    solution2 `fulfills` task2
   prop "solution3 matches task3" $
@@ -42,16 +43,10 @@ testSimple = describe "Testing simple implementation:" $ do
   prop "program generated from task3' matches task3'" $
     buildProgram task3' `fulfills` task3'
 
-  prop "programs build from a simple spec (read and write only) satisfy that spec" $
-    forAll specGen (\s -> buildProgram s `fulfills` s)
-
-  describe "programs build from a simple spec (read and write only) satisfy that spec (double negate)" $ do
-    result <- runIO $ quickCheckResult $ forAll specGen (\s -> buildProgram s `fulfillsNot` s)
-    it "does not fail" $ case result of
-      Failure{} -> False
-      Success{} -> False
-      GaveUp{} -> False
-      NoExpectedFailure{} -> True
+  prop "Testing solution4 against task4" $
+   solution4 `fulfills` task4
+  prop "Testing wrongsolution4 against task4" $
+   wrongSolution4 `fulfillsNot` task4
 
   prop "correct handeling of scoping 1" $
     scopingRight `fulfills` scoping
@@ -60,3 +55,14 @@ testSimple = describe "Testing simple implementation:" $ do
 
   prop "multi parameter programs" $
     printN `fulfills` printNSpec
+
+  prop "programs build from a spec (read and write only) satisfy that spec" $
+    forAll specGen (\s -> buildProgram s `fulfills` s)
+
+  describe "programs build from a spec (read and write only) satisfy that spec (double negate)" $ do
+    result <- runIO $ quickCheckResult $ forAll specGen (\s -> buildProgram s `fulfillsNot` s)
+    it "does not fail" $ case result of
+      Failure{} -> False
+      Success{} -> False
+      GaveUp{} -> False
+      NoExpectedFailure{} -> True

@@ -1,7 +1,8 @@
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE OverloadedStrings #-}
 module SpecGen where
 
-import Test.IOTest.Simple.Language
+import Test.IOTest.Language
 
 import Test.QuickCheck hiding (Positive,output)
 
@@ -18,7 +19,7 @@ go n ss vs = do
   (s, vs') <- oneof [input vs, output vs]
   go (n-1) (s:ss) vs'
 
-newtype VarSet = VarSet [VarName]
+newtype VarSet = VarSet [Varname]
 
 emptyVarSet :: VarSet
 emptyVarSet = VarSet []
@@ -26,16 +27,16 @@ emptyVarSet = VarSet []
 input :: VarSet -> Gen (Specification, VarSet)
 input (VarSet vs) = do
   x <- elements ["x","y","z"]
-  return (readInput x IntTy, VarSet $ x:vs)
+  return (readInput x (intValues [-10..10]), VarSet $ x:vs)
 
 output :: VarSet -> Gen (Specification, VarSet)
 output (VarSet vs) = oneof [unary, binary] where
   unary = do
     f <- elements [sum, length]
     xs <- elements vs
-    return (writeOutput [f <$> getAll xs], VarSet vs)
+    return (writeOutput ["#0"] [f <$> getAll xs] nonStringTerms, VarSet vs)
   binary = do
     f <- elements [(+), (-), (*)]
     x <- elements vs
     y <- elements vs
-    return (writeOutput [f <$> getCurrent x <*> getCurrent y], VarSet vs)
+    return (writeOutput ["#0"] [f <$> getCurrent x <*> getCurrent @Int y] nonStringTerms, VarSet vs)
