@@ -41,10 +41,11 @@ traceGen' spec k d = sized $ \size ->
       -- FIXME: clean up according to paper definition?
     (Write pxy opt ps ts s') -> do
       let v1 = S.fromList ((\p -> fillHoles pxy p ts d) <$> ps)
+          v1' = if opt then S.insert emptyPattern v1 else v1
       t <- traceGen' s' k d
       let (ProgWrite v2 t') = t
-      let v = S.map (uncurry (<>)) $ S.cartesianProduct v1 v2
-      return $ ProgWrite (if opt then S.insert emptyPattern v else v) t'
+      let v = S.map (uncurry (<>)) $ S.cartesianProduct v1' v2
+      return $ ProgWrite v t'
     (TillE s s') ->
       let k' Continue = traceGen' s k'
           k' Exit = traceGen' s' k
