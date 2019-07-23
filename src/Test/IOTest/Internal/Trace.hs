@@ -57,7 +57,7 @@ _ `isCoveredBy` _ = tell "traces dont line up" >> return False
 
 isSubsetOf :: Set LinearPattern -> Set LinearPattern -> Bool
 x `isSubsetOf` y = x == y || all (\px -> any (\py -> px `isSubPatternOf` py) (S.toList y)) (S.toList x)
-                          -- ^           ^        ^- such that
+                          -- '           '        '- such that
                           -- '           '- there exist an element py in y
                           -- '- forall elements px in x
 
