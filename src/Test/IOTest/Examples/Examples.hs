@@ -9,11 +9,13 @@ import Test.IOTest.IOtt
 import Test.IOTest.Language
 import Test.IOTest.Combinators
 
-import Test.QuickCheck as QC (Positive(..))
-
 import Control.Monad (replicateM,replicateM_)
 
 import Data.Proxy
+import Data.Maybe
+
+import Test.QuickCheck as QC (Positive(..))
+import Text.Read (readMaybe)
 
 nats :: ValueSet
 nats = intValues [0..10]
@@ -154,3 +156,22 @@ printNSpec (QC.Positive n) x = repeatSpec n $ writeFixedOutput [buildPattern (sh
 
 printN :: Int -> Int -> IOtt ()
 printN n x = replicateM_ n $ print x
+
+parseSumSpec :: Specification
+parseSumSpec =
+  tillE (
+    readInput "line" (ValueSet (Proxy @'True) ((show @Int <$> [1..10]) ++ (show <$> ['a'..'k']) ) ) <>
+    when ((==2) . length . filter isJust . fmap (readMaybe @Int) <$> getAllS "line") e
+  ) <>
+  writeOutput ["#0"] [sum . fmap fromJust . filter isJust . fmap (readMaybe @Int) <$> getAllS "line"] nonStringTerms
+
+parseSum :: IOtt ()
+parseSum = do
+  let go =
+        do mInt <- readMaybe @Int <$> getLine
+           case mInt of
+             Just n -> return n
+             Nothing -> go
+  x <- go
+  y <- go
+  print $ x + y
