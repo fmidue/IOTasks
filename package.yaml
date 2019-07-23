@@ -29,6 +29,7 @@ dependencies:
 - regex-posix
 - random
 - parsec
+- pretty
 
 library:
   source-dirs: src

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d2c691aed77381b9b7e143cfafa8a2b6ea3290f1d95f5f4f8f5edfb47acc345c
+-- hash: 0e95e85f4d07843b71606647775a455aba450699af8b90728b7f9be35f5e710b
 
 name:           IOTest
 version:        0.1.0.0
@@ -54,6 +54,7 @@ library
     , base >=4.7 && <5
     , containers
     , parsec
+    , pretty
     , random
     , recursion-schemes
     , regex-base
@@ -78,6 +79,7 @@ test-suite IOTest-test
     , containers
     , hspec
     , parsec
+    , pretty
     , random
     , recursion-schemes
     , regex-base
