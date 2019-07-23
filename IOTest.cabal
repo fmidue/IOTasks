@@ -4,10 +4,10 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d14c88664855edfef8f6115ca234c873329136b8bd284d50bdeb4e0cee3e3395
+-- hash: d2c691aed77381b9b7e143cfafa8a2b6ea3290f1d95f5f4f8f5edfb47acc345c
 
 name:           IOTest
-version:        0.0.2.0
+version:        0.1.0.0
 description:    Please see the README on GitHub at <https://github.com/owestphal/IOTest#readme>
 category:       Testing
 homepage:       https://github.com/owestphal/IOTest#readme
