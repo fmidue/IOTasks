@@ -62,7 +62,7 @@ t1@(ProgWrite v1 t1') `isCoveredBy` (ProgWrite v2 t2')
   | S.size v2 == 1 && S.member emptyPattern v2 = InputMismatch $ reportExpectationMismatch t2' t1
   | otherwise = OutputMismatch $ reportCoverageFailure v1 v2
 Stop `isCoveredBy` Stop = MatchSuccessfull
-t1 `isCoveredBy` t2 = AlignmentMismatch (reportExpectationMismatch t1 t2)
+t1 `isCoveredBy` t2 = AlignmentMismatch (reportExpectationMismatch t2 t1)
 
 isSubsetOf :: Set LinearPattern -> Set LinearPattern -> Bool
 x `isSubsetOf` y = x == y || all (\px -> any (\py -> px `isSubPatternOf` py) (S.toList y)) (S.toList x)
