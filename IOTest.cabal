@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.31.1.
+-- This file has been generated from package.yaml by hpack version 0.31.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0e95e85f4d07843b71606647775a455aba450699af8b90728b7f9be35f5e710b
+-- hash: 3c73120f99137d185d9c1efae5499ee4741a7075936a7ce55bc98cea6e6a109f
 
 name:           IOTest
 version:        0.1.0.0
@@ -42,6 +42,7 @@ library
       Test.IOTest.IOProperty
       Test.IOTest.IOtt
       Test.IOTest.Language
+      Test.IOTest.Trace
       Test.IOTest.Translation
       Test.IOTest.Utils
   other-modules:

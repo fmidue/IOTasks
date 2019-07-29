@@ -27,7 +27,7 @@ data Trace' o
   | ProgWrite o (Trace' o)
   | Stop
   | OutOfInputs
-  deriving Functor
+  deriving (Eq,Functor)
 
 type Trace = Trace' String
 type NTrace = Trace' (Set LinearPattern)
