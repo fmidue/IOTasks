@@ -6,8 +6,7 @@ module Test.IOTest.Internal.Trace (
   Trace'(..),
   normalize,
   isCoveredBy,
-  ppNTrace,
-  ppNTraceInfo,
+  printNTraceInfo,
   inputs,
   MatchResult(..),
   ppResult,
@@ -18,16 +17,17 @@ import Test.IOTest.Internal.Pattern
 import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.List
-import           Data.Function ( fix )
+-- import           Data.Function ( fix )
 
-import Text.PrettyPrint hiding ((<>))
+-- import Text.PrettyPrint hiding ((<>))
+import Text.PrettyPrint.HughesPJClass hiding ((<>))
 
 data Trace' o
   = ProgRead String (Trace' o)
   | ProgWrite o (Trace' o)
   | Stop
   | OutOfInputs
-  deriving (Eq,Functor)
+  deriving (Eq,Functor,Show)
 
 type Trace = Trace' String
 type NTrace = Trace' (Set LinearPattern)
@@ -72,52 +72,51 @@ x `isSubsetOf` y = x == y || all (\px -> any (\py -> px `isSubPatternOf` py) (S.
 
 reportCoverageFailure :: Set LinearPattern -> Set LinearPattern -> Doc
 reportCoverageFailure xs ys = text "the set" <+> printSet xs <+> text "is not a subset of" <+> printSet ys
-  where removeBrackets s = s >>= \c -> [c | c `notElem` "[]"]
-        printSet set = braces . text $ removeBrackets $ show (S.toList set)
+
+printSet :: Pretty a => Set a -> Doc
+printSet set = braces . hsep . punctuate (text ",") $ pPrint <$> S.toList set
 
 reportExpectationMismatch :: NTrace -> NTrace -> Doc
-reportExpectationMismatch t1 t2 = text (showNTraceHead Expected t1) $$ text (showNTraceHead Got t2)
+reportExpectationMismatch t1 t2 = ppNTraceHead Expected t1 $$ ppNTraceHead Got t2
 
-instance Show Trace where
-  show (ProgRead v t) = "?"++show v++" "++show t
-  show (ProgWrite v t) = "!"++show v++" "++show t
-  show Stop = "stop"
-  show OutOfInputs = "<out of inputs>"
+instance Pretty Trace where
+  pPrint (ProgRead v t) = hcat [text "?",pPrint v, text " ", pPrint t]
+  pPrint (ProgWrite v t) = hcat [text "!", pPrint v, text " ", pPrint t]
+  pPrint Stop = text "stop"
+  pPrint OutOfInputs = text "<out of inputs>"
 
-instance Show NTrace where
-  show = fix showNTraceFF
+instance Pretty NTrace where
+  pPrint = ppNTrace
 
-showNTraceFF :: (NTrace -> String) -> NTrace -> String
-showNTraceFF ff (ProgRead v t) = "?"++ v++" "++ ff t
-showNTraceFF ff (ProgWrite v t) =
-  let vs = (\x -> if x == "[]" then "e" else x) . show <$> S.toList v
-  in "!{"++ intercalate "," vs ++"} "++ ff t
-showNTraceFF _ Stop = "stop"
-showNTraceFF _ OutOfInputs = "<out of inputs>"
+ppNTraceFF :: (NTrace -> Doc) -> NTrace -> Doc
+ppNTraceFF ff (ProgRead v t) = hcat [text "?", text v, text " ", ff t]
+ppNTraceFF ff (ProgWrite v t) = text "!" <> printSet v <> ff t
+ppNTraceFF _ Stop = text "stop"
+ppNTraceFF _ OutOfInputs = text "<out of inputs>"
 
 data ShowHeadType = Expected | Got | Plain
 
-showNTraceHead :: ShowHeadType -> NTrace -> String
-showNTraceHead Expected t = "Expected: " <> showNTraceHead Plain t
-showNTraceHead Got t = "Got: " <> showNTraceHead Plain t
-showNTraceHead Plain t = showNTraceFF (const "") t
+ppNTraceHead :: ShowHeadType -> NTrace -> Doc
+ppNTraceHead Expected t = text "Expected: " <> ppNTraceHead Plain t
+ppNTraceHead Got t = text "Got: " <> ppNTraceHead Plain t
+ppNTraceHead Plain t = ppNTraceFF (const empty) t
 
-ppNTraceInfo :: NTrace -> Doc
-ppNTraceInfo t = inputSequence $+$ generalizedRun
+printNTraceInfo :: NTrace -> Doc
+printNTraceInfo t = inputSequence $+$ generalizedRun
   where inputSequence = hang (text "Input sequence:") 4 $ hsep $ (text . ('?' :)) <$> inputs t
         generalizedRun = hang (text "Expected run (generalized):") 4 $ ppNTrace t
 
 -- ommit occurences of !{}
 ppNTrace :: NTrace -> Doc
-ppNTrace = hcat . fmap text . filter (/= "!{} ") . traceToStringSequence
+ppNTrace = hcat . traceToStringSequence
 
-traceToStringSequence :: NTrace -> [String]
-traceToStringSequence t@(ProgRead _ t') = showNTraceHead Plain t : traceToStringSequence t'
+traceToStringSequence :: NTrace -> [Doc]
+traceToStringSequence t@(ProgRead _ t') = ppNTraceHead Plain t : traceToStringSequence t'
 traceToStringSequence t@(ProgWrite vs t')
   | S.size vs == 1 && S.member emptyPattern vs = traceToStringSequence t'
-  | otherwise                                  = showNTraceHead Plain t : traceToStringSequence t'
-traceToStringSequence Stop = [showNTraceHead Plain Stop]
-traceToStringSequence OutOfInputs = [showNTraceHead Plain OutOfInputs]
+  | otherwise                                  = ppNTraceHead Plain t : traceToStringSequence t'
+traceToStringSequence Stop = [ppNTraceHead Plain Stop]
+traceToStringSequence OutOfInputs = [ppNTraceHead Plain OutOfInputs]
 
 similar :: Trace' a -> Trace' b -> Bool
 similar x y = inputs x == inputs y

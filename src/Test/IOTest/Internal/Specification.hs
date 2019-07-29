@@ -85,6 +85,3 @@ instance HasVariables Specification where
     -- phi (WriteOutputPF _) = []
     phi NopF = []
     phi EF = []
-
-instance Show Specification where
-  show _ = "HACK"

@@ -15,7 +15,7 @@ import Control.Arrow ((&&&))
 import Data.Coerce
 
 import Test.QuickCheck
-import Text.PrettyPrint
+import Text.PrettyPrint.HughesPJClass
 
 data IOProperty prog spec = Fulfills prog spec | FulfillsNot prog spec
 
@@ -36,7 +36,7 @@ specProperty :: Specification -> IOtt () -> Property
 specProperty spec program =
   let gen = traceGen spec
       prop t = testTrace ((id &&& inputs) t) program
-  in forAllShow gen (render . ppNTraceInfo) prop
+  in forAllShow gen (render . printNTraceInfo) prop
 
 testTrace :: (NTrace, [String]) -> IOtt () -> Property
 testTrace (tg,ins) p =
@@ -46,7 +46,7 @@ testTrace (tg,ins) p =
       MatchSuccessfull -> property True
       err -> counterexample (render $
         hang (text "Actual run:") 4
-          (ppNTrace normalized)
+          (pPrint normalized)
        $$ hang (text "Error:") 4
          (ppResult err) )
        False

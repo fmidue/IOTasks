@@ -18,8 +18,9 @@ import Test.IOTest.Internal.Specification
 import Test.IOTest.IOtt
 
 import Control.Monad (void)
-import           Data.Maybe
-import           System.Random
+import Data.Maybe
+import System.Random
+import Text.PrettyPrint.HughesPJClass
 
 buildProgram :: Specification -> IOtt ()
 buildProgram s = void $ translate s (freshContext s)
@@ -35,7 +36,7 @@ translate (ReadInput x vs) d =
 translate (WriteOutput _ _ [] _) _ = error "empty list of output options"
 translate (WriteOutput _ True _ _) d = return (d,No)
 translate (WriteOutput pxy False (p:_) ts) d = do
-  print $ fillHoles pxy p ts d
+  putStrLn $ render $ pPrint $ fillHoles pxy p ts d
   return (d, No)
 translate E d = return (d, Yes)
 translate Nop d = return (d, No)

@@ -53,5 +53,5 @@ getAll :: forall s a . (Typeable a, StringEmbedding s a) => Proxy s -> Varname -
 getAll p x = Term . MaybeT $ Just <$> do
   mVs <- gets $ lookupNameAtType p x
   case mVs of
-    Left e -> error $ show e
+    Left e -> error $ printLookupError e
     Right vs -> return vs

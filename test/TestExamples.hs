@@ -57,10 +57,10 @@ testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
     printN `fulfills` printNSpec
 
   prop "programs build from a spec (read and write only) satisfy that spec" $
-    forAll specGen (\s -> buildProgram s `fulfills` s)
+    forAllShow specGen (const "<<some specification>>") (\s -> buildProgram s `fulfills` s)
 
   describe "programs build from a spec (read and write only) satisfy that spec (double negate)" $ do
-    result <- runIO $ quickCheckResult $ forAll specGen (\s -> buildProgram s `fulfillsNot` s)
+    result <- runIO $ quickCheckResult $ forAllShow specGen (const "<<some specification>>") (\s -> buildProgram s `fulfillsNot` s)
     it "does not fail" $ case result of
       Failure{} -> False
       Success{} -> False

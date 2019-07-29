@@ -22,6 +22,8 @@ import Data.Dynamic
 
 import System.Random
 
+import Text.PrettyPrint.HughesPJClass hiding ((<>))
+
 data ValueSet where
   ValueSet :: (Extract a b, Typeable b, StringEmbedding s b) => Proxy s -> a -> ValueSet
 
@@ -46,7 +48,7 @@ instance Extract LinearPattern String where
       lengths = randomRs (0,maxLength) gen1
       randomStrings = chunks lengths (randomRs ('A','z') gen2)
     in if not $ hasHoles p
-        then replaceWildCards (show p) randomStrings
+        then replaceWildCards (render $ pPrint p) randomStrings
         else error "can't extract from a pattern with holes"
       where maxLength = 10
 

@@ -11,6 +11,8 @@ module Test.IOTest.Internal.Context
   , HasVariables(..)
   , Varname
   , Value(..)
+  , LookupError(..)
+  , printLookupError
   ) where
 
 import Test.IOTest.Utils
@@ -52,11 +54,11 @@ update vs x v = traverse (addValue x v) vs
 freshContext :: HasVariables a => a -> Context
 freshContext s = (,Nothing) <$> vars s
 
-data LookupError = NameNotFound String | WrongType String
+data LookupError = NameNotFound String | WrongType String deriving Show
 
-instance Show LookupError where
-  show (NameNotFound e) = "lookup error: name not found: " <> e
-  show (WrongType e) = "lookup error: wrong type: " <> e
+printLookupError :: LookupError -> String
+printLookupError (NameNotFound e) = "lookup error: name not found: " <> e
+printLookupError (WrongType e) = "lookup error: wrong type: " <> e
 
 lookupName :: Varname -> Context -> Either LookupError [Value]
 lookupName x c =

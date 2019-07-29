@@ -27,12 +27,12 @@ import Test.QuickCheck
 import Text.Regex.Posix
 import Text.Parsec hiding (Empty)
 import Text.Parsec.String
-
+import Text.PrettyPrint.HughesPJClass hiding ((<>))
 
 data LinearPattern
   = Simple SimplePattern
   | Sequence SimplePattern LinearPattern
-  deriving Eq
+  deriving (Eq,Ord)
 
 emptyPattern :: LinearPattern
 emptyPattern = Simple Empty
@@ -42,21 +42,20 @@ data SimplePattern
   | WildCard
   | Literal String
   | Hole Int
-  deriving Eq
+  deriving (Eq,Ord)
+
+instance Pretty LinearPattern where
+  pPrint (Simple s) = pPrint s
+  pPrint (Sequence p1 p2) = pPrint p1 <> pPrint p2
+
+instance Pretty SimplePattern where
+  pPrint Empty = text ""
+  pPrint WildCard = text "_"
+  pPrint (Literal l) = text l
+  pPrint (Hole n) = text "#" <> pPrint n
 
 instance Show LinearPattern where
-  show (Simple s) = show s
-  show (Sequence p1 p2) = show p1 ++ show p2
-
-instance Show SimplePattern where
-  show Empty = ""
-  show WildCard = "_"
-  show (Literal l) = l
-  show (Hole n) = "#" <> show n
-
--- Ord instance mainly for putting patterns in a Set
-instance Ord LinearPattern where
-  p1 <= p2 = show p1 <= show p2
+  show p = "buildPattern " <> render (doubleQuotes $ pPrint p) 
 
 hasHoles :: LinearPattern -> Bool
 hasHoles (Simple (Hole _)) = True
@@ -121,7 +120,7 @@ fillSimple _ (Literal p) _ _ = Literal p
 fillSimple pxy (Hole n) ts c = Literal . pack pxy $ evalTerm (ts !! n) c
 
 isSubPatternOf :: LinearPattern -> LinearPattern ->  Bool
-p1 `isSubPatternOf` p2 = parse (patternParser p2) "" (show p1) == Right ()
+p1 `isSubPatternOf` p2 = parse (patternParser p2) "" (render $ pPrint p1) == Right ()
 
 -- yields a parser that succesfully parses the string representation of a
 -- pattern less general than the given pattern
@@ -138,4 +137,4 @@ patternParser pat = patternParser' pat >> eof where
 
 -- tests
 _test :: IO ()
-_test = quickCheck $ \xs -> let str = concatMap @[] (\c -> if c == '#' then "#1" else [c]) xs in show (fromString @LinearPattern str) == str
+_test = quickCheck $ \xs -> let str = concatMap @[] (\c -> if c == '#' then "#1" else [c]) xs in render (pPrint (fromString @LinearPattern str)) == str

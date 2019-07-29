@@ -21,11 +21,6 @@ data IOtt' t a where
   WriteLine :: t -> IOtt' t a -> IOtt' t a
   Return :: a -> IOtt' t a
 
-instance (Show a, Show t) => Show (IOtt' t a) where
-  show (ReadLine _) = "ReadLine <<func>>"
-  show (WriteLine t r) = "WriteLine (" ++ show t ++ show r ++ ")"
-  show (Return a) = "Return " ++ show a
-
 deriving instance Functor (IOtt' t)
 
 instance Applicative (IOtt' t) where
