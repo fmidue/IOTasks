@@ -55,7 +55,7 @@ instance Pretty SimplePattern where
   pPrint (Hole n) = text "#" <> pPrint n
 
 instance Show LinearPattern where
-  show p = "buildPattern " <> render (doubleQuotes $ pPrint p) 
+  show p = "buildPattern " <> render (doubleQuotes $ pPrint p)
 
 hasHoles :: LinearPattern -> Bool
 hasHoles (Simple (Hole _)) = True
@@ -95,13 +95,15 @@ instance IsString LinearPattern where
   fromString = buildPattern
 
 instance Semigroup LinearPattern where
-  Simple Empty        <> p                   = p
-  p                   <> Simple Empty        = p
-  Simple WildCard     <> Simple WildCard     = Simple WildCard
-  Simple (Literal l1) <> Simple (Literal l2) = Simple $ Literal (l1 <> l2)
-  Simple p1           <> Simple p2           = Sequence p1 (Simple p2)
-  Simple p1           <> Sequence p21 p22    = Sequence p1 (Sequence p21 p22)
-  Sequence p11 p12    <> p2                  = Sequence p11 (p12 <> p2)
+  Simple Empty        <> p                         = p
+  p                   <> Simple   Empty            = p
+  Simple WildCard     <> Simple   WildCard         = Simple WildCard
+  Simple WildCard     <> Sequence WildCard     p2  = Sequence WildCard p2
+  Simple (Literal l1) <> Simple   (Literal l2)     = Simple $ Literal (l1 <> l2)
+  Simple (Literal l1) <> Sequence (Literal l2) p2  = Simple (Literal (l1 <> l2)) <> p2
+  Simple p1           <> Simple   p2               = Sequence p1 (Simple p2)
+  Simple p1           <> Sequence p21          p22 = Sequence p1 (Sequence p21 p22)
+  Sequence p11 p12    <>                       p2  = Sequence p11 (p12 <> p2)
 
 instance Monoid LinearPattern where
   mempty = Simple Empty

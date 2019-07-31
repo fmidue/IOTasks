@@ -89,8 +89,8 @@ instance Pretty NTrace where
   pPrint = ppNTrace
 
 ppNTraceFF :: (NTrace -> Doc) -> NTrace -> Doc
-ppNTraceFF ff (ProgRead v t) = hcat [text "?", text v, text " ", ff t]
-ppNTraceFF ff (ProgWrite v t) = text "!" <> printSet v <> ff t
+ppNTraceFF ff (ProgRead v t) = (text "?" <> text v) <+> ff t
+ppNTraceFF ff (ProgWrite v t) = (text "!" <> printSet v) <+> ff t
 ppNTraceFF _ Stop = text "stop"
 ppNTraceFF _ OutOfInputs = text "<out of inputs>"
 
@@ -108,7 +108,7 @@ printNTraceInfo t = inputSequence $+$ generalizedRun
 
 -- ommit occurences of !{}
 ppNTrace :: NTrace -> Doc
-ppNTrace = hcat . traceToStringSequence
+ppNTrace = hsep . traceToStringSequence
 
 traceToStringSequence :: NTrace -> [Doc]
 traceToStringSequence t@(ProgRead _ t') = ppNTraceHead Plain t : traceToStringSequence t'

@@ -9,19 +9,19 @@ import Test.IOTest.Language
 
 -- possible elements to build the secret from
 hangmanDomain :: [Int]
-hangmanDomain = [1..100]
+hangmanDomain = [0..9]
 
 hangmanSpec :: [Int] -> Specification
 hangmanSpec word =
   tillE (
        branch (winCondition <$> getAll @Int "guessed")
          nop
-         (writeFixedOutput ["_Correct_"] <> e)
-    <> writeFixedOutput ["_"]
-    <> readInput "guessed" (intValues hangmanDomain)
-    <> branch ((`elem` word) <$> getCurrent @Int "guessed")
-         (optional $ writeFixedOutput ["_wrong_"])
-         (optional $ writeFixedOutput ["_good Guess_"])
+         (writeFixedOutput ["_correct_"] <> e)
+    <> writeFixedOutput ["Game state:_"]
+    <> readInput "guessed" (intValues [0..9])
+    <> branch ((\gs -> (last gs `elem` word) && last gs `notElem` init gs) <$> getAll @Int "guessed")
+         (optional $ writeFixedOutput ["wrong!"])
+         (optional $ writeFixedOutput ["good guess!"])
     )
   where
     winCondition xs = all (`elem` filter (`elem` word) xs) word
@@ -30,16 +30,17 @@ hangmanSpec word =
 hangmanProg :: TeletypeM m => [Int] -> m ()
 hangmanProg word = go [] where
   go guessed
-    | all (`elem` guessed) word = putStrLn "Correct"
+    | all (`elem` guessed) word = putStrLn "correct"
     | otherwise = do
-        putStrLn $ "\n" ++ printWord word guessed ++ "\nwhich number?"
+        putStrLn $ "Game state:" ++ printWord word guessed
+        putStrLn "guess a number!"
         x <- read <$> getLine
         if x `elem` word && x `notElem` guessed
           then do
-            putStrLn "good Guess!" -- this is optional
+            putStrLn "good guess!" -- this is optional
             go (x:guessed)
           else do
-            putStrLn "wrong!"
+            putStrLn "wrong!" -- this is optional
             go guessed
 
 printWord :: (Eq a, Show a) => [a] -> [a] -> String
