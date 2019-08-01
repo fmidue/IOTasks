@@ -46,7 +46,7 @@ instance Extract LinearPattern String where
     let
       (gen1, gen2) = split gen
       lengths = randomRs (0,maxLength) gen1
-      randomStrings = chunks lengths (randomRs ('A','z') gen2)
+      randomStrings = chunks lengths . filter (/='_') $ randomRs ('A','z') gen2
     in if not $ hasHoles p
         then replaceWildCards (render $ pPrint p) randomStrings
         else error "can't extract from a pattern with holes"
