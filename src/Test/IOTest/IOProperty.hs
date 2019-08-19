@@ -46,7 +46,7 @@ testTrace (tg,ins) p =
       MatchSuccessfull -> property True
       err -> counterexample (render $
         hang (text "Actual run:") 4
-          (pPrint normalized)
+          (pPrint trace)
        $$ hang (text "Error:") 4
          (ppResult err) )
        False
