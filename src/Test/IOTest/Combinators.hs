@@ -24,22 +24,22 @@ when p = branch p nop
 
 readTillFixedLength :: Varname -> ValueSet -> Varname -> Specification
 readTillFixedLength n vs xs = elimValueSet vs (undefined :: StdGen) $ \(p :: Proxy s) _ (_ :: b) ->
-  tillE $
+  tillEnd $
     branch ((\xs n -> length xs == n) <$> getAllGeneric @s @b p xs <*> getCurrent n)
       (readInput xs vs)
-      e
+      end
 
 readUntil :: Varname -> Term Bool -> ValueSet -> Specification
 readUntil xs p vs =
-  tillE $
+  tillEnd $
     branch p
       (readInput xs vs)
-      e
+      end
 
 readUntil1 :: Varname -> Term Bool -> ValueSet -> Specification
 readUntil1 xs p ty =
-  tillE $
+  tillEnd $
     readInput xs ty <>
     branch p
       nop
-      e
+      end

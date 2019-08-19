@@ -13,10 +13,10 @@ hangmanDomain = [0..9]
 
 hangmanSpec :: [Int] -> Specification
 hangmanSpec word =
-  tillE (
+  tillEnd (
        branch (winCondition <$> getAll @Int "guessed")
          nop
-         (writeFixedOutput ["_correct_"] <> e)
+         (writeFixedOutput ["_correct_"] <> end)
     <> writeFixedOutput ["Game state:_"]
     <> readInput "guessed" (intValues [0..9])
     <> branch ((\gs -> (last gs `elem` word) && last gs `notElem` init gs) <$> getAll @Int "guessed")

@@ -5,7 +5,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE MonoLocalBinds #-}
 module Test.IOTest.Language
-  ( Specification, readInput, writeOutput, branch, tillE, nop, e
+  ( Specification, readInput, writeOutput, branch, tillEnd, nop, end
   , writeFixedOutput
   , ValueSet(..), Varname, Term, optional
   , getCurrent, getAll
@@ -46,14 +46,14 @@ writeFixedOutput ps = WriteOutput (Proxy @'True) False ps ([] :: [Term String])
 branch :: Term Bool -> Specification -> Specification -> Specification
 branch = Branch
 
-tillE :: Specification -> Specification
-tillE = TillE
+tillEnd :: Specification -> Specification
+tillEnd = TillE
 
 nop :: Specification
 nop = Nop
 
-e :: Specification
-e = E
+end :: Specification
+end = E
 
 intValues :: [Int] -> ValueSet
 intValues = ValueSet (Proxy @'False)
