@@ -15,7 +15,7 @@ import Test.IOTest.Utils
 
 import Prelude hiding (putStrLn,getLine,print)
 import Test.IOTest.Internal.Specification
-import Test.IOTest.IOtt
+import Test.IOTest.IOrep
 
 import Control.Monad (void)
 import Data.Maybe

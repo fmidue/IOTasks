@@ -2,7 +2,7 @@
 import TestExamples
 
 import Test.IOTest.IOProperty
-import Test.IOTest.IOtt
+import Test.IOTest.IOrep
 import Test.IOTest.Examples.Hangman
 
 import Test.Hspec (hspec, describe)
@@ -12,4 +12,4 @@ main :: IO ()
 main = hspec $ do
   testExamples
   describe "Testing hangman" $
-    prop "game runs on a random 'words'" $ \xs -> let word = filter (`elem` hangmanDomain) xs in hangmanProg @IOtt word `fulfills` hangmanSpec word
+    prop "game runs on a random 'words'" $ \xs -> let word = filter (`elem` hangmanDomain) xs in hangmanProg @IOrep word `fulfills` hangmanSpec word

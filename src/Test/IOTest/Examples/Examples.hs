@@ -5,7 +5,7 @@ module Test.IOTest.Examples.Examples where
 
 import Prelude hiding (putStrLn, getLine, print)
 
-import Test.IOTest.IOtt
+import Test.IOTest.IOrep
 import Test.IOTest.Language
 import Test.IOTest.Combinators
 
@@ -52,14 +52,14 @@ task1' =
   readTillFixedLength "n" ints "xs" <>
   writeOutput ["_#0_"] [sum <$> getAll @Int "xs"] nonStringTerms
 
-solution1 :: IOtt ()
+solution1 :: IOrep ()
 solution1 = do
   putStrLn "> "
   n <- read @Int <$> getLine
   xs <- replicateM n $ read @Int <$> getLine
   print $ sum xs
 
-solution1' :: IOtt ()
+solution1' :: IOrep ()
 solution1' = do
   putStrLn "> "
   n <- read @Int <$> getLine
@@ -68,7 +68,7 @@ solution1' = do
   putStrLn "Result: "
   print $ sum xs
 
-wrongSolution1 :: IOtt ()
+wrongSolution1 :: IOrep ()
 wrongSolution1 = do
   putStrLn "> "
   n <- read @Int <$> getLine
@@ -84,7 +84,7 @@ task2 =
   writeOutput ["_#0_"] [count <$> getAll @Int "xs"] nonStringTerms
   where count xs = length [ x | x <- xs, x > 0, x `mod` 3 == 0]
 
-solution2 :: IOtt ()
+solution2 :: IOrep ()
 solution2 = go [] Nothing Nothing where
   go ns mX mY =
     if ((+) <$> mX <*> mY) == Just 0
@@ -108,7 +108,7 @@ task3' =
   readUntil "xs" ((\xs -> last xs == 0) <$> getAll @Int "xs") ints <>
   writeOutput ["_#0_"] [sum <$> getAll @Int "xs"] nonStringTerms
 
-solution3 :: IOtt ()
+solution3 :: IOrep ()
 solution3 = go [] where
   go xs = do
     n <- read @Int <$> getLine
@@ -122,10 +122,10 @@ task4 =
   readInput "line" (ValueSet (Proxy @'True) ("_" :: LinearPattern)) <>
   writeOutput ["_#0_"] [reverse <$> getCurrentS "line"] stringTerms
 
-solution4 :: IOtt ()
+solution4 :: IOrep ()
 solution4 = (reverse <$> getLine) >>= putStrLn
 
-wrongSolution4 :: IOtt ()
+wrongSolution4 :: IOrep ()
 wrongSolution4 = getLine >>= putStrLn
 
 scoping :: Specification
@@ -137,14 +137,14 @@ scoping =
   ) <>
   writeOutput ["#0"] [getCurrent @Int "x"] nonStringTerms
 
-scopingRight :: IOtt ()
+scopingRight :: IOrep ()
 scopingRight = do
   _x <- read @Int <$> getLine
   x <- read @Int <$> getLine
   print x
   print x
 
-scopingWrong :: IOtt ()
+scopingWrong :: IOrep ()
 scopingWrong = do
   x <- read @Int <$> getLine
   y <- read @Int <$> getLine
@@ -154,7 +154,7 @@ scopingWrong = do
 printNSpec :: QC.Positive Int -> Int -> Specification
 printNSpec (QC.Positive n) x = repeatSpec n $ writeFixedOutput [buildPattern (show x)]
 
-printN :: Int -> Int -> IOtt ()
+printN :: Int -> Int -> IOrep ()
 printN n x = replicateM_ n $ print x
 
 parseSumSpec :: Specification
@@ -165,7 +165,7 @@ parseSumSpec =
   ) <>
   writeOutput ["#0"] [sum . fmap fromJust . filter isJust . fmap (readMaybe @Int) <$> getAllS "line"] nonStringTerms
 
-parseSum :: IOtt ()
+parseSum :: IOrep ()
 parseSum = do
   let go =
         do mInt <- readMaybe @Int <$> getLine

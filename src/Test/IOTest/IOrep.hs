@@ -3,8 +3,8 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE StandaloneDeriving #-}
-module Test.IOTest.IOtt (
-  IOtt,
+module Test.IOTest.IOrep (
+  IOrep,
   runProgram,
   TeletypeM(..),
   Handle, BufferMode, hSetBuffering, stdout,
@@ -16,30 +16,30 @@ import Test.IOTest.Internal.Trace
 import Control.Monad
 import qualified System.IO as IO
 
-data IOtt' t a where
-  ReadLine :: (t -> IOtt' t a) -> IOtt' t a
-  WriteLine :: t -> IOtt' t a -> IOtt' t a
-  Return :: a -> IOtt' t a
+data IOrep' t a where
+  ReadLine :: (t -> IOrep' t a) -> IOrep' t a
+  WriteLine :: t -> IOrep' t a -> IOrep' t a
+  Return :: a -> IOrep' t a
 
-deriving instance Functor (IOtt' t)
+deriving instance Functor (IOrep' t)
 
-instance Applicative (IOtt' t) where
+instance Applicative (IOrep' t) where
   (<*>) = ap
   pure = Return
 
-instance Monad (IOtt' t) where
+instance Monad (IOrep' t) where
   (Return a) >>= g = g a
   (ReadLine f) >>= g = ReadLine (f >=> g)
   (WriteLine s ma) >>= g = WriteLine s (ma >>= g)
   return = pure
 
-type IOtt = IOtt' String
+type IOrep = IOrep' String
 
-instance TeletypeM IOtt where
+instance TeletypeM IOrep where
   putStrLn s = WriteLine s $ Return ()
   getLine = ReadLine Return
 
-runProgram :: [String] -> IOtt () -> Trace
+runProgram :: [String] -> IOrep () -> Trace
 runProgram (x:xs) (ReadLine f) = ProgRead x $ runProgram xs $ f x
 runProgram [] (ReadLine _) = OutOfInputs
 runProgram xs (WriteLine v p) =  ProgWrite v $ runProgram xs p
