@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE GADTs #-}
@@ -58,6 +59,9 @@ translate (Branch p s1 s2) = do
   if evalTerm p d
     then translate s2
     else translate s1
-translate (s1 :<> s2) = translate s1 >>= (\_ -> translate s2)
+translate (s1 :<> s2) =
+  translate s1 >>=
+    \case Yes -> return Yes
+          No -> translate s2
 
 data LoopEnd = Yes | No
