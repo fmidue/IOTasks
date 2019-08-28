@@ -22,11 +22,11 @@ import Data.Maybe
 import System.Random
 import Text.PrettyPrint.HughesPJClass
 
-buildProgram :: Specification -> IOtt ()
+buildProgram :: TeletypeM m => Specification -> m ()
 buildProgram s = void $ translate s (freshContext s)
 
 -- translates to a 'minimal' program satisfying the specification
-translate :: Specification -> Context -> IOtt (Context,LoopEnd)
+translate :: TeletypeM m => Specification -> Context -> m (Context,LoopEnd)
 translate (ReadInput x vs) d =
   elimValueSet vs (error "proxy RandomGen sampled" :: StdGen)
     (\ p _ (_ :: ty) -> do

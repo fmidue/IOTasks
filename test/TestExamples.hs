@@ -1,7 +1,9 @@
+{-# LANGUAGE TypeApplications #-}
 module TestExamples where
 
 import Prelude hiding (getLine, putStrLn, print)
 
+import Test.IOTest.IOtt
 import Test.IOTest.IOProperty
 import Test.IOTest.Translation
 import Test.IOTest.Examples.Examples
@@ -33,15 +35,15 @@ testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
     solution3 `fulfills` task3'
 
   prop "program generated from task1 matches task1" $
-    buildProgram task1 `fulfills` task1
+    buildProgram @IOtt task1 `fulfills` task1
   prop "program generated from task1' matches task1'" $
-    buildProgram task1' `fulfills` task1'
+    buildProgram @IOtt task1' `fulfills` task1'
   prop "program generated from task2 matches task2" $
-    buildProgram task2 `fulfills` task2
+    buildProgram @IOtt task2 `fulfills` task2
   prop "program generated from task3 matches task3" $
-    buildProgram task3 `fulfills` task3
+    buildProgram @IOtt task3 `fulfills` task3
   prop "program generated from task3' matches task3'" $
-    buildProgram task3' `fulfills` task3'
+    buildProgram @IOtt task3' `fulfills` task3'
 
   prop "Testing solution4 against task4" $
    solution4 `fulfills` task4
@@ -57,10 +59,10 @@ testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
     printN `fulfills` printNSpec
 
   prop "programs build from a spec (read and write only) satisfy that spec" $
-    forAllShow specGen (const "<<some specification>>") (\s -> buildProgram s `fulfills` s)
+    forAllShow specGen (const "<<some specification>>") (\s -> buildProgram @IOtt s `fulfills` s)
 
   describe "programs build from a spec (read and write only) satisfy that spec (double negate)" $ do
-    result <- runIO $ quickCheckResult $ forAllShow specGen (const "<<some specification>>") (\s -> buildProgram s `fulfillsNot` s)
+    result <- runIO $ quickCheckResult $ forAllShow specGen (const "<<some specification>>") (\s -> buildProgram @IOtt s `fulfillsNot` s)
     it "does not fail" $ case result of
       Failure{} -> False
       Success{} -> False
