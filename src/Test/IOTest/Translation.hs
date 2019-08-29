@@ -3,7 +3,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DataKinds #-}
 module Test.IOTest.Translation (
-  buildProgram
+  buildComputation
 ) where
 
 import Test.IOTest.Internal.Context
@@ -24,8 +24,8 @@ import Text.PrettyPrint.HughesPJClass
 import Control.Monad.State
 import Control.Monad.Trans.Maybe
 
-buildProgram :: MonadTeletype m => Specification -> m ()
-buildProgram s = void $ evalStateT (runMaybeT $ interpret s) (freshContext s)
+buildComputation :: MonadTeletype m => Specification -> m ()
+buildComputation s = void $ evalStateT (runMaybeT $ interpret s) (freshContext s)
 
 -- translates to a 'minimal' program satisfying the specification
 interpret :: MonadTeletype m => Specification -> MaybeT (StateT Context m) ()
@@ -34,19 +34,17 @@ interpret (ReadInput x vs) =
     (\ p _ (_ :: ty) -> do
       v <- unpack @_ @ty p <$> getLine
       modify (fromJust . update x (Value p v))
-      continue
   )
 interpret (WriteOutput _ _ [] _) = error "empty list of output options"
 interpret (WriteOutput _ True _ _) = continue
-interpret (WriteOutput pxy False (p:_) ts) = do
+interpret (WriteOutput pxy False (p:_) ts) =
   get >>= (putStrLn . render . pPrint . fillHoles pxy p ts)
-  continue
 interpret E = loopEnd
 interpret Nop = continue
 interpret (TillE s) =
   let body = interpret s
-      go = body >> go
-  in mapMaybeT (\st -> Just () <$ st) go
+      go = forever body -- repeat until the loop is terminated by an end marker
+  in mapMaybeT (fmap (void . Just)) go
 interpret (Branch p s1 s2) = do
   cond <- gets (evalTerm p)
   if cond

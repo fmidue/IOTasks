@@ -16,5 +16,5 @@ regressionTests :: Spec
 regressionTests = describe "Testing for regressions:" $
   prop "correctly break loop on end marker in interpretation" $
     let s = tillEnd $ end <> writeFixedOutput [buildPattern "X"]
-        p = buildProgram @IOrep s
+        p = buildComputation @IOrep s
     in within 1000000 $ p `fulfills` s

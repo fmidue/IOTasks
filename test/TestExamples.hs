@@ -35,15 +35,15 @@ testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
     solution3 `fulfills` task3'
 
   prop "program generated from task1 matches task1" $
-    buildProgram @IOrep task1 `fulfills` task1
+    buildComputation @IOrep task1 `fulfills` task1
   prop "program generated from task1' matches task1'" $
-    buildProgram @IOrep task1' `fulfills` task1'
+    buildComputation @IOrep task1' `fulfills` task1'
   prop "program generated from task2 matches task2" $
-    buildProgram @IOrep task2 `fulfills` task2
+    buildComputation @IOrep task2 `fulfills` task2
   prop "program generated from task3 matches task3" $
-    buildProgram @IOrep task3 `fulfills` task3
+    buildComputation @IOrep task3 `fulfills` task3
   prop "program generated from task3' matches task3'" $
-    buildProgram @IOrep task3' `fulfills` task3'
+    buildComputation @IOrep task3' `fulfills` task3'
 
   prop "Testing solution4 against task4" $
    solution4 `fulfills` task4
@@ -59,10 +59,10 @@ testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
     printN `fulfills` printNSpec
 
   prop "programs build from a spec (read and write only) satisfy that spec" $
-    forAllShow specGen (const "<<some specification>>") (\s -> buildProgram @IOrep s `fulfills` s)
+    forAllShow specGen (const "<<some specification>>") (\s -> buildComputation @IOrep s `fulfills` s)
 
   describe "programs build from a spec (read and write only) satisfy that spec (double negate)" $ do
-    result <- runIO $ quickCheckResult $ forAllShow specGen (const "<<some specification>>") (\s -> buildProgram @IOrep s `fulfillsNot` s)
+    result <- runIO $ quickCheckResult $ forAllShow specGen (const "<<some specification>>") (\s -> buildComputation @IOrep s `fulfillsNot` s)
     it "does not fail" $ case result of
       Failure{} -> False
       Success{} -> False
