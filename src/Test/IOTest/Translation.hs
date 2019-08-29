@@ -53,7 +53,7 @@ interpret (Branch p s1 s2) = do
 interpret (s1 :<> s2) = interpret s1 >> interpret s2
 
 loopEnd :: Monad m => MaybeT m ()
-loopEnd = fail undefined
+loopEnd = MaybeT $ return Nothing
 
 continue :: Monad m => m ()
 continue = return ()
