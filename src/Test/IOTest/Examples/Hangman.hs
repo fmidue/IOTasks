@@ -27,7 +27,7 @@ hangmanSpec word =
     winCondition xs = all (`elem` filter (`elem` word) xs) word
 
 
-hangmanProg :: TeletypeM m => [Int] -> m ()
+hangmanProg :: MonadTeletype m => [Int] -> m ()
 hangmanProg word = go [] where
   go guessed
     | all (`elem` guessed) word = putStrLn "correct"

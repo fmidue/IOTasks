@@ -6,7 +6,7 @@
 module Test.IOTest.IOrep (
   IOrep,
   runProgram,
-  TeletypeM(..),
+  MonadTeletype(..),
   Handle, BufferMode, hSetBuffering, stdout,
 ) where
 
@@ -14,6 +14,8 @@ import Prelude hiding (getLine, putStrLn, print, readLn)
 
 import Test.IOTest.Internal.Trace
 import Control.Monad
+import Control.Monad.Trans.Maybe
+import Control.Monad.State
 import qualified System.IO as IO
 
 data IOrep' t a where
@@ -35,7 +37,7 @@ instance Monad (IOrep' t) where
 
 type IOrep = IOrep' String
 
-instance TeletypeM IOrep where
+instance MonadTeletype IOrep where
   putStrLn s = WriteLine s $ Return ()
   getLine = ReadLine Return
 
@@ -45,7 +47,7 @@ runProgram [] (ReadLine _) = OutOfInputs
 runProgram xs (WriteLine v p) =  ProgWrite v $ runProgram xs p
 runProgram _ (Return _) =  Stop
 
-class Monad m => TeletypeM m where
+class Monad m => MonadTeletype m where
   putStrLn :: String -> m ()
 
   getLine :: m String
@@ -56,6 +58,14 @@ class Monad m => TeletypeM m where
   readLn :: Read a => m a
   readLn = read <$> getLine
 
+instance MonadTeletype m => MonadTeletype (MaybeT m) where
+  putStrLn = lift . putStrLn
+  getLine = lift getLine
+
+instance MonadTeletype m => MonadTeletype (StateT s m) where
+  putStrLn = lift . putStrLn
+  getLine = lift getLine
+
 data Handle = StdOut
 
 stdout :: Handle
@@ -63,10 +73,10 @@ stdout = StdOut
 
 data BufferMode = NoBuffering
 
-hSetBuffering :: TeletypeM m => Handle -> BufferMode -> m ()
+hSetBuffering :: MonadTeletype m => Handle -> BufferMode -> m ()
 hSetBuffering StdOut NoBuffering = return ()
 
-instance TeletypeM IO where
+instance MonadTeletype IO where
   putStrLn = IO.putStrLn
   getLine = IO.getLine
   readLn = IO.readLn

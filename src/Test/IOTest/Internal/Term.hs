@@ -17,7 +17,7 @@ module Test.IOTest.Internal.Term (
 import Test.IOTest.Internal.Context
 import Test.IOTest.Utils
 
-import Control.Monad.Trans.State
+import Control.Monad.State
 import Control.Monad.Trans.Maybe
 
 import Data.Maybe
