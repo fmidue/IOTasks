@@ -37,8 +37,8 @@ valueTypeRep (Value _ a) = dynTypeRep $ toDyn a
 fromValue :: (Typeable a, StringEmbedding s a) => Proxy s -> Value -> Maybe a
 fromValue _ (Value _ a) = fromDynamic (toDyn a)
 
-update :: Context -> Varname -> Value -> Maybe Context
-update vs x v = traverse (addValue x v) vs
+update :: Varname -> Value -> Context -> Maybe Context
+update x v = traverse (addValue x v)
   where
     addValue x' v' (y,Nothing) =
       if y == x'

@@ -36,7 +36,7 @@ traceGen' spec k d = sized $ \size ->
     (Read x vs s') -> do
       seed <- choose (minBound, maxBound)
       let v = valueOf vs (mkStdGen seed) -- TODO: is there a better way of doing this?
-      t' <- traceGen' s' k (fromMaybe (error "type mismatch on context update") $ update d x v)
+      t' <- traceGen' s' k (fromMaybe (error "type mismatch on context update") $ update x v d)
       return $ ProgWrite (S.singleton emptyPattern) $ ProgRead (show v) t'
       -- FIXME: clean up according to paper definition?
     (Write pxy opt ps ts s') -> do
