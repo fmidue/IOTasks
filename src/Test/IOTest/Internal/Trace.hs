@@ -1,9 +1,12 @@
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE PatternSynonyms #-}
 module Test.IOTest.Internal.Trace (
   NTrace,
   Trace,
   Trace'(..),
+  TraceAction(..),
   normalize,
   isCoveredBy,
   printNTraceInfo,
@@ -13,18 +16,37 @@ module Test.IOTest.Internal.Trace (
 ) where
 
 import Test.IOTest.Internal.Pattern
+import Test.IOTest.Utils
 
 import           Data.Set (Set)
 import qualified Data.Set as S
--- import           Data.Function ( fix )
 
--- import Text.PrettyPrint hiding ((<>))
 import Text.PrettyPrint.HughesPJClass hiding ((<>))
 
-data Trace' o
-  = ProgRead String (Trace' o)
-  | ProgWrite o (Trace' o)
-  | Stop
+import Data.Function (on)
+
+newtype Trace' o = Trace { toList :: [TraceAction o] } deriving Show
+
+instance Semigroup NTrace where
+  Trace [] <> Trace t2 = Trace t2
+  Trace t1 <> Trace t2 = Trace (init t1 <> (last t1 >* t2)) where
+    ProgWrite v1 >* (ProgWrite v2 : t') =
+      let v = S.map (uncurry (<>)) $ S.cartesianProduct v1 v2
+      in (ProgWrite v : t')
+    t >* t' = t : t'
+
+instance Monoid NTrace where
+  mempty = Trace mempty
+
+instance Semigroup Trace where
+  (<>) = Trace ... ((<>) `on` toList)
+
+instance Monoid Trace where
+  mempty = Trace mempty
+
+data TraceAction o
+  = ProgRead String
+  | ProgWrite o
   | OutOfInputs
   deriving (Eq,Functor,Show)
 
@@ -32,11 +54,11 @@ type Trace = Trace' String
 type NTrace = Trace' (Set LinearPattern)
 
 normalize :: Trace -> Trace
-normalize = go "" where
-  go p (ProgWrite v t') = go (p <> v) t'
-  go p (ProgRead v t') = ProgWrite p $ ProgRead v $ go "" t'
-  go p Stop = ProgWrite p Stop
-  go p OutOfInputs = ProgWrite p OutOfInputs
+normalize = Trace . go "" . toList where
+  go p (ProgWrite v : t') = go (p <> v) t'
+  go p (ProgRead v : t') = ProgWrite p : ProgRead v : go "" t'
+  go p [] = [ProgWrite p]
+  go p (OutOfInputs : _) = [ProgWrite p, OutOfInputs]
 
 data MatchResult
   = MatchSuccessfull
@@ -52,16 +74,19 @@ ppResult (OutputMismatch msg) = hang (text "OutputMismatch:") 4 msg
 ppResult (AlignmentMismatch msg) = hang (text "AlignmentMismatch:") 4 msg
 
 isCoveredBy :: Trace -> NTrace -> MatchResult
-t1@(ProgRead x t1') `isCoveredBy` t2@(ProgRead y t2') =
-  if x == y
-    then t1' `isCoveredBy` t2'
-    else InputMismatch (reportExpectationMismatch t2 t1)
-t1@(ProgWrite v1 t1') `isCoveredBy` (ProgWrite v2 t2')
-  | buildPattern v1 `isSubPatternIn` v2 = t1' `isCoveredBy` t2'
-  | S.size v2 == 1 && S.member emptyPattern v2 = InputMismatch $ reportExpectationMismatch t2' t1
-  | otherwise = OutputMismatch $ reportCoverageFailure v1 v2
-Stop `isCoveredBy` Stop = MatchSuccessfull
-t1 `isCoveredBy` t2 = AlignmentMismatch (reportExpectationMismatch t2 t1)
+isCoveredBy (Trace u) (Trace v) = isCoveredBy' u v
+  where
+  t1@(ProgRead x : t1') `isCoveredBy'` t2@(ProgRead y : t2') =
+    if x == y
+      then t1' `isCoveredBy'` t2'
+      else InputMismatch (reportExpectationMismatch (Trace t2) (Trace t1))
+  t1@(ProgWrite v1 : t1') `isCoveredBy'` (ProgWrite v2 : t2')
+    | buildPattern v1 `isSubPatternIn` v2 = t1' `isCoveredBy'` t2'
+    | S.size v2 == 1 && S.member emptyPattern v2 = InputMismatch $ reportExpectationMismatch (Trace t2') (Trace t1)
+    | otherwise = OutputMismatch $ reportCoverageFailure v1 v2
+  (ProgWrite "" : t1') `isCoveredBy'` t2 = t1' `isCoveredBy'` t2
+  [] `isCoveredBy'` [] = MatchSuccessfull
+  t1 `isCoveredBy'` t2 = AlignmentMismatch (reportExpectationMismatch (Trace t2) (Trace t1))
 
 isSubPatternIn :: LinearPattern -> Set LinearPattern -> Bool
 x `isSubPatternIn` y = all (\px -> any (\py -> px `isSubPatternOf` py) (S.toList y)) [x]
@@ -79,19 +104,19 @@ reportExpectationMismatch :: NTrace -> Trace -> Doc
 reportExpectationMismatch t1 t2 = ppNTraceHead Expected t1 $$ ppTraceHead text Got t2
 
 instance Pretty Trace where
-  pPrint (ProgRead v t) = hcat [text "?",pPrint v, text " ", pPrint t]
-  pPrint (ProgWrite v t) = hcat [text "!", pPrint v, text " ", pPrint t]
-  pPrint Stop = text "stop"
-  pPrint OutOfInputs = text "<out of inputs>"
+  pPrint (Trace (ProgRead v : t)) = hcat [text "?",pPrint v, text " ", pPrint (Trace t)]
+  pPrint (Trace (ProgWrite v : t)) = hcat [text "!", pPrint v, text " ", pPrint (Trace t)]
+  pPrint (Trace []) = text "stop"
+  pPrint (Trace (OutOfInputs : _)) = text "<out of inputs>"
 
 instance Pretty NTrace where
   pPrint = ppNTrace
 
 ppTraceFF :: (Trace' o -> Doc) -> (o -> Doc) -> Trace' o -> Doc
-ppTraceFF ff _   (ProgRead v t)  = (text "?" <> text v) <+> ff t
-ppTraceFF ff sho (ProgWrite v t) = (text "!" <> sho v) <+> ff t
-ppTraceFF _  _   Stop            = text "stop"
-ppTraceFF _  _   OutOfInputs     = text "<out of inputs>"
+ppTraceFF ff _   (Trace (ProgRead v : t))   = (text "?" <> text v) <+> ff (Trace t)
+ppTraceFF ff sho (Trace (ProgWrite v : t))  = (text "!" <> sho v) <+> ff (Trace t)
+ppTraceFF _  _   (Trace [])               = text "stop"
+ppTraceFF _  _   (Trace (OutOfInputs : _ )) = text "<out of inputs>"
 
 data ShowHeadType = Expected | Got | Plain
 
@@ -113,18 +138,18 @@ ppNTrace :: NTrace -> Doc
 ppNTrace = hsep . traceToStringSequence
 
 traceToStringSequence :: NTrace -> [Doc]
-traceToStringSequence t@(ProgRead _ t') = ppNTraceHead Plain t : traceToStringSequence t'
-traceToStringSequence t@(ProgWrite vs t')
-  | S.size vs == 1 && S.member emptyPattern vs = traceToStringSequence t'
-  | otherwise                                  = ppNTraceHead Plain t : traceToStringSequence t'
-traceToStringSequence Stop = [ppNTraceHead Plain Stop]
-traceToStringSequence OutOfInputs = [ppNTraceHead Plain OutOfInputs]
+traceToStringSequence t@(Trace (ProgRead _ : t')) = ppNTraceHead Plain t : traceToStringSequence (Trace t')
+traceToStringSequence t@(Trace (ProgWrite vs : t'))
+  | S.size vs == 1 && S.member emptyPattern vs = traceToStringSequence (Trace t')
+  | otherwise                                  = ppNTraceHead Plain t : traceToStringSequence (Trace t')
+traceToStringSequence (Trace []) = [ppNTraceHead Plain (Trace [])]
+traceToStringSequence (Trace (OutOfInputs : _))  = [ppNTraceHead Plain (Trace [OutOfInputs])]
 
 similar :: Trace' a -> Trace' b -> Bool
 similar x y = inputs x == inputs y
 
 inputs :: Trace' a -> [String]
-inputs (ProgRead v t) = v : inputs t
-inputs (ProgWrite _ t) = inputs t
-inputs Stop = []
-inputs OutOfInputs = []
+inputs (Trace (ProgRead v : t)) = v : inputs (Trace t)
+inputs (Trace (ProgWrite _ : t)) = inputs (Trace t)
+inputs (Trace []) = []
+inputs (Trace (OutOfInputs : _)) = []

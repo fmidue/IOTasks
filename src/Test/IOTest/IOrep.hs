@@ -42,10 +42,10 @@ instance MonadTeletype IOrep where
   getLine = ReadLine Return
 
 runProgram :: [String] -> IOrep () -> Trace
-runProgram (x:xs) (ReadLine f) = ProgRead x $ runProgram xs $ f x
-runProgram [] (ReadLine _) = OutOfInputs
-runProgram xs (WriteLine v p) =  ProgWrite v $ runProgram xs p
-runProgram _ (Return _) =  Stop
+runProgram (x:xs) (ReadLine f) = Trace [ProgRead x] <> runProgram xs (f x)
+runProgram [] (ReadLine _) = Trace [OutOfInputs]
+runProgram xs (WriteLine v p) =  Trace [ProgWrite v] <> runProgram xs p
+runProgram _ (Return _) =  Trace []
 
 class Monad m => MonadTeletype m where
   putStrLn :: String -> m ()
