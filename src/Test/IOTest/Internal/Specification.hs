@@ -21,7 +21,7 @@ import Data.Proxy
 type Specification = [Action]
 
 data Action where
-  ReadInput ::Varname -> ValueSet -> Action
+  ReadInput :: Varname -> ValueSet -> Action
   WriteOutput :: StringEmbedding s a => Proxy s -> Bool -> [LinearPattern] -> [Term a] -> Action
   Branch :: Term Bool -> Specification -> Specification -> Action
   TillE :: Specification -> Action

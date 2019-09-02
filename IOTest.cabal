@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9b59dbe86d06816fc90d8ea2c91613434c1d73ac9432fc561de002cd96b81309
+-- hash: 236dcdcf5220b877cc3f155b958c0159c936550098d146f4cae109c2b33fe883
 
 name:           IOTest
 version:        0.1.0.0
@@ -41,6 +41,7 @@ library
       Test.IOTest.IOProperty
       Test.IOTest.IOrep
       Test.IOTest.Language
+      Test.IOTest.Semantics
       Test.IOTest.Trace
       Test.IOTest.Translation
       Test.IOTest.Utils
