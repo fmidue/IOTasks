@@ -12,7 +12,6 @@ module Test.IOTest.Semantics (
   mapSemantics,
   withSemantics,
   interpret,
-  continue,
   loopEnd,
   ) where
 
@@ -88,19 +87,19 @@ interpret' _ w act@WriteOutput{} = w act
 interpret' r w (TillE s) =
   let body = interpret r w s
       go = forever body -- repeat until the loop is terminated by an end marker
-  in mapSemantics  (fmap . first $ void . Just) go
-interpret' r w (Branch p s1 s2) = do
-  cond <- gets (evalTerm p)
-  if cond
-    then interpret r w s2
-    else interpret r w s1
+  in mapSemantics (fmap (first (\Nothing -> Just ()))) go
+interpret' r w (Branch c s1 s2) = do
+  ifM (gets (evalTerm c))
+    (interpret r w s2)
+    (interpret r w s1)
 interpret' _ _ E = loopEnd
+
+-- should be imported from http://hackage.haskell.org/package/extra-1.6.18/docs/src/Control.Monad.Extra.html#ifM
+ifM :: Monad m => m Bool -> m a -> m a -> m a
+ifM b t f = do b <- b; if b then t else f
 
 loopEnd :: Monad m => Semantics m ()
 loopEnd = Semantics (\c -> return (Nothing, c))
-
-continue :: Monad m => Semantics m ()
-continue = mempty
 
 -- orphan instances
 

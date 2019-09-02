@@ -46,7 +46,8 @@ buildRead _ = error "buildRead"
 
 buildWrite :: MonadTeletype m => Action -> Semantics m ()
 buildWrite (WriteOutput _ _ [] _) = error "empty list of output options"
-buildWrite (WriteOutput _ True _ _) = continue
+buildWrite (WriteOutput _ True _ _) =
+  mempty
 buildWrite (WriteOutput pxy False (p:_) ts) =
-  get >>= (putStrLn . render . pPrint . fillHoles pxy p ts)
+  putStrLn . render . pPrint . fillHoles pxy p ts =<< get
 buildWrite _ = error "buildWrite"
