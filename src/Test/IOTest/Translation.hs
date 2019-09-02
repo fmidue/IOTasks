@@ -29,7 +29,7 @@ import Text.PrettyPrint.HughesPJClass hiding ((<>))
 import Control.Monad.State
 
 buildComputation :: MonadTeletype m => Specification -> m ()
-buildComputation s = void $ evalSemantics (buildComputation' s) (freshContext s)
+buildComputation s = fmap fromJust $ evalSemantics (buildComputation' s) (freshContext s)
 
 -- translates to a 'minimal' program satisfying the specification
 buildComputation' ::MonadTeletype m => Specification -> Semantics m ()
