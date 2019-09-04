@@ -95,22 +95,22 @@ continue = mempty
 -- orphan instances
 
 instance MonadGen m => MonadGen (StateT s m) where
-  liftGen g = StateT (\s -> (, s) <$> liftGen g)
+  liftGen g = lift $ liftGen g
   variant n = mapStateT (variant n)
   sized f = let g s = sized (\n -> runStateT (f n) s) in StateT g
   resize n = mapStateT (resize n)
-  choose p = StateT (\s -> (, s) <$> choose p)
+  choose p = lift $ choose p
 
 instance (MonadGen m, Monoid w) => MonadGen (WriterT w m) where
-  liftGen g = WriterT ((, mempty) <$> liftGen g)
+  liftGen g = lift $ liftGen g
   variant n = mapWriterT (variant n)
   sized f = let g = sized (runWriterT . f) in WriterT g
   resize n = mapWriterT (resize n)
-  choose p = WriterT ((, mempty) <$> choose p)
+  choose p = lift $ choose p
 
 instance MonadGen m => MonadGen (MaybeT m) where
-  liftGen g = MaybeT (Just <$> liftGen g)
+  liftGen g = lift $ liftGen g
   variant n = mapMaybeT (variant n)
   sized f = let g = sized (runMaybeT . f) in MaybeT g
   resize n = mapMaybeT (resize n)
-  choose p = MaybeT (Just <$> choose p)
+  choose p = lift $ choose p
