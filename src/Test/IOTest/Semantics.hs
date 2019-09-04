@@ -33,7 +33,7 @@ import Data.Coerce ( coerce )
 import Test.QuickCheck.GenT
 
 newtype Semantics m a = Semantics { runSemantics :: Context -> m (Maybe a, Context) }
-  deriving (Functor, Applicative, Monad, MonadTeletype, MonadState Context) via MaybeT (StateT Context m)
+  deriving (Functor, Applicative, Monad, MonadTeletype, MonadState Context, MonadGen) via MaybeT (StateT Context m)
 
 evalSemantics :: Monad m => Semantics m a -> Context -> m (Maybe a)
 evalSemantics m c = fst <$> runSemantics m c
@@ -52,13 +52,6 @@ instance MonadWriter NTrace m  => MonadWriter NTrace (Semantics m) where
   tell = coerce . tell @NTrace @(MaybeT (StateT Context m))
   listen = listen . coerce
   pass = pass . coerce
-
-instance MonadGen m => MonadGen (Semantics m) where
-  liftGen g = Semantics (\s -> first Just . (, s) <$> liftGen g)
-  variant n = mapSemantics (variant n)
-  sized f = let g s = sized (\n -> runSemantics (f n) s) in Semantics g
-  resize n = mapSemantics (resize n)
-  choose p = Semantics (\s -> first Just . (, s) <$> choose p)
 
 instance (Monad m, Semigroup a) => Semigroup (Semantics m a) where
   (<>) = liftA2 (<>)
