@@ -2,10 +2,10 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE GADTs #-}
-module Test.IOTest.Internal.Context
-  ( Context
+module Test.IOTest.Internal.Environment
+  ( Environment
   , update
-  , freshContext
+  , freshEnvironment
   , lookupName
   , lookupNameAtType
   , HasVariables(..)
@@ -23,7 +23,7 @@ import Type.Reflection
 
 type Varname = String
 
-type Context = [ (Varname, Maybe (SomeTypeRep,[Value]) ) ]
+type Environment = [ (Varname, Maybe (SomeTypeRep,[Value]) ) ]
 
 data Value where
   Value :: (Typeable a, StringEmbedding s a) => Proxy s -> a -> Value
@@ -37,7 +37,7 @@ valueTypeRep (Value _ a) = dynTypeRep $ toDyn a
 fromValue :: (Typeable a, StringEmbedding s a) => Proxy s -> Value -> Maybe a
 fromValue _ (Value _ a) = fromDynamic (toDyn a)
 
-update :: Varname -> Value -> Context -> Maybe Context
+update :: Varname -> Value -> Environment -> Maybe Environment
 update x v = traverse (addValue x v)
   where
     addValue x' v' (y,Nothing) =
@@ -51,8 +51,8 @@ update x v = traverse (addValue x v)
           else Nothing
         else Just (y,Just (tyRep,vs'))
 
-freshContext :: HasVariables a => a -> Context
-freshContext s = (,Nothing) <$> vars s
+freshEnvironment :: HasVariables a => a -> Environment
+freshEnvironment s = (,Nothing) <$> vars s
 
 data LookupError = NameNotFound String | WrongType String deriving Show
 
@@ -60,14 +60,14 @@ printLookupError :: LookupError -> String
 printLookupError (NameNotFound e) = "lookup error: name not found: " <> e
 printLookupError (WrongType e) = "lookup error: wrong type: " <> e
 
-lookupName :: Varname -> Context -> Either LookupError [Value]
+lookupName :: Varname -> Environment -> Either LookupError [Value]
 lookupName x c =
   case lookup x c of
     Just Nothing -> Right []
     Just (Just (_, vs)) -> Right vs
     Nothing -> Left (NameNotFound $ x <> " in " <> show c)
 
-lookupNameAtType :: (Typeable a, StringEmbedding s a) => Proxy s -> Varname -> Context -> Either LookupError [a]
+lookupNameAtType :: (Typeable a, StringEmbedding s a) => Proxy s -> Varname -> Environment -> Either LookupError [a]
 lookupNameAtType p x c =
   case lookupName x c of
     Left e -> Left e

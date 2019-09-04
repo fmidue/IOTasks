@@ -15,7 +15,7 @@ module Test.IOTest.Internal.ValueSet
 
 import Test.IOTest.Utils
 import Test.IOTest.Internal.Pattern
-import Test.IOTest.Internal.Context
+import Test.IOTest.Internal.Environment
 
 import Data.Proxy
 import Data.Dynamic

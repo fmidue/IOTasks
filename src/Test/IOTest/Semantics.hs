@@ -17,7 +17,7 @@ module Test.IOTest.Semantics (
 import Prelude hiding (foldMap)
 
 import Test.IOTest.IOrep
-import Test.IOTest.Internal.Context
+import Test.IOTest.Internal.Environment
 import Test.IOTest.Internal.Specification
 import Test.IOTest.Internal.Trace
 import Test.IOTest.Internal.Term
@@ -33,24 +33,24 @@ import Data.MonoTraversable.Unprefixed
 
 import Test.QuickCheck.GenT
 
-newtype Semantics m a = Semantics { runSemantics :: Context -> m (Maybe a, Context) }
-  deriving (Functor, Applicative, Monad, MonadTeletype, MonadState Context, MonadGen) via MaybeT (StateT Context m)
+newtype Semantics m a = Semantics { runSemantics :: Environment -> m (Maybe a, Environment) }
+  deriving (Functor, Applicative, Monad, MonadTeletype, MonadState Environment, MonadGen) via MaybeT (StateT Environment m)
 
-evalSemantics :: Monad m => Semantics m a -> Context -> m (Maybe a)
+evalSemantics :: Monad m => Semantics m a -> Environment -> m (Maybe a)
 evalSemantics m c = fst <$> runSemantics m c
 
-execSemantics :: Monad m => Semantics m a -> Context -> m Context
+execSemantics :: Monad m => Semantics m a -> Environment -> m Environment
 execSemantics m c = snd <$> runSemantics m c
 
-mapSemantics :: (m (Maybe a, Context) -> n (Maybe b, Context)) -> Semantics m a -> Semantics n b
+mapSemantics :: (m (Maybe a, Environment) -> n (Maybe b, Environment)) -> Semantics m a -> Semantics n b
 mapSemantics f (Semantics g) = Semantics (f . g)
 
-withSemantics :: (Context -> Context) -> Semantics m a -> Semantics m a
+withSemantics :: (Environment -> Environment) -> Semantics m a -> Semantics m a
 withSemantics f (Semantics g) = Semantics (g . f)
 
 instance MonadWriter NTrace m  => MonadWriter NTrace (Semantics m) where
-  writer = coerce . writer @NTrace @(MaybeT (StateT Context m))
-  tell = coerce . tell @NTrace @(MaybeT (StateT Context m))
+  writer = coerce . writer @NTrace @(MaybeT (StateT Environment m))
+  tell = coerce . tell @NTrace @(MaybeT (StateT Environment m))
   listen = listen . coerce
   pass = pass . coerce
 

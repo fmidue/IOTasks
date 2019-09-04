@@ -7,7 +7,7 @@ module Test.IOTest.Internal.Pattern
   ( matches
   , buildPattern
   , buildPattern'
-  , matchesWithContext
+  , matchesWithEnvironment
   , LinearPattern
   , hasHoles
   , fillHoles
@@ -15,7 +15,7 @@ module Test.IOTest.Internal.Pattern
   , isSubPatternOf
   ) where
 
-import Test.IOTest.Internal.Context
+import Test.IOTest.Internal.Environment
 import Test.IOTest.Internal.Term
 import Test.IOTest.Utils
 
@@ -108,14 +108,14 @@ instance Semigroup LinearPattern where
 instance Monoid LinearPattern where
   mempty = Simple Empty
 
-matchesWithContext :: StringEmbedding s a => Proxy s -> String -> LinearPattern -> [Term a] -> Context -> Maybe Bool
-matchesWithContext pxy xs p ts c = xs `matches` fillHoles pxy p ts c
+matchesWithEnvironment :: StringEmbedding s a => Proxy s -> String -> LinearPattern -> [Term a] -> Environment -> Maybe Bool
+matchesWithEnvironment pxy xs p ts c = xs `matches` fillHoles pxy p ts c
 
-fillHoles :: StringEmbedding s a =>  Proxy s -> LinearPattern -> [Term a] -> Context -> LinearPattern
+fillHoles :: StringEmbedding s a =>  Proxy s -> LinearPattern -> [Term a] -> Environment -> LinearPattern
 fillHoles pxy (Simple p) ts c = Simple $ fillSimple pxy p ts c
 fillHoles pxy (Sequence p1 p2) ts c = Simple (fillSimple pxy p1 ts c) <> fillHoles pxy p2 ts c
 
-fillSimple :: StringEmbedding s a =>  Proxy s -> SimplePattern -> [Term a] -> Context -> SimplePattern
+fillSimple :: StringEmbedding s a =>  Proxy s -> SimplePattern -> [Term a] -> Environment -> SimplePattern
 fillSimple _ Empty _ _ = Empty
 fillSimple _ WildCard _ _ = WildCard
 fillSimple _ (Literal p) _ _ = Literal p

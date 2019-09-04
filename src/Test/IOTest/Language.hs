@@ -20,7 +20,7 @@ import Test.IOTest.Utils
 import Test.IOTest.Internal.Specification
 import qualified Test.IOTest.Internal.Term as T
 import Test.IOTest.Internal.Term (Term)
-import Test.IOTest.Internal.Context (Varname)
+import Test.IOTest.Internal.Environment (Varname)
 import Test.IOTest.Internal.ValueSet
 import Test.IOTest.Internal.Pattern
 

@@ -10,7 +10,7 @@ module Test.IOTest.Translation (
   buildComputation
 ) where
 
-import Test.IOTest.Internal.Context
+import Test.IOTest.Internal.Environment
 import Test.IOTest.Internal.Pattern
 import Test.IOTest.Internal.ValueSet
 import Test.IOTest.Utils
@@ -28,7 +28,7 @@ import Control.Monad.State
 
 buildComputation :: MonadTeletype m => Specification -> m ()
 buildComputation s = do
-  loopStatus <- evalSemantics (buildComputation' s) (freshContext s)
+  loopStatus <- evalSemantics (buildComputation' s) (freshEnvironment s)
   case loopStatus of
     Just () -> return ()
     Nothing -> error "buildComputation: loopEnd at toplevel"

@@ -13,7 +13,7 @@ import Prelude hiding (putStrLn, getLine)
 import Test.IOTest.Semantics
 import Test.IOTest.Internal.Trace
 import Test.IOTest.Internal.Pattern
-import Test.IOTest.Internal.Context
+import Test.IOTest.Internal.Environment
 import Test.IOTest.Internal.ValueSet
 import Test.IOTest.Internal.Specification
 
@@ -29,7 +29,7 @@ import Control.Monad.Writer
 
 traceGen :: MonadGen m => Specification -> m NTrace
 traceGen s = do
-  (loopStatus, t) <- runWriterT $ evalSemantics (traceGen' s) (freshContext s)
+  (loopStatus, t) <- runWriterT $ evalSemantics (traceGen' s) (freshEnvironment s)
   case loopStatus of
     Just () -> return t
     Nothing -> error "traceGen: loopEnd at toplevel"
@@ -41,7 +41,7 @@ genRead :: (MonadGen m, MonadWriter NTrace m) => Action -> Semantics m ()
 genRead (ReadInput x vs) = sized $ \size -> do
   seed <- choose (minBound, maxBound)
   let v = valueOf vs (mkStdGen seed) -- TODO: is there a better way of doing this?
-  modify (fromMaybe (error "type mismatch on context update") . update x v)
+  modify (fromMaybe (error "type mismatch on environment update") . update x v)
   tell $ Trace [ProgRead (show v)]
   -- FIXME: clean up according to paper definition?
 genRead _ = error "genRead"

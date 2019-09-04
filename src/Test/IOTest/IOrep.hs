@@ -19,8 +19,8 @@ import Control.Monad.State
 import qualified System.IO as IO
 
 data IOrep' t a where
-  ReadLine :: (t -> IOrep' t a) -> IOrep' t a
-  WriteLine :: t -> IOrep' t a -> IOrep' t a
+  GetLine :: (t -> IOrep' t a) -> IOrep' t a
+  PutLine :: t -> IOrep' t a -> IOrep' t a
   Return :: a -> IOrep' t a
 
 deriving instance Functor (IOrep' t)
@@ -31,20 +31,20 @@ instance Applicative (IOrep' t) where
 
 instance Monad (IOrep' t) where
   (Return a) >>= g = g a
-  (ReadLine f) >>= g = ReadLine (f >=> g)
-  (WriteLine s ma) >>= g = WriteLine s (ma >>= g)
+  (GetLine f) >>= g = GetLine (f >=> g)
+  (PutLine s ma) >>= g = PutLine s (ma >>= g)
   return = pure
 
 type IOrep = IOrep' String
 
 instance MonadTeletype IOrep where
-  putStrLn s = WriteLine s $ Return ()
-  getLine = ReadLine Return
+  putStrLn s = PutLine s $ Return ()
+  getLine = GetLine Return
 
 runProgram :: [String] -> IOrep () -> Trace
-runProgram (x:xs) (ReadLine f) = Trace [ProgRead x] <> runProgram xs (f x)
-runProgram [] (ReadLine _) = Trace [OutOfInputs]
-runProgram xs (WriteLine v p) =  Trace [ProgWrite v] <> runProgram xs p
+runProgram (x:xs) (GetLine f) = Trace [ProgRead x] <> runProgram xs (f x)
+runProgram [] (GetLine _) = Trace [OutOfInputs]
+runProgram xs (PutLine v p) =  Trace [ProgWrite v] <> runProgram xs p
 runProgram _ (Return _) =  Trace []
 
 class Monad m => MonadTeletype m where

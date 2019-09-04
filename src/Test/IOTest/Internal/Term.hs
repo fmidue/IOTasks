@@ -14,7 +14,7 @@ module Test.IOTest.Internal.Term (
   isEpsilon
 ) where
 
-import Test.IOTest.Internal.Context
+import Test.IOTest.Internal.Environment
 import Test.IOTest.Utils
 
 import Control.Monad.State
@@ -24,10 +24,10 @@ import Data.Maybe
 import Data.Dynamic
 import Data.Proxy
 
-newtype Term a = Term { getTerm :: MaybeT (State Context) a }
-  deriving (Functor, Applicative) via (MaybeT (State Context))
+newtype Term a = Term { getTerm :: MaybeT (State Environment) a }
+  deriving (Functor, Applicative) via (MaybeT (State Environment))
 
-evalTerm :: Term a -> Context -> a
+evalTerm :: Term a -> Environment -> a
 evalTerm t = fromMaybe (error "Can not evaluate epsilon!") . (evalState . runMaybeT $ getTerm t)
 
 --TODO: What is this good for?
