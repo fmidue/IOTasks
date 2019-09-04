@@ -12,7 +12,6 @@ module Test.IOTest.Translation (
 
 import Test.IOTest.Internal.Context
 import Test.IOTest.Internal.Pattern
-import Test.IOTest.Internal.Term
 import Test.IOTest.Internal.ValueSet
 import Test.IOTest.Utils
 
@@ -21,7 +20,6 @@ import Test.IOTest.IOrep
 import Test.IOTest.Semantics
 import Test.IOTest.Internal.Specification
 
-import Control.Monad (void)
 import Data.Maybe
 import System.Random
 import Text.PrettyPrint.HughesPJClass hiding ((<>))
@@ -29,7 +27,11 @@ import Text.PrettyPrint.HughesPJClass hiding ((<>))
 import Control.Monad.State
 
 buildComputation :: MonadTeletype m => Specification -> m ()
-buildComputation s = void $ evalSemantics (buildComputation' s) (freshContext s)
+buildComputation s = do
+  loopStatus <- evalSemantics (buildComputation' s) (freshContext s)
+  case loopStatus of
+    Just () -> return ()
+    Nothing -> error "buildComputation: loopEnd at toplevel"
 
 -- translates to a 'minimal' program satisfying the specification
 buildComputation' ::MonadTeletype m => Specification -> Semantics m ()

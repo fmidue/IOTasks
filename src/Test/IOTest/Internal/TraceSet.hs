@@ -28,7 +28,11 @@ import Control.Monad.State
 import Control.Monad.Writer
 
 traceGen :: MonadGen m => Specification -> m NTrace
-traceGen s = execWriterT $ evalSemantics (traceGen' s) (freshContext s)
+traceGen s = do
+  (loopStatus, t) <- runWriterT $ evalSemantics (traceGen' s) (freshContext s)
+  case loopStatus of
+    Just () -> return t
+    Nothing -> error "traceGen: loopEnd at toplevel"
 
 traceGen' :: (MonadGen m, MonadWriter NTrace m) => Specification -> Semantics m ()
 traceGen' = interpret genRead genWrite
