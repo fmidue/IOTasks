@@ -27,7 +27,11 @@ import Text.PrettyPrint.HughesPJClass hiding ((<>))
 import Control.Monad.State
 
 buildComputation :: MonadTeletype m => Specification -> m ()
-buildComputation s = fromJust <$> evalSemantics (buildComputation' s) (freshContext s)
+buildComputation s = do
+  loopStatus <- evalSemantics (buildComputation' s) (freshContext s)
+  case loopStatus of
+    Just () -> return ()
+    Nothing -> error "buildComputation: loopEnd at toplevel"
 
 -- translates to a 'minimal' program satisfying the specification
 buildComputation' ::MonadTeletype m => Specification -> Semantics m ()
