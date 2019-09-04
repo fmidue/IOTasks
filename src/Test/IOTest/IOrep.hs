@@ -6,7 +6,7 @@
 module Test.IOTest.IOrep (
   IOrep,
   runProgram,
-  MonadTeletype(..),
+  MonadTeletype(..), print, readLn,
   Handle, BufferMode, hSetBuffering, stdout,
 ) where
 
@@ -49,14 +49,13 @@ runProgram _ (Return _) =  Trace []
 
 class Monad m => MonadTeletype m where
   putStrLn :: String -> m ()
-
   getLine :: m String
 
-  print :: Show a => a -> m ()
-  print = putStrLn . show
+print :: (Show a, MonadTeletype m) => a -> m ()
+print = putStrLn . show
 
-  readLn :: Read a => m a
-  readLn = read <$> getLine
+readLn :: (Read a, MonadTeletype m) => m a
+readLn = read <$> getLine
 
 instance MonadTeletype m => MonadTeletype (MaybeT m) where
   putStrLn = lift . putStrLn
@@ -79,5 +78,3 @@ hSetBuffering StdOut NoBuffering = return ()
 instance MonadTeletype IO where
   putStrLn = IO.putStrLn
   getLine = IO.getLine
-  readLn = IO.readLn
-  print = IO.print
