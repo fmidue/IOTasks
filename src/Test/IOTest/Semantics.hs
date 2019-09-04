@@ -12,7 +12,6 @@ module Test.IOTest.Semantics (
   mapSemantics,
   withSemantics,
   interpret,
-  continue,
   loopEnd,
   ) where
 
@@ -22,6 +21,7 @@ import Test.IOTest.Internal.Specification
 import Test.IOTest.Internal.Trace
 import Test.IOTest.Internal.Term
 
+import Control.Monad.Extra (ifM)
 import Control.Monad.State
 import Control.Monad.Writer
 import Control.Monad.Trans.Maybe
@@ -88,19 +88,15 @@ interpret' _ w act@WriteOutput{} = w act
 interpret' r w (TillE s) =
   let body = interpret r w s
       go = forever body -- repeat until the loop is terminated by an end marker
-  in mapSemantics  (fmap . first $ void . Just) go
-interpret' r w (Branch p s1 s2) = do
-  cond <- gets (evalTerm p)
-  if cond
-    then interpret r w s2
-    else interpret r w s1
+  in mapSemantics (fmap (first (\Nothing -> Just ()))) go
+interpret' r w (Branch c s1 s2) =
+  ifM (gets (evalTerm c))
+    (interpret r w s2)
+    (interpret r w s1)
 interpret' _ _ E = loopEnd
 
 loopEnd :: Monad m => Semantics m ()
 loopEnd = Semantics (\c -> return (Nothing, c))
-
-continue :: Monad m => Semantics m ()
-continue = mempty
 
 -- orphan instances
 
