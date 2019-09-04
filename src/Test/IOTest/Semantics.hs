@@ -14,6 +14,8 @@ module Test.IOTest.Semantics (
   loopEnd,
   ) where
 
+import Prelude hiding (foldMap)
+
 import Test.IOTest.IOrep
 import Test.IOTest.Internal.Context
 import Test.IOTest.Internal.Specification
@@ -27,6 +29,7 @@ import Control.Monad.Trans.Maybe
 
 import Data.Bifunctor
 import Data.Coerce ( coerce )
+import Data.MonoTraversable.Unprefixed
 
 import Test.QuickCheck.GenT
 

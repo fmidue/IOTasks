@@ -33,6 +33,7 @@ dependencies:
 - parsec
 - pretty
 - extra
+- mono-traversable
 
 library:
   source-dirs: src

@@ -1,13 +1,17 @@
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DataKinds #-}
 module Test.IOTest.Internal.Specification (
-  Specification,
+  Specification(..),
   Action (..),
   optional,
 ) where
+
+import Prelude hiding (foldr)
 
 import Test.IOTest.Utils
 import Test.IOTest.Internal.Context
@@ -17,8 +21,14 @@ import Test.IOTest.Internal.ValueSet
 
 import Data.List (nub)
 import Data.Proxy
+import Data.MonoTraversable
+import Data.MonoTraversable.Unprefixed (foldr)
 
-type Specification = [Action]
+newtype Specification = Spec [Action]
+  deriving (Semigroup, Monoid, MonoFoldable) via [Action]
+
+-- for MonoFoldable
+type instance Element Specification = Action
 
 data Action where
   ReadInput :: Varname -> ValueSet -> Action
@@ -29,11 +39,11 @@ data Action where
 
 -- move into Combinators ?
 optional :: Specification -> Specification
-optional [] = []
-optional (WriteOutput p _ ps ts : xs) = [WriteOutput p True ps ts] <> optional xs
+optional (Spec []) = Spec []
+optional (Spec (WriteOutput p _ ps ts : xs)) = Spec [WriteOutput p True ps ts] <> optional (Spec xs)
 optional _ = error "only writes can be optional"
 
-instance HasVariables [Action] where
+instance HasVariables Specification where
   vars = nub . foldr phi [] where
     phi (ReadInput v _) vs = v : vs
     phi WriteOutput{} vs = vs

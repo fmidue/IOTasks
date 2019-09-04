@@ -28,7 +28,7 @@ import Data.Proxy
 import Data.Typeable
 
 readInput :: Varname -> ValueSet -> Specification
-readInput x vs = [ReadInput x vs]
+readInput x vs = Spec [ReadInput x vs]
 
 type HasStringTerms (s::Bool) = Proxy s
 
@@ -38,22 +38,22 @@ nonStringTerms :: HasStringTerms 'False
 nonStringTerms = Proxy
 
 writeOutput :: StringEmbedding s a => [LinearPattern] -> [Term a] -> HasStringTerms s -> Specification
-writeOutput ps ts proxy = [WriteOutput proxy False ps ts]
+writeOutput ps ts proxy = Spec [WriteOutput proxy False ps ts]
 
 writeFixedOutput :: [LinearPattern] -> Specification
-writeFixedOutput ps = [WriteOutput (Proxy @'True) False ps ([] :: [Term String])]
+writeFixedOutput ps = Spec [WriteOutput (Proxy @'True) False ps ([] :: [Term String])]
 
 branch :: Term Bool -> Specification -> Specification -> Specification
-branch t s1 s2 = [Branch t s1 s2]
+branch t s1 s2 = Spec [Branch t s1 s2]
 
 tillEnd :: Specification -> Specification
-tillEnd s = [TillE s]
+tillEnd s = Spec [TillE s]
 
 nop :: Specification
 nop = mempty
 
 end :: Specification
-end = [E]
+end = Spec [E]
 
 intValues :: [Int] -> ValueSet
 intValues = ValueSet (Proxy @'False)
