@@ -21,6 +21,7 @@ import Test.IOTest.Internal.Specification
 import Test.IOTest.Internal.Trace
 import Test.IOTest.Internal.Term
 
+import Control.Monad.Extra (ifM)
 import Control.Monad.State
 import Control.Monad.Writer
 import Control.Monad.Trans.Maybe
@@ -88,15 +89,11 @@ interpret' r w (TillE s) =
   let body = interpret r w s
       go = forever body -- repeat until the loop is terminated by an end marker
   in mapSemantics (fmap (first (\Nothing -> Just ()))) go
-interpret' r w (Branch c s1 s2) = do
+interpret' r w (Branch c s1 s2) =
   ifM (gets (evalTerm c))
     (interpret r w s2)
     (interpret r w s1)
 interpret' _ _ E = loopEnd
-
--- should be imported from http://hackage.haskell.org/package/extra-1.6.18/docs/src/Control.Monad.Extra.html#ifM
-ifM :: Monad m => m Bool -> m a -> m a -> m a
-ifM b t f = do b <- b; if b then t else f
 
 loopEnd :: Monad m => Semantics m ()
 loopEnd = Semantics (\c -> return (Nothing, c))

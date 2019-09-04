@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 236dcdcf5220b877cc3f155b958c0159c936550098d146f4cae109c2b33fe883
+-- hash: 3d7e9f8eb67e90afe2a666148f6dee847c87a2121541c0e1ff4241ec2f66ad07
 
 name:           IOTest
 version:        0.1.0.0
@@ -54,6 +54,7 @@ library
       QuickCheck
     , base >=4.7 && <5
     , containers
+    , extra
     , mtl
     , parsec
     , pretty
@@ -81,6 +82,7 @@ test-suite IOTest-test
     , QuickCheck
     , base >=4.7 && <5
     , containers
+    , extra
     , hspec
     , mtl
     , parsec

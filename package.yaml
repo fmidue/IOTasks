@@ -32,6 +32,7 @@ dependencies:
 - random
 - parsec
 - pretty
+- extra
 
 library:
   source-dirs: src
