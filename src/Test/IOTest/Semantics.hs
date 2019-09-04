@@ -53,11 +53,11 @@ instance MonadWriter NTrace m  => MonadWriter NTrace (Semantics m) where
   listen = listen . coerce
   pass = pass . coerce
 
-instance (Monad m, Semigroup a) => Semigroup (Semantics m a) where
-  (<>) = liftA2 (<>)
+instance Monad m => Semigroup (Semantics m ()) where
+  (<>) = (>>)
 
-instance (Monad m, Monoid a) => Monoid (Semantics m a) where
-  mempty = pure mempty
+instance Monad m => Monoid (Semantics m ()) where
+  mempty = pure ()
 
 interpret ::
      (Monad m)
