@@ -1,4 +1,3 @@
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -25,7 +24,6 @@ import Control.Monad.Extra (ifM)
 import Control.Monad.State
 import Control.Monad.Writer
 import Control.Monad.Trans.Maybe
-import Control.Applicative
 
 import Data.Bifunctor
 import Data.Coerce ( coerce )
