@@ -87,7 +87,7 @@ interpret' r w (Branch c s1 s2) =
 interpret' _ _ E = loopEnd
 
 loopEnd :: Monad m => Semantics m ()
-loopEnd = Semantics (\c -> return (Nothing, c))
+loopEnd = Semantics (\d -> return (Nothing, d))
 
 -- orphan instances
 
