@@ -34,7 +34,7 @@ buildComputation s = do
     Nothing -> error "buildComputation: loopEnd at toplevel"
 
 -- translates to a 'minimal' program satisfying the specification
-buildComputation' ::MonadTeletype m => Specification -> Semantics m ()
+buildComputation' :: MonadTeletype m => Specification -> Semantics m ()
 buildComputation' = interpret buildRead buildWrite
 
 buildRead :: MonadTeletype m => Action -> Semantics m ()
