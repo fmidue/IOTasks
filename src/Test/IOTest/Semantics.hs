@@ -58,7 +58,7 @@ instance Monad m => Semigroup (Semantics m ()) where
   (<>) = (>>)
 
 instance Monad m => Monoid (Semantics m ()) where
-  mempty = pure ()
+  mempty = return ()
 
 interpret ::
      (Monad m)
