@@ -105,18 +105,18 @@ instance Semigroup LinearPattern where
 instance Monoid LinearPattern where
   mempty = Simple Empty
 
-matchesWithEnvironment :: StringEmbedding s a => Proxy s -> String -> (LinearPattern, [Term a]) -> Environment -> Maybe Bool
-matchesWithEnvironment pxy xs (p,ts) d = xs `matches` fillHoles pxy (p,ts) d
+matchesWithEnvironment :: StringEmbedding a => String -> (LinearPattern, [Term a]) -> Environment -> Maybe Bool
+matchesWithEnvironment xs (p,ts) d = xs `matches` fillHoles (p,ts) d
 
-fillHoles :: StringEmbedding s a => Proxy s -> (LinearPattern, [Term a]) -> Environment -> LinearPattern
-fillHoles pxy (Simple p, ts) d = Simple $ fillSimple pxy (p,ts) d
-fillHoles pxy (Sequence p1 p2, ts) d = Simple (fillSimple pxy (p1,ts) d) <> fillHoles pxy (p2,ts) d
+fillHoles :: StringEmbedding a => (LinearPattern, [Term a]) -> Environment -> LinearPattern
+fillHoles (Simple p, ts) d = Simple $ fillSimple (p,ts) d
+fillHoles (Sequence p1 p2, ts) d = Simple (fillSimple (p1,ts) d) <> fillHoles (p2,ts) d
 
-fillSimple :: StringEmbedding s a => Proxy s -> (SimplePattern, [Term a]) -> Environment -> SimplePattern
-fillSimple _ (Empty, _) _ = Empty
-fillSimple _ (WildCard, _) _ = WildCard
-fillSimple _ (Literal p, _) _ = Literal p
-fillSimple pxy (Hole n, ts) d = Literal . pack pxy $ evalTerm (ts !! n) d
+fillSimple :: StringEmbedding a => (SimplePattern, [Term a]) -> Environment -> SimplePattern
+fillSimple (Empty, _) _ = Empty
+fillSimple (WildCard, _) _ = WildCard
+fillSimple (Literal p, _) _ = Literal p
+fillSimple (Hole n, ts) d = Literal . pack $ evalTerm (ts !! n) d
 
 isSubPatternOf :: LinearPattern -> LinearPattern ->  Bool
 p1 `isSubPatternOf` p2 = parse (patternParser p2) "" (render $ pPrint p1) == Right ()

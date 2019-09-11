@@ -48,9 +48,9 @@ genRead (ReadInput x vs) = sized $ \size -> do
 genRead _ = error "genRead"
 
 genWrite :: (MonadGen m, MonadWriter NTrace m) => Action -> Semantics m ()
-genWrite (WriteOutput pxy opt ps ts) = sized $ \size -> do
+genWrite (WriteOutput opt ps ts) = sized $ \size -> do
   d <- get
-  let v1 = S.fromList ((\p -> fillHoles pxy (p,ts) d) <$> ps)
+  let v1 = S.fromList ((\p -> fillHoles (p,ts) d) <$> ps)
       v1' = if opt then S.insert emptyPattern v1 else v1
   unless (null v1') $ tell (Trace [ProgWrite v1'])
 genWrite _ = error "genWrite"

@@ -25,13 +25,13 @@ import System.Random
 import Text.PrettyPrint.HughesPJClass hiding ((<>))
 
 data ValueSet where
-  ValueSet :: (Extract a b, Typeable b, StringEmbedding s b) => Proxy s -> a -> ValueSet
+  ValueSet :: (Extract a b, Typeable b, StringEmbedding b) => a -> ValueSet
 
-elimValueSet :: RandomGen g => ValueSet -> g -> (forall s a b. (Extract a b, Typeable b, StringEmbedding s b) => Proxy s -> Proxy a -> b -> c) -> c
-elimValueSet (ValueSet ps (xs :: ty)) gen f = f ps (Proxy @ty) $ extract gen xs
+elimValueSet :: RandomGen g => ValueSet -> g -> (forall a b. (Extract a b, Typeable b, StringEmbedding b) => Proxy a -> b -> c) -> c
+elimValueSet (ValueSet (xs :: ty)) gen f = f (Proxy @ty) $ extract gen xs
 
 valueOf :: RandomGen g => ValueSet -> g -> Value
-valueOf vs gen = elimValueSet vs gen (\ ps _ x -> Value ps x)
+valueOf vs gen = elimValueSet vs gen (const Value)
 
 class Extract ts t | ts -> t where
   extract :: RandomGen g => g -> ts -> t

@@ -16,7 +16,6 @@ module Test.IOTest.Internal.Environment
 import Test.IOTest.Utils
 
 import Data.Dynamic
-import Data.Proxy
 import Type.Reflection
 
 type Varname = String
@@ -24,16 +23,16 @@ type Varname = String
 type Environment = [ (Varname, Maybe (SomeTypeRep,[Value]) ) ]
 
 data Value where
-  Value :: (Typeable a, StringEmbedding s a) => Proxy s -> a -> Value
+  Value :: (Typeable a, StringEmbedding a) => a -> Value
 
 instance Show Value where
-  show (Value p a) = pack p a
+  show (Value a) = pack a
 
 valueTypeRep :: Value -> SomeTypeRep
-valueTypeRep (Value _ a) = dynTypeRep $ toDyn a
+valueTypeRep (Value a) = dynTypeRep $ toDyn a
 
-fromValue :: (Typeable a, StringEmbedding s a) => Proxy s -> Value -> Maybe a
-fromValue _ (Value _ a) = fromDynamic (toDyn a)
+fromValue :: Typeable a => Value -> Maybe a
+fromValue (Value a) = fromDynamic (toDyn a)
 
 update :: Varname -> Value -> Environment -> Maybe Environment
 update x v = traverse (addValue x v)
@@ -59,17 +58,20 @@ printLookupError (NameNotFound e) = "lookup error: name not found: " <> e
 printLookupError (WrongType e) = "lookup error: wrong type: " <> e
 
 lookupName :: Varname -> Environment -> Either LookupError [Value]
-lookupName x c =
+lookupName x c = snd <$> lookupName' x c
+
+lookupName' :: Varname -> Environment -> Either LookupError (SomeTypeRep,[Value])
+lookupName' x c =
   case lookup x c of
-    Just Nothing -> Right []
-    Just (Just (_, vs)) -> Right vs
+    Just Nothing -> Right (undefined,[])
+    Just (Just (tyRep, vs)) -> Right (tyRep, vs)
     Nothing -> Left (NameNotFound $ x <> " in " <> show c)
 
-lookupNameAtType :: (Typeable a, StringEmbedding s a) => Proxy s -> Varname -> Environment -> Either LookupError [a]
-lookupNameAtType p x c =
+lookupNameAtType :: Typeable a => Varname -> Environment -> Either LookupError [a]
+lookupNameAtType x c =
   case lookupName x c of
     Left e -> Left e
-    Right vs -> case traverse (fromValue p) vs of
+    Right vs -> case traverse fromValue vs of
       Just typedVs -> Right typedVs
       Nothing -> Left (WrongType $ x <> " in " <> show c)
 

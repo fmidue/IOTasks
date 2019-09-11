@@ -29,7 +29,7 @@ task1 =
   writeFixedOutput ["_"] <>
   readInput "n" (intValues [0..10]) <>
   readTillFixedLength "n" (intValues [-10..10]) "xs" <>
-  writeOutput ["#0"] [sum <$> getAll @Int "xs"] nonStringTerms
+  writeOutput ["#0"] [sum <$> getAll @Int "xs"]
 
 spec :: Specification
 spec =
@@ -37,20 +37,20 @@ spec =
   readInput "n" (intValues [0..10]) <>
   tillExit (
     branch ((\n xs -> length xs == n) <$> getCurrent "n" <*> getAll @Int "xs")
-     ( writeOutput ["_#0_"] [length <$> getAll @Int "xs"] nonStringTerms <>
+     ( writeOutput ["_#0_"] [length <$> getAll @Int "xs"] <>
        readInput "xs" (intValues [-10..10])
      )
      exit
   ) <>
-  writeOutput ["_#0_"] [sum <$> getAll @Int "xs"] nonStringTerms
+  writeOutput ["_#0_"] [sum <$> getAll @Int "xs"]
 
 task1' :: Specification
 task1' =
   optional (writeFixedOutput ["_"]) <>
   readInput "n" nats <>
-  optional (writeOutput ["_#0_"] [getCurrent @Int "n"] nonStringTerms) <>
+  optional (writeOutput ["_#0_"] [getCurrent @Int "n"]) <>
   readTillFixedLength "n" ints "xs" <>
-  writeOutput ["_#0_"] [sum <$> getAll @Int "xs"] nonStringTerms
+  writeOutput ["_#0_"] [sum <$> getAll @Int "xs"]
 
 solution1 :: IOrep ()
 solution1 = do
@@ -81,7 +81,7 @@ task2 :: Specification
 task2 =
   repeatSpec 2 (readInput "xs" ints) <> --otherwise the condition will throw an exception
   readUntil "xs" ((\xs -> length xs > 1 && last xs + last (init xs) == 0 ) <$> getAll @Int "xs") ints <>
-  writeOutput ["_#0_"] [count <$> getAll @Int "xs"] nonStringTerms
+  writeOutput ["_#0_"] [count <$> getAll @Int "xs"]
   where count xs = length [ x | x <- xs, x > 0, x `mod` 3 == 0]
 
 solution2 :: IOrep ()
@@ -100,13 +100,13 @@ task3 =
   tillExit $
     readInput "x" ints <>
     when ((0==) <$> getCurrent @Int "x")
-      (writeOutput ["_#0_"] [sum <$> getAll @Int "x"] nonStringTerms <> exit)
+      (writeOutput ["_#0_"] [sum <$> getAll @Int "x"] <> exit)
 
 task3' :: Specification
 task3' =
   readInput "xs" ints <> --otherwise last will fail
   readUntil "xs" ((\xs -> last xs == 0) <$> getAll @Int "xs") ints <>
-  writeOutput ["_#0_"] [sum <$> getAll @Int "xs"] nonStringTerms
+  writeOutput ["_#0_"] [sum <$> getAll @Int "xs"]
 
 solution3 :: IOrep ()
 solution3 = go [] where
@@ -119,8 +119,8 @@ solution3 = go [] where
 -- read and reverse
 task4 :: Specification
 task4 =
-  readInput "line" (ValueSet (Proxy @'True) ("_" :: LinearPattern)) <>
-  writeOutput ["_#0_"] [reverse <$> getCurrentS "line"] stringTerms
+  readInput "line" (ValueSet ("_" :: LinearPattern)) <>
+  writeOutput ["_#0_"] [reverse <$> getCurrentS "line"]
 
 solution4 :: IOrep ()
 solution4 = (reverse <$> getLine) >>= putStrLn
@@ -133,9 +133,9 @@ scoping =
   readInput "x" ints <>
   (
     readInput "x" ints <>
-    writeOutput ["#0"] [getCurrent @Int "x"] nonStringTerms
+    writeOutput ["#0"] [getCurrent @Int "x"]
   ) <>
-  writeOutput ["#0"] [getCurrent @Int "x"] nonStringTerms
+  writeOutput ["#0"] [getCurrent @Int "x"]
 
 scopingRight :: IOrep ()
 scopingRight = do
@@ -160,10 +160,10 @@ printN n x = replicateM_ n $ print x
 parseSumSpec :: Specification
 parseSumSpec =
   tillExit (
-    readInput "line" (ValueSet (Proxy @'True) ((show @Int <$> [1..10]) ++ (show <$> ['a'..'k']) ) ) <>
+    readInput "line" (ValueSet ((show @Int <$> [1..10]) ++ (show <$> ['a'..'k']) ) ) <>
     when ((==2) . length . filter isJust . fmap (readMaybe @Int) <$> getAllS "line") exit
   ) <>
-  writeOutput ["#0"] [sum . fmap fromJust . filter isJust . fmap (readMaybe @Int) <$> getAllS "line"] nonStringTerms
+  writeOutput ["#0"] [sum . fmap fromJust . filter isJust . fmap (readMaybe @Int) <$> getAllS "line"]
 
 parseSum :: IOrep ()
 parseSum = do

@@ -34,9 +34,9 @@ output (VarSet vs) = oneof [unary, binary] where
   unary = do
     f <- elements [sum, length]
     xs <- elements vs
-    return (writeOutput ["#0"] [f <$> getAll xs] nonStringTerms, VarSet vs)
+    return (writeOutput ["#0"] [f <$> getAll xs], VarSet vs)
   binary = do
     f <- elements [(+), (-), (*)]
     x <- elements vs
     y <- elements vs
-    return (writeOutput ["#0"] [f <$> getCurrent x <*> getCurrent @Int y] nonStringTerms, VarSet vs)
+    return (writeOutput ["#0"] [f <$> getCurrent x <*> getCurrent @Int y], VarSet vs)

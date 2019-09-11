@@ -20,7 +20,6 @@ import Test.IOTest.Internal.Pattern
 import Test.IOTest.Internal.ValueSet
 
 import Data.List (nub)
-import Data.Proxy
 import Data.MonoTraversable
 import Data.MonoTraversable.Unprefixed (foldr)
 
@@ -32,7 +31,7 @@ type instance Element Specification = Action
 
 data Action where
   ReadInput :: Varname -> ValueSet -> Action
-  WriteOutput :: StringEmbedding s a => Proxy s -> Bool -> [LinearPattern] -> [Term a] -> Action
+  WriteOutput :: StringEmbedding a => Bool -> [LinearPattern] -> [Term a] -> Action
   Branch :: Term Bool -> Specification -> Specification -> Action
   TillE :: Specification -> Action
   E :: Action
@@ -40,7 +39,7 @@ data Action where
 -- move into Combinators ?
 optional :: Specification -> Specification
 optional (Spec []) = Spec []
-optional (Spec (WriteOutput p _ ps ts : xs)) = Spec [WriteOutput p True ps ts] <> optional (Spec xs)
+optional (Spec (WriteOutput _ ps ts : xs)) = Spec [WriteOutput True ps ts] <> optional (Spec xs)
 optional _ = error "only writes can be optional"
 
 instance HasVariables Specification where

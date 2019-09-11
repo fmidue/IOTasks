@@ -37,11 +37,11 @@ stringTerms = Proxy
 nonStringTerms :: HasStringTerms 'False
 nonStringTerms = Proxy
 
-writeOutput :: StringEmbedding s a => [LinearPattern] -> [Term a] -> HasStringTerms s -> Specification
-writeOutput ps ts proxy = Spec [WriteOutput proxy False ps ts]
+writeOutput :: StringEmbedding a => [LinearPattern] -> [Term a] -> Specification
+writeOutput ps ts = Spec [WriteOutput False ps ts]
 
 writeFixedOutput :: [LinearPattern] -> Specification
-writeFixedOutput ps = Spec [WriteOutput (Proxy @'True) False ps ([] :: [Term String])]
+writeFixedOutput ps = Spec [WriteOutput False ps ([] :: [Term String])]
 
 branch :: Term Bool -> Specification -> Specification -> Specification
 branch t s1 s2 = Spec [Branch t s1 s2]
@@ -56,22 +56,22 @@ exit :: Specification
 exit = Spec [E]
 
 intValues :: [Int] -> ValueSet
-intValues = ValueSet (Proxy @'False)
+intValues = ValueSet
 
-getCurrent :: (Typeable a, StringEmbedding 'False a) => Varname -> Term a
-getCurrent = T.getCurrent (Proxy @'False)
+getCurrent :: (Typeable a, StringEmbedding a) => Varname -> Term a
+getCurrent = T.getCurrent
 
 getCurrentS :: Varname -> Term String
-getCurrentS = T.getCurrent (Proxy @'True)
+getCurrentS = T.getCurrent
 
-getAll :: (Typeable a, StringEmbedding 'False a) => Varname -> Term [a]
-getAll = T.getAll (Proxy @'False)
+getAll :: (Typeable a, StringEmbedding a) => Varname -> Term [a]
+getAll = T.getAll
 
 getAllS :: Varname -> Term [String]
-getAllS = T.getAll (Proxy @'True)
+getAllS = T.getAll
 
-getCurrentGeneric :: forall s a . (Typeable a, StringEmbedding s a) => Proxy s -> Varname -> Term a
+getCurrentGeneric :: (Typeable a, StringEmbedding a) => Varname -> Term a
 getCurrentGeneric = T.getCurrent
 
-getAllGeneric :: forall s a . (Typeable a, StringEmbedding s a) => Proxy s -> Varname -> Term [a]
+getAllGeneric :: (Typeable a, StringEmbedding a) => Varname -> Term [a]
 getAllGeneric = T.getAll

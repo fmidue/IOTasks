@@ -13,7 +13,6 @@ module Test.IOTest.Internal.Term (
 ) where
 
 import Test.IOTest.Internal.Environment
-import Test.IOTest.Utils
 
 import Data.Functor.Identity (Identity(..))
 import Control.Monad.Reader
@@ -21,7 +20,6 @@ import Control.Monad.Trans.Maybe
 
 import Data.Maybe
 import Data.Dynamic
-import Data.Proxy
 
 newtype Term a = Term { getTerm :: Environment -> Maybe a }
   deriving (Functor, Applicative) via MaybeT (Reader Environment)
@@ -41,16 +39,16 @@ epsilon = Term $ \d -> Nothing
 isEpsilon :: Term a -> Bool
 isEpsilon t = isNothing $ getTerm t []
 
-getCurrent :: forall s a . (Typeable a, StringEmbedding s a) => Proxy s -> Varname -> Term a
-getCurrent p x =
-  let vs = getAll p x
+getCurrent :: Typeable a => Varname -> Term a
+getCurrent x =
+  let vs = getAll x
   in if isJust $ getTerm vs []
     then last <$> vs
     else error $ "getCurrent: no values stored for " <> x
 
-getAll :: forall s a . (Typeable a, StringEmbedding s a) => Proxy s -> Varname -> Term [a]
-getAll p x = Term $ Just . \d ->
-  let mVs = lookupNameAtType p x d in
+getAll :: Typeable a => Varname -> Term [a]
+getAll x = Term $ Just . \d ->
+  let mVs = lookupNameAtType x d in
   case mVs of
     Left e -> error $ printLookupError e
     Right vs -> vs

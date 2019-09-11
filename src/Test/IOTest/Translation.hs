@@ -26,6 +26,8 @@ import Text.PrettyPrint.HughesPJClass hiding ((<>))
 
 import Control.Monad.State
 
+import Data.Proxy
+
 buildComputation :: MonadTeletype m => Specification -> m ()
 buildComputation s = do
   loopStatus <- evalSemantics (buildComputation' s) (freshEnvironment s)
@@ -40,19 +42,19 @@ buildComputation' = interpret buildRead buildWrite
 buildRead :: MonadTeletype m => Action -> Semantics m ()
 buildRead (ReadInput x vs) =
   elimValueSet vs (error "proxy RandomGen sampled" :: StdGen)
-    (\ p _ (_ :: ty) -> do
-      v <- unpack @_ @ty p <$> getLine
-      modify (fromJust . update x (Value p v))
+    (const $ \(_:: ty) -> do
+      v <- unpack @ty <$> getLine
+      modify (fromJust . update x (Value v))
     )
 buildRead _ = error "buildRead"
 
 buildWrite :: MonadTeletype m => Action -> Semantics m ()
-buildWrite (WriteOutput _ _ [] _) = error "empty list of output options"
-buildWrite (WriteOutput _ True _ _) =
+buildWrite (WriteOutput _ [] _) = error "empty list of output options"
+buildWrite (WriteOutput True _ _) =
   mempty
-buildWrite (WriteOutput pxy False (p:_) ts) = do
+buildWrite (WriteOutput False (p:_) ts) = do
   v <- gets (eval (p,ts))
   putStrLn . render . pPrint $ v
   where
-    eval = fillHoles pxy
+    eval = fillHoles
 buildWrite _ = error "buildWrite"
