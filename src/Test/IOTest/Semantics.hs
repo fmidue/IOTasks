@@ -11,7 +11,7 @@ module Test.IOTest.Semantics (
   mapSemantics,
   withSemantics,
   interpret,
-  loopEnd,
+  loopExit,
   ) where
 
 import Prelude hiding (foldMap)
@@ -78,16 +78,16 @@ interpret' r _ act@ReadInput{} = r act
 interpret' _ w act@WriteOutput{} = w act
 interpret' r w (TillE s) =
   let body = interpret r w s
-      go = forever body -- repeat until the loop is terminated by an end marker
+      go = forever body -- repeat until the loop is terminated by an exit marker
   in mapSemantics (fmap (first (\Nothing -> Just ()))) go
 interpret' r w (Branch c s1 s2) =
   ifM (gets (evalTerm c))
     (interpret r w s2)
     (interpret r w s1)
-interpret' _ _ E = loopEnd
+interpret' _ _ E = loopExit
 
-loopEnd :: Applicative m => Semantics m ()
-loopEnd = Semantics (\d -> pure (Nothing, d))
+loopExit :: Applicative m => Semantics m ()
+loopExit = Semantics (\d -> pure (Nothing, d))
 
 -- orphan instances
 

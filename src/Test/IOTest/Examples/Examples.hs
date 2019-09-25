@@ -35,12 +35,12 @@ spec :: Specification
 spec =
   writeFixedOutput ["_"] <>
   readInput "n" (intValues [0..10]) <>
-  tillEnd (
+  tillExit (
     branch ((\n xs -> length xs == n) <$> getCurrent "n" <*> getAll @Int "xs")
      ( writeOutput ["_#0_"] [length <$> getAll @Int "xs"] nonStringTerms <>
        readInput "xs" (intValues [-10..10])
      )
-     end
+     exit
   ) <>
   writeOutput ["_#0_"] [sum <$> getAll @Int "xs"] nonStringTerms
 
@@ -97,10 +97,10 @@ solution2 = go [] Nothing Nothing where
 -- read till zero then sum
 task3 :: Specification
 task3 =
-  tillEnd $
+  tillExit $
     readInput "x" ints <>
     when ((0==) <$> getCurrent @Int "x")
-      (writeOutput ["_#0_"] [sum <$> getAll @Int "x"] nonStringTerms <> end)
+      (writeOutput ["_#0_"] [sum <$> getAll @Int "x"] nonStringTerms <> exit)
 
 task3' :: Specification
 task3' =
@@ -159,9 +159,9 @@ printN n x = replicateM_ n $ print x
 
 parseSumSpec :: Specification
 parseSumSpec =
-  tillEnd (
+  tillExit (
     readInput "line" (ValueSet (Proxy @'True) ((show @Int <$> [1..10]) ++ (show <$> ['a'..'k']) ) ) <>
-    when ((==2) . length . filter isJust . fmap (readMaybe @Int) <$> getAllS "line") end
+    when ((==2) . length . filter isJust . fmap (readMaybe @Int) <$> getAllS "line") exit
   ) <>
   writeOutput ["#0"] [sum . fmap fromJust . filter isJust . fmap (readMaybe @Int) <$> getAllS "line"] nonStringTerms
 

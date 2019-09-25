@@ -15,10 +15,10 @@ import Test.QuickCheck (within, sample)
 
 regressionTests :: Spec
 regressionTests = describe "Testing for regressions:" $ do
-  prop "correctly break loop on end marker in interpretation" $
-    let s = tillEnd $ end <> writeFixedOutput [buildPattern "X"]
+  prop "correctly break loop on exit marker in interpretation" $
+    let s = tillExit $ exit <> writeFixedOutput [buildPattern "X"]
         p = buildComputation @IOrep s
     in within 1000000 $ p `fulfills` s
-  describe "fail with a runtime error for a toplevel loopEnd in traceGen and buildComputation" $ do
-    specify "for buildComputation" $ buildComputation end `shouldThrow` anyErrorCall
-    specify "for traceGen" $ sample (traceGen end) `shouldThrow` anyErrorCall
+  describe "fail with a runtime error for a toplevel loopExit in traceGen and buildComputation" $ do
+    specify "for buildComputation" $ buildComputation exit `shouldThrow` anyErrorCall
+    specify "for traceGen" $ sample (traceGen exit) `shouldThrow` anyErrorCall

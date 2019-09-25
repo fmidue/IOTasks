@@ -32,7 +32,7 @@ traceGen s = do
   (loopStatus, t) <- runWriterT $ evalSemantics (traceGen' s) (freshEnvironment s)
   case loopStatus of
     Just () -> return t
-    Nothing -> error "traceGen: loopEnd at toplevel"
+    Nothing -> error "traceGen: loopExit at toplevel"
 
 traceGen' :: (MonadGen m, MonadWriter NTrace m) => Specification -> Semantics m ()
 traceGen' = interpret genRead genWrite
