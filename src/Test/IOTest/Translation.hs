@@ -30,8 +30,8 @@ buildComputation :: MonadTeletype m => Specification -> m ()
 buildComputation s = do
   loopStatus <- evalSemantics (buildComputation' s) (freshEnvironment s)
   case loopStatus of
-    Just () -> return ()
-    Nothing -> error "buildComputation: loopExit at toplevel"
+    Right () -> return ()
+    Left Exit -> error "buildComputation: loopExit at toplevel"
 
 -- translates to a 'minimal' program satisfying the specification
 buildComputation' :: MonadTeletype m => Specification -> Semantics m ()

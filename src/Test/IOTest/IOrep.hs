@@ -8,13 +8,14 @@ module Test.IOTest.IOrep (
   runProgram,
   MonadTeletype(..), print, readLn,
   Handle, BufferMode, hSetBuffering, stdout,
+  Exit(..),
 ) where
 
 import Prelude hiding (getLine, putStrLn, print, readLn)
 
 import Test.IOTest.Internal.Trace
 import Control.Monad
-import Control.Monad.Trans.Maybe
+import Control.Monad.Trans.Except
 import Control.Monad.State
 import qualified System.IO as IO
 
@@ -57,7 +58,9 @@ print = putStrLn . show
 readLn :: (Read a, MonadTeletype m) => m a
 readLn = read <$> getLine
 
-instance MonadTeletype m => MonadTeletype (MaybeT m) where
+data Exit = Exit
+
+instance MonadTeletype m => MonadTeletype (ExceptT Exit m) where
   putStrLn = lift . putStrLn
   getLine = lift getLine
 

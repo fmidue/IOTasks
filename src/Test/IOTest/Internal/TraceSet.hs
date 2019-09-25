@@ -10,6 +10,7 @@ module Test.IOTest.Internal.TraceSet (
 
 import Prelude hiding (putStrLn, getLine)
 
+import Test.IOTest.IOrep
 import Test.IOTest.Semantics
 import Test.IOTest.Internal.Trace
 import Test.IOTest.Internal.Pattern
@@ -31,8 +32,8 @@ traceGen :: MonadGen m => Specification -> m NTrace
 traceGen s = do
   (loopStatus, t) <- runWriterT $ evalSemantics (traceGen' s) (freshEnvironment s)
   case loopStatus of
-    Just () -> return t
-    Nothing -> error "traceGen: loopExit at toplevel"
+    Right () -> return t
+    Left Exit -> error "traceGen: loopExit at toplevel"
 
 traceGen' :: (MonadGen m, MonadWriter NTrace m) => Specification -> Semantics m ()
 traceGen' = interpret genRead genWrite
