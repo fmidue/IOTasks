@@ -50,6 +50,9 @@ buildWrite :: MonadTeletype m => Action -> Semantics m ()
 buildWrite (WriteOutput _ _ [] _) = error "empty list of output options"
 buildWrite (WriteOutput _ True _ _) =
   mempty
-buildWrite (WriteOutput pxy False (p:_) ts) =
-  putStrLn . render . pPrint . fillHoles pxy p ts =<< get
+buildWrite (WriteOutput pxy False (p:_) ts) = do
+  v <- gets (eval (p,ts))
+  putStrLn . render . pPrint $ v
+  where
+    eval = fillHoles pxy
 buildWrite _ = error "buildWrite"
