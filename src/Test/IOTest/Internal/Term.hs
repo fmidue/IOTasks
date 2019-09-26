@@ -15,20 +15,20 @@ module Test.IOTest.Internal.Term (
 import Test.IOTest.Internal.Environment
 import Test.IOTest.Utils
 
-import Control.Monad.State
+import Control.Monad.Reader
 import Control.Monad.Trans.Maybe
 
 import Data.Maybe
 import Data.Dynamic
 import Data.Proxy
 
-newtype Term a = Term { getTerm :: MaybeT (State Environment) a }
-  deriving (Functor, Applicative) via (MaybeT (State Environment))
+newtype Term a = Term { getTerm :: MaybeT (Reader Environment) a }
+  deriving (Functor, Applicative) via (MaybeT (Reader Environment))
 
 evalTerm :: Term a -> Environment -> a
-evalTerm t = fromMaybe (error "Can not evaluate epsilon!") . (evalState . runMaybeT $ getTerm t)
+evalTerm t = fromMaybe (error "Can not evaluate epsilon!") . (runReader . runMaybeT $ getTerm t)
 
---TODO: What is this good for?
+--TODO: What is this good for? Janis: I don't think for anything.
 -- update :: Eq v => v -> s -> Term ()
 -- update x v = Term $ MaybeT $ Just <$> modify (map (x `addValue` v))
 --   where
@@ -38,18 +38,18 @@ epsilon :: Term a
 epsilon = Term $ MaybeT $ return Nothing
 
 isEpsilon :: Term a -> Bool
-isEpsilon t = isNothing $ evalState (runMaybeT $ getTerm t) []
+isEpsilon t = isNothing $ runReader (runMaybeT $ getTerm t) []
 
 getCurrent :: forall s a . (Typeable a, StringEmbedding s a) => Proxy s -> Varname -> Term a
 getCurrent p x =
   let vs = getAll p x
-  in if not . null $ evalState (runMaybeT $ getTerm vs) []
+  in if not . null $ runReader (runMaybeT $ getTerm vs) []
     then last <$> vs
     else error $ "getCurrent: no values stored for " <> x
 
 getAll :: forall s a . (Typeable a, StringEmbedding s a) => Proxy s -> Varname -> Term [a]
 getAll p x = Term . MaybeT $ Just <$> do
-  mVs <- gets $ lookupNameAtType p x
+  mVs <- reader $ lookupNameAtType p x
   case mVs of
     Left e -> error $ printLookupError e
     Right vs -> return vs
