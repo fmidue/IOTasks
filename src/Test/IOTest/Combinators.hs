@@ -4,7 +4,6 @@
 module Test.IOTest.Combinators (
   readTillFixedLength,
   readUntil,
-  readUntil1,
   repeatSpec,
   when
 ) where

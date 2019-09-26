@@ -6,8 +6,7 @@
 module Test.IOTest.IOrep (
   IOrep,
   runProgram,
-  MonadTeletype(..), print, readLn,
-  Handle, BufferMode, hSetBuffering, stdout,
+  MonadTeletype(..), print,
   Exit(..),
 ) where
 

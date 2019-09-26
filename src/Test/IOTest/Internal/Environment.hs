@@ -6,12 +6,10 @@ module Test.IOTest.Internal.Environment
   ( Environment
   , update
   , freshEnvironment
-  , lookupName
   , lookupNameAtType
   , HasVariables(..)
   , Varname
   , Value(..)
-  , LookupError(..)
   , printLookupError
   ) where
 

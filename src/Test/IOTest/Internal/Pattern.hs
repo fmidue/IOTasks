@@ -4,10 +4,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 module Test.IOTest.Internal.Pattern
-  ( matches
-  , buildPattern
-  , buildPattern'
-  , matchesWithEnvironment
+  ( buildPattern
   , LinearPattern
   , hasHoles
   , fillHoles

@@ -10,8 +10,6 @@ module Test.IOTest.Internal.Term (
   getCurrent,
   getAll,
   evalTerm,
-  epsilon,
-  isEpsilon
 ) where
 
 import Test.IOTest.Internal.Environment

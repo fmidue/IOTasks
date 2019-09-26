@@ -1,4 +1,7 @@
-module Test.IOTest.Trace where
+module Test.IOTest.Trace
+  ( generateTrace
+  , generateTraces
+  ) where
 
 import Test.IOTest.Language
 import Test.IOTest.Utils

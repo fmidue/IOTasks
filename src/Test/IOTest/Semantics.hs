@@ -7,9 +7,6 @@
 module Test.IOTest.Semantics (
   Semantics(..),
   evalSemantics,
-  execSemantics,
-  mapSemantics,
-  withSemantics,
   interpret,
   ) where
 
