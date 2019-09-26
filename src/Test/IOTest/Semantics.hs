@@ -11,7 +11,6 @@ module Test.IOTest.Semantics (
   mapSemantics,
   withSemantics,
   interpret,
-  loopExit,
   ) where
 
 import Prelude hiding (foldMap)
@@ -25,6 +24,7 @@ import Test.IOTest.Internal.Term
 import Control.Monad.Extra (ifM)
 import Control.Monad.State
 import Control.Monad.Writer
+import Control.Monad.Except
 import Control.Monad.Trans.Except
 
 import Data.Bifunctor
@@ -34,7 +34,7 @@ import Data.MonoTraversable.Unprefixed
 import Test.QuickCheck.GenT
 
 newtype Semantics m a = Semantics { runSemantics :: Environment -> m (Either Exit a, Environment) }
-  deriving (Functor, Applicative, Monad, MonadTeletype, MonadState Environment, MonadGen) via ExceptT Exit (StateT Environment m)
+  deriving (Functor, Applicative, Monad, MonadTeletype, MonadState Environment, MonadError Exit, MonadGen) via ExceptT Exit (StateT Environment m)
 
 evalSemantics :: Monad m => Semantics m a -> Environment -> m (Either Exit a)
 evalSemantics m c = fst <$> runSemantics m c
@@ -78,16 +78,13 @@ interpret' r _ act@ReadInput{} = r act
 interpret' _ w act@WriteOutput{} = w act
 interpret' r w (TillE s) =
   let body = interpret r w s
-      go = forever body -- repeat until the loop is terminated by an exit marker
-  in mapSemantics (fmap (first (\(Left Exit) -> Right ()))) go
+      loop = forever body -- repeat until the loop is terminated by an exit marker
+  in catchError loop (\Exit -> return ())
 interpret' r w (Branch c s1 s2) =
   ifM (gets (evalTerm c))
     (interpret r w s2)
     (interpret r w s1)
-interpret' _ _ E = loopExit
-
-loopExit :: Applicative m => Semantics m ()
-loopExit = Semantics (\d -> pure (Left Exit, d))
+interpret' _ _ E = throwError Exit
 
 -- orphan instances
 
