@@ -43,7 +43,7 @@ isEpsilon t = isNothing $ runReader (runMaybeT $ getTerm t) []
 getCurrent :: forall s a . (Typeable a, StringEmbedding s a) => Proxy s -> Varname -> Term a
 getCurrent p x =
   let vs = getAll p x
-  in if not . null $ runReader (runMaybeT $ getTerm vs) []
+  in if isJust $ runReader (runMaybeT $ getTerm vs) []
     then last <$> vs
     else error $ "getCurrent: no values stored for " <> x
 
