@@ -36,7 +36,7 @@ evalTerm t = fromMaybe (error "Can not evaluate epsilon!") . getTerm t
 --     addValue x' v' (y,vs') = if y == x' then (y,vs' ++ [v']) else (y,vs')
 
 epsilon :: Term a
-epsilon = Term $ return Nothing
+epsilon = Term $ \d -> Nothing
 
 isEpsilon :: Term a -> Bool
 isEpsilon t = isNothing $ getTerm t []
