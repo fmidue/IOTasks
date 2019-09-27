@@ -24,7 +24,7 @@ import Data.Dynamic
 import Data.Proxy
 
 newtype Term a = Term { getTerm :: Environment -> Maybe a }
-  deriving (Functor, Applicative) via (MaybeT (Reader Environment))
+  deriving (Functor, Applicative) via MaybeT (Reader Environment)
 
 evalTerm :: Term a -> Environment -> a
 evalTerm t = fromMaybe (error "Can not evaluate epsilon!") . getTerm t
@@ -49,8 +49,8 @@ getCurrent p x =
     else error $ "getCurrent: no values stored for " <> x
 
 getAll :: forall s a . (Typeable a, StringEmbedding s a) => Proxy s -> Varname -> Term [a]
-getAll p x = Term $ Just <$> do
-  mVs <- reader $ lookupNameAtType p x
+getAll p x = Term $ Just . \d ->
+  let mVs = lookupNameAtType p x d in
   case mVs of
     Left e -> error $ printLookupError e
-    Right vs -> return vs
+    Right vs -> vs
