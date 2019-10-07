@@ -22,9 +22,7 @@ import Control.Monad.Extra (ifM)
 import Control.Monad.State
 import Control.Monad.Writer
 import Control.Monad.Except
-import Control.Monad.Trans.Except
 
-import Data.Bifunctor
 import Data.Coerce ( coerce )
 import Data.MonoTraversable.Unprefixed
 

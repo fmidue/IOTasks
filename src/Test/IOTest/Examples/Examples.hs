@@ -11,7 +11,6 @@ import Test.IOTest.Combinators
 
 import Control.Monad (replicateM,replicateM_)
 
-import Data.Proxy
 import Data.Maybe
 
 import Test.QuickCheck as QC (Positive(..))

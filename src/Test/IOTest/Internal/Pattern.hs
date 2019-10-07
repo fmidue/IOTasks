@@ -18,7 +18,6 @@ import Test.IOTest.Utils
 
 import Data.String
 import Data.Functor
-import Data.Proxy
 
 import Test.QuickCheck
 import Text.Regex.Posix

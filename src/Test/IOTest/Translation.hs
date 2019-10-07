@@ -26,8 +26,6 @@ import Text.PrettyPrint.HughesPJClass hiding ((<>))
 
 import Control.Monad.State
 
-import Data.Proxy
-
 buildComputation :: MonadTeletype m => Specification -> m ()
 buildComputation s = do
   loopStatus <- evalSemantics (buildComputation' s) (freshEnvironment s)
