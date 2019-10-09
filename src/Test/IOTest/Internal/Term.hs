@@ -16,38 +16,24 @@ import Test.IOTest.Internal.Environment
 
 import Data.Functor.Identity (Identity(..))
 import Control.Monad.Reader
-import Control.Monad.Trans.Maybe
 
-import Data.Maybe
 import Data.Dynamic
 
-newtype Term a = Term { getTerm :: Environment -> Maybe a }
-  deriving (Functor, Applicative) via MaybeT (Reader Environment)
+newtype Term a = Term { getTerm :: Environment -> a }
+  deriving (Functor, Applicative) via (Reader Environment)
 
 evalTerm :: Term a -> Environment -> a
-evalTerm t = fromMaybe (error "Can not evaluate epsilon!") . getTerm t
-
---TODO: What is this good for? Janis: I don't think for anything.
--- update :: Eq v => v -> s -> Term ()
--- update x v = Term $ Just <$> modify (map (x `addValue` v))
---   where
---     addValue x' v' (y,vs') = if y == x' then (y,vs' ++ [v']) else (y,vs')
-
-epsilon :: Term a
-epsilon = Term $ \d -> Nothing
-
-isEpsilon :: Term a -> Bool
-isEpsilon t = isNothing $ getTerm t []
+evalTerm = getTerm
 
 getCurrent :: Typeable a => Varname -> Term a
-getCurrent x =
-  let vs = getAll x
-  in if isJust $ getTerm vs []
-    then last <$> vs
+getCurrent x = Term $ \d ->
+  let xs = evalTerm (getAll x) d
+  in if (not . null) xs
+    then last xs
     else error $ "getCurrent: no values stored for " <> x
 
 getAll :: Typeable a => Varname -> Term [a]
-getAll x = Term $ Just . \d ->
+getAll x = Term $ \d ->
   let mVs = lookupNameAtType x d in
   case mVs of
     Left e -> error $ printLookupError e
