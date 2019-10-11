@@ -21,6 +21,7 @@ import Test.IOTest.Semantics
 import Test.IOTest.Internal.Specification
 
 import Data.Maybe
+import           Data.Dynamic                   ( toDyn )
 import System.Random
 import Text.PrettyPrint.HughesPJClass hiding ((<>))
 
@@ -42,6 +43,7 @@ buildRead (ReadInput x vs) =
   elimValueSet vs (error "proxy RandomGen sampled" :: StdGen)
     (const $ \(_:: ty) -> do
       v <- unpack @ty <$> getLine
+      unless (containsValue vs (toDyn v)) (error "encountered out of range input")
       modify (fromJust . update x (Value v))
     )
 buildRead _ = error "buildRead"
