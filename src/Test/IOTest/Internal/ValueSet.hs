@@ -11,6 +11,7 @@ module Test.IOTest.Internal.ValueSet
   ( ValueSet(..)
   , valueOf
   , elimValueSet
+  , containsValue
   ) where
 
 import Test.IOTest.Utils
@@ -25,13 +26,16 @@ import System.Random
 import Text.PrettyPrint.HughesPJClass hiding ((<>))
 
 data ValueSet where
-  ValueSet :: (Extract a b, Typeable b, StringEmbedding b) => a -> ValueSet
+  ValueSet :: (Extract a b, DecMem a b, Typeable b, StringEmbedding b) => a -> ValueSet
 
-elimValueSet :: RandomGen g => ValueSet -> g -> (forall a b. (Extract a b, Typeable b, StringEmbedding b) => Proxy a -> b -> c) -> c
+elimValueSet :: RandomGen g => ValueSet -> g -> (forall a b. (Extract a b, DecMem a b, Typeable b, StringEmbedding b) => Proxy a -> b -> c) -> c
 elimValueSet (ValueSet (xs :: ty)) gen f = f (Proxy @ty) $ extract gen xs
 
 valueOf :: RandomGen g => ValueSet -> g -> Value
 valueOf vs gen = elimValueSet vs gen (const Value)
+
+containsValue :: ValueSet -> Dynamic -> Bool
+containsValue (ValueSet (xs :: ty)) x = contains xs (fromDyn x $ error "containsValue: fromDyn failed")
 
 class Extract ts t | ts -> t where
   extract :: RandomGen g => g -> ts -> t
@@ -51,6 +55,15 @@ instance Extract LinearPattern String where
         then replaceWildCards (render $ pPrint p) randomStrings
         else error "can't extract from a pattern with holes"
       where maxLength = 10
+
+class DecMem xs x | xs -> x where
+  contains :: xs -> x -> Bool
+
+instance Eq x => DecMem [x] x where
+  contains = flip elem
+
+instance DecMem LinearPattern String where
+  contains p x = buildPattern x `isSubPatternOf` p
 
 chunks :: [Int] -> [a] -> [[a]]
 chunks [] _ = []
@@ -72,3 +85,6 @@ instance Random a => Extract (a -> Bool) a where
   extract gen f =
     let as = randoms gen
     in head $ dropWhile (not . f) as
+
+instance DecMem (a -> Bool) a where
+  contains = id
