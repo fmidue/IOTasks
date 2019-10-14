@@ -19,11 +19,11 @@ import           Data.List                      ( nub )
 data Term a = Term { termVars :: [Varname], getTerm :: Environment -> a }
 
 instance Functor Term where
-  fmap f (Term vs e) = Term vs (fmap f e)
+  fmap f (Term vs e) = Term vs (f . e)
 
 instance Applicative Term where
-  pure x = Term [] $ pure x
-  Term vs1 fab <*> Term vs2 fa = Term (nub $ vs1 ++ vs2) $ fab <*> fa
+  pure x = Term [] $ const x
+  Term vs1 fab <*> Term vs2 fa = Term (nub $ vs1 ++ vs2) $ \d -> fab d $ fa d
 
 evalTerm :: Term a -> Environment -> a
 evalTerm = getTerm
