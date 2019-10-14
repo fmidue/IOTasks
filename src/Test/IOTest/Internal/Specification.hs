@@ -37,7 +37,7 @@ data Action where
   E :: Action
 
 instance Show Specification where
-  show (Spec as) = "Spec " ++ show as
+  show (Spec as) = show as
 
 instance Show Action where
   show (ReadInput x _) = "ReadInput " ++ show x ++ " _"
