@@ -6,7 +6,6 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
 module Test.IOTest.Internal.Term (
   Term,
-  --update,
   getCurrent,
   getAll,
   evalTerm,
@@ -14,27 +13,34 @@ module Test.IOTest.Internal.Term (
 
 import Test.IOTest.Internal.Environment
 
-import Data.Functor.Identity (Identity(..))
-import Control.Monad.Reader
-
 import Data.Dynamic
+import           Data.List                      ( nub )
 
-newtype Term a = Term { getTerm :: Environment -> a }
-  deriving (Functor, Applicative) via (Reader Environment)
+data Term a = Term { termVars :: [Varname], getTerm :: Environment -> a }
+
+instance Functor Term where
+  fmap f (Term vs e) = Term vs (fmap f e)
+
+instance Applicative Term where
+  pure x = Term [] $ pure x
+  Term vs1 fab <*> Term vs2 fa = Term (nub $ vs1 ++ vs2) $ fab <*> fa
 
 evalTerm :: Term a -> Environment -> a
 evalTerm = getTerm
 
 getCurrent :: Typeable a => Varname -> Term a
-getCurrent x = Term $ \d ->
+getCurrent x = Term [x] $ \d ->
   let xs = evalTerm (getAll x) d
   in if (not . null) xs
     then last xs
     else error $ "getCurrent: no values stored for " <> x
 
 getAll :: Typeable a => Varname -> Term [a]
-getAll x = Term $ \d ->
+getAll x = Term [x] $ \d ->
   let mVs = lookupNameAtType x d in
   case mVs of
     Left e -> error $ printLookupError e
     Right vs -> vs
+
+instance HasVariables (Term a) where
+  vars = termVars
