@@ -10,6 +10,7 @@ import Test.IOTest.Internal.Term
 
 import Test.QuickCheck hiding (output)
 import           Data.List                      ( nub )
+import           Control.Monad.Extra            ( ifM )
 
 specGen :: Gen Specification
 specGen = do
@@ -111,7 +112,9 @@ loop vs used vss = sized $ \n -> do
   s1 <- resize n1 (specGen' vs used vss)
   s2 <- resize n2 (specGen' vs used vss)
   s1' <- insert progress s1
-  let s = Branch c s1' (s2 <> exit)
+  s <- ifM (arbitrary @Bool)
+    (return $ Branch c s1' (s2 <> exit))
+    (return $ Branch (not <$> c) (s2 <> exit) s1')
   return $ TillE $ prefix <> Spec [s]
 
 loopCondition :: [Varname] -> Gen (Term Bool, Varname)
