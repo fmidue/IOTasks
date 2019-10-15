@@ -109,9 +109,11 @@ loop vs used vss = sized $ \n -> do
   ty <- elements vss
   let (n1, n2) = splitSize $ n - pLen - 3
       progress = ReadInput x ty
-      s1 = resize n1 (specGen' vs used vss)
-      s2 = resize n2 (specGen' vs used vss)
-  s <- Branch c <$> (insert progress =<< s1) <*> ((<>) <$> s2 <*> pure exit)
+  s1 <- resize n1 (specGen' vs used vss)
+  s2 <- resize n2 (specGen' vs used vss)
+  s <- do
+    s1' <- insert progress s1
+    return $ Branch c s1' (s2 <> exit)
   return $ TillE $ prefix <> Spec [s]
 
 loopCondition :: [Varname] -> Gen (Term Bool, Varname)
