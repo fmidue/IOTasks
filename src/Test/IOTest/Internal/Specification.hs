@@ -42,7 +42,7 @@ instance Show Specification where
 instance Show Action where
   show (ReadInput x _) = "ReadInput " ++ show x ++ " _"
   show (WriteOutput b ps ts) = concat ["WriteOutput ", show b, " ", show ps, " _{"++ show (vars <$> ts) ++"}"]
-  show (Branch _ s1 s2) = concat ["Branch _ ", show s1, " ", show s2]
+  show (Branch c s1 s2) = concat ["Branch _{",show $ vars c,"} ", show s1, " ", show s2]
   show (TillE s) = "TillE " ++ show s
   show E = "E"
 
