@@ -10,7 +10,6 @@ import Test.IOTest.Internal.Term
 
 import Test.QuickCheck hiding (output)
 import           Data.List                      ( nub )
-import           Control.Applicative            ( liftA2 )
 
 specGen :: Gen Specification
 specGen = do
