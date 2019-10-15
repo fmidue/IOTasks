@@ -129,10 +129,7 @@ always = True
 
 -- splits (non-negative) n into k (non-negative) values s.t. sum [n_1,..,n_k] == n
 splitSizeIn :: Int -> Int -> Gen [Int]
-splitSizeIn k n
-  | k < 1     = error "splitSizeIn: cannot split in less then one value!"
-  | k == 1    = return [n]
-  | otherwise = do
-    i <- choose (0,n)
-    is <- splitSizeIn (k-1) (n-i)
-    return $ i:is
+splitSizeIn k n = elements $ go k n where
+  go :: Int -> Int -> [[Int]]
+  go 1 n = [[n]]
+  go j m = concat [ (i:) <$> go (j-1) (m-i) | i <- [0..m] ]
