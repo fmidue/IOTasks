@@ -58,11 +58,11 @@ testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
   prop "multi parameter programs" $
     printN `fulfills` printNSpec
 
-  prop "programs build from a spec satisfy that spec" $
+  prop "programs built from a spec satisfy that spec" $
     forAll specGen (\s -> buildComputation @IOrep s `fulfills` s)
 
   -- FIXME: currently broken (timeout), needs to be revised anyway
-  -- describe "programs build from a spec satisfy that spec (double negate)" $ do
+  -- describe "programs built from a spec satisfy that spec (double negate)" $ do
   --   result <- runIO $ quickCheckWithResult stdArgs{maxSize = 15} $ forAll specGen (\s -> within 5000000 $ buildComputation @IOrep s `fulfillsNot` s)
   --   it "does not fail" $ case result of
   --     Failure{} -> False
