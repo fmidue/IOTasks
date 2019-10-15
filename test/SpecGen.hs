@@ -103,19 +103,20 @@ condition vs used = oneof [unary, binary] where
 -- this only generates loops with exactly one exit marker.
 loop :: [Varname] -> [Varname] -> [ValueSet] -> Gen Action
 loop vs used vss = sized $ \n -> do
-  pLen <- choose @Int (0,n - 3)
-  prefix <- resize pLen (specGen' vs used vss)
+  ~[preLen, loopLen, postLen] <- splitSizeIn 3 (n-3)
+  prefix <- resize preLen (specGen' vs used vss)
+  postfix <- resize postLen (specGen' vs used vss)
   (c,x) <- loopCondition vs
   ty <- elements vss
-  let (n1, n2) = splitSize $ n - pLen - 3
-      progress = ReadInput x ty
+  ~[n1, n2] <- splitSizeIn 2 loopLen
+  let progress = ReadInput x ty
   s1 <- resize n1 (specGen' vs used vss)
   s2 <- resize n2 (specGen' vs used vss)
   s1' <- insert progress s1
   s <- ifM (arbitrary @Bool)
     (return $ Branch c s1' (s2 <> exit))
     (return $ Branch (not <$> c) (s2 <> exit) s1')
-  return $ TillE $ prefix <> Spec [s]
+  return $ TillE $ prefix <> Spec [s] <> postfix
 
 loopCondition :: [Varname] -> Gen (Term Bool, Varname)
 loopCondition vs = do
@@ -130,3 +131,13 @@ insert a (Spec as) = do
 
 always :: Bool
 always = True
+
+-- splits (non-negative) n into k (non-negative) values s.t. sum [n_1,..,n_k] == n
+splitSizeIn :: Int -> Int -> Gen [Int]
+splitSizeIn k n
+  | k < 1     = error "splitSizeIn: cannot split in less then one value!"
+  | k == 1    = return [n]
+  | otherwise = do
+    i <- choose (0,n)
+    is <- splitSizeIn (k-1) (n-i)
+    return $ i:is
