@@ -28,7 +28,6 @@ source-repository head
 
 library
   exposed-modules:
-      Sketch
       Test.IOTest.Combinators
       Test.IOTest.Examples.Examples
       Test.IOTest.Examples.Hangman
