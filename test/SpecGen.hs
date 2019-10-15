@@ -79,15 +79,10 @@ term vs used = oneof $ concat
 branch :: [Varname] -> [Varname] -> [ValueSet] -> Gen Action
 branch vs used vss = sized $ \n -> do
   c <- condition vs used
-  let (n1,n2) = splitSize (n-1)
+  ~[n1,n2] <- splitSizeIn 2 (n-1)
   s1 <- resize n1 (specGen' vs used vss)
   s2 <- resize n2 (specGen' vs used vss)
   return $ Branch c s1 s2
-
--- maybe randomize this too
-splitSize :: Int -> (Int, Int)
-splitSize n | even n    = let n' = div n 2 in (n',n')
-            | otherwise = let n' = div n 2 in (n', n'+1)
 
 condition :: [Varname] -> [Varname] -> Gen (Term Bool)
 condition vs used = oneof [unary, binary] where
