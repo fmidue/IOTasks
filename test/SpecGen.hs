@@ -111,9 +111,7 @@ loop vs used vss = sized $ \n -> do
       progress = ReadInput x ty
       s1 = resize n1 (specGen' vs used vss)
       s2 = resize n2 (specGen' vs used vss)
-  s <- ifM (arbitrary @Bool)
-    (Branch c <$> ((<>) <$> s1 <*> pure exit) <*> (insert progress =<< s2))
-    (Branch c <$> (insert progress =<< s1) <*> ((<>) <$> s2 <*> pure exit))
+  s <- Branch c <$> (insert progress =<< s1) <*> ((<>) <$> s2 <*> pure exit)
   return $ TillE $ prefix <> Spec [s]
 
 loopCondition :: [Varname] -> Gen (Term Bool, Varname)

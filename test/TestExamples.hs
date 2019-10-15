@@ -58,8 +58,8 @@ testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
   prop "multi parameter programs" $
     printN `fulfills` printNSpec
 
-  modifyMaxSize (const 5) $ prop "programs build from a spec satisfy that spec" $
-    forAll specGen (\s -> within 5000000 $ buildComputation @IOrep s `fulfills` s)
+  prop "programs build from a spec satisfy that spec" $
+    forAll specGen (\s -> buildComputation @IOrep s `fulfills` s)
 
   -- FIXME: currently broken (timeout), needs to be revised anyway
   -- describe "programs build from a spec satisfy that spec (double negate)" $ do
