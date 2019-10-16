@@ -2,7 +2,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE GADTs #-}
-module Test.IOTest.Internal.Environment
+module Test.IOTest.Environment
   ( Environment
   , update
   , freshEnvironment

@@ -2,11 +2,11 @@
 module SpecGen (specGen) where
 
 import Test.IOTest.Language (exit)
-import Test.IOTest.Internal.Specification
-import Test.IOTest.Internal.ValueSet
-import Test.IOTest.Internal.Environment
-import Test.IOTest.Internal.Pattern
-import Test.IOTest.Internal.Term
+import Test.IOTest.Specification
+import Test.IOTest.ValueSet
+import Test.IOTest.Environment
+import Test.IOTest.Pattern
+import Test.IOTest.Term
 
 import Test.QuickCheck hiding (output)
 import           Data.List                      ( nub )

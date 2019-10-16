@@ -17,12 +17,12 @@ module Test.IOTest.Language
   ) where
 
 import Test.IOTest.Utils
-import Test.IOTest.Internal.Specification
-import qualified Test.IOTest.Internal.Term as T
-import Test.IOTest.Internal.Term (Term)
-import Test.IOTest.Internal.Environment (Varname)
-import Test.IOTest.Internal.ValueSet
-import Test.IOTest.Internal.Pattern
+import Test.IOTest.Specification
+import qualified Test.IOTest.Term as T
+import Test.IOTest.Term (Term)
+import Test.IOTest.Environment (Varname)
+import Test.IOTest.ValueSet
+import Test.IOTest.Pattern
 
 import Data.Proxy
 import Data.Typeable

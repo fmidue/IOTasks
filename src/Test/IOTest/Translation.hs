@@ -10,15 +10,15 @@ module Test.IOTest.Translation (
   buildComputation
 ) where
 
-import Test.IOTest.Internal.Environment
-import Test.IOTest.Internal.Pattern
-import Test.IOTest.Internal.ValueSet
+import Test.IOTest.Environment
+import Test.IOTest.Pattern
+import Test.IOTest.ValueSet
 import Test.IOTest.Utils
 
 import Prelude hiding (putStrLn,getLine,print)
 import Test.IOTest.IOrep
 import Test.IOTest.Semantics
-import Test.IOTest.Internal.Specification
+import Test.IOTest.Specification
 
 import Data.Maybe
 import           Data.Dynamic                   ( toDyn )

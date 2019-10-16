@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 1d038fec88e3085b8e954e510ad79d3743c27694e856cc05e87a73b38860a3fc
+-- hash: 39ed23312753cc5b281c60c377bf7347cc1ddc21a8ca6b66c00435cb4b188d50
 
 name:           IOTest
 version:        0.1.0.0
@@ -29,21 +29,21 @@ source-repository head
 library
   exposed-modules:
       Test.IOTest.Combinators
+      Test.IOTest.Environment
       Test.IOTest.Examples.Examples
       Test.IOTest.Examples.Hangman
-      Test.IOTest.Internal.Environment
-      Test.IOTest.Internal.Pattern
-      Test.IOTest.Internal.Specification
-      Test.IOTest.Internal.Term
-      Test.IOTest.Internal.Trace
-      Test.IOTest.Internal.TraceSet
-      Test.IOTest.Internal.ValueSet
       Test.IOTest.IOProperty
       Test.IOTest.IOrep
       Test.IOTest.Language
+      Test.IOTest.Pattern
       Test.IOTest.Semantics
+      Test.IOTest.Specification
+      Test.IOTest.Term
+      Test.IOTest.Trace
+      Test.IOTest.TraceSet
       Test.IOTest.Translation
       Test.IOTest.Utils
+      Test.IOTest.ValueSet
   other-modules:
       Paths_IOTest
   hs-source-dirs:

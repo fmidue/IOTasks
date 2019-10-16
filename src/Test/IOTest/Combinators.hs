@@ -9,7 +9,7 @@ module Test.IOTest.Combinators (
 ) where
 
 import Test.IOTest.Language
-import Test.IOTest.Internal.ValueSet
+import Test.IOTest.ValueSet
 
 import System.Random
 

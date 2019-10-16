@@ -7,9 +7,9 @@ module Test.IOTest.IOProperty (
 ) where
 
 import Test.IOTest.IOrep (IOrep, runProgram)
-import Test.IOTest.Internal.Specification
-import Test.IOTest.Internal.Trace
-import Test.IOTest.Internal.TraceSet
+import Test.IOTest.Specification
+import Test.IOTest.Trace
+import Test.IOTest.TraceSet
 
 import Control.Arrow ((&&&))
 import Data.Coerce

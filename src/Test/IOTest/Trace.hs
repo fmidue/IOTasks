@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE PatternSynonyms #-}
-module Test.IOTest.Internal.Trace (
+module Test.IOTest.Trace (
   NTrace,
   Trace,
   Trace'(..),
@@ -15,7 +15,7 @@ module Test.IOTest.Internal.Trace (
   ppResult,
 ) where
 
-import Test.IOTest.Internal.Pattern
+import Test.IOTest.Pattern
 import Test.IOTest.Utils
 
 import           Data.Set (Set)

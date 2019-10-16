@@ -13,10 +13,10 @@ module Test.IOTest.Semantics (
 import Prelude hiding (foldMap)
 
 import Test.IOTest.IOrep
-import Test.IOTest.Internal.Environment
-import Test.IOTest.Internal.Specification
-import Test.IOTest.Internal.Trace
-import Test.IOTest.Internal.Term
+import Test.IOTest.Environment
+import Test.IOTest.Specification
+import Test.IOTest.Trace
+import Test.IOTest.Term
 
 import Control.Monad.Extra (ifM)
 import Control.Monad.State

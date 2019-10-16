@@ -4,7 +4,7 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
-module Test.IOTest.Internal.TraceSet (
+module Test.IOTest.TraceSet (
   traceGen
 ) where
 
@@ -12,11 +12,11 @@ import Prelude hiding (putStrLn, getLine)
 
 import Test.IOTest.IOrep
 import Test.IOTest.Semantics
-import Test.IOTest.Internal.Trace
-import Test.IOTest.Internal.Pattern
-import Test.IOTest.Internal.Environment
-import Test.IOTest.Internal.ValueSet
-import Test.IOTest.Internal.Specification
+import Test.IOTest.Trace
+import Test.IOTest.Pattern
+import Test.IOTest.Environment
+import Test.IOTest.ValueSet
+import Test.IOTest.Specification
 
 -- import Test.QuickCheck hiding (Positive,Function)
 import Test.QuickCheck.GenT

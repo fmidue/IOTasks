@@ -12,7 +12,7 @@ module Test.IOTest.IOrep (
 
 import Prelude hiding (getLine, putStrLn, print, readLn)
 
-import Test.IOTest.Internal.Trace
+import Test.IOTest.Trace
 import Control.Monad
 import Control.Monad.Trans.Except
 import Control.Monad.State

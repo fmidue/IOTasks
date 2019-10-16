@@ -3,7 +3,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
-module Test.IOTest.Internal.Pattern
+module Test.IOTest.Pattern
   ( buildPattern
   , LinearPattern
   , hasHoles
@@ -12,8 +12,8 @@ module Test.IOTest.Internal.Pattern
   , isSubPatternOf
   ) where
 
-import Test.IOTest.Internal.Environment
-import Test.IOTest.Internal.Term
+import Test.IOTest.Environment
+import Test.IOTest.Term
 import Test.IOTest.Utils
 
 import Data.String

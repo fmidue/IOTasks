@@ -4,14 +4,14 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
-module Test.IOTest.Internal.Term (
+module Test.IOTest.Term (
   Term,
   getCurrent,
   getAll,
   evalTerm,
 ) where
 
-import Test.IOTest.Internal.Environment
+import Test.IOTest.Environment
 
 import Data.Dynamic
 import           Data.List                      ( nub )

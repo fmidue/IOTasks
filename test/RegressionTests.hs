@@ -7,7 +7,7 @@ import Test.IOTest.IOrep
 import Test.IOTest.IOProperty
 import Test.IOTest.Translation
 import Test.IOTest.Language
-import Test.IOTest.Internal.TraceSet
+import Test.IOTest.TraceSet
 
 import Test.Hspec
 import Test.Hspec.QuickCheck (prop)

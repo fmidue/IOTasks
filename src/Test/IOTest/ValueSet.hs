@@ -7,7 +7,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DataKinds #-}
-module Test.IOTest.Internal.ValueSet
+module Test.IOTest.ValueSet
   ( ValueSet(..)
   , valueOf
   , elimValueSet
@@ -15,8 +15,8 @@ module Test.IOTest.Internal.ValueSet
   ) where
 
 import Test.IOTest.Utils
-import Test.IOTest.Internal.Pattern
-import Test.IOTest.Internal.Environment
+import Test.IOTest.Pattern
+import Test.IOTest.Environment
 
 import Data.Proxy
 import Data.Dynamic
