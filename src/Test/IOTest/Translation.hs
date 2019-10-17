@@ -21,11 +21,12 @@ import Test.IOTest.Semantics
 import Test.IOTest.Specification
 
 import Data.Maybe
-import           Data.Dynamic                   ( toDyn )
 import System.Random
 import Text.PrettyPrint.HughesPJClass hiding ((<>))
 
 import Control.Monad.State
+
+import Type.Reflection
 
 buildComputation :: MonadTeletype m => Specification -> m ()
 buildComputation s = do
@@ -43,8 +44,8 @@ buildRead (ReadInput x vs) =
   elimValueSet vs (error "proxy RandomGen sampled" :: StdGen)
     (const $ \(_:: ty) -> do
       v <- unpack @ty <$> getLine
-      unless (containsValue vs (toDyn v)) (error "encountered out of range input")
-      modify (fromJust . update x (Value v))
+      unless (containsValue vs (Value typeRep v)) (error "encountered out of range input")
+      modify (fromJust . update x v)
     )
 buildRead _ = error "buildRead"
 

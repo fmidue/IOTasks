@@ -1,79 +1,102 @@
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE PolyKinds #-}
 module Test.IOTest.Environment
-  ( Environment
-  , update
+  (Environment
+  , Test.IOTest.Environment.update
+  , updateWithValue
   , freshEnvironment
   , lookupNameAtType
   , HasVariables(..)
   , Varname
-  , Value(..)
   , printLookupError
   ) where
 
 import Test.IOTest.Utils
+import Test.IOTest.Value
 
+import Data.Kind
 import Data.Dynamic
+import Data.Proxy
 import Type.Reflection
+
+import Data.Maybe
+import Control.Applicative
+import           Control.Monad                  ( (>=>) )
+import Data.List.NonEmpty as NonEmpty
+import Data.HashMap.Strict as Map
 
 type Varname = String
 
-type Environment = [ (Varname, Maybe (SomeTypeRep,[Value]) ) ]
+data Entry where
+  EmptyEntry :: Entry
+  MkEntry :: StringEmbedding a => TypeRep a -> NonEmpty a -> Entry
 
-data Value where
-  Value :: (Typeable a, StringEmbedding a) => a -> Value
+instance Show Entry where
+  show EmptyEntry = "EmptyEntry"
+  show (MkEntry r vs) = "(" <> show r <> ", " <> show (pack <$> vs) <>")"
 
-instance Show Value where
-  show (Value a) = pack a
+newEntry :: forall (a :: Type). (Typeable a, StringEmbedding a) => a -> Entry
+newEntry x = MkEntry (typeOf x) (x :| [])
 
-valueTypeRep :: Value -> SomeTypeRep
-valueTypeRep (Value a) = dynTypeRep $ toDyn a
+addValue :: (Typeable a, StringEmbedding a) => a -> Entry -> Maybe Entry
+addValue x EmptyEntry = Just $ MkEntry typeRep (x :| [])
+addValue x (MkEntry r (hd :| tl)) =
+  case typeOf x `eqTypeRep` r of
+    Just HRefl -> Just $ MkEntry r (hd :| tl ++ [x])
+    Nothing -> Nothing
 
-fromValue :: Typeable a => Value -> Maybe a
-fromValue (Value a) = fromDynamic (toDyn a)
+newtype Environment = MkEnvironment (HashMap Varname Entry)
 
-update :: Varname -> Value -> Environment -> Maybe Environment
-update x v = traverse (addValue x v)
-  where
-    addValue x' v' (y,Nothing) =
-      if y == x'
-        then Just (y, Just (valueTypeRep v', [v']))
-        else Just (y,Nothing)
-    addValue x' v' (y,Just (tyRep,vs')) =
-      if y == x'
-        then if tyRep == valueTypeRep v'
-          then Just (y, Just (valueTypeRep v',vs' ++ [v']))
-          else Nothing
-        else Just (y,Just (tyRep,vs'))
+newEnvironment :: Environment
+newEnvironment = MkEnvironment Map.empty
 
 freshEnvironment :: HasVariables a => a -> Environment
-freshEnvironment s = (,Nothing) <$> vars s
+freshEnvironment s =
+  let addNames = Prelude.foldr ((>=>) . addName) return $ vars s
+  in fromJust $ addNames newEnvironment
+
+addName :: Varname -> Environment -> Maybe Environment
+addName x (MkEnvironment xs) =
+  case Map.lookup x xs of
+    Just _ -> Nothing
+    Nothing -> Just $ MkEnvironment (Map.insert x EmptyEntry xs)
+
+update :: (Typeable a, StringEmbedding a) => Varname -> a -> Environment -> Maybe Environment
+update x v = updateWithValue x (Value typeRep v)
+
+updateWithValue :: Varname -> Value -> Environment -> Maybe Environment
+updateWithValue x (Value vRep v) (MkEnvironment es) =
+  case Map.lookup x es of
+    Nothing -> Nothing
+    Just EmptyEntry -> Just $ MkEnvironment $ Map.update (\EmptyEntry -> Just $ newEntry v) x es
+    Just (MkEntry eRep _) ->
+      case vRep `eqTypeRep` eRep of
+        Nothing -> Nothing
+        Just HRefl -> Just $ MkEnvironment $ Map.update (\e -> addValue v e <|> Just e) x es
+
+lookupNameAtType :: Typeable a => Proxy a -> Varname -> Environment -> Either LookupError [a]
+lookupNameAtType (_ :: Proxy a) x (MkEnvironment es) =
+  case Map.lookup x es of
+    Nothing -> Left $ NameNotFound $ x <> " in " <> show es
+    Just EmptyEntry -> Right []
+    Just (MkEntry r vs) ->
+      case typeRep @a `eqTypeRep` r of
+        Just HRefl -> Right $ NonEmpty.toList vs
+        Nothing -> Left $ WrongType $ x  <> " in " <> show es
 
 data LookupError = NameNotFound String | WrongType String deriving Show
 
 printLookupError :: LookupError -> String
 printLookupError (NameNotFound e) = "lookup error: name not found: " <> e
 printLookupError (WrongType e) = "lookup error: wrong type: " <> e
-
-lookupName :: Varname -> Environment -> Either LookupError [Value]
-lookupName x c = snd <$> lookupName' x c
-
-lookupName' :: Varname -> Environment -> Either LookupError (SomeTypeRep,[Value])
-lookupName' x c =
-  case lookup x c of
-    Just Nothing -> Right (undefined,[])
-    Just (Just (tyRep, vs)) -> Right (tyRep, vs)
-    Nothing -> Left (NameNotFound $ x <> " in " <> show c)
-
-lookupNameAtType :: Typeable a => Varname -> Environment -> Either LookupError [a]
-lookupNameAtType x c =
-  case lookupName x c of
-    Left e -> Left e
-    Right vs -> case traverse fromValue vs of
-      Just typedVs -> Right typedVs
-      Nothing -> Left (WrongType $ x <> " in " <> show c)
 
 class HasVariables a where
   vars :: a -> [Varname]

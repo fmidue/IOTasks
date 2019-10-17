@@ -1,13 +1,12 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE MonoLocalBinds #-}
 module Test.IOTest.Language
   ( Specification, readInput, writeOutput, branch, tillExit, nop, exit
   , writeFixedOutput
-  , ValueSet(..), Varname, Term, optional
+  , Varname, Term, optional
   , getCurrent, getAll
   , getCurrentS, getAllS
   , getCurrentGeneric, getAllGeneric
@@ -56,7 +55,7 @@ exit :: Specification
 exit = Spec [E]
 
 intValues :: [Int] -> ValueSet
-intValues = ValueSet
+intValues = valueSet
 
 getCurrent :: (Typeable a, StringEmbedding a) => Varname -> Term a
 getCurrent = T.getCurrent

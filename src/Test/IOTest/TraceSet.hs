@@ -4,6 +4,7 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
 module Test.IOTest.TraceSet (
   traceGen
 ) where
@@ -41,9 +42,9 @@ traceGen' = interpret genRead genWrite
 genRead :: (MonadGen m, MonadWriter NTrace m) => Action -> Semantics m ()
 genRead (ReadInput x vs) = sized $ \size -> do
   seed <- choose (minBound, maxBound)
-  let v = valueOf vs (mkStdGen seed) -- TODO: is there a better way of doing this?
-  modify (fromMaybe (error "type mismatch on environment update") . update x v)
-  tell $ Trace [ProgRead (show v)]
+  let val = valueOf vs (mkStdGen seed)
+  modify (fromMaybe (error "type mismatch on environment update") . updateWithValue x val)
+  tell $ Trace [ProgRead (show val)]
   -- FIXME: clean up according to paper definition?
 genRead _ = error "genRead"
 

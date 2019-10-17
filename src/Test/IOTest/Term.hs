@@ -15,6 +15,7 @@ import Test.IOTest.Environment
 
 import Data.Dynamic
 import           Data.List                      ( nub )
+import           Data.Proxy
 
 data Term a = Term { termVars :: [Varname], getTerm :: Environment -> a }
 
@@ -37,7 +38,7 @@ getCurrent x = Term [x] $ \d ->
 
 getAll :: Typeable a => Varname -> Term [a]
 getAll x = Term [x] $ \d ->
-  let mVs = lookupNameAtType x d in
+  let mVs = lookupNameAtType Proxy x d in
   case mVs of
     Left e -> error $ printLookupError e
     Right vs -> vs

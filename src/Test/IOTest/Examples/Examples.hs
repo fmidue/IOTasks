@@ -8,6 +8,7 @@ import Prelude hiding (putStrLn, getLine, print)
 import Test.IOTest.IOrep
 import Test.IOTest.Language
 import Test.IOTest.Combinators
+import Test.IOTest.ValueSet
 
 import Control.Monad (replicateM,replicateM_)
 
@@ -118,7 +119,7 @@ solution3 = go [] where
 -- read and reverse
 task4 :: Specification
 task4 =
-  readInput "line" (ValueSet ("_" :: LinearPattern)) <>
+  readInput "line" (valueSet ("_" :: LinearPattern)) <>
   writeOutput ["_#0_"] [reverse <$> getCurrentS "line"]
 
 solution4 :: IOrep ()
@@ -159,7 +160,7 @@ printN n x = replicateM_ n $ print x
 parseSumSpec :: Specification
 parseSumSpec =
   tillExit (
-    readInput "line" (ValueSet ((show @Int <$> [1..10]) ++ (show <$> ['a'..'k']) ) ) <>
+    readInput "line" (valueSet ((show @Int <$> [1..10]) ++ (show <$> ['a'..'k']) ) ) <>
     when ((==2) . length . filter isJust . fmap (readMaybe @Int) <$> getAllS "line") exit
   ) <>
   writeOutput ["#0"] [sum . fmap fromJust . filter isJust . fmap (readMaybe @Int) <$> getAllS "line"]

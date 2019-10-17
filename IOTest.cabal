@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 39ed23312753cc5b281c60c377bf7347cc1ddc21a8ca6b66c00435cb4b188d50
+-- hash: 9493c1d7447ffbcdb1b6e484c962092e02b042ffd923be14038cdd7e28d62c62
 
 name:           IOTest
 version:        0.1.0.0
@@ -43,6 +43,7 @@ library
       Test.IOTest.TraceSet
       Test.IOTest.Translation
       Test.IOTest.Utils
+      Test.IOTest.Value
       Test.IOTest.ValueSet
   other-modules:
       Paths_IOTest
@@ -64,6 +65,7 @@ library
     , regex-base
     , regex-posix
     , transformers
+    , unordered-containers
   default-language: Haskell2010
 
 test-suite IOTest-test
@@ -94,4 +96,5 @@ test-suite IOTest-test
     , regex-base
     , regex-posix
     , transformers
+    , unordered-containers
   default-language: Haskell2010

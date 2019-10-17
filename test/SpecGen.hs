@@ -15,7 +15,7 @@ import           Control.Monad.Extra            ( ifM )
 specGen :: Gen Specification
 specGen = do
   let vs = ["m","n","x","y","z"]
-      vss = [ValueSet [(0::Int)..10], ValueSet [(-10 :: Int)..10] ]
+      vss = [valueSet [(0::Int)..10], valueSet [(-10 :: Int)..10] ]
   specGen' vs [] vss
 
 specGen' :: [Varname] -> [Varname] -> [ValueSet] -> Gen Specification

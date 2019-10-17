@@ -8,34 +8,48 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DataKinds #-}
 module Test.IOTest.ValueSet
-  ( ValueSet(..)
+  ( ValueSet
+  , Value(..)
+  , valueSet
   , valueOf
-  , elimValueSet
   , containsValue
+  , elimValueSet
+  , valueFromString
+  -- , elementRep
   ) where
 
 import Test.IOTest.Utils
 import Test.IOTest.Pattern
-import Test.IOTest.Environment
+import Test.IOTest.Value
 
 import Data.Proxy
 import Data.Dynamic
+import Type.Reflection
 
 import System.Random
 
 import Text.PrettyPrint.HughesPJClass hiding ((<>))
 
 data ValueSet where
-  ValueSet :: (Extract a b, DecMem a b, Typeable b, StringEmbedding b) => a -> ValueSet
+  MkValueSet :: (Extract a b, DecMem a b, Typeable b, StringEmbedding b) => TypeRep b -> a -> ValueSet
 
-elimValueSet :: RandomGen g => ValueSet -> g -> (forall a b. (Extract a b, DecMem a b, Typeable b, StringEmbedding b) => Proxy a -> b -> c) -> c
-elimValueSet (ValueSet (xs :: ty)) gen f = f (Proxy @ty) $ extract gen xs
+valueSet :: (Extract a b, DecMem a b, Typeable b, StringEmbedding b) => a -> ValueSet
+valueSet = MkValueSet typeRep
 
 valueOf :: RandomGen g => ValueSet -> g -> Value
-valueOf vs gen = elimValueSet vs gen (const Value)
+valueOf (MkValueSet r vs) gen = Value r $ extract gen vs
 
-containsValue :: ValueSet -> Dynamic -> Bool
-containsValue (ValueSet (xs :: ty)) x = contains xs (fromDyn x $ error "containsValue: fromDyn failed")
+containsValue :: ValueSet -> Value -> Bool
+containsValue (MkValueSet r vs) (Value r' v) =
+  case r `eqTypeRep` r' of
+    Just HRefl -> vs `contains` v
+    Nothing -> False
+
+valueFromString :: ValueSet -> String -> Value
+valueFromString (MkValueSet (_ :: TypeRep a) _) str = Value typeRep (unpack @a str)
+
+elimValueSet :: RandomGen g => ValueSet -> g -> (forall a b. (Extract a b, DecMem a b, Typeable b, StringEmbedding b) => Proxy a -> b -> c) -> c
+elimValueSet (MkValueSet _ (xs :: ty)) gen f = f (Proxy @ty) $ extract gen xs
 
 class Extract ts t | ts -> t where
   extract :: RandomGen g => g -> ts -> t
