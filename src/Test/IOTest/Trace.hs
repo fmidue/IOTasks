@@ -51,7 +51,7 @@ data TraceAction o
   deriving (Eq,Functor,Show)
 
 type Trace = Trace' String
-type NTrace = Trace' (Set LinearPattern)
+type NTrace = Trace' (Set Pattern)
 
 normalize :: Trace -> Trace
 normalize = Trace . go "" . toList where
@@ -88,13 +88,13 @@ isCoveredBy (Trace u) (Trace v) = isCoveredBy' u v
   [] `isCoveredBy'` [] = MatchSuccessfull
   t1 `isCoveredBy'` t2 = AlignmentMismatch (reportExpectationMismatch (Trace t2) (Trace t1))
 
-isSubPatternIn :: LinearPattern -> Set LinearPattern -> Bool
+isSubPatternIn :: Pattern -> Set Pattern -> Bool
 x `isSubPatternIn` y = all (\px -> any (\py -> px `isSubPatternOf` py) (S.toList y)) [x]
                           -- '           '        '- such that
                           -- '           '- there exist an element py in y
                           -- '- forall elements px in x
 
-reportCoverageFailure :: String -> Set LinearPattern -> Doc
+reportCoverageFailure :: String -> Set Pattern -> Doc
 reportCoverageFailure xs ys = text "the value" <+> text xs <+> text "is not covered by" <+> printSet ys
 
 printSet :: Pretty a => Set a -> Doc

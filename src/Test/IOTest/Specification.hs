@@ -31,7 +31,7 @@ type instance Element Specification = Action
 
 data Action where
   ReadInput :: Varname -> ValueSet -> Action
-  WriteOutput :: StringEmbedding a => Bool -> [LinearPattern] -> [Term a] -> Action
+  WriteOutput :: StringEmbedding a => Bool -> [TermPattern] -> [Term a] -> Action
   Branch :: Term Bool -> Specification -> Specification -> Action
   TillE :: Specification -> Action
   E :: Action

@@ -53,7 +53,7 @@ output :: [Varname] -> [Varname] -> Gen (Action, [Varname])
 output vs used = do
   opt <- arbitrary @Bool
   n <- oneof [return 1, choose @Int (2,4)]
-  let ps = [ buildPattern $ '#':show i | i <- [0 .. n-1] ]
+  let ps = [ buildTermPattern $ '#':show i | i <- [0 .. n-1] ]
   ts <- vectorOf n (term vs used)
   return (WriteOutput opt ps ts, used)
 

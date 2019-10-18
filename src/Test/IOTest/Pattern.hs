@@ -1,11 +1,16 @@
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE LambdaCase #-}
 module Test.IOTest.Pattern
   ( buildPattern
-  , LinearPattern
+  , buildTermPattern
+  , Pattern
+  , TermPattern
   , hasHoles
   , fillHoles
   , emptyPattern
@@ -20,119 +25,141 @@ import Data.String
 import Data.Functor
 
 import Test.QuickCheck
-import Text.Regex.Posix
-import Text.Parsec hiding (Empty)
+import Text.Parsec
 import Text.Parsec.String
 import Text.PrettyPrint.HughesPJClass hiding ((<>))
 
-data LinearPattern
-  = Simple SimplePattern
-  | Sequence SimplePattern LinearPattern
-  deriving (Eq,Ord)
+-- ----------------------------- --
+-- TODO: reduce code duplication --
+-- ----------------------------- --
 
-emptyPattern :: LinearPattern
-emptyPattern = Simple Empty
+newtype TermPattern = TermPattern [SimplePattern 'WithVars] deriving (Eq,Ord)
+newtype Pattern = Pattern [SimplePattern 'NoVars] deriving (Eq,Ord)
+-- Ord instances are mainly for putting pattern into Sets
 
-data SimplePattern
-  = Empty
-  | WildCard
-  | Literal String
-  | Hole Int
-  deriving (Eq,Ord)
+data PType = WithVars | NoVars
 
-instance Pretty LinearPattern where
-  pPrint (Simple s) = pPrint s
-  pPrint (Sequence p1 p2) = pPrint p1 <> pPrint p2
+data SimplePattern (t :: PType) where
+  WildCard :: SimplePattern t
+  Literal :: String -> SimplePattern t
+  Hole :: Int -> SimplePattern 'WithVars
 
-instance Pretty SimplePattern where
-  pPrint Empty = text ""
+deriving instance Eq (SimplePattern t)
+deriving instance Ord (SimplePattern t)
+
+emptyPattern :: Pattern
+emptyPattern = mempty
+
+instance Pretty Pattern where
+  pPrint (Pattern xs) = foldr (\x ys -> pPrint x <> ys) mempty xs
+
+instance Show Pattern where
+  show p = "buildPattern " <> render (doubleQuotes $ pPrint p)
+
+instance Pretty TermPattern where
+  pPrint (TermPattern xs) = foldr (\x ys -> pPrint x <> ys) mempty xs
+
+instance Show TermPattern where
+  show p = "buildTermPattern " <> render (doubleQuotes $ pPrint p)
+
+instance Pretty (SimplePattern l) where
   pPrint WildCard = text "_"
   pPrint (Literal l) = text l
   pPrint (Hole n) = text "#" <> pPrint n
 
-instance Show LinearPattern where
-  show p = "buildPattern " <> render (doubleQuotes $ pPrint p)
+hasHoles :: TermPattern -> Bool
+hasHoles (TermPattern xs) = any (\case Hole _ -> True; _ -> False) xs
 
-hasHoles :: LinearPattern -> Bool
-hasHoles (Simple (Hole _)) = True
-hasHoles (Simple _) = False
-hasHoles (Sequence (Hole _) _) = True
-hasHoles (Sequence _ p2) = hasHoles p2
+-- matches :: String -> Pattern -> Bool
+-- matches xs p = (\s -> xs =~ ("^" ++ s ++ "$")) $ regexString p
+--
+-- regexString :: Pattern -> String
+-- regexString (Pattern xs) = foldr (\x ys -> simpleRegexString x ++ ys) "" xs
+--
+-- simpleRegexString :: SimplePattern 'NoVars -> String
+-- simpleRegexString WildCard = ".*"
+-- simpleRegexString (Literal p) = p
 
--- returns Nothing if the pattern contains at least one hole
-matches :: String -> LinearPattern -> Maybe Bool
-matches xs p = regexString p <&> (\s -> xs =~ ("^" ++ s ++ "$"))
-
-regexString :: LinearPattern -> Maybe String
-regexString (Simple s) = simpleRegexString s
-regexString (Sequence p1 p2) = (++) <$> simpleRegexString p1 <*> regexString p2
-
-simpleRegexString :: SimplePattern -> Maybe String
-simpleRegexString Empty = Just ""
-simpleRegexString WildCard = Just ".*"
-simpleRegexString (Literal p) = Just p
-simpleRegexString (Hole _) = Nothing
-
-buildPattern :: String -> LinearPattern
-buildPattern "" = Simple Empty
-buildPattern "_" = Simple WildCard
-buildPattern ('_':xs) = Simple WildCard <> buildPattern xs
-buildPattern ('#':n:xs) = Simple (Hole $ read [n]) <> buildPattern xs
+buildPattern :: String -> Pattern
+buildPattern "" = Pattern []
+buildPattern "_" = Pattern [WildCard]
+buildPattern ('_':xs) = Pattern [WildCard] <> buildPattern xs
 buildPattern xs =
   let (lit,rest) = span (/= '_') xs
   in if null rest
-    then Simple (Literal lit)
-    else Simple (Literal lit) <> buildPattern rest
+    then Pattern [Literal lit]
+    else Pattern [Literal lit] <> buildPattern rest
 
-buildPattern' :: Show a => a -> LinearPattern
-buildPattern' = buildPattern . show
+buildTermPattern :: String -> TermPattern
+buildTermPattern "" = TermPattern []
+buildTermPattern "_" = TermPattern [WildCard]
+buildTermPattern ('_':xs) = TermPattern [WildCard] <> buildTermPattern xs
+buildTermPattern ('#':n:xs) = TermPattern [Hole $ read [n]] <> buildTermPattern xs
+buildTermPattern xs =
+  let (lit,rest) = span (/= '_') xs
+  in if null rest
+    then TermPattern [Literal lit]
+    else TermPattern [Literal lit] <> buildTermPattern rest
 
-instance IsString LinearPattern where
+instance IsString Pattern where
   fromString = buildPattern
 
-instance Semigroup LinearPattern where
-  Simple Empty        <> p                         = p
-  p                   <> Simple   Empty            = p
-  Simple WildCard     <> Simple   WildCard         = Simple WildCard
-  Simple WildCard     <> Sequence WildCard     p2  = Sequence WildCard p2
-  Simple (Literal l1) <> Simple   (Literal l2)     = Simple $ Literal (l1 <> l2)
-  Simple (Literal l1) <> Sequence (Literal l2) p2  = Simple (Literal (l1 <> l2)) <> p2
-  Simple p1           <> Simple   p2               = Sequence p1 (Simple p2)
-  Simple p1           <> Sequence p21          p22 = Sequence p1 (Sequence p21 p22)
-  Sequence p11 p12    <>                       p2  = Sequence p11 (p12 <> p2)
+instance IsString TermPattern where
+  fromString = buildTermPattern
 
-instance Monoid LinearPattern where
-  mempty = Simple Empty
+instance Semigroup Pattern where
+  Pattern [] <> p = p
+  p <> Pattern [] = p
+  Pattern xs <> Pattern (y:ys) =
+    let xs' = init xs
+        x = last xs
+    in Pattern $ xs' ++ op x y ++ ys
 
-matchesWithEnvironment :: StringEmbedding a => String -> (LinearPattern, [Term a]) -> Environment -> Maybe Bool
-matchesWithEnvironment xs (p,ts) d = xs `matches` fillHoles (p,ts) d
+instance Monoid Pattern where
+  mempty = Pattern []
 
-fillHoles :: StringEmbedding a => (LinearPattern, [Term a]) -> Environment -> LinearPattern
-fillHoles (Simple p, ts) d = Simple $ fillSimple (p,ts) d
-fillHoles (Sequence p1 p2, ts) d = Simple (fillSimple (p1,ts) d) <> fillHoles (p2,ts) d
+instance Semigroup TermPattern where
+  TermPattern [] <> p = p
+  p <> TermPattern [] = p
+  TermPattern xs <> TermPattern (y:ys) =
+    let xs' = init xs
+        x = last xs
+    in TermPattern $ xs' ++ op x y ++ ys
 
-fillSimple :: StringEmbedding a => (SimplePattern, [Term a]) -> Environment -> SimplePattern
-fillSimple (Empty, _) _ = Empty
+instance Monoid TermPattern where
+  mempty = TermPattern []
+
+op :: SimplePattern t -> SimplePattern t -> [SimplePattern t]
+op WildCard WildCard = [WildCard]
+op (Literal l1) (Literal l2) = [Literal (l1 ++ l2)]
+op p1 p2 = [p1,p2]
+
+-- matchesWithEnvironment :: StringEmbedding a => String -> (TermPattern, [Term a]) -> Environment -> Bool
+-- matchesWithEnvironment xs (p,ts) d = xs `matches` fillHoles (p,ts) d
+
+fillHoles :: StringEmbedding a => (TermPattern, [Term a]) -> Environment -> Pattern
+fillHoles (TermPattern xs, ts) d = Pattern $ (\s -> fillSimple (s, ts) d) <$> xs
+
+fillSimple :: StringEmbedding a => (SimplePattern 'WithVars, [Term a]) -> Environment -> SimplePattern 'NoVars
 fillSimple (WildCard, _) _ = WildCard
 fillSimple (Literal p, _) _ = Literal p
 fillSimple (Hole n, ts) d = Literal . pack $ evalTerm (ts !! n) d
 
-isSubPatternOf :: LinearPattern -> LinearPattern ->  Bool
+isSubPatternOf :: Pattern -> Pattern ->  Bool
 p1 `isSubPatternOf` p2 = parse (patternParser p2) "" (render $ pPrint p1) == Right ()
 
 -- yields a parser that succesfully parses the string representation of a
 -- pattern less general than the given pattern
-patternParser :: LinearPattern -> Parser ()
+patternParser :: Pattern -> Parser ()
 patternParser pat = patternParser' pat >> eof where
-  patternParser' (Simple Empty) = void $ string ""
-  patternParser' (Simple (Literal l)) = void $ string l
-  patternParser' (Simple (Hole n)) = void . string $ "#" <> show n
-  patternParser' (Simple WildCard) = void $ many anyChar
-  patternParser' (Sequence Empty p2) = string "" >> patternParser' p2
-  patternParser' (Sequence (Literal l) p2) = string l >> patternParser' p2
-  patternParser' (Sequence (Hole n) p2) = string ("#" <> show n) >> patternParser' p2
-  patternParser' p@(Sequence WildCard p2) = try (anyChar >> patternParser' p) <|> patternParser' p2
+  patternParser' (Pattern []) = void $ string ""
+  patternParser' (Pattern [Literal l]) = void $ string l
+  -- patternParser' (TermPattern [Hole n]) = void . string $ "#" <> show n
+  patternParser' (Pattern [WildCard]) = void $ many anyChar
+  patternParser' (Pattern (Literal l : p2)) = string l >> patternParser' (Pattern p2)
+  -- patternParser' (TermPattern (Hole n : p2)) = string ("#" <> show n) >> patternParser' p2
+  patternParser' p@(Pattern (WildCard : p2)) = try (anyChar >> patternParser' p) <|> patternParser' (Pattern p2)
 
 -- tests
 _test :: IO ()
-_test = quickCheck $ \xs -> let str = concatMap @[] (\c -> if c == '#' then "#1" else [c]) xs in render (pPrint (fromString @LinearPattern str)) == str
+_test = quickCheck $ \xs -> let str = concatMap @[] (\c -> if c == '#' then "#1" else [c]) xs in render (pPrint (fromString @Pattern str)) == str

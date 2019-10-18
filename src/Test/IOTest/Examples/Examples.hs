@@ -119,7 +119,7 @@ solution3 = go [] where
 -- read and reverse
 task4 :: Specification
 task4 =
-  readInput "line" (valueSet ("_" :: LinearPattern)) <>
+  readInput "line" (valueSet ("_" :: Pattern)) <>
   writeOutput ["_#0_"] [reverse <$> getCurrentS "line"]
 
 solution4 :: IOrep ()
@@ -152,7 +152,7 @@ scopingWrong = do
   print x
 
 printNSpec :: QC.Positive Int -> Int -> Specification
-printNSpec (QC.Positive n) x = repeatSpec n $ writeFixedOutput [buildPattern (show x)]
+printNSpec (QC.Positive n) x = repeatSpec n $ writeFixedOutput [buildTermPattern (show x)]
 
 printN :: Int -> Int -> IOrep ()
 printN n x = replicateM_ n $ print x

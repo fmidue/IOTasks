@@ -10,7 +10,8 @@ module Test.IOTest.Language
   , getCurrent, getAll
   , getCurrentS, getAllS
   , getCurrentGeneric, getAllGeneric
-  , LinearPattern, buildPattern
+  , Pattern, buildPattern
+  , TermPattern, buildTermPattern
   , intValues
   , stringTerms, nonStringTerms
   ) where
@@ -36,10 +37,10 @@ stringTerms = Proxy
 nonStringTerms :: HasStringTerms 'False
 nonStringTerms = Proxy
 
-writeOutput :: StringEmbedding a => [LinearPattern] -> [Term a] -> Specification
+writeOutput :: StringEmbedding a => [TermPattern] -> [Term a] -> Specification
 writeOutput ps ts = Spec [WriteOutput False ps ts]
 
-writeFixedOutput :: [LinearPattern] -> Specification
+writeFixedOutput :: [TermPattern] -> Specification
 writeFixedOutput ps = Spec [WriteOutput False ps ([] :: [Term String])]
 
 branch :: Term Bool -> Specification -> Specification -> Specification

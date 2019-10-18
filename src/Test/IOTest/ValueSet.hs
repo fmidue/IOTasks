@@ -59,15 +59,13 @@ instance Extract [t] t where
     let (i,_) = randomR (0,length xs - 1) gen
     in xs !! i
 
-instance Extract LinearPattern String where
+instance Extract Pattern String where
   extract gen p =
     let
       (gen1, gen2) = split gen
       lengths = randomRs (0,maxLength) gen1
       randomStrings = chunks lengths . filter (/='_') $ randomRs ('A','z') gen2
-    in if not $ hasHoles p
-        then replaceWildCards (render $ pPrint p) randomStrings
-        else error "can't extract from a pattern with holes"
+    in replaceWildCards (render $ pPrint p) randomStrings
       where maxLength = 10
 
 class DecMem xs x | xs -> x where
@@ -76,7 +74,7 @@ class DecMem xs x | xs -> x where
 instance Eq x => DecMem [x] x where
   contains = flip elem
 
-instance DecMem LinearPattern String where
+instance DecMem Pattern String where
   contains p x = buildPattern x `isSubPatternOf` p
 
 chunks :: [Int] -> [a] -> [[a]]
