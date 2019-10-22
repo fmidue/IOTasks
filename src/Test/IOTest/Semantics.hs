@@ -43,9 +43,9 @@ mapSemantics f (Semantics g) = Semantics (f . g)
 withSemantics :: (Environment -> Environment) -> Semantics m a -> Semantics m a
 withSemantics f (Semantics g) = Semantics (g . f)
 
-instance MonadWriter NTrace m  => MonadWriter NTrace (Semantics m) where
-  writer = coerce . writer @NTrace @(ExceptT Exit (StateT Environment m))
-  tell = coerce . tell @NTrace @(ExceptT Exit (StateT Environment m))
+instance MonadWriter GeneralizedNTrace m  => MonadWriter GeneralizedNTrace (Semantics m) where
+  writer = coerce . writer @GeneralizedNTrace @(ExceptT Exit (StateT Environment m))
+  tell = coerce . tell @GeneralizedNTrace @(ExceptT Exit (StateT Environment m))
   listen = listen . coerce
   pass = pass . coerce
 

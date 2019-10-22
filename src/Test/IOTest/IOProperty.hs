@@ -35,13 +35,13 @@ instance (Show b, Arbitrary b, Testable (IOProperty a' b'), Coercible b a) => Te
 specProperty :: Specification -> IOrep () -> Property
 specProperty spec program =
   let gen = traceGen spec
-      prop t = testTrace ((id &&& inputs) t) program
-  in forAllShow gen (render . printNTraceInfo) prop
+      prop t = testTrace ((id &&& inputsG) t) program
+  in forAllShow gen (render . printGenNTraceInfo) prop
 
-testTrace :: (NTrace, [String]) -> IOrep () -> Property
+testTrace :: (GeneralizedNTrace, [String]) -> IOrep () -> Property
 testTrace (tg,ins) p =
   let trace = runProgram ins p
-      normalized = normalize trace
+      normalized = normalizeO trace
   in case normalized `isCoveredBy` tg of
       MatchSuccessfull -> property True
       err -> counterexample (render $
