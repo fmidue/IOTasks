@@ -15,7 +15,7 @@ module Test.IOTest.ValueSet
   , containsValue
   , elimValueSet
   , valueFromString
-  -- , elementRep
+  , Extract(..)
   ) where
 
 import Test.IOTest.Utils

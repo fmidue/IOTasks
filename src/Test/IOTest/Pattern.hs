@@ -15,6 +15,7 @@ module Test.IOTest.Pattern
   , fillHoles
   , emptyPattern
   , isSubPatternOf
+  , isContainedIn
   ) where
 
 import Test.IOTest.Environment
@@ -51,12 +52,15 @@ emptyPattern :: Pattern
 emptyPattern = mempty
 
 instance Pretty Pattern where
+  pPrint (Pattern []) = text "emptyPattern"
   pPrint (Pattern xs) = foldr (\x ys -> pPrint x <> ys) mempty xs
 
 instance Show Pattern where
+  show (Pattern []) = "emptyPattern"
   show p = "buildPattern " <> render (doubleQuotes $ pPrint p)
 
 instance Pretty TermPattern where
+  pPrint (TermPattern []) = text "emptyTermPattern"
   pPrint (TermPattern xs) = foldr (\x ys -> pPrint x <> ys) mempty xs
 
 instance Show TermPattern where
@@ -80,8 +84,8 @@ hasHoles (TermPattern xs) = any (\case Hole _ -> True; _ -> False) xs
 -- simpleRegexString WildCard = ".*"
 -- simpleRegexString (Literal p) = p
 
+-- buildPattern always results in an non-emtpy Pattern
 buildPattern :: String -> Pattern
-buildPattern "" = Pattern []
 buildPattern "_" = Pattern [WildCard]
 buildPattern ('_':xs) = Pattern [WildCard] <> buildPattern xs
 buildPattern xs =
@@ -90,8 +94,8 @@ buildPattern xs =
     then Pattern [Literal lit]
     else Pattern [Literal lit] <> buildPattern rest
 
+-- buildTermPattern always results in an non-emtpy Pattern
 buildTermPattern :: String -> TermPattern
-buildTermPattern "" = TermPattern []
 buildTermPattern "_" = TermPattern [WildCard]
 buildTermPattern ('_':xs) = TermPattern [WildCard] <> buildTermPattern xs
 buildTermPattern ('#':n:xs) = TermPattern [Hole $ read [n]] <> buildTermPattern xs
@@ -147,6 +151,9 @@ fillSimple (Hole n, ts) d = Literal . pack $ evalTerm (ts !! n) d
 
 isSubPatternOf :: Pattern -> Pattern ->  Bool
 p1 `isSubPatternOf` p2 = parse (patternParser p2) "" (render $ pPrint p1) == Right ()
+
+isContainedIn :: String -> Pattern -> Bool
+isContainedIn s p = buildPattern s `isSubPatternOf` p
 
 -- yields a parser that succesfully parses the string representation of a
 -- pattern less general than the given pattern

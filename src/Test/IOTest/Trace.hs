@@ -7,15 +7,21 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 module Test.IOTest.Trace (
-  OrdinaryTrace,
+  Trace(..),
+  OrdinaryTrace(..),
+  OrdinaryNTrace(..),
   progRead,
   progWrite,
   stop,
   outOfInputs,
-  GeneralizedNTrace,
-  progReadN,
-  progWriteN,
+  GeneralizedNTrace(..),
+  GeneralizedTrace(..),
+  NTrace(..),
+  RNTrace(..),
+  progReadG,
+  progWriteG,
   normalizeO,
+  normalizeG,
   isCoveredBy,
   printGenNTraceInfo,
   inputsG,
@@ -38,11 +44,18 @@ newtype OrdinaryTrace = OT (Trace String)
   deriving (Semigroup, Monoid, Pretty) via Trace String
 newtype OrdinaryNTrace = ONT (NTrace String)
   deriving (Eq, Show)
+  deriving (Semigroup, Monoid) via (NTrace String)
+
 newtype GeneralizedTrace = GT (Trace (Set Pattern))
   deriving (Eq, Show)
   deriving (Semigroup, Monoid) via Trace (Set Pattern)
 newtype GeneralizedNTrace = GNT (NTrace (Set Pattern))
   deriving (Eq, Show)
+  deriving (Semigroup, Monoid) via NTrace (MergeElements Pattern)
+
+newtype MergeElements a = MergeElements (Set a)
+instance (Ord a, Semigroup a) => Semigroup (MergeElements a) where
+  MergeElements xs <> MergeElements ys = MergeElements $ S.map (uncurry (<>)) $ S.cartesianProduct xs ys
 
 data Trace a
  = ProgRead String (Trace a)
@@ -72,6 +85,18 @@ stop = OT mempty
 outOfInputs :: OrdinaryTrace
 outOfInputs = OT OutOfInputs
 
+progReadG :: String -> GeneralizedTrace
+progReadG v = GT $ ProgRead v Stop
+
+progWriteG :: Set Pattern -> GeneralizedTrace
+progWriteG v = GT $ ProgWrite v Stop
+
+stopG :: GeneralizedTrace
+stopG = GT Stop
+
+outOfInputsG :: GeneralizedTrace
+outOfInputsG = GT OutOfInputs
+
 data NTrace a
   = NonWrite (RNTrace a)
   | ProgWriteN a (RNTrace a)
@@ -83,37 +108,25 @@ data RNTrace a
   | OutOfInputsN
   deriving (Eq, Show, Functor)
 
-instance Semigroup GeneralizedNTrace where
-  (GNT (ProgWriteN v t1)) <> (GNT (NonWrite t2)) = GNT $ ProgWriteN v (combineRN t1 t2) --t1 <> t2
-  (GNT (ProgWriteN v1 StopN)) <> (GNT (ProgWriteN v2 t2)) = GNT $ ProgWriteN (concatPatterns v1 v2) t2
-  (GNT (ProgWriteN v1 (ProgReadN v11 t1))) <> (GNT (ProgWriteN v2 t2)) = GNT $ ProgWriteN v1 $ ProgReadN v11 t' where (GNT t') = GNT t1 <> (GNT $ ProgWriteN v2 t2)
-  (GNT (ProgWriteN v1 OutOfInputsN)) <> (GNT (ProgWriteN _ _)) = GNT $ ProgWriteN v1 OutOfInputsN
-  (GNT (NonWrite (ProgReadN v t1))) <> t2 = GNT $ NonWrite $ ProgReadN v t' where (GNT t') = GNT t1 <> t2
-  (GNT (NonWrite StopN)) <> t2 = t2
-  (GNT (NonWrite OutOfInputsN)) <> _ = GNT $ NonWrite OutOfInputsN
+instance Semigroup a => Semigroup (NTrace a) where
+  (ProgWriteN v t1) <> (NonWrite t2) = ProgWriteN v $ t1 <> t2
+  (ProgWriteN v1 StopN) <> (ProgWriteN v2 t2) = ProgWriteN (v1 <> v2) t2
+  (ProgWriteN v1 (ProgReadN v11 t1)) <> (ProgWriteN v2 t2) = ProgWriteN v1 $ ProgReadN v11 $ t1 <> ProgWriteN v2 t2
+  (ProgWriteN v1 OutOfInputsN) <> (ProgWriteN _ _) = ProgWriteN v1 OutOfInputsN
+  (NonWrite (ProgReadN v t1)) <> t2 = NonWrite $ ProgReadN v $ t1 <> t2
+  (NonWrite StopN) <> t2 = t2
+  (NonWrite OutOfInputsN) <> _ = NonWrite OutOfInputsN
 
-combineRN :: RNTrace (Set Pattern) -> RNTrace (Set Pattern) -> RNTrace (Set Pattern)
-combineRN (ProgReadN v t1) t2 = ProgReadN v t where (GNT t) = GNT t1 <> (GNT $ NonWrite t2)
-combineRN StopN t2 = t2
-combineRN OutOfInputsN _ = OutOfInputsN
+instance Semigroup a => Semigroup (RNTrace a) where
+  (ProgReadN v t1) <> t2 = ProgReadN v $ t1 <> NonWrite t2
+  StopN <> t2 = t2
+  OutOfInputsN <> _ = OutOfInputsN
 
-concatPatterns :: Set Pattern -> Set Pattern -> Set Pattern
-concatPatterns xs ys = S.map (uncurry (<>)) $ S.cartesianProduct xs ys
+instance Semigroup a => Monoid (NTrace a) where
+  mempty = NonWrite mempty
 
-instance Monoid GeneralizedNTrace where
-  mempty = GNT $ NonWrite StopN
-
-progReadN :: String -> GeneralizedNTrace
-progReadN v = GNT $ NonWrite $ ProgReadN v $ NonWrite StopN
-
-progWriteN :: Set Pattern -> GeneralizedNTrace
-progWriteN v = GNT $ ProgWriteN v StopN
-
-stopN :: GeneralizedNTrace
-stopN = GNT $ NonWrite StopN
-
-outOfInputsN :: GeneralizedNTrace
-outOfInputsN = GNT $ NonWrite OutOfInputsN
+instance Semigroup a => Monoid (RNTrace a) where
+  mempty = StopN
 
 normalizeO :: OrdinaryTrace -> OrdinaryNTrace
 normalizeO = go Nothing where
