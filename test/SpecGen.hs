@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeApplications #-}
 module SpecGen (specGen) where
 
-import Test.IOTest.Language (exit)
+import Test.IOTest.Language (exit, ints, nats)
 import Test.IOTest.Specification
 import Test.IOTest.ValueSet
 import Test.IOTest.Environment
@@ -15,7 +15,7 @@ import           Control.Monad.Extra            ( ifM )
 specGen :: Gen Specification
 specGen = do
   let vs = ["m","n","x","y","z"]
-      vss = [valueSet [(0::Int)..10], valueSet [(-10 :: Int)..10] ]
+      vss = [ints, nats]
   specGen' vs [] vss
 
 specGen' :: [Varname] -> [Varname] -> [ValueSet] -> Gen Specification
