@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeApplications #-}
-module SpecGen (specGen) where
+module SpecGen (specGen, loopBodyGen) where
 
-import Test.IOTest.Language (exit, ints, nats)
+import Test.IOTest.Language (tillExit, exit, ints, nats)
 import Test.IOTest.Specification
 import Test.IOTest.ValueSet
 import Test.IOTest.Environment
@@ -13,11 +13,21 @@ import           Data.List                      ( nub )
 import           Control.Monad.Extra            ( ifM )
 
 specGen :: Gen Specification
-specGen = do
+specGen =
   let vs = ["m","n","x","y","z"]
       vss = [ints, nats]
-  specGen' vs [] vss
+  in specGen' vs [] vss
 
+loopBodyGen :: Gen Specification
+loopBodyGen = sized $ \n ->
+  let vs = ["m","n","x","y","z"]
+      vss = [ints, nats]
+  in if n <= 2
+    then return $ exit
+    else do
+      ~(TillE s) <- loop vs [] vss
+      return s
+      
 specGen' :: [Varname] -> [Varname] -> [ValueSet] -> Gen Specification
 specGen' vs used vss = sized $ \n ->
   if n > 0

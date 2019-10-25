@@ -8,6 +8,8 @@ import Test.IOTest.IOProperty
 import Test.IOTest.Translation
 import Test.IOTest.TraceSet
 import Test.IOTest.Examples.Examples
+import Test.IOTest.Trace
+import Test.IOTest.Language
 
 import Test.Hspec
 import Test.Hspec.QuickCheck (prop)
@@ -65,12 +67,33 @@ testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
   prop "relate traceGen and accept" $
     forAll specGen (\s -> forAll (traceGen s) (\t' -> forAll (sampleTrace t') (accept s)))
 
+  prop "inputs are never optional for a fixed input prefix" $
+    forAll specGen (\s ->
+      forAll (traceGen s) (\t ->
+        let is = inputsG $ normalizeG t
+        in not (null is) ==> fulfillsNotFor (init is) (buildComputation @IOrep s) s))
 
-  -- FIXME: currently broken (timeout), needs to be revised anyway
-  -- describe "programs built from a spec satisfy that spec (double negate)" $ do
-  --   result <- runIO $ quickCheckWithResult stdArgs{maxSize = 15} $ forAll specGen (\s -> within 5000000 $ buildComputation @IOrep s `fulfillsNot` s)
-  --   it "does not fail" $ case result of
-  --     Failure{} -> False
-  --     Success{} -> False
-  --     GaveUp{} -> False
-  --     NoExpectedFailure{} -> True
+  prop "tillExit s === tillExit (s <> tillExit s <> exit) " $
+    forAll loopBodyGen $ \s -> testEquiv
+      (tillExit s)
+      (tillExit (s <> tillExit s <> exit))
+
+  prop "s1 <> (s2 <> s3) === (s1 <> s2) <> s3" $
+    forAll ((,,) <$> specGen <*> specGen <*> specGen) $
+      \(s1,s2,s3) -> testEquiv
+        (s1 <> (s2 <> s3))
+        ((s1 <> s2) <> s3)
+
+  prop "tillExit (s1 <> exit) === tillExit (s1 <> exit <> s2)" $
+    forAll ((,) <$> specGen <*> specGen) $
+      \(s1,s2) -> testEquiv
+        (tillExit (s1 <> exit))
+        (tillExit (s1 <> exit <> s2))
+
+testEquiv :: Specification -> Specification -> Property
+testEquiv s1 s2 = p1 .&&. p2 where
+  p1 = s1 `testAgainst` s2
+  p2 = s2 `testAgainst` s1
+  testAgainst x y =
+    forAll (traceGen x) (\t ->
+      forAll (sampleTrace t) (accept y))
