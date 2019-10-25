@@ -24,8 +24,6 @@ import Data.Maybe (fromMaybe)
 import Test.QuickCheck
 import Text.PrettyPrint.HughesPJClass hiding ((<>))
 
-import Debug.Trace
-
 class IOTestable a b where
   fulfills :: a -> b -> Property
   fulfillsNotFor :: [String] -> a -> b -> Property
@@ -76,7 +74,7 @@ accept' (ReadInput x ty : s') k t env = False
 accept' (WriteOutput True ps ts : s') k t env =
   accept' (WriteOutput False ps ts : s') k t env || accept' s' k t env
 accept' (WriteOutput False ps ts : s') k (OT (ProgWrite v t')) env =
-  let vs = traceShowId $ (\p -> fillHoles (p,ts) env) <$> ps
+  let vs = (\p -> fillHoles (p,ts) env) <$> ps
   in any (v `isContainedIn`) vs && accept' s' k (OT t') env
 accept' (WriteOutput{} : _) _ _ _ = False
 accept' (Branch c (Spec s1) (Spec s2) : s') k t env =
