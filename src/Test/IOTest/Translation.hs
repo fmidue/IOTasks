@@ -21,6 +21,7 @@ import Test.IOTest.Semantics
 import Test.IOTest.Specification
 
 import Data.Maybe
+import Data.Proxy
 import System.Random
 import Text.PrettyPrint.HughesPJClass hiding ((<>))
 
@@ -41,12 +42,10 @@ buildComputation' = interpret buildRead buildWrite
 
 buildRead :: MonadTeletype m => Action -> Semantics m ()
 buildRead (ReadInput x vs) =
-  elimValueSet vs (error "proxy RandomGen sampled" :: StdGen)
-    (const $ \(_:: ty) -> do
+  withProxy vs $ \(_ :: Proxy ty) -> do
       v <- unpack @ty <$> getLine
       unless (containsValue vs (Value typeRep v)) (error "encountered out of range input")
       modify (fromJust . update x v)
-    )
 buildRead _ = error "buildRead"
 
 buildWrite :: MonadTeletype m => Action -> Semantics m ()

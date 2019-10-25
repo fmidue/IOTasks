@@ -42,8 +42,7 @@ traceGen' = interpret genRead genWrite
 
 genRead :: (MonadGen m, MonadWriter GeneralizedTrace m) => Action -> Semantics m ()
 genRead (ReadInput x vs) = sized $ \size -> do
-  seed <- choose (minBound, maxBound)
-  let val = valueOf vs (mkStdGen seed)
+  val <- valueOf vs
   modify (fromMaybe (error "type mismatch on environment update") . updateWithValue x val)
   tell $ progReadG (show val)
   -- FIXME: clean up according to paper definition?
@@ -65,8 +64,7 @@ sampleTrace (GT Stop) = return $ OT Stop
 sampleTrace (GT OutOfInputs) = return $ OT OutOfInputs
 sampleTrace (GT (ProgWrite vs t2)) = do
   p <- elements $ S.toList vs
-  seed <- choose (minBound, maxBound)
-  let v = extract (mkStdGen seed) p
+  v <- extract p
   (OT t1) <- sampleTrace (GT t2)
   return $ if p == emptyPattern
     then OT t1

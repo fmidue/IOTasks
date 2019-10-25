@@ -11,7 +11,7 @@ module Test.IOTest.Combinators (
 import Test.IOTest.Language
 import Test.IOTest.ValueSet
 
-import System.Random
+import Data.Proxy
 
 repeatSpec :: Int -> Specification -> Specification
 repeatSpec 0 _ = nop
@@ -21,9 +21,9 @@ when :: Term Bool -> Specification -> Specification
 when p = branch p nop
 
 readTillFixedLength :: Varname -> ValueSet -> Varname -> Specification
-readTillFixedLength n vs xs = elimValueSet vs (undefined :: StdGen) $ \_ (_ :: b) ->
+readTillFixedLength n vs xs = withProxy vs $ \(_ :: Proxy a) ->
   tillExit $
-    branch ((\xs n -> length xs == n) <$> getAllGeneric @b xs <*> getCurrent n)
+    branch ((\xs n -> length xs == n) <$> getAllGeneric @a xs <*> getCurrent n)
       (readInput xs vs)
       exit
 

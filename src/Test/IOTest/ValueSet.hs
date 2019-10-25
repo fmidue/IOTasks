@@ -13,7 +13,7 @@ module Test.IOTest.ValueSet
   , valueSet
   , valueOf
   , containsValue
-  , elimValueSet
+  , withProxy
   , valueFromString
   , Extract(..)
   ) where
@@ -26,47 +26,48 @@ import Data.Proxy
 import Data.Dynamic
 import Type.Reflection
 
-import System.Random
-
 import Text.PrettyPrint.HughesPJClass hiding ((<>))
+import Test.QuickCheck (Gen, Arbitrary, arbitrary)
+import Test.QuickCheck.GenT
 
 data ValueSet where
-  MkValueSet :: (Extract a b, DecMem a b, Typeable b, StringEmbedding b) => TypeRep b -> a -> ValueSet
+  MkValueSet :: (Typeable a, Arbitrary a, StringEmbedding a) =>
+        { containedType :: TypeRep a
+        , isMember :: a -> Bool
+        , valueGen :: Gen a
+        } -> ValueSet
 
-valueSet :: (Extract a b, DecMem a b, Typeable b, StringEmbedding b) => a -> ValueSet
-valueSet = MkValueSet typeRep
+-- data ValueSet where
+--   MkValueSet :: (Extract a b, DecMem a b, Typeable b, StringEmbedding b) => TypeRep b -> a -> ValueSet
 
-valueOf :: RandomGen g => ValueSet -> g -> Value
-valueOf (MkValueSet r vs) gen = Value r $ extract gen vs
+valueSet :: (Extract t a, DecMem t a, Typeable a, Arbitrary a, StringEmbedding a) => t -> ValueSet
+valueSet x = MkValueSet typeRep (x `contains`) (extract x)
+
+valueOf :: MonadGen m => ValueSet -> m Value
+valueOf (MkValueSet r _ gen) = liftGen $ Value r <$> gen
 
 containsValue :: ValueSet -> Value -> Bool
-containsValue (MkValueSet r vs) (Value r' v) =
+containsValue (MkValueSet r p _) (Value r' v) =
   case r `eqTypeRep` r' of
-    Just HRefl -> vs `contains` v
+    Just HRefl -> p v
     Nothing -> False
 
 valueFromString :: ValueSet -> String -> Value
-valueFromString (MkValueSet (_ :: TypeRep a) _) str = Value typeRep (unpack @a str)
+valueFromString (MkValueSet (_ :: TypeRep a) _ _) str = Value typeRep (unpack @a str)
 
-elimValueSet :: RandomGen g => ValueSet -> g -> (forall a b. (Extract a b, DecMem a b, Typeable b, StringEmbedding b) => Proxy a -> b -> c) -> c
-elimValueSet (MkValueSet _ (xs :: ty)) gen f = f (Proxy @ty) $ extract gen xs
+withProxy :: ValueSet -> (forall a. (Typeable a, Arbitrary a, StringEmbedding a) => Proxy a -> b ) -> b
+withProxy (MkValueSet (_ :: TypeRep a) _ _) f = f (Proxy @a)
 
 class Extract ts t | ts -> t where
-  extract :: RandomGen g => g -> ts -> t
+  extract :: MonadGen m => ts -> m t
 
 instance Extract [t] t where
-  extract gen xs =
-    let (i,_) = randomR (0,length xs - 1) gen
-    in xs !! i
+  extract = elements
 
 instance Extract Pattern String where
-  extract gen p =
-    let
-      (gen1, gen2) = split gen
-      lengths = randomRs (0,maxLength) gen1
-      randomStrings = chunks lengths . filter (/='_') $ randomRs ('A','z') gen2
-    in replaceWildCards (render $ pPrint p) randomStrings
-      where maxLength = 10
+  extract p = do
+    randomStrings <- listOf $ filter (/='_') <$> liftGen arbitrary
+    return $ replaceWildCards (render $ pPrint p) randomStrings
 
 class DecMem xs x | xs -> x where
   contains :: xs -> x -> Bool
@@ -76,11 +77,6 @@ instance Eq x => DecMem [x] x where
 
 instance DecMem Pattern String where
   contains p x = buildPattern x `isSubPatternOf` p
-
-chunks :: [Int] -> [a] -> [[a]]
-chunks [] _ = []
-chunks _ [] = []
-chunks (n:ns) xs = take n xs : chunks ns (drop n xs)
 
 replaceWildCards :: String -> [String] -> String
 replaceWildCards "" _ = ""
@@ -93,10 +89,8 @@ replaceWildCards (x:xs) ys = x : replaceWildCards xs ys
 -- Extracting numbers does either yield very large absolute values or takes
 -- extremly long if the predicate is very specific
 -- Right now this is more of an example what is possible with this interface
-instance Random a => Extract (a -> Bool) a where
-  extract gen f =
-    let as = randoms gen
-    in head $ dropWhile (not . f) as
+instance Arbitrary a => Extract (a -> Bool) a where
+  extract f =  liftGen $ arbitrary `suchThat` f
 
 instance DecMem (a -> Bool) a where
   contains = id
