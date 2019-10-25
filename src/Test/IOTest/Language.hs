@@ -13,6 +13,8 @@ module Test.IOTest.Language
   , Pattern, buildPattern
   , TermPattern, buildTermPattern
   , intValues
+  , ints
+  , nats
   , stringTerms, nonStringTerms
   ) where
 
@@ -26,6 +28,8 @@ import Test.IOTest.Pattern
 
 import Data.Proxy
 import Data.Typeable
+
+import Test.QuickCheck (Gen, elements)
 
 readInput :: Varname -> ValueSet -> Specification
 readInput x vs = Spec [ReadInput x vs]
@@ -57,6 +61,16 @@ exit = Spec [E]
 
 intValues :: [Int] -> ValueSet
 intValues = valueSet
+
+ints :: ValueSet
+ints = valueSet' (const True) gen where
+  gen :: Gen Int
+  gen = elements [-10..10]
+
+nats :: ValueSet
+nats = valueSet' (>= 0) gen where
+  gen :: Gen Int
+  gen = elements [0..10]
 
 getCurrent :: (Typeable a, StringEmbedding a) => Varname -> Term a
 getCurrent = T.getCurrent

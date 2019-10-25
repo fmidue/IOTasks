@@ -17,28 +17,22 @@ import Data.Maybe
 import Test.QuickCheck as QC (Positive(..))
 import Text.Read (readMaybe)
 
-nats :: ValueSet
-nats = intValues [0..10]
-
-ints :: ValueSet
-ints = intValues [-10..10]
-
 -- read natural number n, then read n integers and sum them
 task1 :: Specification
 task1 =
   writeFixedOutput ["_"] <>
-  readInput "n" (intValues [0..10]) <>
-  readTillFixedLength "n" (intValues [-10..10]) "xs" <>
+  readInput "n" nats <>
+  readTillFixedLength "n" ints "xs" <>
   writeOutput ["#0"] [sum <$> getAll @Int "xs"]
 
 spec :: Specification
 spec =
   writeFixedOutput ["_"] <>
-  readInput "n" (intValues [0..10]) <>
+  readInput "n" nats <>
   tillExit (
     branch ((\n xs -> length xs == n) <$> getCurrent "n" <*> getAll @Int "xs")
      ( writeOutput ["_#0_"] [length <$> getAll @Int "xs"] <>
-       readInput "xs" (intValues [-10..10])
+       readInput "xs" ints
      )
      exit
   ) <>

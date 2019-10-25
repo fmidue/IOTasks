@@ -11,6 +11,7 @@ module Test.IOTest.ValueSet
   ( ValueSet
   , Value(..)
   , valueSet
+  , valueSet'
   , valueOf
   , containsValue
   , withProxy
@@ -41,7 +42,10 @@ data ValueSet where
 --   MkValueSet :: (Extract a b, DecMem a b, Typeable b, StringEmbedding b) => TypeRep b -> a -> ValueSet
 
 valueSet :: (Extract t a, DecMem t a, Typeable a, Arbitrary a, StringEmbedding a) => t -> ValueSet
-valueSet x = MkValueSet typeRep (x `contains`) (extract x)
+valueSet x =  valueSet' (x `contains`) (extract x)
+
+valueSet' :: (Typeable a, Arbitrary a, StringEmbedding a) => (a -> Bool) -> Gen a -> ValueSet
+valueSet' = MkValueSet typeRep
 
 valueOf :: MonadGen m => ValueSet -> m Value
 valueOf (MkValueSet r _ gen) = liftGen $ Value r <$> gen
