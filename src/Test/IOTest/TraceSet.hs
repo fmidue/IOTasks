@@ -19,13 +19,10 @@ import Test.IOTest.Environment
 import Test.IOTest.ValueSet
 import Test.IOTest.Specification
 
--- import Test.QuickCheck hiding (Positive,Function)
 import Test.QuickCheck.GenT
 
 import qualified Data.Set as S
 import           Data.Maybe
-
-import System.Random
 
 import Control.Monad.State
 import Control.Monad.Writer

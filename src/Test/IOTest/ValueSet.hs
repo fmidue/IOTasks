@@ -33,13 +33,10 @@ import Test.QuickCheck.GenT
 
 data ValueSet where
   MkValueSet :: (Typeable a, Arbitrary a, StringEmbedding a) =>
-        { containedType :: TypeRep a
-        , isMember :: a -> Bool
-        , valueGen :: Gen a
+        { _containedType :: TypeRep a
+        , _isMember :: a -> Bool
+        , _valueGen :: Gen a
         } -> ValueSet
-
--- data ValueSet where
---   MkValueSet :: (Extract a b, DecMem a b, Typeable b, StringEmbedding b) => TypeRep b -> a -> ValueSet
 
 valueSet :: (Extract t a, DecMem t a, Typeable a, Arbitrary a, StringEmbedding a) => t -> ValueSet
 valueSet x =  valueSet' (x `contains`) (extract x)

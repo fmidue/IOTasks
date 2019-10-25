@@ -22,7 +22,6 @@ import Test.IOTest.Specification
 
 import Data.Maybe
 import Data.Proxy
-import System.Random
 import Text.PrettyPrint.HughesPJClass hiding ((<>))
 
 import Control.Monad.State

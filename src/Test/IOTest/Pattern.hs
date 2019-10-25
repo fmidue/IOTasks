@@ -74,16 +74,6 @@ instance Pretty (SimplePattern l) where
 hasHoles :: TermPattern -> Bool
 hasHoles (TermPattern xs) = any (\case Hole _ -> True; _ -> False) xs
 
--- matches :: String -> Pattern -> Bool
--- matches xs p = (\s -> xs =~ ("^" ++ s ++ "$")) $ regexString p
---
--- regexString :: Pattern -> String
--- regexString (Pattern xs) = foldr (\x ys -> simpleRegexString x ++ ys) "" xs
---
--- simpleRegexString :: SimplePattern 'NoVars -> String
--- simpleRegexString WildCard = ".*"
--- simpleRegexString (Literal p) = p
-
 -- buildPattern always results in an non-emtpy Pattern
 buildPattern :: String -> Pattern
 buildPattern "_" = Pattern [WildCard]
@@ -138,9 +128,6 @@ op WildCard WildCard = [WildCard]
 op (Literal l1) (Literal l2) = [Literal (l1 ++ l2)]
 op p1 p2 = [p1,p2]
 
--- matchesWithEnvironment :: StringEmbedding a => String -> (TermPattern, [Term a]) -> Environment -> Bool
--- matchesWithEnvironment xs (p,ts) d = xs `matches` fillHoles (p,ts) d
-
 fillHoles :: StringEmbedding a => (TermPattern, [Term a]) -> Environment -> Pattern
 fillHoles (TermPattern xs, ts) d = Pattern $ (\s -> fillSimple (s, ts) d) <$> xs
 
@@ -161,10 +148,8 @@ patternParser :: Pattern -> Parser ()
 patternParser pat = patternParser' pat >> eof where
   patternParser' (Pattern []) = void $ string ""
   patternParser' (Pattern [Literal l]) = void $ string l
-  -- patternParser' (TermPattern [Hole n]) = void . string $ "#" <> show n
   patternParser' (Pattern [WildCard]) = void $ many anyChar
   patternParser' (Pattern (Literal l : p2)) = string l >> patternParser' (Pattern p2)
-  -- patternParser' (TermPattern (Hole n : p2)) = string ("#" <> show n) >> patternParser' p2
   patternParser' p@(Pattern (WildCard : p2)) = try (anyChar >> patternParser' p) <|> patternParser' (Pattern p2)
 
 -- tests
