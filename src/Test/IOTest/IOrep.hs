@@ -6,7 +6,7 @@
 module Test.IOTest.IOrep (
   IOrep,
   runProgram,
-  MonadTeletype(..), print,
+  MonadTeletype(..), print, readLn,
   Exit(..),
 ) where
 
