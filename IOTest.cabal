@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9493c1d7447ffbcdb1b6e484c962092e02b042ffd923be14038cdd7e28d62c62
+-- hash: b7cdc76f46e66546d249c0d1ef0042033027a261ee2cf37276341fd741b62bfd
 
 name:           IOTest
 version:        0.1.0.0
@@ -78,7 +78,7 @@ test-suite IOTest-test
       Paths_IOTest
   hs-source-dirs:
       test
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2
   build-depends:
       IOTest
     , QuickCheck
