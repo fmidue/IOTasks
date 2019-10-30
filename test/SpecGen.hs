@@ -74,7 +74,7 @@ output :: GenM Action
 output = do
   opt <- liftGen $ arbitrary @Bool
   n <- oneof [return 1, choose (2::Int,4)]
-  let ps = [ buildTermPattern $ '#':show i | i <- [0 .. n-1] ]
+  let ps = [ buildTermPattern $ '#':show i ++ "\n" | i <- [0 .. n-1] ]
   ts <- vectorOf n term
   return $ WriteOutput opt ps ts
 

@@ -65,12 +65,12 @@ testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
     forAll specGen (\s -> buildComputation @IOrep s `fulfills` s)
 
   prop "relate traceGen and accept" $
-    forAll specGen (\s -> forAll (traceGen s) (\t' -> forAll (sampleTrace t') (accept s)))
+    forAll specGen (\s -> forAll (traceGen s) (\t' -> forAll (sampleNTrace t') (accept s)))
 
   prop "inputs are never optional for a fixed input prefix" $
     forAll specGen (\s ->
       forAll (traceGen s) (\t ->
-        let is = inputsG $ normalizeG t
+        let is = inputsG t
         in not (null is) ==> fulfillsNotFor (init is) (buildComputation @IOrep s) s))
 
   prop "tillExit s === tillExit (s <> tillExit s <> exit) " $
@@ -96,4 +96,4 @@ testEquiv s1 s2 = p1 .&&. p2 where
   p2 = s2 `testAgainst` s1
   testAgainst x y =
     forAll (traceGen x) (\t ->
-      forAll (sampleTrace t) (accept y))
+      forAll (sampleNTrace t) (accept y))

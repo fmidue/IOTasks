@@ -18,8 +18,8 @@ module Test.IOTest.Trace (
   GeneralizedTrace(..),
   NTrace(..),
   RNTrace(..),
-  progReadG,
-  progWriteG,
+  progReadN,
+  progWriteN,
   normalizeO,
   normalizeG,
   isCoveredBy,
@@ -85,17 +85,17 @@ stop = OT mempty
 outOfInputs :: OrdinaryTrace
 outOfInputs = OT OutOfInputs
 
-progReadG :: String -> GeneralizedTrace
-progReadG v = GT $ ProgRead v Stop
+progReadN :: String -> GeneralizedNTrace
+progReadN v = GNT $ NonWrite $ ProgReadN v $ NonWrite StopN
 
-progWriteG :: Set Pattern -> GeneralizedTrace
-progWriteG v = GT $ ProgWrite v Stop
+progWriteN :: Set Pattern -> GeneralizedNTrace
+progWriteN v = GNT $ ProgWriteN v StopN
 
-stopG :: GeneralizedTrace
-stopG = GT Stop
+stopN :: GeneralizedNTrace
+stopN = GNT $ NonWrite StopN
 
-outOfInputsG :: GeneralizedTrace
-outOfInputsG = GT OutOfInputs
+outOfInputsN :: GeneralizedNTrace
+outOfInputsN = GNT $ NonWrite OutOfInputsN
 
 data NTrace a
   = NonWrite (RNTrace a)

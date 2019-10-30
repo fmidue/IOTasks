@@ -40,7 +40,7 @@ instance (Show b, Arbitrary b, IOTestable a' b', Coercible b a) => IOTestable (a
 
 specProperty :: Specification -> IOrep () -> Property
 specProperty spec program =
-  let gen = normalizeG <$> traceGen spec
+  let gen = traceGen spec
       prop t = testTrace ((id &&& inputsG) t) program
   in forAllShow gen (render . printGenNTraceInfo) prop
 
