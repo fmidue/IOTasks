@@ -55,19 +55,6 @@ v <.> t' = ProgWriteStopN v <> t'
 langConcat :: MergeSet Pattern -> MergeSet Pattern -> MergeSet Pattern
 langConcat xs ys = MkMergeSet $ S.map (uncurry (<>)) $ (S.cartesianProduct `on` fromMergeSet) xs ys
 
--- sampleTrace ::  MonadGen m => GeneralizedTrace -> m OrdinaryTrace
--- sampleTrace (ProgReadN v t) = do
---   t' <- sampleTrace t
---   return $ ProgRead v t'
--- sampleTrace StopN = return Stop
--- sampleTrace (ProgWriteReadN vs v t2) = do
---   p <- elements $ S.toList vs
---   v <- extract p
---   t1 <- sampleTrace t2
---   return $ if p == emptyPattern
---     then OT t1
---     else OT $ ProgWrite v t1
-
 -- only works as intended if the input trace has linebreaks only after each previously seperate output
 sampleNTrace ::  MonadGen m => GeneralizedTrace -> m OrdinaryTrace
 sampleNTrace (ProgReadN v t) = do
