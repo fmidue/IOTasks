@@ -16,6 +16,7 @@ import Test.Hspec.QuickCheck (prop)
 import Test.QuickCheck
 
 import SpecGen
+import           Data.Maybe                     ( isJust )
 
 testExamples :: Spec
 testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
@@ -63,6 +64,13 @@ testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
 
   prop "programs built from a spec satisfy that spec" $
     forAll specGen (\s -> buildComputation @IOrep s `fulfills` s)
+
+  prop "programs build from a spec dont go wrong on inputs generated from the same spec" $
+    forAll specGen (\s ->
+      forAll (traceGen s) (\t ->
+        let is = inputsN t
+        in isJust $ runProgram is (buildComputation @IOrep s
+    )))
 
   prop "relate traceGen and accept" $
     forAll specGen (\s -> forAll (traceGen s) (\t' -> forAll (sampleNTrace t') (accept s)))
