@@ -8,14 +8,11 @@ module Test.IOTest.Language
   , writeFixedOutput
   , Varname, Term, optional
   , getCurrent, getAll
-  , getCurrentS, getAllS
-  , getCurrentGeneric, getAllGeneric
   , Pattern, buildPattern
   , TermPattern, buildTermPattern
   , intValues
   , ints
   , nats
-  , stringTerms, nonStringTerms
   ) where
 
 import Test.IOTest.Utils
@@ -26,20 +23,12 @@ import Test.IOTest.Environment (Varname)
 import Test.IOTest.ValueSet
 import Test.IOTest.Pattern
 
-import Data.Proxy
 import Data.Typeable
 
 import Test.QuickCheck (Gen, elements)
 
 readInput :: Varname -> ValueSet -> Specification
 readInput x vs = Spec [ReadInput x vs]
-
-type HasStringTerms (s::Bool) = Proxy s
-
-stringTerms :: HasStringTerms 'True
-stringTerms = Proxy
-nonStringTerms :: HasStringTerms 'False
-nonStringTerms = Proxy
 
 writeOutput :: StringEmbedding a => [TermPattern] -> [Term a] -> Specification
 writeOutput ps ts = Spec [WriteOutput False ps ts]
@@ -75,17 +64,5 @@ nats = valueSet' (>= 0) gen where
 getCurrent :: (Typeable a, StringEmbedding a) => Varname -> Term a
 getCurrent = T.getCurrent
 
-getCurrentS :: Varname -> Term String
-getCurrentS = T.getCurrent
-
 getAll :: (Typeable a, StringEmbedding a) => Varname -> Term [a]
 getAll = T.getAll
-
-getAllS :: Varname -> Term [String]
-getAllS = T.getAll
-
-getCurrentGeneric :: (Typeable a, StringEmbedding a) => Varname -> Term a
-getCurrentGeneric = T.getCurrent
-
-getAllGeneric :: (Typeable a, StringEmbedding a) => Varname -> Term [a]
-getAllGeneric = T.getAll

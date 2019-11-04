@@ -5,13 +5,11 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE LambdaCase #-}
 module Test.IOTest.Pattern
   ( buildPattern
   , buildTermPattern
   , Pattern
   , TermPattern
-  , hasHoles
   , fillHoles
   , emptyPattern
   , isSubPatternOf
@@ -70,9 +68,6 @@ instance Pretty (SimplePattern l) where
   pPrint WildCard = text "_"
   pPrint (Literal l) = text l
   pPrint (Hole n) = text "#" <> pPrint n
-
-hasHoles :: TermPattern -> Bool
-hasHoles (TermPattern xs) = any (\case Hole _ -> True; _ -> False) xs
 
 -- buildPattern always results in an non-emtpy Pattern
 buildPattern :: String -> Pattern

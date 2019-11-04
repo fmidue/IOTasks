@@ -22,7 +22,6 @@ module Test.IOTest.Environment
 import Test.IOTest.Utils
 import Test.IOTest.Value
 
-import Data.Kind
 import Data.Dynamic
 import Data.Proxy
 import Type.Reflection
@@ -43,11 +42,11 @@ instance Show Entry where
   show EmptyEntry = "EmptyEntry"
   show (MkEntry r vs) = "(" <> show r <> ", " <> show (pack <$> vs) <>")"
 
-newEntry :: forall (a :: Type). (Typeable a, StringEmbedding a) => a -> Entry
-newEntry x = MkEntry (typeOf x) (x :| [])
+newEntry :: (Typeable a, StringEmbedding a) => a -> Entry
+newEntry x = MkEntry typeRep (x :| [])
 
 addValue :: (Typeable a, StringEmbedding a) => a -> Entry -> Maybe Entry
-addValue x EmptyEntry = Just $ MkEntry typeRep (x :| [])
+addValue x EmptyEntry = Just $ newEntry x
 addValue x (MkEntry r (hd :| tl)) =
   case typeOf x `eqTypeRep` r of
     Just HRefl -> Just $ MkEntry r (hd :| tl ++ [x])
@@ -76,11 +75,12 @@ updateWithValue :: Varname -> Value -> Environment -> Maybe Environment
 updateWithValue x (Value vRep v) (MkEnvironment es) =
   case Map.lookup x es of
     Nothing -> Nothing
-    Just EmptyEntry -> Just $ MkEnvironment $ Map.update (\EmptyEntry -> Just $ newEntry v) x es
+    Just EmptyEntry -> updateEntry
     Just (MkEntry eRep _) ->
       case vRep `eqTypeRep` eRep of
         Nothing -> Nothing
-        Just HRefl -> Just $ MkEnvironment $ Map.update (\e -> addValue v e <|> Just e) x es
+        Just HRefl -> updateEntry
+  where updateEntry = Just $ MkEnvironment $ Map.update (\e -> addValue v e <|> Just e) x es
 
 lookupNameAtType :: Typeable a => Proxy a -> Varname -> Environment -> Either LookupError [a]
 lookupNameAtType (_ :: Proxy a) x (MkEnvironment es) =

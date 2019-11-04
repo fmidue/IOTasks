@@ -114,7 +114,7 @@ solution3 = go [] where
 task4 :: Specification
 task4 =
   readInput "line" (valueSet ("_" :: Pattern)) <>
-  writeOutput ["_#0_"] [reverse <$> getCurrentS "line"]
+  writeOutput ["_#0_"] [reverse <$> getCurrent @String "line"]
 
 solution4 :: IOrep ()
 solution4 = (reverse <$> getLine) >>= putStrLn
@@ -155,9 +155,9 @@ parseSumSpec :: Specification
 parseSumSpec =
   tillExit (
     readInput "line" (valueSet ((show @Int <$> [1..10]) ++ (show <$> ['a'..'k']) ) ) <>
-    when ((==2) . length . filter isJust . fmap (readMaybe @Int) <$> getAllS "line") exit
+    when ((==2) . length . filter isJust . fmap (readMaybe @Int) <$> getAll "line") exit
   ) <>
-  writeOutput ["#0"] [sum . fmap fromJust . filter isJust . fmap (readMaybe @Int) <$> getAllS "line"]
+  writeOutput ["#0"] [sum . fmap fromJust . filter isJust . fmap (readMaybe @Int) <$> getAll "line"]
 
 parseSum :: IOrep ()
 parseSum = do

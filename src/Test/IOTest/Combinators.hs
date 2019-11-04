@@ -23,7 +23,7 @@ when p = branch p nop
 readTillFixedLength :: Varname -> ValueSet -> Varname -> Specification
 readTillFixedLength n vs xs = withProxy vs $ \(_ :: Proxy a) ->
   tillExit $
-    branch ((\xs n -> length xs == n) <$> getAllGeneric @a xs <*> getCurrent n)
+    branch ((\xs n -> length xs == n) <$> getAll @a xs <*> getCurrent n)
       (readInput xs vs)
       exit
 
@@ -32,12 +32,4 @@ readUntil xs p vs =
   tillExit $
     branch p
       (readInput xs vs)
-      exit
-
-readUntil1 :: Varname -> Term Bool -> ValueSet -> Specification
-readUntil1 xs p ty =
-  tillExit $
-    readInput xs ty <>
-    branch p
-      nop
       exit

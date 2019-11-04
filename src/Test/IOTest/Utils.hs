@@ -5,13 +5,9 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DataKinds #-}
-module Test.IOTest.Utils
-  ( (...)
-  , StringEmbedding(..)
+module Test.IOTest.Utils (
+  StringEmbedding(..),
   ) where
-
-(...) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
-(...) = (.) . (.)
 
 -- alternative to Show/Read that does not escape strings
 class StringEmbedding a where

@@ -22,20 +22,21 @@ import Test.QuickCheck.GenT
 
 import qualified Data.Set as S
 import           Data.Maybe
+import           Data.Function                  ( on )
 
-traceGen :: MonadGen m => Specification -> m GeneralizedNTrace
+traceGen :: MonadGen m => Specification -> m GeneralizedTrace
 traceGen (Spec s) = traceSet s kTI (freshEnvironment (Spec s)) where
-  kTI End  _ = return . GNT $ NonWrite StopN
+  kTI End  _ = return StopN
   kTI Exit _ = error "traceGen: 'throwError Exit' at toplevel"
 
-traceSet :: MonadGen m => [Action] -> (Cont -> Environment -> m GeneralizedNTrace) -> Environment -> m GeneralizedNTrace
+traceSet :: MonadGen m => [Action] -> (Cont -> Environment -> m GeneralizedTrace) -> Environment -> m GeneralizedTrace
 traceSet (ReadInput x ty : s') k e = do
   v <- valueOf ty
   let e' = fromMaybe (error "type mismatch on environment update") (updateWithValue x v e)
-  fmap (progReadN (show v) <>) (traceSet s' k e')
+  fmap (ProgReadN (show v) StopN <>) (traceSet s' k e')
 traceSet (WriteOutput opt ps ts : s') k e =
   let v1 = S.fromList ((\p -> fillHoles (p,ts) e) <$> ps)
-      v1' = if opt then S.insert emptyPattern v1 else v1
+      v1' = MkMergeSet $ if opt then S.insert emptyPattern v1 else v1
   in fmap (v1' <.>) (traceSet s' k e)
 traceSet (Branch c (Spec s1) (Spec s2) : s') k e = if evalTerm c e then traceSet (s2 <> s') k e else traceSet (s1 <> s') k e
 traceSet (TillE (Spec s) : s') k e = traceSet s k' e
@@ -46,38 +47,43 @@ traceSet [] k e = k End e
 
 data Cont = Exit | End
 
-(<.>) :: S.Set Pattern -> GeneralizedNTrace -> GeneralizedNTrace
-v <.> (GNT (ProgWriteN v' t'')) = GNT $ ProgWriteN (v `langConcat` v') t''
-v <.> (GNT (NonWrite t')) = GNT $ ProgWriteN v t'
+(<.>) :: MergeSet Pattern -> GeneralizedTrace -> GeneralizedTrace
+vs <.> ProgWriteReadN vs' v' t'' = ProgWriteReadN (langConcat vs vs') v' t''
+vs <.> ProgWriteStopN vs' = ProgWriteStopN (langConcat vs vs')
+v <.> t' = ProgWriteStopN v <> t'
 
-langConcat :: S.Set Pattern -> S.Set Pattern -> S.Set Pattern
-langConcat xs ys = S.map (uncurry (<>)) $ S.cartesianProduct xs ys
+langConcat :: MergeSet Pattern -> MergeSet Pattern -> MergeSet Pattern
+langConcat xs ys = MkMergeSet $ S.map (uncurry (<>)) $ (S.cartesianProduct `on` fromMergeSet) xs ys
 
-sampleTrace ::  MonadGen m => GeneralizedTrace -> m OrdinaryTrace
-sampleTrace (GT (ProgRead v t)) = do
-  (OT t') <- sampleTrace (GT t)
-  return $ OT $ ProgRead v t'
-sampleTrace (GT Stop) = return $ OT Stop
-sampleTrace (GT OutOfInputs) = return $ OT OutOfInputs
-sampleTrace (GT (ProgWrite vs t2)) = do
-  p <- elements $ S.toList vs
-  v <- extract p
-  (OT t1) <- sampleTrace (GT t2)
-  return $ if p == emptyPattern
-    then OT t1
-    else OT $ ProgWrite v t1
+-- sampleTrace ::  MonadGen m => GeneralizedTrace -> m OrdinaryTrace
+-- sampleTrace (ProgReadN v t) = do
+--   t' <- sampleTrace t
+--   return $ ProgRead v t'
+-- sampleTrace StopN = return Stop
+-- sampleTrace (ProgWriteReadN vs v t2) = do
+--   p <- elements $ S.toList vs
+--   v <- extract p
+--   t1 <- sampleTrace t2
+--   return $ if p == emptyPattern
+--     then OT t1
+--     else OT $ ProgWrite v t1
 
 -- only works as intended if the input trace has linebreaks only after each previously seperate output
-sampleNTrace ::  MonadGen m => GeneralizedNTrace -> m OrdinaryTrace
-sampleNTrace (GNT (NonWrite (ProgReadN v t))) = do
-  (OT t') <- sampleNTrace (GNT t)
-  return $ OT $ ProgRead v t'
-sampleNTrace (GNT (NonWrite StopN)) = return $ OT Stop
-sampleNTrace (GNT (NonWrite OutOfInputsN)) = return $ OT OutOfInputs
-sampleNTrace (GNT (ProgWriteN vs t2)) = do
+sampleNTrace ::  MonadGen m => GeneralizedTrace -> m OrdinaryTrace
+sampleNTrace (ProgReadN v t) = do
+  t' <- sampleNTrace t
+  return $ ProgRead v t'
+sampleNTrace StopN = return Stop
+sampleNTrace (ProgWriteStopN (MkMergeSet vs)) = do
   p <- elements $ S.toList vs
-  v <- fmap (++ "\n") . lines <$> extract p
-  (OT t1) <- sampleNTrace (GNT $ NonWrite t2)
+  vs' <- fmap (++ "\n") . lines <$> extract p
   return $ if p == emptyPattern
-    then OT t1
-    else OT $ foldr ProgWrite Stop v <> t1
+    then Stop
+    else foldr ProgWrite Stop vs'
+sampleNTrace (ProgWriteReadN (MkMergeSet vs) v t2) = do
+  p <- elements $ S.toList vs
+  vs' <- fmap (++ "\n") . lines <$> extract p
+  t1 <- sampleNTrace t2
+  return $ if p == emptyPattern
+    then ProgRead v t1
+    else foldr ProgWrite Stop vs' <> ProgRead v t1

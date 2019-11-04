@@ -41,11 +41,12 @@ instance MonadTeletype IOrep where
   putStrLn s = PutLine s $ Return ()
   getLine = GetLine Return
 
-runProgram :: [String] -> IOrep () -> OrdinaryTrace
-runProgram (x:xs) (GetLine f) = progRead x <> runProgram xs (f x)
-runProgram [] (GetLine _) = outOfInputs
-runProgram xs (PutLine v p) =  progWrite v <> runProgram xs p
-runProgram _ (Return _) =  stop
+-- returns Nothing if the number of inputs provided was not sufficient to complete the program run
+runProgram :: [String] -> IOrep () -> Maybe OrdinaryTrace
+runProgram (x:xs) (GetLine f) = ProgRead x <$> runProgram xs (f x)
+runProgram [] (GetLine _) = Nothing
+runProgram xs (PutLine v p) =  ProgWrite v <$> runProgram xs p
+runProgram _ (Return _) =  Just Stop
 
 class Monad m => MonadTeletype m where
   putStrLn :: String -> m ()
@@ -66,16 +67,6 @@ instance MonadTeletype m => MonadTeletype (ExceptT Exit m) where
 instance MonadTeletype m => MonadTeletype (StateT s m) where
   putStrLn = lift . putStrLn
   getLine = lift getLine
-
-data Handle = StdOut
-
-stdout :: Handle
-stdout = StdOut
-
-data BufferMode = NoBuffering
-
-hSetBuffering :: MonadTeletype m => Handle -> BufferMode -> m ()
-hSetBuffering StdOut NoBuffering = return ()
 
 instance MonadTeletype IO where
   putStrLn = IO.putStrLn

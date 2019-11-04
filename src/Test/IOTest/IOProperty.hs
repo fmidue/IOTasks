@@ -31,8 +31,9 @@ class IOTestable a b where
 instance IOTestable (IOrep ()) Specification where
   fulfills prog spec = specProperty spec prog
   fulfillsNotFor ins prog spec =
-    let trace = runProgram ins prog
-    in property . not $ spec `accept` trace
+    case runProgram ins prog of
+      Nothing -> property True
+      Just trace -> property . not $ spec `accept` trace
 
 instance (Show b, Arbitrary b, IOTestable a' b', Coercible b a) => IOTestable (a -> a') (b -> b') where
   fulfills f g = forAllShrink arbitrary shrink (\x -> f (coerce x) `fulfills` g x)
@@ -41,14 +42,14 @@ instance (Show b, Arbitrary b, IOTestable a' b', Coercible b a) => IOTestable (a
 specProperty :: Specification -> IOrep () -> Property
 specProperty spec program =
   let gen = traceGen spec
-      prop t = testTrace ((id &&& inputsG) t) program
+      prop t = testTrace ((id &&& inputsN) t) program
   in forAllShow gen (render . printGenNTraceInfo) prop
 
-testTrace :: (GeneralizedNTrace, [String]) -> IOrep () -> Property
+testTrace :: (GeneralizedTrace, [String]) -> IOrep () -> Property
 testTrace (tg,ins) p =
-  let trace = runProgram ins p
-      normalized = normalizeO trace
-  in case normalized `isCoveredBy` tg of
+  case runProgram ins p of
+    Nothing -> property False
+    Just trace -> case trace `isCoveredBy` tg of
       MatchSuccessfull -> property True
       err -> counterexample (render $
         hang (text "Actual run:") 4
@@ -61,21 +62,21 @@ testTrace (tg,ins) p =
 
 accept :: Specification -> OrdinaryTrace -> Bool
 accept s@(Spec as) t = accept' as kI t (freshEnvironment s) where
-  kI Exit _         _ = error "loop exit marker on toplevel"
-  kI End  (OT Stop) _ = True
-  kI End  (OT _   ) _ = False
+  kI Exit _    _ = error "loop exit marker on toplevel"
+  kI End  Stop _ = True
+  kI End  _    _ = False
 
 accept' :: [Action] -> (Cont -> OrdinaryTrace -> Environment -> Bool) -> OrdinaryTrace -> Environment -> Bool
-accept' (ReadInput x ty : s') k (OT (ProgRead v t')) env =
+accept' (ReadInput x ty : s') k (ProgRead v t') env =
   let val = valueFromString ty v
       env' = fromMaybe (error "accept: environment update failed") (updateWithValue x val env)
-  in containsValue ty val && accept' s' k (OT t') env'
+  in containsValue ty val && accept' s' k t' env'
 accept' (ReadInput x ty : s') k t env = False
 accept' (WriteOutput True ps ts : s') k t env =
   accept' (WriteOutput False ps ts : s') k t env || accept' s' k t env
-accept' (WriteOutput False ps ts : s') k (OT (ProgWrite v t')) env =
+accept' (WriteOutput False ps ts : s') k (ProgWrite v t') env =
   let vs = (\p -> fillHoles (p,ts) env) <$> ps
-  in any (v `isContainedIn`) vs && accept' s' k (OT t') env
+  in any (v `isContainedIn`) vs && accept' s' k t' env
 accept' (WriteOutput{} : _) _ _ _ = False
 accept' (Branch c (Spec s1) (Spec s2) : s') k t env =
   if evalTerm c env

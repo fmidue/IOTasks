@@ -70,7 +70,7 @@ testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
   prop "inputs are never optional for a fixed input prefix" $
     forAll specGen (\s ->
       forAll (traceGen s) (\t ->
-        let is = inputsG t
+        let is = inputsN t
         in not (null is) ==> fulfillsNotFor (init is) (buildComputation @IOrep s) s))
 
   prop "tillExit s === tillExit (s <> tillExit s <> exit) " $

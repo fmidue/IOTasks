@@ -2,7 +2,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Test.IOTest.Semantics (
   Semantics(..),
@@ -15,15 +14,12 @@ import Prelude hiding (foldMap)
 import Test.IOTest.IOrep
 import Test.IOTest.Environment
 import Test.IOTest.Specification
-import Test.IOTest.Trace
 import Test.IOTest.Term
 
 import Control.Monad.Extra (ifM)
 import Control.Monad.State
-import Control.Monad.Writer
 import Control.Monad.Except
 
-import Data.Coerce ( coerce )
 import Data.MonoTraversable.Unprefixed
 
 import Test.QuickCheck.GenT
@@ -33,21 +29,6 @@ newtype Semantics m a = Semantics { runSemantics :: Environment -> m (Either Exi
 
 evalSemantics :: Monad m => Semantics m a -> Environment -> m (Either Exit a)
 evalSemantics m c = fst <$> runSemantics m c
-
-execSemantics :: Monad m => Semantics m a -> Environment -> m Environment
-execSemantics m c = snd <$> runSemantics m c
-
-mapSemantics :: (m (Either Exit a, Environment) -> n (Either Exit b, Environment)) -> Semantics m a -> Semantics n b
-mapSemantics f (Semantics g) = Semantics (f . g)
-
-withSemantics :: (Environment -> Environment) -> Semantics m a -> Semantics m a
-withSemantics f (Semantics g) = Semantics (g . f)
-
-instance MonadWriter GeneralizedTrace m  => MonadWriter GeneralizedTrace (Semantics m) where
-  writer = coerce . writer @GeneralizedTrace @(ExceptT Exit (StateT Environment m))
-  tell = coerce . tell @GeneralizedTrace @(ExceptT Exit (StateT Environment m))
-  listen = listen . coerce
-  pass = pass . coerce
 
 instance Monad m => Semigroup (Semantics m ()) where
   (<>) = (>>)
@@ -88,13 +69,6 @@ instance MonadGen m => MonadGen (StateT s m) where
   variant n = mapStateT (variant n)
   sized f = let g s = sized (\n -> runStateT (f n) s) in StateT g
   resize n = mapStateT (resize n)
-  choose p = lift $ choose p
-
-instance (MonadGen m, Monoid w) => MonadGen (WriterT w m) where
-  liftGen g = lift $ liftGen g
-  variant n = mapWriterT (variant n)
-  sized f = let g = sized (runWriterT . f) in WriterT g
-  resize n = mapWriterT (resize n)
   choose p = lift $ choose p
 
 instance MonadGen m => MonadGen (ExceptT Exit m) where
