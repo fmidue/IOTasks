@@ -36,24 +36,21 @@ buildComputation s = do
     Left Exit -> error "buildComputation: 'throwError Exit' at toplevel"
 
 -- translates to a 'minimal' program satisfying the specification
-buildComputation' :: MonadTeletype m => Specification -> Semantics m ()
-buildComputation' = interpret buildRead buildWrite
+buildComputation' ::MonadTeletype m => Specification -> Semantics m ()
+buildComputation' = interpret build
 
-buildRead :: MonadTeletype m => Action -> Semantics m ()
-buildRead (ReadInput x vs) =
+build :: MonadTeletype m => Action -> Semantics m ()
+build (ReadInput x vs) =
   withProxy vs $ \(_ :: Proxy ty) -> do
       v <- unpack @ty <$> getLine
       unless (containsValue vs (Value typeRep v)) (error "encountered out of range input")
       modify (fromJust . update x v)
-buildRead _ = error "buildRead"
-
-buildWrite :: MonadTeletype m => Action -> Semantics m ()
-buildWrite (WriteOutput _ [] _) = error "empty list of output options"
-buildWrite (WriteOutput True _ _) =
+build (WriteOutput _ [] _) = error "empty list of output options"
+build (WriteOutput True _ _) =
   mempty
-buildWrite (WriteOutput False (p:_) ts) = do
+build (WriteOutput False (p:_) ts) = do
   v <- gets (eval (p,ts))
   putStrLn . render . pPrint $ v
   where
     eval = fillHoles
-buildWrite _ = error "buildWrite"
+build _ = return ()

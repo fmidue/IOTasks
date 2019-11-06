@@ -38,29 +38,29 @@ instance Monad m => Monoid (Semantics m ()) where
 
 interpret ::
      (Monad m)
-  => (Action -> Semantics m ()) -- handle read
-  -> (Action -> Semantics m ()) -- handle write
+  => (Action -> Semantics m ()) -- extra behavior for single action
   -> Specification -- specification
   -> Semantics m ()
-interpret r w = foldMap (interpret' r w)
+interpret sem = foldMap (interpret' sem)
 
 interpret' ::
      (Monad m)
-  => (Action -> Semantics m ()) -- handle read
-  -> (Action -> Semantics m ()) -- handle write
+  => (Action -> Semantics m ()) -- extra behavior for single action
   -> Action -- action
   -> Semantics m ()
-interpret' r _ act@ReadInput{} = r act
-interpret' _ w act@WriteOutput{} = w act
-interpret' r w (TillE s) =
-  let body = interpret r w s
-      loop = forever body -- repeat until the loop is terminated by an exit marker
-  in catchError loop (\Exit -> return ())
-interpret' r w (Branch c s1 s2) =
-  ifM (gets (evalTerm c))
-    (interpret r w s2)
-    (interpret r w s1)
-interpret' _ _ E = throwError Exit
+interpret' sem act = sem act >> structure act
+  where
+    structure ReadInput{} = return ()
+    structure WriteOutput{} = return ()
+    structure (TillE s) =
+      let body = interpret sem s
+          loop = forever body -- repeat until the loop is terminated by an end marker
+      in catchError loop (\Exit -> return ())
+    structure (Branch c s1 s2) =
+      ifM (gets (evalTerm c))
+        (interpret sem s2)
+        (interpret sem s1)
+    structure E = throwError Exit
 
 -- orphan instances
 
