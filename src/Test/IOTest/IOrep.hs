@@ -1,8 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE StandaloneDeriving #-}
 module Test.IOTest.IOrep (
   IOrep,
   runProgram,
@@ -18,12 +16,11 @@ import Control.Monad.Trans.Except
 import Control.Monad.State
 import qualified System.IO as IO
 
-data IOrep' t a where
-  GetLine :: (t -> IOrep' t a) -> IOrep' t a
-  PutLine :: t -> IOrep' t a -> IOrep' t a
-  Return :: a -> IOrep' t a
-
-deriving instance Functor (IOrep' t)
+data IOrep' t a
+  = GetLine (t -> IOrep' t a)
+  | PutLine t (IOrep' t a)
+  | Return a
+  deriving Functor
 
 instance Applicative (IOrep' t) where
   (<*>) = ap
