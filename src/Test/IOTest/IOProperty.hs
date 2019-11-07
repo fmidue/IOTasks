@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Test.IOTest.IOProperty (
   fulfills,
+  neverFulfills,
   fulfillsNotFor,
   accept,
 ) where
@@ -26,10 +27,12 @@ import Text.PrettyPrint.HughesPJClass hiding ((<>))
 
 class IOTestable a b where
   fulfills :: a -> b -> Property
+  neverFulfills :: a -> b -> Property
   fulfillsNotFor :: [String] -> a -> b -> Property
 
 instance IOTestable (IOrep ()) Specification where
-  fulfills prog spec = specProperty spec prog
+  fulfills prog spec = specProperty True spec prog
+  neverFulfills prog spec = specProperty False spec prog
   fulfillsNotFor ins prog spec =
     case runProgram ins prog of
       Nothing -> property True
@@ -37,26 +40,33 @@ instance IOTestable (IOrep ()) Specification where
 
 instance (Show b, Arbitrary b, IOTestable a' b', Coercible b a) => IOTestable (a -> a') (b -> b') where
   fulfills f g = forAllShrink arbitrary shrink (\x -> f (coerce x) `fulfills` g x)
+  neverFulfills f g = forAllShrink arbitrary shrink (\x -> f (coerce x) `neverFulfills` g x)
   fulfillsNotFor ins f g = forAllShrink arbitrary shrink (\x -> fulfillsNotFor ins (f (coerce x)) (g x))
 
-specProperty :: Specification -> IOrep () -> Property
-specProperty spec program =
+-- target represents the expected outcome of checking the property,
+-- i.e. the property is satisfied iff for all inputs the performed check returns target
+specProperty :: Bool -> Specification -> IOrep () -> Property
+specProperty target spec program =
   let gen = traceGen spec
-      prop t = testTrace ((id &&& inputsN) t) program
+      prop t = testTrace target ((id &&& inputsN) t) program
   in forAllShow gen (render . printGenNTraceInfo) prop
 
-testTrace :: (GeneralizedTrace, [String]) -> IOrep () -> Property
-testTrace (tg,ins) p =
+testTrace :: Bool -> (GeneralizedTrace, [String]) -> IOrep () -> Property
+testTrace target (tg,ins) p =
   case runProgram ins p of
-    Nothing -> property False
+    Nothing -> property (not target)
     Just trace -> case trace `isCoveredBy` tg of
-      MatchSuccessfull -> property True
-      err -> counterexample (render $
-        hang (text "Actual run:") 4
-          (pPrint trace)
-       $$ hang (text "Error:") 4
-         (ppResult err) )
-       False
+      MatchSuccessfull -> formatCounterexample MatchSuccessfull trace $ property target
+      err -> formatCounterexample err trace $ not target
+
+formatCounterexample :: Testable prop => MatchResult -> OrdinaryTrace -> prop -> Property
+formatCounterexample res trace = counterexample . render $
+  hang (text "Actual run:") 4
+    (pPrint trace)
+  $$ hang (text "Error:") 4 errorMsg
+  where errorMsg = case res of
+          MatchSuccessfull -> text "Expected error, but matching succeeded"
+          err -> ppResult err
 
   --in _ -- counterexample (msg ++ "\n  program trace: " ++ show normalized) result
 
