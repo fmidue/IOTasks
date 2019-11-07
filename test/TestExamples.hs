@@ -65,6 +65,11 @@ testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
   prop "programs built from a spec satisfy that spec" $
     forAll specGen (\s -> buildComputation @IOrep s `fulfills` s)
 
+  prop "programs built from a spec do not always satisfy that spec if they implement branches in 'reverse'" $
+    forAll specGen (\s ->
+      let (prog, ty) = buildWrongComputation @IOrep s
+      in  ty == Wrong ==> expectFailure $ prog `fulfills` s)
+
   prop "programs build from a spec dont go wrong on inputs generated from the same spec" $
     forAll specGen (\s ->
       forAll (traceGen s) (\t ->
