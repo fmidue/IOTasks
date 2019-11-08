@@ -10,7 +10,6 @@
 module Test.IOTest.Translation (
   buildComputation,
   buildWrongComputation,
-  CompType(..),
 ) where
 
 import Test.IOTest.Environment
@@ -61,45 +60,23 @@ build (WriteOutput False (p:_) ts) = do
     eval = fillHoles
 build _ = return ()
 
-buildWrongComputation :: MonadTeletype m => Specification -> (m (), CompType)
-buildWrongComputation s =
-  let (ty, compS) = buildWrongComputation' s
-      comp = do
-        loopStatus <- evalSemantics compS (freshEnvironment s)
-        case loopStatus of
-          Right () -> return ()
-          Left Exit -> error "buildWrongComputation: 'throwError Exit' at toplevel"
-  in (comp, ty)
+buildWrongComputation :: MonadTeletype m => Specification -> m ()
+buildWrongComputation s = do
+  loopStatus <- evalSemantics (buildWrongComputation' s) (freshEnvironment s)
+  case loopStatus of
+    Right () -> return ()
+    Left Exit -> error "buildWrongComputation: 'throwError Exit' at toplevel"
 
-buildWrongComputation' :: MonadTeletype m => Specification -> (CompType, Semantics m ())
-buildWrongComputation' = interpret' build'
+buildWrongComputation' :: MonadTeletype m => Specification -> Semantics m ()
+buildWrongComputation' = interpret' buildWrong
 
-build' :: MonadTeletype m => ActionSemantic CompType m
-build' = ASem
-  { r = \x vs ->
-      (mempty
-      , withProxy vs $ \(_ :: Proxy ty) -> do
-          v <- unpack @ty <$> getLine
-          unless (containsValue vs (Value typeRep v)) (error "encountered out of range input")
-          modify (fromJust . update x v)
-      )
-  , w = \opt ps ts -> if null ps then error "empty list of output options" else
-      (mempty
-      , do
-          v <- gets (fillHoles (head ps,ts))
-          putStrLn . render . pPrint $ v
-      )
-  , b = \_ (_,(_,p1)) (_,(_,p2)) -> ((Wrong,p2),(Wrong,p1)) -- swap branches
-  , l = snd
-  , e = id
-  }
-
-data CompType = Wrong | NotWrong deriving (Eq, Show)
-
-instance Semigroup CompType where
-  Wrong <> _ = Wrong
-  _ <> Wrong = Wrong
-  _ <> _ = NotWrong
-
-instance Monoid CompType where
-  mempty = NotWrong
+buildWrong :: MonadTeletype m => (Action, Semantics m ()) -> Semantics m ()
+buildWrong (ReadInput{} ,p) = p
+buildWrong (WriteOutput{} ,p) = p
+buildWrong (Branch c s1 s2, _) =
+  ifM (gets (evalTerm c))
+    -- swap branches
+    (buildWrongComputation s2)
+    (buildWrongComputation s1)
+buildWrong (TillE _, p) = p
+buildWrong (E,p) = p
