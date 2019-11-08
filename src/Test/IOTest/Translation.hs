@@ -71,8 +71,8 @@ buildWrongComputation' :: MonadTeletype m => Specification -> Semantics m ()
 buildWrongComputation' = interpret' buildWrong
 
 buildWrong :: MonadTeletype m => (Action, Semantics m ()) -> Semantics m ()
-buildWrong (ReadInput{} ,p) = p
-buildWrong (WriteOutput{} ,p) = p
+buildWrong (r@ReadInput{} ,p) = build r >> p
+buildWrong (w@WriteOutput{} ,p) = build w >> p
 buildWrong (Branch c s1 s2, _) =
   ifM (gets (evalTerm c))
     -- swap branches
