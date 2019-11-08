@@ -54,7 +54,7 @@ specProperty target spec program =
 testTrace :: Bool -> (GeneralizedTrace, [String]) -> IOrep () -> Property
 testTrace target (tg,ins) p =
   case runProgram ins p of
-    Nothing -> property (not target)
+    Nothing -> counterexample outOfInputsMsg $ property (not target)
     Just trace -> case trace `isCoveredBy` tg of
       MatchSuccessfull -> formatCounterexample MatchSuccessfull trace $ property target
       err -> formatCounterexample err trace $ not target
@@ -68,7 +68,10 @@ formatCounterexample res trace = counterexample . render $
           MatchSuccessfull -> text "Expected error, but matching succeeded"
           err -> ppResult err
 
-  --in _ -- counterexample (msg ++ "\n  program trace: " ++ show normalized) result
+outOfInputsMsg :: String
+outOfInputsMsg = render . text $
+  "Could not produce a complete trace for the given input sequence because the "
+  ++ "program atempted to read more than the provied ones."
 
 accept :: Specification -> OrdinaryTrace -> Bool
 accept s@(Spec as) t = accept' as kI t (freshEnvironment s) where
