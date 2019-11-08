@@ -40,11 +40,15 @@ instance Monad m => Monoid (Semantics m ()) where
 
 interpret ::
      (Monad m)
-  => (Action -> Semantics m ()) -- extra behavior for single action
+  => (Action -> Semantics m ()) -- behavior for read and write actions
   -> Specification -- specification
   -> Semantics m ()
 interpret sem =
-  foldMap (\act -> sem act >> structure (interpret sem) act)
+  foldMap (\act -> case act of
+                     ReadInput{}   -> sem act
+                     WriteOutput{} -> sem act
+                     _             -> structure (interpret sem) act
+          )
 
 interpret' ::
      Monad m
@@ -58,8 +62,6 @@ modifyInterpretation :: (Action -> a) -> ((Action, a) -> b) -> Action -> b
 modifyInterpretation i f act = f (act, i act)
 
 structure :: Monad m => (Specification -> Semantics m ()) -> Action -> Semantics m ()
-structure _ ReadInput{} = return ()
-structure _ WriteOutput{} = return ()
 structure ff (TillE s) =
   let body = ff s
       loop = forever body -- repeat until the loop is terminated by an end marker
@@ -69,6 +71,7 @@ structure ff (Branch c s1 s2) =
     (ff s2)
     (ff s1)
 structure _ E = throwError Exit
+structure _ _ = error "not a structure action"
 
 -- orphan instances
 

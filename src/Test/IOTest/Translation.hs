@@ -58,7 +58,7 @@ build (WriteOutput False (p:_) ts) = do
   putStrLn . render . pPrint $ v
   where
     eval = fillHoles
-build _ = return ()
+build _ = error "not a read or write action"
 
 buildWrongComputation :: MonadTeletype m => Specification -> m ()
 buildWrongComputation s = do
@@ -71,8 +71,8 @@ buildWrongComputation' :: MonadTeletype m => Specification -> Semantics m ()
 buildWrongComputation' = interpret' buildWrong
 
 buildWrong :: MonadTeletype m => (Action, Semantics m ()) -> Semantics m ()
-buildWrong (r@ReadInput{} ,p) = build r >> p
-buildWrong (w@WriteOutput{} ,p) = build w >> p
+buildWrong (r@ReadInput{}, _) = build r
+buildWrong (w@WriteOutput{}, _) = build w
 buildWrong (Branch c s1 s2, _) =
   ifM (gets (evalTerm c))
     -- swap branches
