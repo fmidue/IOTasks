@@ -22,10 +22,10 @@ testExamples :: Spec
 testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
   prop "solution1 matches task1" $
     solution1 `fulfills` task1
-  -- prop "solution1' does not match task1" $
-  --   solution1' `fulfillsNot` task1
-  -- prop "wrongSolution1 does not match task1" $
-  --   wrongSolution1 `fulfillsNot` task1
+  prop "solution1' does not match task1" $
+    expectFailure $ solution1' `fulfills` task1
+  prop "wrongSolution1 does not match task1" $
+    expectFailure $ wrongSolution1 `fulfills` task1
   prop "solution1 matches task1'" $
     solution1 `fulfills` task1'
 
@@ -50,14 +50,14 @@ testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
     buildComputation @IOrep task3' `fulfills` task3'
 
   prop "Testing solution4 against task4" $
-   solution4 `fulfills` task4
-  -- prop "Testing wrongsolution4 against task4" $
-  --  wrongSolution4 `fulfillsNot` task4
+    solution4 `fulfills` task4
+  prop "Testing wrongsolution4 against task4" $
+    expectFailure $ wrongSolution4 `fulfills` task4
 
   prop "correct handeling of scoping 1" $
     scopingRight `fulfills` scoping
-  -- prop "correct handeling of scoping 2" $
-  --   scopingWrong `fulfillsNot` scoping
+  prop "correct handeling of scoping 2" $
+    expectFailure $ scopingWrong `fulfills` scoping
 
   prop "multi parameter programs" $
     printN `fulfills` printNSpec
