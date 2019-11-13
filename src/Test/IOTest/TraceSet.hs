@@ -22,7 +22,6 @@ import Test.QuickCheck.GenT
 
 import qualified Data.Set as S
 import           Data.Maybe
-import           Data.Function                  ( on )
 
 traceGen :: MonadGen m => Specification -> m GeneralizedTrace
 traceGen (Spec s) = traceSet s kTI (freshEnvironment (Spec s)) where
@@ -53,7 +52,7 @@ vs <.> ProgWriteStopN vs' = ProgWriteStopN (langConcat vs vs')
 v <.> t' = ProgWriteStopN v <> t'
 
 langConcat :: MergeSet Pattern -> MergeSet Pattern -> MergeSet Pattern
-langConcat xs ys = MkMergeSet $ S.map (uncurry (<>)) $ (S.cartesianProduct `on` fromMergeSet) xs ys
+langConcat = (<>)
 
 -- only works as intended if the input trace has linebreaks only after each previously seperate output
 sampleNTrace ::  MonadGen m => GeneralizedTrace -> m OrdinaryTrace
