@@ -39,11 +39,11 @@ instance MonadTeletype IOrep where
   getLine = GetLine Return
 
 -- returns Nothing if the number of inputs provided was not sufficient to complete the program run
-runProgram :: [String] -> IOrep () -> Maybe OrdinaryTrace
-runProgram (x:xs) (GetLine f) = ProgRead x <$> runProgram xs (f x)
-runProgram [] (GetLine _) = Nothing
-runProgram xs (PutLine v p) =  ProgWrite v <$> runProgram xs p
-runProgram _ (Return _) =  Just Stop
+runProgram :: [String] -> IOrep () -> OrdinaryTrace
+runProgram (x:xs) (GetLine f) = ProgRead x $ runProgram xs (f x)
+runProgram [] (GetLine _) = ProgRead "<unkown input>" undefined
+runProgram xs (PutLine v p) =  ProgWrite v $ runProgram xs p
+runProgram _ (Return _) =  Stop
 
 class Monad m => MonadTeletype m where
   putStrLn :: String -> m ()

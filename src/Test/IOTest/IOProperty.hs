@@ -34,9 +34,8 @@ instance IOTestable (IOrep ()) Specification where
   fulfills prog spec = specProperty True spec prog
   neverFulfills prog spec = specProperty False spec prog
   fulfillsNotFor ins prog spec =
-    case runProgram ins prog of
-      Nothing -> property True
-      Just trace -> property . not $ spec `accept` trace
+    let trace = runProgram ins prog
+    in property . not $ spec `accept` trace
 
 instance (Show b, Arbitrary b, IOTestable a' b', Coercible b a) => IOTestable (a -> a') (b -> b') where
   fulfills f g = forAllShrink arbitrary shrink (\x -> f (coerce x) `fulfills` g x)
@@ -53,25 +52,20 @@ specProperty target spec program =
 
 testTrace :: Bool -> (GeneralizedTrace, [String]) -> IOrep () -> Property
 testTrace target (tg,ins) p =
-  case runProgram ins p of
-    Nothing -> counterexample outOfInputsMsg $ property (not target)
-    Just trace -> case trace `isCoveredBy` tg of
-      MatchSuccessfull -> formatCounterexample MatchSuccessfull trace $ property target
-      err -> formatCounterexample err trace $ not target
+  let trace = runProgram ins p
+      len = length ins
+  in case trace `isCoveredBy` tg of
+    MatchSuccessfull -> formatCounterexample len MatchSuccessfull trace $ property target
+    err -> formatCounterexample len err trace $ not target
 
-formatCounterexample :: Testable prop => MatchResult -> OrdinaryTrace -> prop -> Property
-formatCounterexample res trace = counterexample . render $
+formatCounterexample :: Testable prop => Int -> MatchResult -> OrdinaryTrace -> prop -> Property
+formatCounterexample n res trace = counterexample . render $
   hang (text "Actual run:") 4
-    (pPrint trace)
+    (ppTrace n trace)
   $$ hang (text "Error:") 4 errorMsg
   where errorMsg = case res of
           MatchSuccessfull -> text "Expected error, but matching succeeded"
           err -> ppResult err
-
-outOfInputsMsg :: String
-outOfInputsMsg = render . text $
-  "Could not produce a complete trace for the given input sequence because the "
-  ++ "program atempted to read more than the provied ones."
 
 accept :: Specification -> OrdinaryTrace -> Bool
 accept s@(Spec as) t = accept' as kI t (freshEnvironment s) where

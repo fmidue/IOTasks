@@ -17,6 +17,7 @@ module Test.IOTest.Trace (
   inputsN,
   MatchResult(..),
   ppResult,
+  ppTrace,
 ) where
 
 import Prelude hiding (GT)
@@ -87,6 +88,7 @@ data MatchResult
   | InputMismatch Doc
   | OutputMismatch Doc
   | AlignmentMismatch Doc
+  | TerminationMismatch Doc
   deriving Show
 
 ppResult :: MatchResult -> Doc
@@ -94,6 +96,7 @@ ppResult MatchSuccessfull = text $ show MatchSuccessfull
 ppResult (InputMismatch msg) = hang (text "InputMismatch:") 4 msg
 ppResult (OutputMismatch msg) = hang (text "OutputMismatch:") 4 msg
 ppResult (AlignmentMismatch msg) = hang (text "AlignmentMismatch:") 4 msg
+ppResult (TerminationMismatch msg) = hang (text "TerminationMismatch:") 4 msg
 
 isCoveredBy :: OrdinaryTrace -> GeneralizedTrace -> MatchResult
 isCoveredBy u v = isCoveredBy' (normalize u) v
@@ -113,6 +116,7 @@ isCoveredBy u v = isCoveredBy' (normalize u) v
   StopN `isCoveredBy'` StopN = MatchSuccessfull
   t1 `isCoveredBy'` (ProgWriteReadN (MkMergeSet vs2) v2 t2') | S.member emptyPattern vs2 = t1 `isCoveredBy'` ProgReadN v2 t2'
   t1 `isCoveredBy'` (ProgWriteStopN (MkMergeSet vs2)) | S.member emptyPattern vs2 = t1 `isCoveredBy'` StopN
+  t1 `isCoveredBy'` StopN = TerminationMismatch (reportTerminationMismatch t1)
   t1 `isCoveredBy'` t2 = AlignmentMismatch (reportExpectationMismatch t2 t1)
 
 isSubPatternIn :: Pattern -> Set Pattern -> Bool
@@ -129,11 +133,18 @@ printSet set = braces . hsep . punctuate (text ",") $ pPrint <$> S.toList set
 
 reportExpectationMismatch :: GeneralizedTrace -> NTrace String -> Doc
 reportExpectationMismatch t1 t2 = ppNTraceHead Expected t1 $$ ppTraceHead text Got t2
---
+
+reportTerminationMismatch :: NTrace a -> Doc
+reportTerminationMismatch t = ppNTraceHead Expected StopN $$ ppTraceHead (const $ text "...") Got t
+
 instance Pretty a => Pretty (Trace a) where
-  pPrint (ProgRead v t) = hcat [text "?",pPrint v, text " ", pPrint t]
-  pPrint (ProgWrite v t) = hcat [text "!", pPrint v, text " ", pPrint t]
-  pPrint Stop = text "stop"
+  pPrint = ppTrace (-1) -- TODO: handle this in a less hacky way
+
+ppTrace :: Pretty a => Int -> Trace a -> Doc
+ppTrace 0 (ProgRead _ _) = text "..."
+ppTrace n (ProgRead v t) = hcat [text "?",pPrint v, text " ", ppTrace (n-1) t]
+ppTrace n (ProgWrite v t) = hcat [text "!", pPrint v, text " ", ppTrace n t]
+ppTrace _ Stop = text "stop"
 
 instance Pretty GeneralizedTrace where
   pPrint = ppNTrace

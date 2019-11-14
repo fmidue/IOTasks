@@ -31,7 +31,6 @@ import Control.Monad.State
 import Control.Monad.Extra ( ifM )
 
 import Type.Reflection
-import GHC.TypeLits
 
 buildComputation :: MonadTeletype m => Specification -> m ()
 buildComputation s = do
