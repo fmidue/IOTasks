@@ -41,23 +41,26 @@ buildComputation s = do
 
 -- translates to a 'minimal' program satisfying the specification
 buildComputation' :: MonadTeletype m => Specification -> Semantics m ()
-buildComputation' = interpret build
+buildComputation' = interpret (build InputRangeCheck)
 
-build :: MonadTeletype m => Action -> Semantics m ()
-build (ReadInput x vs) =
+data Checks = NoCheck | InputRangeCheck deriving (Eq, Show)
+
+build :: MonadTeletype m => Checks -> Action -> Semantics m ()
+build c (ReadInput x vs) =
   withProxy vs $ \(_ :: Proxy ty) -> do
       v <- unpack @ty <$> getLine
-      unless (containsValue vs (Value typeRep v)) (error "encountered out of range input")
+      when (c == InputRangeCheck && not (containsValue vs (Value typeRep v)))
+        (error "encountered out of range input")
       modify (fromJust . update x v)
-build (WriteOutput _ [] _) = error "empty list of output options"
-build (WriteOutput True _ _) =
+build _ (WriteOutput _ [] _) = error "empty list of output options"
+build _ (WriteOutput True _ _) =
   mempty
-build (WriteOutput False (p:_) ts) = do
+build _ (WriteOutput False (p:_) ts) = do
   v <- gets (eval (p,ts))
   putStrLn . render . pPrint $ v
   where
     eval = fillHoles
-build _ = error "not a read or write action"
+build _ _ = error "not a read or write action"
 
 buildWrongComputation :: MonadTeletype m => Specification -> m ()
 buildWrongComputation s = do
@@ -70,8 +73,8 @@ buildWrongComputation' :: MonadTeletype m => Specification -> Semantics m ()
 buildWrongComputation' = interpret' buildWrong
 
 buildWrong :: MonadTeletype m => (Action, Semantics m ()) -> Semantics m ()
-buildWrong (r@ReadInput{}, _) = build r
-buildWrong (w@WriteOutput{}, _) = build w
+buildWrong (r@ReadInput{}, _) = build NoCheck r
+buildWrong (w@WriteOutput{}, _) = build NoCheck w
 buildWrong (Branch c s1 s2, _) =
   ifM (gets (evalTerm c))
     -- swap branches
