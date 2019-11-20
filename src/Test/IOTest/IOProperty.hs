@@ -6,6 +6,7 @@ module Test.IOTest.IOProperty (
   neverFulfills,
   fulfillsNotFor,
   accept,
+  matchesTrace,
 ) where
 
 import Test.IOTest.IOrep (IOrep, runProgram)
@@ -16,8 +17,6 @@ import Test.IOTest.Environment
 import Test.IOTest.Term
 import Test.IOTest.Pattern
 import Test.IOTest.ValueSet
-
-import Control.Arrow ((&&&))
 
 import Data.Coerce
 import Data.Maybe (fromMaybe)
@@ -47,19 +46,21 @@ instance (Show b, Arbitrary b, IOTestable a' b', Coercible b a) => IOTestable (a
 specProperty :: Bool -> Specification -> IOrep () -> Property
 specProperty target spec program =
   let gen = traceGen spec
-      prop t = testTrace target ((id &&& inputsN) t) program
+      prop tg = case program `matchesTrace` tg of
+          (MatchSuccessfull,(len, trace)) -> addCounterexample MatchSuccessfull (len,trace) target
+          (err, (len, trace)) -> addCounterexample err (len,trace) $ not target
   in forAllShow gen (render . printGenNTraceInfo) prop
 
-testTrace :: Bool -> (GeneralizedTrace, [String]) -> IOrep () -> Property
-testTrace target (tg,ins) p =
-  let trace = runProgram ins p
-      len = length ins
-  in case trace `isCoveredBy` tg of
-    MatchSuccessfull -> formatCounterexample len MatchSuccessfull trace $ property target
-    err -> formatCounterexample len err trace $ not target
+matchesTrace :: IOrep () -> GeneralizedTrace -> (MatchResult, (Int, OrdinaryTrace))
+matchesTrace program tg =
+  let inputs = inputsN tg
+      len = length inputs
+      trace = runProgram inputs program
+      result = trace `isCoveredBy` tg
+  in (result,(len,trace))
 
-formatCounterexample :: Testable prop => Int -> MatchResult -> OrdinaryTrace -> prop -> Property
-formatCounterexample n res trace = counterexample . render $
+addCounterexample :: Testable prop => MatchResult -> (Int,OrdinaryTrace) -> prop -> Property
+addCounterexample res (n,trace) = counterexample . render $
   hang (text "Actual run:") 4
     (ppTrace n trace)
   $$ hang (text "Error:") 4 errorMsg

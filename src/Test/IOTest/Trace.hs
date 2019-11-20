@@ -89,7 +89,7 @@ data MatchResult
   | OutputMismatch Doc
   | AlignmentMismatch Doc
   | TerminationMismatch Doc
-  deriving Show
+  deriving (Show, Eq)
 
 ppResult :: MatchResult -> Doc
 ppResult MatchSuccessfull = text $ show MatchSuccessfull
