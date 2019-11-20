@@ -54,7 +54,7 @@ v <.> t' = ProgWriteStopN v <> t'
 langConcat :: MergeSet Pattern -> MergeSet Pattern -> MergeSet Pattern
 langConcat = (<>)
 
--- only works as intended if the input trace has linebreaks only after each previously seperate output
+-- only works as intended if the input trace has linebreaks after each previously seperate output
 sampleNTrace ::  MonadGen m => GeneralizedTrace -> m OrdinaryTrace
 sampleNTrace (ProgReadN v t) = do
   t' <- sampleNTrace t

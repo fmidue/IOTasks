@@ -66,8 +66,11 @@ instance Show TermPattern where
 
 instance Pretty (SimplePattern l) where
   pPrint WildCard = text "_"
-  pPrint (Literal l) = text l
+  pPrint (Literal l) = text (escapeNewline l)
   pPrint (Hole n) = text "#" <> pPrint n
+
+escapeNewline :: String -> String
+escapeNewline = concatMap (\c -> if c == '\n' then "\\n" else [c])
 
 -- buildPattern always results in an non-emtpy Pattern
 buildPattern :: String -> Pattern
@@ -142,9 +145,9 @@ isContainedIn s p = buildPattern s `isSubPatternOf` p
 patternParser :: Pattern -> Parser ()
 patternParser pat = patternParser' pat >> eof where
   patternParser' (Pattern []) = void $ string ""
-  patternParser' (Pattern [Literal l]) = void $ string l
+  patternParser' (Pattern [Literal l]) = void $ string (escapeNewline l)
   patternParser' (Pattern [WildCard]) = void $ many anyChar
-  patternParser' (Pattern (Literal l : p2)) = string l >> patternParser' (Pattern p2)
+  patternParser' (Pattern (Literal l : p2)) = string (escapeNewline l) >> patternParser' (Pattern p2)
   patternParser' p@(Pattern (WildCard : p2)) = try (anyChar >> patternParser' p) <|> patternParser' (Pattern p2)
 
 -- tests

@@ -28,7 +28,7 @@ import Data.Dynamic
 import Type.Reflection
 
 import Text.PrettyPrint.HughesPJClass hiding ((<>))
-import Test.QuickCheck (Gen, Arbitrary, arbitrary)
+import Test.QuickCheck (Gen, Arbitrary, arbitrary, arbitraryPrintableChar)
 import Test.QuickCheck.GenT
 
 data ValueSet where
@@ -67,8 +67,13 @@ instance Extract [t] t where
 
 instance Extract Pattern String where
   extract p = do
-    randomStrings <- listOf $ filter (/='_') <$> liftGen arbitrary
-    return $ replaceWildCards (render $ pPrint p) randomStrings
+    randomStrings <- listOf $ filter (/='_') <$> liftGen (listOf arbitraryPrintableChar)
+    return $ replaceWildCards (unescapeNewline $ render $ pPrint p) randomStrings
+
+unescapeNewline :: String -> String
+unescapeNewline "" = ""
+unescapeNewline ('\\':'n':xs) = '\n' : unescapeNewline xs
+unescapeNewline (x:xs) = x : unescapeNewline xs
 
 class DecMem xs x | xs -> x where
   contains :: xs -> x -> Bool
