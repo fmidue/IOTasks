@@ -34,7 +34,7 @@ getCurrent x = Term [x] $ \d ->
   let xs = evalTerm (getAll x) d
   in if (not . null) xs
     then last xs
-    else error $ "getCurrent: no values stored for " <> x
+    else error $ "getCurrent: no values stored for " <> x <> " in " <> show d
 
 getAll :: Typeable a => Varname -> Term [a]
 getAll x = Term [x] $ \d ->

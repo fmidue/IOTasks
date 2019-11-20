@@ -52,7 +52,7 @@ addValue x (MkEntry r (hd :| tl)) =
     Just HRefl -> Just $ MkEntry r (hd :| tl ++ [x])
     Nothing -> Nothing
 
-newtype Environment = MkEnvironment (HashMap Varname Entry)
+newtype Environment = MkEnvironment (HashMap Varname Entry) deriving Show
 
 newEnvironment :: Environment
 newEnvironment = MkEnvironment Map.empty
