@@ -10,8 +10,8 @@
 {-# LANGUAGE PolyKinds #-}
 module Test.IOTest.Environment
   (Environment
-  , Test.IOTest.Environment.update
-  , updateWithValue
+  , store
+  , storeValue
   , freshEnvironment
   , lookupNameAtType
   , HasVariables(..)
@@ -68,11 +68,11 @@ addName x (MkEnvironment xs) =
     Just _ -> Nothing
     Nothing -> Just $ MkEnvironment (Map.insert x EmptyEntry xs)
 
-update :: (Typeable a, StringEmbedding a) => Varname -> a -> Environment -> Maybe Environment
-update x v = updateWithValue x (Value typeRep v)
+store :: (Typeable a, StringEmbedding a) => a -> Varname -> Environment -> Maybe Environment
+store = storeValue . Value typeRep
 
-updateWithValue :: Varname -> Value -> Environment -> Maybe Environment
-updateWithValue x (Value vRep v) (MkEnvironment es) =
+storeValue :: Value -> Varname -> Environment -> Maybe Environment
+storeValue (Value vRep v) x (MkEnvironment es) =
   case Map.lookup x es of
     Nothing -> Nothing
     Just EmptyEntry -> updateEntry
