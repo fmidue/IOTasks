@@ -39,16 +39,19 @@ data Action where
   E :: Action
 
 instance Show Specification where
-  show (Spec as) = show as
+  show = render . pPrint
 
 instance Show Action where
   show = render . pPrint
 
+instance Pretty Specification where
+  pPrint (Spec as) = vcat $ pPrint <$> as
+
 instance Pretty Action where
   pPrint (ReadInput x _) = text "ReadInput" <+> text (show x) <+> text "_"
   pPrint (WriteOutput b ps ts) = hsep [text "WriteOutput", text (show b), text (show ps), text "_{", text (show (vars <$> ts)), text "}"]
-  pPrint (Branch c s1 s2) = hang (text "Branch _{" <+> text (show $ vars c) <+> text "}") 2 (text (show s1) $+$ text (show s2))
-  pPrint (TillE s) = hang (text "TillE") 2 (text (show s))
+  pPrint (Branch c s1 s2) = hang (text "Branch _{" <+> text (show $ vars c) <+> text "}") 2 (parens (pPrint s1) $+$ parens (pPrint s2))
+  pPrint (TillE s) = hang (text "TillE") 2 (parens (pPrint s))
   pPrint E = text "E"
 
 -- move into Combinators ?
