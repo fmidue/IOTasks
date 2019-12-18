@@ -97,6 +97,3 @@ data LookupError = NameNotFound String | WrongType String deriving Show
 printLookupError :: LookupError -> String
 printLookupError (NameNotFound e) = "lookup error: name not found: " <> e
 printLookupError (WrongType e) = "lookup error: wrong type: " <> e
-
-class HasVariables a where
-  vars :: a -> [Varname]

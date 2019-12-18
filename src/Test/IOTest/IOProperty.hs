@@ -29,7 +29,7 @@ class IOTestable a b where
   neverFulfills :: a -> b -> Property
   fulfillsNotFor :: [String] -> a -> b -> Property
 
-instance IOTestable (IOrep ()) Specification where
+instance (EvalTerm t, TermVars t) => IOTestable (IOrep ()) (Specification t) where
   fulfills prog spec = specProperty True spec prog
   neverFulfills prog spec = specProperty False spec prog
   fulfillsNotFor ins prog spec =
@@ -43,7 +43,7 @@ instance (Show b, Arbitrary b, IOTestable a' b', Coercible b a) => IOTestable (a
 
 -- target represents the expected outcome of checking the property,
 -- i.e. the property is satisfied iff for all inputs the performed check returns target
-specProperty :: Bool -> Specification -> IOrep () -> Property
+specProperty :: (EvalTerm t, TermVars t) => Bool -> Specification t -> IOrep () -> Property
 specProperty target spec program =
   let gen = traceGen spec
       prop tg = case program `matchesTrace` tg of
@@ -68,13 +68,13 @@ addCounterexample res (n,trace) = counterexample . render $
           MatchSuccessfull -> text "Expected error, but matching succeeded"
           err -> ppResult err
 
-accept :: Specification -> OrdinaryTrace -> Bool
+accept :: (EvalTerm t, TermVars t) => Specification t -> OrdinaryTrace -> Bool
 accept s@(Spec as) t = accept' as kI t (freshEnvironment s) where
   kI Exit _    _ = error "loop exit marker on toplevel"
   kI End  Stop _ = True
   kI End  _    _ = False
 
-accept' :: [Action] -> (Cont -> OrdinaryTrace -> Environment -> Bool) -> OrdinaryTrace -> Environment -> Bool
+accept' :: EvalTerm t => [Action t] -> (Cont -> OrdinaryTrace -> Environment -> Bool) -> OrdinaryTrace -> Environment -> Bool
 accept' (ReadInput x ty : s') k (ProgRead v t') env =
   let val = valueFromString ty v
       env' = fromMaybe (error "accept: environment update failed") (storeValue x val env)

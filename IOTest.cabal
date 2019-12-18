@@ -36,6 +36,7 @@ library
       Test.IOTest.IOrep
       Test.IOTest.Language
       Test.IOTest.Pattern
+      Test.IOTest.Python
       Test.IOTest.Semantics
       Test.IOTest.Specification
       Test.IOTest.Term

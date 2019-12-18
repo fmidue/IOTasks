@@ -7,7 +7,7 @@ import Test.IOTest.Specification
 import Test.IOTest.ValueSet
 import Test.IOTest.Environment
 import Test.IOTest.Pattern
-import Test.IOTest.Term
+import Test.IOTest.Term hiding (sum)
 
 import Test.QuickCheck (arbitrary, Gen)
 import Test.QuickCheck.GenT
@@ -19,13 +19,13 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Data.Functor.Identity
 
-specGen :: Gen Specification
+specGen :: (Term t, Applicative t) => Gen (Specification t)
 specGen =
   let vs = ["m","n","x","y","z"]
       vss = [ints, nats]
   in runIdentity <$>runGenT (runReaderT (evalStateT specGen' []) (vs,vss))
 
-loopBodyGen :: Gen Specification
+loopBodyGen :: (Term t, Applicative t) => Gen (Specification t)
 loopBodyGen =
   let vs = ["m","n","x","y","z"]
       vss = [ints, nats]
@@ -37,7 +37,7 @@ loopBodyGen =
 
 type GenM a = StateT [Varname] (ReaderT ([Varname], [ValueSet]) (GenT Identity)) a
 
-specGen' :: GenM Specification
+specGen' :: (Term t, Applicative t) => GenM (Specification t)
 specGen' = sized $ \n ->
   if n > 0
     then do
@@ -49,12 +49,12 @@ specGen' = sized $ \n ->
     else
       return $ Spec []
 
-simple :: GenM (Specification, Int)
+simple :: (Term t, Applicative t) => GenM ((Specification t), Int)
 simple = do
   a <- oneof [input, output]
   return (Spec [a], 1)
 
-complex :: GenM (Specification, Int)
+complex :: (Term t, Applicative t) => GenM ((Specification t), Int)
 complex = sized $ \n -> do
   n' <- choose (2,n)
   a <- resize n' . oneof $
@@ -62,7 +62,7 @@ complex = sized $ \n -> do
     [ loop   | n' > 2 ]
   return (Spec [a], n')
 
-input :: GenM Action
+input :: GenM (Action t)
 input = do
   (xs,vss) <- ask
   x <- elements xs
@@ -70,7 +70,7 @@ input = do
   modify (nub.(x:))
   return $ ReadInput x vs
 
-output :: GenM Action
+output :: (Term t, Applicative t) => GenM (Action t)
 output = do
   opt <- liftGen $ arbitrary @Bool
   n <- oneof [return 1, choose (2::Int,4)]
@@ -78,7 +78,7 @@ output = do
   ts <- vectorOf n term
   return $ WriteOutput opt ps ts
 
-term :: GenM (Term Int)
+term :: (Term t, Applicative t) => GenM (t Int)
 term = do
   used <- get
   oneof $ concat
@@ -102,7 +102,7 @@ term = do
     y <- elements used
     return $ f <$> getCurrent x <*> getCurrent y
 
-branch :: GenM Action
+branch :: (Term t, Applicative t) => GenM (Action t)
 branch = sized $ \n -> do
   c <- condition
   ~[n1,n2] <- splitSizeIn 2 (n-1)
@@ -112,12 +112,12 @@ branch = sized $ \n -> do
     (resize n2 specGen')
   return $ Branch c s1 s2
 
-condition :: GenM (Term Bool)
+condition :: (Term t, Applicative t) => GenM (t Bool)
 condition = oneof [unary, binary] where
   unary = do
     vs <- asks fst
     x <- elements vs
-    return $ null <$> getAll @Int x
+    return $ null <$> getAll @_ @Int x
   binary = do
     op <- elements [(==), (>), (<)]
     t1 <- term
@@ -125,7 +125,7 @@ condition = oneof [unary, binary] where
     return $ op <$> t1 <*> t2
 
 -- this only generates loops with exactly one exit marker.
-loop :: GenM Action
+loop :: (Term t, Applicative t) => GenM (Action t)
 loop = sized $ \n -> do
   vss <- asks snd
   ~[preLen, loopLen] <- splitSizeIn 2 (n-3)
@@ -145,14 +145,14 @@ loop = sized $ \n -> do
     ]
   return $ TillE $ prefix <> Spec [s]
 
-loopCondition :: GenM (Term Bool, Varname)
+loopCondition :: (Term t, Applicative t) => GenM (t Bool, Varname)
 loopCondition = do
   vs <- asks fst
   x <- elements vs
   n <- choose (0,10)
-  return ((\xs i -> length xs > i) <$> getAll @Int x <*> pure n, x)
+  return ((\xs i -> length xs > i) <$> getAll @_ @Int x <*> pure n, x)
 
-insert :: Action -> Specification -> GenM Specification
+insert :: Action t -> (Specification t) -> GenM (Specification t)
 insert a (Spec as) = do
   ix <- choose (0,length as)
   return . Spec $ take ix as ++ [a] ++ drop ix as

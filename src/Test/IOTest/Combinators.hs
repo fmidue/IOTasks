@@ -13,21 +13,21 @@ import Test.IOTest.ValueSet
 
 import Data.Proxy
 
-repeatSpec :: Int -> Specification -> Specification
+repeatSpec :: Int -> Specification t -> Specification t
 repeatSpec 0 _ = nop
 repeatSpec n s = s <> repeatSpec (n-1) s
 
-when :: Term Bool -> Specification -> Specification
+when :: t Bool -> Specification t -> Specification t
 when p = branch p nop
 
-readTillFixedLength :: Varname -> ValueSet -> Varname -> Specification
+readTillFixedLength :: (Term t, Applicative t) => Varname -> ValueSet -> Varname -> Specification t
 readTillFixedLength n vs xs = withProxy vs $ \(_ :: Proxy a) ->
   tillExit $
     branch ((\xs n -> length xs == n) <$> getAll @a xs <*> getCurrent n)
       (readInput xs vs)
       exit
 
-readUntil :: Varname -> Term Bool -> ValueSet -> Specification
+readUntil :: Varname -> t Bool -> ValueSet -> Specification t
 readUntil xs p vs =
   tillExit $
     branch p

@@ -6,15 +6,16 @@ import Prelude hiding (getLine, putStrLn, print)
 
 import Test.IOTest.IOrep
 import Test.IOTest.Language
+import Test.IOTest.Term (ApplicativeTerm)
 
 -- possible elements to build the secret from
 hangmanDomain :: [Int]
 hangmanDomain = [0..9]
 
-hangmanSpec :: [Int] -> Specification
+hangmanSpec :: (Term t, Applicative t) => [Int] -> Specification t
 hangmanSpec word =
   tillExit (
-       branch (winCondition <$> getAll @Int "guessed")
+       branch (winCondition <$> getAll "guessed")
          nop
          (writeFixedOutput ["_correct_"] <> exit)
     <> writeFixedOutput ["Game state:_"]
@@ -24,6 +25,7 @@ hangmanSpec word =
          (optional $ writeFixedOutput ["good guess!"])
     )
   where
+    winCondition :: [Int] -> Bool
     winCondition xs = all (`elem` filter (`elem` word) xs) word
 
 

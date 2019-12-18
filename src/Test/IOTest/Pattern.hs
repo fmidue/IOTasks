@@ -126,10 +126,10 @@ op WildCard WildCard = [WildCard]
 op (Literal l1) (Literal l2) = [Literal (l1 ++ l2)]
 op p1 p2 = [p1,p2]
 
-fillHoles :: StringEmbedding a => (TermPattern, [Term a]) -> Environment -> Pattern
+fillHoles :: (EvalTerm t, StringEmbedding a) => (TermPattern, [t a]) -> Environment -> Pattern
 fillHoles (TermPattern xs, ts) d = Pattern $ (\s -> fillSimple (s, ts) d) <$> xs
 
-fillSimple :: StringEmbedding a => (SimplePattern 'WithVars, [Term a]) -> Environment -> SimplePattern 'NoVars
+fillSimple :: EvalTerm t => StringEmbedding a => (SimplePattern 'WithVars, [t a]) -> Environment -> SimplePattern 'NoVars
 fillSimple (WildCard, _) _ = WildCard
 fillSimple (Literal p, _) _ = Literal p
 fillSimple (Hole n, ts) d = Literal . pack $ evalTerm (ts !! n) d

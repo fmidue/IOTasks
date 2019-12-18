@@ -9,6 +9,8 @@ import Test.IOTest.IOrep
 import Test.IOTest.Language
 import Test.IOTest.Combinators
 import Test.IOTest.ValueSet
+import Test.IOTest.Term (EqTermSym(..), LengthTermSym(..), SumTermSym)
+import qualified Test.IOTest.Term as Term (sum)
 
 import Control.Monad (replicateM,replicateM_)
 
@@ -18,14 +20,14 @@ import Test.QuickCheck as QC (Positive(..))
 import Text.Read (readMaybe)
 
 -- read natural number n, then read n integers and sum them
-task1 :: Specification
+task1 :: (Term t, Applicative t) => Specification t
 task1 =
   writeFixedOutput ["_"] <>
   readInput "n" nats <>
   readTillFixedLength "n" ints "xs" <>
   writeOutput ["#0"] [sum <$> getAll @Int "xs"]
 
-spec :: Specification
+spec :: (Term t, Applicative t) => Specification t
 spec =
   writeFixedOutput ["_"] <>
   readInput "n" nats <>
@@ -38,7 +40,17 @@ spec =
   ) <>
   writeOutput ["_#0_"] [sum <$> getAll @Int "xs"]
 
-task1' :: Specification
+spec' :: (Term t, EqTermSym t, LengthTermSym t, SumTermSym t) => Specification t
+spec' =
+  readInput "n" (intValues [0..10]) <>
+  tillExit (
+    branch ( len (getAll @Int "xs") `eq` getCurrent "n")
+     ( readInput "xs" (intValues [-10..10]) )
+     exit
+  ) <>
+  writeOutput ["#0"] [Term.sum $ getAll @Int "xs"]
+
+task1' :: (Term t, Applicative t) => Specification t
 task1' =
   optional (writeFixedOutput ["_"]) <>
   readInput "n" nats <>
@@ -71,7 +83,7 @@ wrongSolution1 = do
   putStrLn "17"
 
 -- read till last two numbers sum to 0 than count positive numbers divisible by 3
-task2 :: Specification
+task2 :: (Term t, Functor t) => Specification t
 task2 =
   repeatSpec 2 (readInput "xs" ints) <> --otherwise the condition will throw an exception
   readUntil "xs" ((\xs -> length xs > 1 && last xs + last (init xs) == 0 ) <$> getAll @Int "xs") ints <>
@@ -89,14 +101,14 @@ solution2 = go [] Nothing Nothing where
         go (n:ns) (Just n) mX
 
 -- read till zero then sum
-task3 :: Specification
+task3 :: (Term t, Functor t) => Specification t
 task3 =
   tillExit $
     readInput "x" ints <>
     when ((0==) <$> getCurrent @Int "x")
       (writeOutput ["_#0_"] [sum <$> getAll @Int "x"] <> exit)
 
-task3' :: Specification
+task3' :: (Term t, Functor t) => Specification t
 task3' =
   readInput "xs" ints <> --otherwise last will fail
   readUntil "xs" ((\xs -> last xs == 0) <$> getAll @Int "xs") ints <>
@@ -111,7 +123,7 @@ solution3 = go [] where
       else go $ n:xs
 
 -- read and reverse
-task4 :: Specification
+task4 ::(Term t, Functor t) => Specification t
 task4 =
   readInput "line" (valueSet ("_" :: Pattern)) <>
   writeOutput ["_#0_"] [reverse <$> getCurrent @String "line"]
@@ -122,7 +134,7 @@ solution4 = (reverse <$> getLine) >>= putStrLn
 wrongSolution4 :: IOrep ()
 wrongSolution4 = getLine >>= putStrLn
 
-scoping :: Specification
+scoping :: (Term t, Functor t) => Specification t
 scoping =
   readInput "x" ints <>
   (
@@ -145,13 +157,13 @@ scopingWrong = do
   print y
   print x
 
-printNSpec :: QC.Positive Int -> Int -> Specification
+printNSpec :: QC.Positive Int -> Int -> Specification t
 printNSpec (QC.Positive n) x = repeatSpec n $ writeFixedOutput [buildTermPattern (show x)]
 
 printN :: Int -> Int -> IOrep ()
 printN n x = replicateM_ n $ print x
 
-parseSumSpec :: Specification
+parseSumSpec :: (Term t, Functor t) => Specification t
 parseSumSpec =
   tillExit (
     readInput "line" (valueSet ((show @Int <$> [1..10]) ++ (show <$> ['a'..'k']) ) ) <>

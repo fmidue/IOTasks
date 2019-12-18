@@ -7,6 +7,7 @@
 {-# LANGUAGE DataKinds #-}
 module Test.IOTest.Utils (
   StringEmbedding(..),
+  HasVariables(..),
   ) where
 
 -- alternative to Show/Read that does not escape strings
@@ -24,3 +25,8 @@ instance StringEmbedding String where
 
 instance StringEmbedding Bool
 instance StringEmbedding Int
+
+type Varname = String
+
+class HasVariables a where
+  vars :: a -> [Varname]
