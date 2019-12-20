@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 182d36732b294fc53aadb25e34865d45fe4a19a4ddb584b062f777130af7b4c8
+-- hash: ab747fd8bc40eb1a88170cbe983451a5cb3e6a2cfb660a20de329057e5fd93b6
 
 name:           IOTasks
 version:        0.1.0.0
@@ -41,6 +41,7 @@ library
       Test.IOTasks.TraceSet
       Test.IOTasks.Trace
   other-modules:
+      Test.IOTasks.Analysis
       Test.IOTasks.Interpreter
       Test.IOTasks.IOProperty
       Test.IOTasks.Pattern
