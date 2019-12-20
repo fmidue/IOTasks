@@ -62,7 +62,7 @@ complex = sized $ \n -> do
     [ loop   | n' > 2 ]
   return (Spec [a], n')
 
-input :: GenM (Action ITerm)
+input :: GenM (Action (Specification ITerm) ITerm)
 input = do
   (xs,vss) <- ask
   x <- elements xs
@@ -70,7 +70,7 @@ input = do
   modify (nub.(x:))
   return $ ReadInput x vs
 
-output :: GenM (Action ITerm)
+output :: GenM (Action (Specification ITerm) ITerm)
 output = do
   opt <- liftGen $ arbitrary @Bool
   n <- oneof [return 1, choose (2::Int,4)]
@@ -102,7 +102,7 @@ term = do
     y <- elements used
     return $ f (getCurrent x) (getCurrent y)
 
-branch :: GenM (Action ITerm)
+branch :: GenM (Action (Specification ITerm) ITerm)
 branch = sized $ \n -> do
   c <- condition
   ~[n1,n2] <- splitSizeIn 2 (n-1)
@@ -125,7 +125,7 @@ condition = oneof [unary, binary] where
     return $ t1 `op` t2
 
 -- this only generates loops with exactly one exit marker.
-loop :: GenM (Action ITerm)
+loop :: GenM (Action (Specification ITerm) ITerm)
 loop = sized $ \n -> do
   vss <- asks snd
   ~[preLen, loopLen] <- splitSizeIn 2 (n-3)
@@ -152,7 +152,7 @@ loopCondition = do
   n <- choose (0,10)
   return (T.length (getAll @Int x) T.> (lit n), x)
 
-insert :: Action ITerm -> Specification ITerm -> GenM (Specification ITerm)
+insert :: Action (Specification ITerm) ITerm -> Specification ITerm -> GenM (Specification ITerm)
 insert a (Spec as) = do
   ix <- choose (0,length as)
   return . Spec $ take ix as ++ [a] ++ drop ix as

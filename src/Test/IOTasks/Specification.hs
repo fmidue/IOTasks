@@ -28,30 +28,30 @@ import Data.MonoTraversable.Unprefixed (foldr)
 import Text.PrettyPrint.Annotated.HughesPJClass (Pretty)
 import qualified Text.PrettyPrint.Annotated.HughesPJClass as PP
 
-newtype Specification t = Spec [Action t]
-  deriving (Semigroup, Monoid, MonoFoldable) via [Action t]
+newtype Specification t = Spec [Action (Specification t) t]
+  deriving (Semigroup, Monoid, MonoFoldable) via [Action (Specification t) t]
 
 -- for MonoFoldable
-type instance Element (Specification t) = (Action t)
+type instance Element (Specification t) = Action (Specification t) t
 
-data Action t where
-  ReadInput :: Varname -> ValueSet -> Action t
-  WriteOutput :: StringEmbedding a => Bool -> [TermPattern] -> [t a] -> Action t
-  Branch :: t Bool -> Specification t -> Specification t -> Action t
-  TillE :: Specification t -> Action t
-  E :: Action t
+data Action r t where
+  ReadInput :: Varname -> ValueSet -> Action r t
+  WriteOutput :: StringEmbedding a => Bool -> [TermPattern] -> [t a] -> Action r t
+  Branch :: t Bool -> r -> r -> Action r t
+  TillE :: r -> Action r t
+  E :: Action r t
 
 instance SynTerm t => Show (Specification t) where
   show = PP.render . PP.pPrint
 
-instance SynTerm t => Show (Action t) where
+instance (Pretty r, SynTerm t) => Show (Action r t) where
   show = PP.render . PP.pPrint
 
 instance SynTerm t => Pretty (Specification t) where
   pPrint (Spec []) = PP.text "0" PP.$$ PP.text " "
   pPrint (Spec as) = PP.vcat (PP.pPrint <$> as) PP.$$ PP.text " "
 
-instance SynTerm t => Pretty (Action t) where
+instance (Pretty r, SynTerm t) => Pretty (Action r t) where
   pPrint (ReadInput x _) = PP.text "ReadInput" PP.<+> PP.text (show x) PP.<+> PP.text "_"
   pPrint (WriteOutput b ps ts) = PP.hsep [PP.text "WriteOutput", PP.text (show b), PP.text (show ps), PP.text (show (printTerm <$> ts))]
   pPrint (Branch c s1 s2) = PP.hang (PP.text "Branch" PP.<+> PP.parens (PP.text $ printTerm c)) 2 (PP.parens (PP.pPrint s1) PP.$+$ PP.parens (PP.pPrint s2))

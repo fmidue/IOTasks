@@ -73,7 +73,7 @@ accept s@(Spec as) t = accept' as kI t (freshEnvironment (specVars s)) where
   kI End  Stop _ = True
   kI End  _    _ = False
 
-accept' :: SemTerm t => [Action t] -> (Cont -> OrdinaryTrace -> Environment -> Bool) -> OrdinaryTrace -> Environment -> Bool
+accept' :: SemTerm t => [Action (Specification t) t] -> (Cont -> OrdinaryTrace -> Environment -> Bool) -> OrdinaryTrace -> Environment -> Bool
 accept' (ReadInput x ty : s') k (ProgRead v t') env =
   let val = valueFromString ty v
       env' = fromMaybe (error "accept: environment update failed") (storeValue x val env)

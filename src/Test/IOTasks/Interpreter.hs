@@ -45,7 +45,7 @@ buildComputation' = interpret (build InputRangeCheck)
 
 data Checks = NoCheck | InputRangeCheck deriving (Eq, Show)
 
-build :: (MonadTeletype m, SemTerm t) => Checks -> Action t -> Semantics m ()
+build :: (MonadTeletype m, SemTerm t) => Checks -> Action (Specification t) t -> Semantics m ()
 build c (ReadInput x vs) =
   withProxy vs $ \(_ :: Proxy ty) -> do
       v <- unpack @ty <$> getLine
@@ -77,7 +77,7 @@ buildWrongComputation s = do
 buildWrongComputation' :: (MonadTeletype m, SemTerm t, TermVars t) => Specification t -> Semantics m ()
 buildWrongComputation' = interpret' buildWrong
 
-buildWrong :: (MonadTeletype m, SemTerm t, TermVars t) => (Action t, Semantics m ()) -> Semantics m ()
+buildWrong :: (MonadTeletype m, SemTerm t, TermVars t) => (Action (Specification t) t, Semantics m ()) -> Semantics m ()
 buildWrong (r@ReadInput{}, _) = build NoCheck r
 buildWrong (w@WriteOutput{}, _) = build NoCheck w
 buildWrong (Branch c s1 s2, _) =

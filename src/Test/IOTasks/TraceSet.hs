@@ -28,7 +28,7 @@ traceGen (Spec s) = traceSet s kTI (freshEnvironment $ specVars (Spec s)) where
   kTI End  _ = return StopN
   kTI Exit _ = error "traceGen: 'throwError Exit' at toplevel"
 
-traceSet :: (MonadGen m, SemTerm t) => [Action t] -> (Cont -> Environment -> m GeneralizedTrace) -> Environment -> m GeneralizedTrace
+traceSet :: SemTerm t => MonadGen m => [Action (Specification t) t] -> (Cont -> Environment -> m GeneralizedTrace) -> Environment -> m GeneralizedTrace
 traceSet (ReadInput x ty : s') k e = do
   v <- valueOf ty
   let e' = fromMaybe (error "type mismatch on environment update") (storeValue x v e)

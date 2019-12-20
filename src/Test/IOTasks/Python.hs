@@ -19,7 +19,7 @@ pythonCode s = decls $$ body
 buildPythonProgram :: SynTerm t => Specification t -> Doc
 buildPythonProgram (Spec as) = Prelude.foldr (\a code -> pythonTranslation a $$ code) (text "pass") as
 
-pythonTranslation :: SynTerm t => Action t -> Doc
+pythonTranslation :: SynTerm t => Action (Specification t) t -> Doc
 pythonTranslation (ReadInput x _) = text $ x ++ "_A += [int(input())]"
 pythonTranslation (WriteOutput True _ _) = text "pass"
 pythonTranslation (WriteOutput False _ (t:_)) = text $ "print(" ++ printPythonCode t ++ ")"

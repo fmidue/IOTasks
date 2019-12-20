@@ -36,7 +36,7 @@ analyse (Spec as) = analyse' as
 
 data Level = Top | Loop
 
-analyse' :: SynTerm t => [Action t] -> [Fact]
+analyse' :: SynTerm t => [Action (Specification t) t] -> [Fact]
 analyse' [] = []
 analyse' (ReadInput _ _: s') = analyse' s'
 analyse' (WriteOutput _ _ ts: s') = joinFacts $ analyse' s' : (termFacts <$> ts)
@@ -52,7 +52,7 @@ analyse' (E : _) = []
 printProgram :: (TermVars t, SynTerm t) => Specification t -> Doc
 printProgram (Spec as) = hang (text "p = do") 2 (vcat $ map (translate (analyse' as)) as)
 
-translate :: (TermVars t, SynTerm t) => [Fact] -> Action t -> Doc
+translate :: (TermVars t, SynTerm t) => [Fact] -> Action (Specification t) t -> Doc
 translate fs (ReadInput x _) =
   case lookup x fs of
     Just C -> text $ x ++ " <- readLn"
