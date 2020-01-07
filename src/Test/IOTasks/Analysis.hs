@@ -31,48 +31,42 @@ termFacts = go . viewTerm where
       (x,"_A") -> [(x,A)]
       _        -> []
 
-analyse :: SynTerm t => Specification t -> [Fact]
-analyse (Spec as) = analyse' as
+analyse :: SynTerm t => Specification t -> [AnnAction [Fact] t]
+-- analyse (Spec as) = analyse' as
+analyse = annotateSpec f where
+  f ReadInput{} = []
+  f (WriteOutput _ _ ts) = joinFacts $ termFacts <$> ts
+  f (Branch c _ _) = termFacts c
+  f (TillE _) = []
+  f E = []
 
 data Level = Top | Loop
 
-analyse' :: SynTerm t => [Action (Specification t) t] -> [Fact]
-analyse' [] = []
-analyse' (ReadInput _ _: s') = analyse' s'
-analyse' (WriteOutput _ _ ts: s') = joinFacts $ analyse' s' : (termFacts <$> ts)
-analyse' (Branch c s1 s2 : s') =
-  joinFacts
-    [ termFacts c
-    , analyse s1
-    , analyse s2
-    , analyse' s']
-analyse' (TillE s : s') = joinFacts [analyse s, analyse' s']
-analyse' (E : _) = []
-
 printProgram :: (TermVars t, SynTerm t) => Specification t -> Doc
-printProgram (Spec as) = hang (text "p = do") 2 (vcat $ map (translate (analyse' as)) as)
+printProgram s = hang (text "p = do") 2 (vcat $ map (translate (getAnnotation $ head x)) x)
+  where x = analyse s
 
-translate :: (TermVars t, SynTerm t) => [Fact] -> Action (Specification t) t -> Doc
-translate fs (ReadInput x _) =
+translate :: (TermVars t, SynTerm t) => [Fact] -> AnnAction [Fact] t -> Doc
+translate fs (AnnAction _ (ReadInput x _)) =
   case lookup x fs of
     Just C -> text $ x ++ " <- readLn"
     Just A -> text "v <- readLn" $$ text ("modify (store v "++ x ++")")
     Nothing -> error "invalid spec"
-translate _ (WriteOutput True _ _) = mempty
-translate fs (WriteOutput False _ (t:_)) =
+translate _ (AnnAction _ (WriteOutput True _ _)) = mempty
+translate fs (AnnAction _ (WriteOutput False _ (t:_))) =
      text ("v <- gets (evalTerm (" ++ applicativeContext fs t ++ "))")
   $$ text "print v"
-translate _ (WriteOutput False _  []) = error "invalid spec"
-translate fs (Branch c (Spec as1) (Spec as2)) =
+translate _ (AnnAction _ (WriteOutput False _  [])) = error "invalid spec"
+translate fs (AnnAction _ (Branch c as1 as2)) =
   hang (text ("ifM (gets" ++ applicativeContext fs c ++ ")")) 2 $
        hang (text "then do") 2 (vcat (translate fs <$> as1))
     $$ hang (text "else do") 2 (vcat (translate fs <$> as2))
-translate fs (TillE (Spec as)) =
+translate fs (AnnAction _ (TillE as)) =
   hang (text "let loop = do") 2
     (vcat (translate fs <$> as)
     $$ text "loop")
   $$ text "catchError (\\_ -> return ()) loop"
-translate _ E = text "throwError Exit"
+translate _ (AnnAction _ E) = text "throwError Exit"
 
 flattenAST :: AST -> String
 flattenAST = go "" "" where
@@ -97,3 +91,39 @@ applicativeContext :: (SynTerm t, TermVars t) => [Fact] -> t a -> String
 applicativeContext fs t =
   let vs = map ("getAll " ++) $ filter (\v -> lookup v fs == Just A) (termVars t)
   in "(\\" ++ unwords vs ++ " -> " ++ flattenAST (adjustVars fs $ viewTerm t) ++ ") <$> " ++ head vs ++ concatMap ( ++ " <*> ") (tail vs)
+
+annotateSpec :: SynTerm t
+  => (Action (Specification t) t -> [Fact])
+  -> Specification t
+  -> [AnnAction [Fact] t]
+annotateSpec f (Spec as) = go as where
+  --go :: [Action (Specification t) t] -> [([Fact],Action ([Fact], (Specification t)) t)]
+  go [] = []
+  go (a@(ReadInput x ty): s') =
+    let r = go s'
+    in AnnAction (safeJoinWithHeads (f a) [r]) (ReadInput x ty) : r
+  go (a@(WriteOutput o ps ts): s') =
+    let r = go s'
+    in AnnAction (safeJoinWithHeads (f a) [r])  (WriteOutput o ps ts) : r
+  go (a@(Branch c s1 s2) : s') =
+    let r = go s'
+        q1 = annotateSpec f s1
+        q2 = annotateSpec f s2
+    in AnnAction
+        (safeJoinWithHeads (f a) [ q1, q2, r])
+        (Branch c q1 q2) : r
+  go (a@(TillE s) : s') =
+    let r = go s'
+        q = annotateSpec f s
+    in AnnAction (safeJoinWithHeads (f a) [q, r]) (TillE q) : r
+  go (E : s) = AnnAction (f E) E : go s
+
+safeJoinWithHeads :: [Fact] -> [[AnnAction [Fact] t]] -> [Fact]
+safeJoinWithHeads f = joinFacts .  (f :) . map safeHeadFact where
+  safeHeadFact [] = []
+  safeHeadFact (x:_) = getAnnotation x
+
+data AnnAction a t =  AnnAction
+  { getAnnotation :: a
+  , getAction :: Action [AnnAction a t] t
+  }
