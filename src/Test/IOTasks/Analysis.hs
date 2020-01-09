@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RankNTypes #-}
@@ -13,6 +14,7 @@ import Control.Monad.State
 import Data.Functor.Identity
 import Data.List (sort, groupBy, maximumBy, intercalate)
 import Data.Function (on)
+import Data.Maybe (fromMaybe)
 
 import Text.PrettyPrint.HughesPJ hiding (first, (<>))
 
@@ -65,41 +67,52 @@ rootUsageFacts :: [AnnAction t [Fact (Either Usage Modification)]] -> [Fact Usag
 rootUsageFacts = concatMap (\case (v,Left u) -> [(v,u)]; _ -> []) . safeHeadFact
 
 printProgram :: (TermVars t, SynTerm t) => Specification t -> Doc
-printProgram s = hang (text "p :: IO ()" $$ text "p = do") 2 (vcat . fst $ runFreshVarM (mapM (translate (rootUsageFacts x)) x) initState)
+printProgram s = hang (text "p :: IO ()" $$ text "p = do") 2 (vcat . fst $ runFreshVarM (mapM (translate (rootUsageFacts x)) x) (initState (specVars s)))
   where x = analyse s
 
 -- stores next fresh index and a stack of most recent indecies for the current/surounding scopes
 -- invariant: stack is never empty
-newtype FreshVarM a = FreshVarM { runFreshVarM :: (Int,[Int]) -> (a,(Int,[Int])) }
-  deriving (Functor, Applicative, Monad, MonadState (Int,[Int])) via (StateT (Int,[Int]) Identity)
+newtype FreshVarM a = FreshVarM { runFreshVarM :: [(Varname, IndexContext)] -> (a,[(Varname, IndexContext)]) }
+  deriving (Functor, Applicative, Monad, MonadState [(Varname, IndexContext)]) via (StateT [(Varname, IndexContext)] Identity)
 
-initState :: (Int,[Int])
-initState = (1,[-1])
+type IndexContext = (Int, [Int])
+
+initState :: [Varname] -> [(Varname,IndexContext)]
+initState = map (,defaultContext)
+
+defaultContext :: IndexContext
+defaultContext = (1,[-1])
 
 mapHead :: (a -> a) -> [a] -> [a]
 mapHead _ [] = []
 mapHead f (x:xs) = f x : xs
 
+update :: Eq k => k -> (v -> v) -> [(k,v)] -> [(k,v)]
+update _ _ [] = []
+update k f ((k',v) : xs)
+  | k == k' = (k',f v) : update k f xs
+  | otherwise = (k',v) : update k f xs
+
 -- generating a fresh name under the assumption that user defined variables dont end in numberic sequences
 freshName :: Varname -> FreshVarM Varname
 freshName v = do
-  i <- gets fst
-  modify $ \(next,_:xs) -> (next+1, next:xs)
+  i <- gets $ fst . fromMaybe defaultContext . lookup v
+  modify $ update v (\(next,_:xs) -> (next+1, next:xs))
   return $ v ++ show i
 
 currentName :: Varname -> FreshVarM Varname
 currentName v = do
-  i <- gets (head . snd)
+  i <- gets $ head . snd . fromMaybe defaultContext . lookup v
   case i of
     -1 -> return "[]" -- TODO: get rid of this encoding with better types!
     0   -> return v
     _   -> return $ v ++ show i
 
 enterScope :: FreshVarM ()
-enterScope = modify $ second (0:)
+enterScope = modify $ map (second $ second (0:))
 
 leaveScope :: FreshVarM ()
-leaveScope = modify (second tail)
+leaveScope = modify $ map (second $ second tail)
 
 translate :: (TermVars t, SynTerm t) => [Fact Usage] -> AnnAction t [Fact (Either Usage Modification)] -> FreshVarM Doc
 translate fs (AnnAction _ (ReadInput x _)) =
