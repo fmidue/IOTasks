@@ -3,10 +3,13 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE DataKinds #-}
 module Test.IOTasks.Analysis where
 
 import Test.IOTasks.Specification
 import Test.IOTasks.Term
+import Test.IOTasks.Utils
+import Test.IOTasks.IR
 
 import Control.Arrow ((***), first, second)
 import Control.Monad.State
@@ -16,7 +19,7 @@ import Data.List (sort, groupBy, maximumBy, intercalate)
 import Data.Function (on)
 import Data.Maybe (fromMaybe)
 
-import Text.PrettyPrint.HughesPJ hiding (first, (<>))
+import Text.PrettyPrint.HughesPJClass hiding (first, (<>))
 
 type Fact a = (Varname, a)
 
@@ -67,7 +70,7 @@ rootUsageFacts :: [AnnAction t [Fact (Either Usage Modification)]] -> [Fact Usag
 rootUsageFacts = concatMap (\case (v,Left u) -> [(v,u)]; _ -> []) . safeHeadFact
 
 printProgram :: (TermVars t, SynTerm t) => Specification t -> Doc
-printProgram s = hang (text "p :: IO ()" $$ text "p = do") 2 (vcat . fst $ runFreshVarM (mapM (translate (rootUsageFacts x)) x) (initState (specVars s)))
+printProgram s = hang (text "p :: IO ()" $$ text "p = do") 2 (vcat . (map pPrint) . fst $ runFreshVarM (mapM (translate (rootUsageFacts x)) x) (initState (specVars s)))
   where x = analyse s
 
 -- stores next fresh index and a stack of most recent indecies for the current/surounding scopes
@@ -114,22 +117,19 @@ enterScope = modify $ map (second $ second (0:))
 leaveScope :: FreshVarM ()
 leaveScope = modify $ map (second $ second tail)
 
-translate :: (TermVars t, SynTerm t) => [Fact Usage] -> AnnAction t [Fact (Either Usage Modification)] -> FreshVarM Doc
+translate :: (TermVars t, SynTerm t) => [Fact Usage] -> AnnAction t [Fact (Either Usage Modification)] -> FreshVarM (IR l)
 translate fs (AnnAction _ (ReadInput x _)) =
   case lookup x fs of
-    Just C -> return $ text $ x ++ " <- readLn"
+    Just C -> return $ READ x
     Just A -> do
       xk <- currentName x
       xi <- freshName x
-      return $
-        text "v <- readLn"
-        $$ text ("let " ++ xi ++ " = " ++ xk ++ " ++ " ++ "[v]")
+      return $ READ "v" `SEQ` UPDATE xi xk
     Nothing -> error "invalid spec"
-translate _ (AnnAction _ (WriteOutput True _ _)) = return empty
+translate _ (AnnAction _ (WriteOutput True _ _)) = return NOP
 translate fs (AnnAction _ (WriteOutput False _ (t:_))) = do
   ast <- adjustVars fs $ viewTerm t
-  return $
-    text ("print (" ++ flattenAST ast ++ ")")
+  return $ PRINT ast
 translate _ (AnnAction _ (WriteOutput False _  [])) = error "invalid spec"
 translate fs (AnnAction _ (Branch c as1 as2)) = do
   enterScope
@@ -139,31 +139,26 @@ translate fs (AnnAction _ (Branch c as1 as2)) = do
   y <- mapM (translate fs) as1
   leaveScope
   ast <- adjustVars fs $ viewTerm c
-  return $
-    hang (text ("if " ++ flattenAST ast)) 2 $
-      hang (text "then do") 2 (vcat x)
-    $$ hang (text "else do") 2 (vcat y)
+  return $ IF ast (foldr SEQ NOP x) (foldr SEQ NOP y)
 translate fs (AnnAction _ (TillE as)) = do
   let writeVars = concatMap (\case (x,Right W) -> [x]; _ -> []) (safeHeadFact as)
   enterScope
   body <- translateLoop fs writeVars as
   leaveScope
   params <- mapM currentName writeVars
-  matchTuple <- mkReturnTuple <$> mapM freshName writeVars
-  return $ hang (text $ "let loop " ++ unwords writeVars  ++ " = do") 6
-    body
-    $$ (matchTuple <+> text ("<- loop " ++ unwords params))
+  returnVars <- mapM freshName writeVars
+  return $ DEFLOOP writeVars params returnVars body
   -- $$ text "catchError (\\_ -> return ()) loop"
-translate _ (AnnAction _ E) = return $ text "throwError Exit"
-translate _  EmptyAction = return empty
+translate _ (AnnAction _ E) = error "E at toplevel"
+translate _  EmptyAction = return NOP
 
-translateLoop :: (TermVars t, SynTerm t)  => [Fact Usage] ->  [Varname] -> [AnnAction t [Fact (Either Usage Modification)]] -> FreshVarM Doc
-translateLoop fs wVars = (vcat <$>) . mapM go where
+translateLoop :: (TermVars t, SynTerm t)  => [Fact Usage] ->  [Varname] -> [AnnAction t [Fact (Either Usage Modification)]] -> FreshVarM (IR 'Body)
+translateLoop fs wVars = (foldr SEQ NOP <$>) . mapM go where
   go EmptyAction = do
     params <- mapM currentName wVars
-    return . text $ "loop " ++ unwords params
+    return $ CALLLOOP params
   go (AnnAction _ E) =
-    return $ text "return" <+> mkReturnTuple wVars
+    return $ RETURN wVars
   go (AnnAction _ (Branch c as1 as2)) = do
     enterScope
     x <- translateLoop fs wVars as2
@@ -172,20 +167,11 @@ translateLoop fs wVars = (vcat <$>) . mapM go where
     y <- translateLoop fs wVars as1
     leaveScope
     ast <- adjustVars fs $ viewTerm c
-    return $ hang (text ("if " ++ flattenAST ast)) 2 $
-         hang (text "then do") 2 x
-      $$ hang (text "else do") 2 y
+    return $ IF ast x y
   go a = translate fs a
 
 mkReturnTuple :: [Varname] -> Doc
 mkReturnTuple vs = maybeParens (length vs /= 1) (text (intercalate "," vs))
-
-
-flattenAST :: AST -> String
-flattenAST = go "" "" where
-  go l r (Node s ts) = l ++ s ++ " " ++ unwords (map (go "(" ")") ts) ++ r
-  go l r (Infix x op y) = l ++ go "(" ")" x ++ " " ++ op ++  " " ++  go "(" ")" y ++ r
-  go _ _ (Leaf s) = s
 
 adjustVars :: [Fact Usage] -> AST -> FreshVarM AST
 adjustVars fs (Node f xs) = do
