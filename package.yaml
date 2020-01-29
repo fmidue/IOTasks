@@ -35,6 +35,7 @@ dependencies:
 - pretty
 - extra
 - mono-traversable
+- lattices
 
 library:
   source-dirs: src

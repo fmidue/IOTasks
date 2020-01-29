@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d99a764113f9a1d7b01b23c62e1f76a82843cb80e95904e50800ff64b9e4b6d4
+-- hash: ac567ee9ccbab032d195659d67d687347cee9070e196bb850798f1be7ad5e4b4
 
 name:           IOTasks
 version:        0.1.0.0
@@ -61,6 +61,7 @@ library
     , base >=4.7 && <5
     , containers
     , extra
+    , lattices
     , mono-traversable
     , mtl
     , parsec
@@ -94,6 +95,7 @@ test-suite IOTasks-test
     , deepseq
     , extra
     , hspec
+    , lattices
     , mono-traversable
     , mtl
     , parsec
