@@ -3,7 +3,10 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DataKinds #-}
-module Test.IOTasks.Analysis where
+{-# LANGUAGE ViewPatterns #-}
+module Test.IOTasks.Analysis (
+  printProgram,
+  ) where
 
 import Test.IOTasks.Specification
 import Test.IOTasks.Term
@@ -14,7 +17,6 @@ import Control.Arrow ((***), second)
 import Control.Monad.State
 
 import Data.Functor.Identity
-import Data.List (intercalate)
 import Data.Maybe (fromMaybe)
 
 import Text.PrettyPrint.HughesPJClass hiding (first, (<>))
@@ -99,10 +101,6 @@ initState = map (,defaultContext)
 defaultContext :: IndexContext
 defaultContext = (1,[-1])
 
-mapHead :: (a -> a) -> [a] -> [a]
-mapHead _ [] = []
-mapHead f (x:xs) = f x : xs
-
 update :: Eq k => k -> (v -> v) -> [(k,v)] -> [(k,v)]
 update _ _ [] = []
 update k f ((k',v) : xs)
@@ -130,14 +128,14 @@ enterScope = modify $ map (second $ second (0:))
 leaveScope :: FreshVarM ()
 leaveScope = modify $ map (second $ second tail)
 
-translate :: (TermVars t, SynTerm t) => Facts Usage -> AnnAction t (Facts (Usage, Modification)) -> FreshVarM (IR l)
+translate :: (TermVars t, SynTerm t) => Facts Usage -> AnnAction t (Facts (Usage, Modification)) -> FreshVarM (IR 'Top)
 translate fs (AnnAction _ (ReadInput x _)) =
   case Map.lookup x fs of
     Just C -> return $ READ x
     Just A -> do
       xk <- currentName x
       xi <- freshName x
-      return $ READ "v" `SEQ` UPDATE xi xk
+      return $ READ "v" `SEQ` UPDATE xi xk "v"
     Nothing -> error "invalid spec"
 translate _ (AnnAction _ (WriteOutput True _ _)) = return NOP
 translate fs (AnnAction _ (WriteOutput False _ (t:_))) = do
@@ -161,9 +159,8 @@ translate fs (AnnAction _ (TillE as)) = do
   params <- mapM currentName writeVars
   returnVars <- mapM freshName writeVars
   return $ DEFLOOP writeVars params returnVars body
-  -- $$ text "catchError (\\_ -> return ()) loop"
 translate _ (AnnAction _ E) = error "E at toplevel"
-translate _  EmptyAction = return NOP
+translate _ EmptyAction = return NOP
 
 translateLoop :: (TermVars t, SynTerm t)  => Facts Usage ->  [Varname] -> [AnnAction t (Facts (Usage, Modification))] -> FreshVarM (IR 'Body)
 translateLoop fs wVars = (foldr SEQ NOP <$>) . mapM go where
@@ -181,10 +178,7 @@ translateLoop fs wVars = (foldr SEQ NOP <$>) . mapM go where
     leaveScope
     ast <- adjustVars fs $ viewTerm c
     return $ IF ast x y
-  go a = translate fs a
-
-mkReturnTuple :: [Varname] -> Doc
-mkReturnTuple vs = maybeParens (length vs /= 1) (text (intercalate "," vs))
+  go a = topToBody <$> translate fs a
 
 adjustVars :: Facts Usage -> AST -> FreshVarM AST
 adjustVars fs (Node f xs) = do
@@ -206,23 +200,16 @@ adjustVars fs (Leaf s) = do
       "_A" -> Leaf xi
       _ -> Leaf s
 
--- obsolete
--- applicativeContext :: (SynTerm t, TermVars t) => [Fact Usage] -> t a -> String
--- applicativeContext fs t =
---   let vs = map ("getAll " ++) $ filter (\v -> lookup v fs == Just A) (termVars t)
---   in "(\\" ++ unwords vs ++ " -> " ++ flattenAST (adjustVars fs $ viewTerm t) ++ ") <$> " ++ head vs ++ concatMap ( ++ " <*> ") (tail vs)
-
 normalizeSpec :: Specification t -> Specification t
 normalizeSpec (Spec as) = Spec $ go as where
   go (Branch c s1 s2 : as') = [Branch c (s1 <> Spec as') (s2 <> Spec as')]
   go x = x
 
-
 annotateSpec :: (Ord i, SynTerm t)
   => Transfer t i
   -> Specification t
   -> [AnnAction t (Facts i)]
-annotateSpec t@Transfer{..} (Spec as) = go as where
+annotateSpec t@Transfer{..} (normalizeSpec -> Spec as) = go as where
   --go :: [Action (Specification t) t] -> [([Fact],Action ([Fact], (Specification t)) t)]
   go [] = [EmptyAction]
   go (ReadInput x ty : s') =
@@ -248,9 +235,6 @@ safeHeadFact :: [AnnAction t (Facts i)] -> Facts i
 safeHeadFact [] = Map.empty
 safeHeadFact (EmptyAction:_) = Map.empty
 safeHeadFact (x:_) = getAnnotation x
-
-safeJoinWithHeads :: Lattice i => Facts i -> [[AnnAction t (Facts i)]] -> Facts i
-safeJoinWithHeads f = joinFacts .  (f :) . map safeHeadFact
 
 data Transfer t i = Transfer
   { tRead :: Varname -> Facts i -> Facts i
@@ -282,6 +266,6 @@ partitionFacts = Map.foldrWithKey f (Map.empty,Map.empty) where
 
 data AnnAction t a =  AnnAction
   { getAnnotation :: a
-  , getAction :: Action [AnnAction t a] t
+  , _getAction :: Action [AnnAction t a] t
   }
   | EmptyAction

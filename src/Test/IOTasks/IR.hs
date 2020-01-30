@@ -12,18 +12,27 @@ data Level = Top | Body
 
 data IR l where
   READ :: Varname -> IR l
-  UPDATE :: Varname -> Varname -> IR l
+  UPDATE :: Varname -> Varname -> Varname -> IR l -- UPDATE x y v appends the value from v to y and assigns the result to x, ie. x := y ++ v
   PRINT :: AST -> IR l
   IF :: AST -> IR l -> IR l -> IR l
-  DEFLOOP :: [Varname] -> [Varname] -> [Varname] -> IR 'Body -> IR l
-  CALLLOOP :: [Varname] -> IR 'Body
-  RETURN :: [Varname] -> IR 'Body
+  DEFLOOP :: [Varname] -> [Varname] -> [Varname] -> IR 'Body -> IR l -- define and call a loop
+  CALLLOOP :: [Varname] -> IR 'Body -- recursive call of the current loop
+  RETURN :: [Varname] -> IR 'Body -- finish current loop
   SEQ :: IR l -> IR l -> IR l
   NOP :: IR l
 
+topToBody :: IR 'Top -> IR 'Body
+topToBody (READ x) = READ x
+topToBody (UPDATE x1 x2 x3) = UPDATE x1 x2 x3
+topToBody (PRINT x) = PRINT x
+topToBody (IF x1 x2 x3) = IF x1 (topToBody x2) (topToBody x3)
+topToBody (DEFLOOP x1 x2 x3 x4) = DEFLOOP x1 x2 x3 x4
+topToBody (SEQ x1 x2) = SEQ (topToBody x1) (topToBody x2)
+topToBody NOP = NOP
+
 instance Pretty (IR l) where
   pPrint (READ x) = text $ x ++ " <- readLn"
-  pPrint (UPDATE xi xk) = text $ "let " ++ xi ++ " = " ++ xk ++ " ++ " ++ "[v]"
+  pPrint (UPDATE xi xk v) = text $ "let " ++ xi ++ " = " ++ xk ++ " ++ " ++ "[" ++ v ++ "]"
   pPrint (PRINT ast) = text $ "print (" ++ flattenAST ast ++ ")"
   pPrint (IF ast t e) =
     hang (text $ "if " ++ flattenAST ast) 2 $
