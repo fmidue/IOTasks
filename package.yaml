@@ -36,6 +36,7 @@ dependencies:
 - extra
 - mono-traversable
 - lattices
+- pretty-tree
 
 library:
   source-dirs: src

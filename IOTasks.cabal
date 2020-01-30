@@ -4,13 +4,14 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ac567ee9ccbab032d195659d67d687347cee9070e196bb850798f1be7ad5e4b4
+-- hash: 03b1accdf8fba0af4b51dccfb778573692ea7c95bd94214da0a4203edfe5b095
 
 name:           IOTasks
 version:        0.1.0.0
 description:    Please see the README on GitHub at <https://github.com/fmidue/IOTasks#readme>
 category:       Testing
 homepage:       https://github.com/fmidue/IOTasks#readme
+bug-reports:    https://github.com/fmidue/IOTasks/issues
 author:         Oliver Westphal
 maintainer:     oliver.westphal@uni-due.de
 copyright:      2018 Oliver Westphal
@@ -66,6 +67,7 @@ library
     , mtl
     , parsec
     , pretty
+    , pretty-tree
     , quickcheck-transformer
     , random
     , recursion-schemes
@@ -100,6 +102,7 @@ test-suite IOTasks-test
     , mtl
     , parsec
     , pretty
+    , pretty-tree
     , quickcheck-transformer
     , random
     , recursion-schemes

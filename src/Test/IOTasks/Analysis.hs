@@ -6,6 +6,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module Test.IOTasks.Analysis (
   printProgram,
+  programIR,
   ) where
 
 import Test.IOTasks.Specification
@@ -85,7 +86,10 @@ rootUsageFacts :: [AnnAction t (Facts (Usage, Modification))] -> Facts Usage
 rootUsageFacts = Map.map fst . safeHeadFact
 
 printProgram :: (TermVars t, SynTerm t) => Specification t -> Doc
-printProgram s = hang (text "p :: IO ()" $$ text "p = do") 2 (vcat . map pPrint . fst $ runFreshVarM (mapM (translate (rootUsageFacts x)) x) (initState (specVars s)))
+printProgram = hang (text "p :: IO ()" $$ text "p = do") 2 . pPrint . programIR
+
+programIR :: (TermVars t, SynTerm t) => Specification t -> IR 'Top
+programIR s = foldr1 SEQ . fst $ runFreshVarM (mapM (translate (rootUsageFacts x)) x) (initState (specVars s))
   where x = analyse s
 
 -- stores next fresh index and a stack of most recent indecies for the current/surounding scopes
@@ -135,7 +139,7 @@ translate fs (AnnAction _ (ReadInput x _)) =
     Just A -> do
       xk <- currentName x
       xi <- freshName x
-      return $ READ "v" `SEQ` UPDATE xi xk "v"
+      return $ READ "v" `SEQ` UPDATE xi (\xk v -> Infix (Leaf xk) "++" (Leaf $ "["++v++"]")) xk "v"
     Nothing -> error "invalid spec"
 translate _ (AnnAction _ (WriteOutput True _ _)) = return NOP
 translate fs (AnnAction _ (WriteOutput False _ (t:_))) = do
@@ -150,7 +154,7 @@ translate fs (AnnAction _ (Branch c as1 as2)) = do
   y <- mapM (translate fs) as1
   leaveScope
   ast <- adjustVars fs $ viewTerm c
-  return $ IF ast (foldr SEQ NOP x) (foldr SEQ NOP y)
+  return $ IF ast (foldr1 SEQ x) (foldr1 SEQ y)
 translate fs (AnnAction _ (TillE as)) = do
   let writeVars = Map.keys . Map.filter ((== W).snd) $ safeHeadFact as
   enterScope
