@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE GADTs #-}
@@ -15,6 +17,8 @@ import Data.Tree (Tree)
 import qualified Data.Tree as Tree
 import Data.Tree.Pretty
 import Data.Function (on)
+
+import Data.Functor.Foldable
 
 data Level = Top | Body
 
@@ -34,10 +38,58 @@ data IR l where
   SEQ :: IR l -> IR l -> IR l
   NOP :: IR l
 
+data IRF l x where
+  READF :: Varname -> IRF l x
+  UPDATEF :: Varname -> (Varname -> Varname -> AST) -> Varname -> Varname -> IRF l x -- UPDATE x f y v assigns the result f applied to y and v to x, ie. x := f y v
+  PRINTF :: AST -> IRF l x
+  IFF :: AST -> x -> x -> IRF l x
+  DEFLOOPF :: [Varname] -> [Arg] -> [Varname] -> IR 'Body -> IRF l x -- define and call a loop
+  CALLLOOPF :: [Varname] -> IRF 'Body x -- recursive call of the current loop
+  RETURNF :: [Varname] -> IRF 'Body x -- finish current loop
+  SEQF :: x -> x -> IRF l x
+  NOPF :: IRF l x
+
+instance Functor (IRF l) where
+  fmap _ (READF x) = READF x
+  fmap _ (UPDATEF x1 x2 x3 x4) = UPDATEF x1 x2 x3 x4
+  fmap _ (PRINTF x) = PRINTF x
+  fmap f (IFF x1 x2 x3) = IFF x1 (f x2) (f x3)
+  fmap f (DEFLOOPF x1 x2 x3 x4) = DEFLOOPF x1 x2 x3 x4
+  fmap _ (CALLLOOPF x) = CALLLOOPF x
+  fmap _ (RETURNF x) = RETURNF x
+  fmap f (SEQF x1 x2) = SEQF (f x1) (f x2)
+  fmap _ NOPF = NOPF
+
+type instance Base (IR l) = IRF l
+
+instance Recursive (IR l) where
+  project (READ x) = READF x
+  project (UPDATE x1 x2 x3 x4) = UPDATEF x1 x2 x3 x4
+  project (PRINT x) = PRINTF x
+  project (IF x1 x2 x3) = IFF x1 x2 x3
+  project (DEFLOOP x1 x2 x3 x4) = DEFLOOPF x1 x2 x3 x4
+  project (CALLLOOP x) = CALLLOOPF x
+  project (RETURN x) = RETURNF x
+  project (SEQ x1 x2) = SEQF x1 x2
+  project NOP = NOPF
+
+instance Corecursive (IR l) where
+  embed (READF x) = READ x
+  embed (UPDATEF x1 x2 x3 x4) = UPDATE x1 x2 x3 x4
+  embed (PRINTF x) = PRINT x
+  embed (IFF x1 x2 x3) = IF x1 x2 x3
+  embed (DEFLOOPF x1 x2 x3 x4) = DEFLOOP x1 x2 x3 x4
+  embed (CALLLOOPF x) = CALLLOOP x
+  embed (RETURNF x) = RETURN x
+  embed (SEQF x1 x2) = SEQ x1 x2
+  embed NOPF = NOP
+
 deriving instance Show (IR l)
 
 instance Eq (IR l) where
   (==) = (==) `on` show
+
+type Algebra l = IRF l (IR l) -> IR l
 
 topToBody :: IR 'Top -> IR 'Body
 topToBody (READ x) = READ x
@@ -88,42 +140,33 @@ tupelize [v] = v
 tupelize vs = "(" ++ intercalate "," vs ++ ")"
 
 ---
+optExample = optimize [opt3,opt2,opt1]
 
-optimize :: [IR l -> IR l] -> IR l -> IR l
+optimize :: [Algebra l] -> IR l -> IR l
 optimize fs ir =
-  let ir' = foldr ($) ir fs
+  let ir' = foldr cata ir fs
   in if ir == ir' then ir else optimize fs ir'
 
-opt1 :: IR l -> IR l
-opt1 (SEQ (DEFLOOP wVs _ rVs p) (SEQ (PRINT (algebra -> (f,c))) p')) = SEQ (DEFLOOP wVs [c] rVs (changeToFold f p)) (SEQ (PRINT (Leaf $ tupelize rVs)) p')
-opt1 (SEQ x y) = opt1 x `SEQ` opt1 y
-opt1 (IF c t e) = IF c (opt1 t) (opt1 e)
-opt1 x = x
+opt1 :: Algebra l
+opt1 (SEQF (DEFLOOP wVs _ rVs p) (SEQ (PRINT (algebra -> (f,c))) p')) = SEQ (DEFLOOP wVs [c] rVs (cata (changeToFold f) p)) (SEQ (PRINT (Leaf $ tupelize rVs)) p')
+opt1 x = embed x
 
-opt2 :: IR l -> IR l
-opt2 (SEQ (DEFLOOP wVs ps [rV] p) (SEQ (PRINT (Leaf rV')) p')) | rV == rV' =  SEQ (DEFLOOP wVs ps [] (changeToPrintAcc p)) p'
-opt2 (SEQ x y) = opt2 x `SEQ` opt2 y
-opt2 (IF c t e) = IF c (opt2 t) (opt2 e)
-opt2 x = x
+opt2 :: Algebra l
+opt2 (SEQF (DEFLOOP wVs ps [rV] p) (SEQ (PRINT (Leaf rV')) p')) | rV == rV' =  SEQ (DEFLOOP wVs ps [] (cata changeToPrintAcc p)) p'
+opt2 x = embed x
 
-opt3 :: IR l -> IR l
-opt3 (SEQ (SEQ xx (UPDATE xk f xi v)) (SEQ (CALLLOOP [xk']) yy)) | xk == xk' = SEQ xx (SEQ (CALLLOOP [printAST $ f xi v]) yy)
-opt3 (SEQ x y) = opt3 x `SEQ` opt3 y
-opt3 (IF c t e) = IF c (opt3 t) (opt3 e)
-opt3 (DEFLOOP wVs ps rVs p) = DEFLOOP wVs ps rVs (opt3 p)
-opt3 x = x
+opt3 :: Algebra l
+opt3 (SEQF (SEQ xx (UPDATE xk f xi v)) (SEQ (CALLLOOP [xk']) yy)) | xk == xk' = SEQ xx (SEQ (CALLLOOP [printAST $ f xi v]) yy)
+opt3 (DEFLOOPF wVs ps rVs p) = DEFLOOP wVs ps rVs (cata opt3 p)
+opt3 x = embed x
 
-changeToFold :: (String -> String -> AST) -> IR 'Body -> IR 'Body
-changeToFold f (SEQ x y) = changeToFold f x `SEQ` changeToFold f y
-changeToFold f (UPDATE xk _ xi v) = UPDATE xk f xi v
-changeToFold f (IF c t e) = IF c (changeToFold f t) (changeToFold f e)
-changeToFold _ x = x
+changeToFold :: (String -> String -> AST) -> Algebra 'Body
+changeToFold f (UPDATEF xk _ xi v) = UPDATE xk f xi v
+changeToFold _ x = embed x
 
-changeToPrintAcc :: IR 'Body -> IR 'Body
-changeToPrintAcc (SEQ x y) = changeToPrintAcc x `SEQ` changeToPrintAcc y
-changeToPrintAcc (IF c t e) = IF c (changeToPrintAcc t) (changeToPrintAcc e)
-changeToPrintAcc (RETURN [rV]) = PRINT $ Leaf rV
-changeToPrintAcc x = x
+changeToPrintAcc :: Algebra 'Body
+changeToPrintAcc (RETURNF [rV]) = PRINT $ Leaf rV
+changeToPrintAcc x = embed x
 
 -- mock implementation
 algebra :: AST -> (String -> String -> AST, String)
