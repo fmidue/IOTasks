@@ -77,7 +77,7 @@ accept s@(Spec as) t = accept' as kI t (freshEnvironment s) where
 accept' :: [Action] -> (Cont -> OrdinaryTrace -> Environment -> Bool) -> OrdinaryTrace -> Environment -> Bool
 accept' (ReadInput x ty : s') k (ProgRead v t') env =
   let val = valueFromString ty v
-      env' = fromMaybe (error "accept: environment update failed") (storeValue val x env)
+      env' = fromMaybe (error "accept: environment update failed") (storeValue x val env)
   in containsValue ty val && accept' s' k t' env'
 accept' (ReadInput x ty : s') k t env = False
 accept' (WriteOutput True ps ts : s') k t env =

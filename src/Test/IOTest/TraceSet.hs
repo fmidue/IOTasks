@@ -31,7 +31,7 @@ traceGen (Spec s) = traceSet s kTI (freshEnvironment (Spec s)) where
 traceSet :: MonadGen m => [Action] -> (Cont -> Environment -> m GeneralizedTrace) -> Environment -> m GeneralizedTrace
 traceSet (ReadInput x ty : s') k e = do
   v <- valueOf ty
-  let e' = fromMaybe (error "type mismatch on environment update") (storeValue v x e)
+  let e' = fromMaybe (error "type mismatch on environment update") (storeValue x v e)
   fmap (ProgReadN (show v) StopN <>) (traceSet s' k e')
 traceSet (WriteOutput opt ps ts : s') k e =
   let v1 = S.fromList ((\p -> fillHoles (p,ts) e) <$> ps)

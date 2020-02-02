@@ -51,7 +51,7 @@ build c (ReadInput x vs) =
       v <- unpack @ty <$> getLine
       when (c == InputRangeCheck && not (containsValue vs (Value typeRep v)))
         (error "encountered out of range input")
-      modify (fromJust . store v x)
+      modify (fromJust . store x v)
 build _ (WriteOutput _ [] _) = error "empty list of output options"
 build _ (WriteOutput True _ _) =
   mempty

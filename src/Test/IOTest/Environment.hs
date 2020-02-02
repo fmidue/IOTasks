@@ -68,11 +68,11 @@ addName x (MkEnvironment xs) =
     Just _ -> Nothing
     Nothing -> Just $ MkEnvironment (Map.insert x EmptyEntry xs)
 
-store :: (Typeable a, StringEmbedding a) => a -> Varname -> Environment -> Maybe Environment
-store = storeValue . Value typeRep
+store :: (Typeable a, StringEmbedding a) => Varname -> a -> Environment -> Maybe Environment
+store x = storeValue x . Value typeRep
 
-storeValue :: Value -> Varname -> Environment -> Maybe Environment
-storeValue (Value vRep v) x (MkEnvironment es) =
+storeValue :: Varname -> Value -> Environment -> Maybe Environment
+storeValue x (Value vRep v) (MkEnvironment es) =
   case Map.lookup x es of
     Nothing -> Nothing
     Just EmptyEntry -> updateEntry
