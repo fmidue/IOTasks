@@ -13,6 +13,7 @@ module Test.IOTest.Term (
   isClosed,
   viewTerm,
   termVars,
+  printTerm,
   --
   getCurrent,
   getAll,
@@ -89,6 +90,9 @@ printAST = printAST' "" ""
     printAST' o c (Infix x op y) = o ++ printAST x ++ " " ++ op ++ " " ++ printAST y ++ c
     printAST' _ _ (Leaf x) = x
     printAST' o c (Lam vs b) = o ++ "\\" ++ unwords vs ++ " -> " ++ printAST b ++ c
+
+printTerm :: Term a -> String
+printTerm = printAST . viewTerm
 
 -- construction of terms
 getAll :: Typeable a => Varname -> Term [a]

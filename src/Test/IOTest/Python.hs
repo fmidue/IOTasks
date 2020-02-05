@@ -2,7 +2,7 @@
 module Test.IOTest.Python where
 
 import Test.IOTest.Specification
-import Test.IOTest.Term
+import Test.IOTest.Term (Term,AST(..),viewTerm)
 import Test.IOTest.Environment (HasVariables(..))
 
 import Text.PrettyPrint
