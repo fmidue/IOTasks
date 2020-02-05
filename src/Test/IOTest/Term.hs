@@ -108,7 +108,11 @@ getCurrent x = Term (Leaf $ x ++ "_C") [x] evalGetCurrent where
   evalGetCurrent d = Prelude.last $ evalTerm (getAll x) d
 
 lit :: Show a => a -> Term a
-lit x = Term (Leaf $ show x) [] (const x)
+lit x = embed x (Leaf $ show x)
+
+-- might need some sanity checks if publicly exposed
+embed :: a -> AST -> Term a
+embed x ast = Term ast [] (const x)
 
 liftT :: (a -> b, String) -> Term a -> Term b
 liftT (f,name) (Term ast vs eval) = Term (Node name [ast]) vs (f . eval)
