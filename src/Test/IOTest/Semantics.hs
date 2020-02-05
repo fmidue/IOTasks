@@ -39,9 +39,9 @@ instance Monad m => Monoid (Semantics m ()) where
   mempty = return ()
 
 interpret ::
-     (Monad m, EvalTerm t)
-  => (Action t -> Semantics m ()) -- behavior for read and write actions
-  -> Specification t -- specification
+     Monad m
+  => (Action -> Semantics m ()) -- behavior for read and write actions
+  -> Specification -- specification
   -> Semantics m ()
 interpret sem =
   foldMap (\act -> case act of
@@ -51,17 +51,17 @@ interpret sem =
           )
 
 interpret' ::
-     (Monad m, EvalTerm t)
-  => ((Action t, Semantics m ()) -> Semantics m ()) -- extra behavior for single action that can use or completly discard the structural interpretation
-  -> Specification t -- specification
+     Monad m
+  => ((Action, Semantics m ()) -> Semantics m ()) -- extra behavior for single action that can use or completly discard the structural interpretation
+  -> Specification -- specification
   -> Semantics m ()
 interpret' sem =
   foldMap (modifyInterpretation (structure (interpret' sem)) sem)
 
-modifyInterpretation :: (Action t -> a) -> ((Action t, a) -> b) -> Action t -> b
+modifyInterpretation :: (Action -> a) -> ((Action, a) -> b) -> Action -> b
 modifyInterpretation i f act = f (act, i act)
 
-structure :: (Monad m, EvalTerm t) => (Specification t -> Semantics m ()) -> Action t -> Semantics m ()
+structure :: Monad m => (Specification -> Semantics m ()) -> Action -> Semantics m ()
 structure ff (TillE s) =
   let body = ff s
       loop = forever body -- repeat until the loop is terminated by an end marker

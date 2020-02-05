@@ -27,25 +27,25 @@ import Data.Typeable
 
 import Test.QuickCheck (Gen, elements)
 
-readInput :: Varname -> ValueSet -> Specification t
+readInput :: Varname -> ValueSet -> Specification
 readInput x vs = Spec [ReadInput x vs]
 
-writeOutput :: StringEmbedding a => [TermPattern] -> [t a] -> Specification t
+writeOutput :: StringEmbedding a => [TermPattern] -> [Term a] -> Specification
 writeOutput ps ts = Spec [WriteOutput False ps ts]
 
-writeFixedOutput :: [TermPattern] -> Specification t
-writeFixedOutput ps = Spec [WriteOutput False ps ([] :: [t String])]
+writeFixedOutput :: [TermPattern] -> Specification
+writeFixedOutput ps = Spec [WriteOutput False ps ([] :: [Term String])]
 
-branch :: t Bool -> Specification t -> Specification t -> Specification t
+branch :: Term Bool -> Specification -> Specification -> Specification
 branch t s1 s2 = Spec [Branch t s1 s2]
 
-tillExit :: Specification t -> Specification t
+tillExit :: Specification -> Specification
 tillExit s = Spec [TillE s]
 
-nop :: Specification t
+nop :: Specification
 nop = mempty
 
-exit :: Specification t
+exit :: Specification
 exit = Spec [E]
 
 intValues :: [Int] -> ValueSet
@@ -61,8 +61,8 @@ nats = valueSet' (>= 0) gen where
   gen :: Gen Int
   gen = elements [0..10]
 
-getCurrent :: forall a t. (Typeable a, StringEmbedding a, Term t) => Varname -> t a
+getCurrent :: (Typeable a, StringEmbedding a) => Varname -> Term a
 getCurrent = T.getCurrent
 
-getAll :: forall a t. (Typeable a, StringEmbedding a, Term t) => Varname -> t [a]
+getAll :: (Typeable a, StringEmbedding a) => Varname -> Term [a]
 getAll = T.getAll

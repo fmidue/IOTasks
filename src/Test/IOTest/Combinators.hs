@@ -11,23 +11,25 @@ module Test.IOTest.Combinators (
 import Test.IOTest.Language
 import Test.IOTest.ValueSet
 
+import Test.IOTest.Term as T
+
 import Data.Proxy
 
-repeatSpec :: Int -> Specification t -> Specification t
+repeatSpec :: Int -> Specification -> Specification
 repeatSpec 0 _ = nop
-repeatSpec n s = s <> repeatSpec (n-1) s
+repeatSpec n s = s <> repeatSpec (n Prelude.- 1) s
 
-when :: t Bool -> Specification t -> Specification t
+when :: Term Bool -> Specification -> Specification
 when p = branch p nop
 
-readTillFixedLength :: (Term t, Applicative t) => Varname -> ValueSet -> Varname -> Specification t
+readTillFixedLength :: Varname -> ValueSet -> Varname -> Specification
 readTillFixedLength n vs xs = withProxy vs $ \(_ :: Proxy a) ->
   tillExit $
-    branch ((\xs n -> length xs == n) <$> getAll @a xs <*> getCurrent n)
+    branch (T.length (T.getAll @a xs) T.== T.getCurrent n)
       (readInput xs vs)
       exit
 
-readUntil :: Varname -> t Bool -> ValueSet -> Specification t
+readUntil :: Varname -> Term Bool -> ValueSet -> Specification
 readUntil xs p vs =
   tillExit $
     branch p

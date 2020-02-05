@@ -24,45 +24,45 @@ import GHC.Generics
 
 import qualified SpecGen
 
-specGen :: Gen (Specification ApplicativeTerm)
+specGen :: Gen Specification
 specGen = SpecGen.specGen
 
-loopBodyGen :: Gen (Specification ApplicativeTerm)
+loopBodyGen :: Gen Specification
 loopBodyGen = SpecGen.loopBodyGen
 
-fulfills :: IOrep () -> Specification ApplicativeTerm -> Property
+fulfills :: IOrep () -> Specification -> Property
 fulfills = IOP.fulfills
 
 testExamples :: Spec
 testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
   prop "solution1 matches task1" $
-    solution1 `fulfills` task1 @ApplicativeTerm
+    solution1 `fulfills` task1
   prop "solution1' does not match task1" $
     expectFailure $ solution1' `fulfills` task1
   prop "wrongSolution1 does not match task1" $
     expectFailure $ wrongSolution1 `fulfills` task1
   prop "solution1 matches task1'" $
-    solution1 `fulfills` task1' @ApplicativeTerm
+    solution1 `fulfills` task1'
 
   prop "solution1' matches task1'" $
-    solution1' `fulfills` task1' @ApplicativeTerm
+    solution1' `fulfills` task1'
   prop "solution2 matches task2" $
-   solution2 `fulfills` task2 @ApplicativeTerm
+   solution2 `fulfills` task2
   prop "solution3 matches task3" $
-    solution3 `fulfills` task3 @ApplicativeTerm
+    solution3 `fulfills` task3
   prop "solution3 matches task3'" $
-    solution3 `fulfills` task3' @ApplicativeTerm
+    solution3 `fulfills` task3'
 
   prop "program generated from task1 matches task1" $
-    buildComputation @IOrep @ApplicativeTerm task1 `fulfills` task1 @ApplicativeTerm
+    buildComputation @IOrep task1 `fulfills` task1
   prop "program generated from task1' matches task1'" $
-    buildComputation @IOrep @ApplicativeTerm task1' `fulfills` task1' @ApplicativeTerm
+    buildComputation @IOrep task1' `fulfills` task1'
   prop "program generated from task2 matches task2" $
-    buildComputation @IOrep @ApplicativeTerm task2 `fulfills` task2 @ApplicativeTerm
+    buildComputation @IOrep task2 `fulfills` task2
   prop "program generated from task3 matches task3" $
-    buildComputation @IOrep @ApplicativeTerm task3 `fulfills` task3 @ApplicativeTerm
+    buildComputation @IOrep task3 `fulfills` task3
   prop "program generated from task3' matches task3'" $
-    buildComputation @IOrep @ApplicativeTerm task3' `fulfills` task3' @ApplicativeTerm
+    buildComputation @IOrep task3' `fulfills` task3'
 
   prop "Testing solution4 against task4" $
     solution4 `fulfills` task4
@@ -70,12 +70,12 @@ testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
     expectFailure $ wrongSolution4 `fulfills` task4
 
   prop "correct handeling of scoping 1" $
-    scopingRight `fulfills` scoping @ApplicativeTerm
+    scopingRight `fulfills` scoping
   prop "correct handeling of scoping 2" $
     expectFailure $ scopingWrong `fulfills` scoping
 
   -- prop "multi parameter programs" $
-  --   printN `fulfills` printNSpec @ApplicativeTerm
+  --   printN `fulfills` printNSpec
 
   prop "programs built from a spec satisfy that spec" $
     forAll specGen (\s -> buildComputation @IOrep s `fulfills` s)
@@ -119,7 +119,7 @@ testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
         (tillExit (s1 <> exit))
         (tillExit (s1 <> exit <> s2))
 
-testEquiv :: (EvalTerm t, TermVars t) => Specification t -> Specification t -> Property
+testEquiv :: Specification -> Specification -> Property
 testEquiv s1 s2 = p1 .&&. p2 where
   p1 = s1 `testAgainst` s2
   p2 = s2 `testAgainst` s1

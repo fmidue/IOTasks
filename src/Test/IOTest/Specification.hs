@@ -15,7 +15,7 @@ import Prelude hiding (foldr)
 
 import Test.IOTest.Utils
 import Test.IOTest.Environment
-import Test.IOTest.Term
+import Test.IOTest.Term (Term, termVars)
 import Test.IOTest.Pattern
 import Test.IOTest.ValueSet
 
@@ -25,29 +25,29 @@ import Data.MonoTraversable.Unprefixed (foldr)
 
 import Text.PrettyPrint.Annotated.HughesPJClass hiding ((<>))
 
-newtype Specification t = Spec [Action t]
-  deriving (Semigroup, Monoid, MonoFoldable) via [Action t]
+newtype Specification = Spec [Action]
+  deriving (Semigroup, Monoid, MonoFoldable) via [Action]
 
 -- for MonoFoldable
-type instance Element (Specification t) = Action t
+type instance Element Specification = Action
 
-data Action t where
-  ReadInput :: Varname -> ValueSet -> Action t
-  WriteOutput :: StringEmbedding a => Bool -> [TermPattern] -> [t a] -> Action t
-  Branch :: t Bool -> Specification t -> Specification t -> Action t
-  TillE :: Specification t -> Action t
-  E :: Action t
+data Action where
+  ReadInput :: Varname -> ValueSet -> Action
+  WriteOutput :: StringEmbedding a => Bool -> [TermPattern] -> [Term a] -> Action
+  Branch :: Term Bool -> Specification -> Specification -> Action
+  TillE :: Specification -> Action
+  E :: Action
 
-instance TermVars t => Show (Specification t) where
+instance Show Specification where
   show = render . pPrint
 
-instance TermVars t => Show (Action t) where
+instance Show Action where
   show = render . pPrint
 
-instance TermVars t => Pretty (Specification t) where
+instance Pretty Specification where
   pPrint (Spec as) = vcat $ pPrint <$> as
 
-instance TermVars t => Pretty (Action t) where
+instance Pretty Action where
   pPrint (ReadInput x _) = text "ReadInput" <+> text (show x) <+> text "_"
   pPrint (WriteOutput b ps ts) = hsep [text "WriteOutput", text (show b), text (show ps), text "_{", text (show (termVars <$> ts)), text "}"]
   pPrint (Branch c s1 s2) = hang (text "Branch _{" <+> text (show $ termVars c) <+> text "}") 2 (parens (pPrint s1) $+$ parens (pPrint s2))
@@ -55,12 +55,12 @@ instance TermVars t => Pretty (Action t) where
   pPrint E = text "E"
 
 -- move into Combinators ?
-optional :: Specification t -> Specification t
+optional :: Specification -> Specification
 optional (Spec []) = Spec []
 optional (Spec (WriteOutput _ ps ts : xs)) = Spec [WriteOutput True ps ts] <> optional (Spec xs)
 optional _ = error "only writes can be optional"
 
-instance TermVars t => HasVariables (Specification t) where
+instance HasVariables Specification where
   vars = nub . foldr phi [] where
     phi (ReadInput v _) vs = v : vs
     phi (WriteOutput _ _ ts) vs = concatMap termVars ts ++ vs
