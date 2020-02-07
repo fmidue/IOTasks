@@ -12,10 +12,11 @@ module Test.IOTest.Environment
   (Environment
   , store
   , storeValue
+  , Value(..)
   , freshEnvironment
   , lookupNameAtType
-  , HasVariables(..)
   , Varname
+  , LookupError
   , printLookupError
   ) where
 
@@ -57,9 +58,9 @@ newtype Environment = MkEnvironment (HashMap Varname Entry) deriving Show
 newEnvironment :: Environment
 newEnvironment = MkEnvironment Map.empty
 
-freshEnvironment :: HasVariables a => a -> Environment
-freshEnvironment s =
-  let addNames = Prelude.foldr ((>=>) . addName) return $ vars s
+freshEnvironment :: [Varname] -> Environment
+freshEnvironment vs =
+  let addNames = Prelude.foldr ((>=>) . addName) return vs
   in fromJust $ addNames newEnvironment
 
 addName :: Varname -> Environment -> Maybe Environment

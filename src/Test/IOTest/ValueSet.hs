@@ -56,7 +56,7 @@ containsValue (MkValueSet r p _) (Value r' v) =
 valueFromString :: ValueSet -> String -> Value
 valueFromString (MkValueSet (_ :: TypeRep a) _ _) str = Value typeRep (unpack @a str)
 
-withProxy :: ValueSet -> (forall a. (Typeable a, Arbitrary a, StringEmbedding a) => Proxy a -> b ) -> b
+withProxy :: ValueSet -> (forall a. (Typeable a, Arbitrary a, StringEmbedding a) => Proxy a -> b) -> b
 withProxy (MkValueSet (_ :: TypeRep a) _ _) f = f (Proxy @a)
 
 class Extract ts t | ts -> t where

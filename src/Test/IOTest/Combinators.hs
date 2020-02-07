@@ -8,28 +8,26 @@ module Test.IOTest.Combinators (
   when
 ) where
 
-import Test.IOTest.Language
+import Test.IOTest
 import Test.IOTest.ValueSet
 
-import Test.IOTest.Term as T
+import Data.Dynamic (Typeable)
 
-import Data.Proxy
-
-repeatSpec :: Int -> Specification -> Specification
+repeatSpec :: Int -> Specification t -> Specification t
 repeatSpec 0 _ = nop
 repeatSpec n s = s <> repeatSpec (n Prelude.- 1) s
 
-when :: Term Bool -> Specification -> Specification
+when :: t Bool -> Specification t -> Specification t
 when p = branch p nop
 
-readTillFixedLength :: Varname -> ValueSet -> Varname -> Specification
-readTillFixedLength n vs xs = withProxy vs $ \(_ :: Proxy a) ->
+readTillFixedLength :: forall t a. (Term t, Typeable a) => (t [a] -> t Int) -> (t Int -> t Int -> t Bool) -> Varname -> ValueSet -> Varname -> Specification t
+readTillFixedLength len eq n vs xs =
   tillExit $
-    branch (T.length (T.getAll @a xs) T.== T.getCurrent n)
+    branch (len (getAll @a xs) `eq` getCurrent n)
       (readInput xs vs)
       exit
 
-readUntil :: Varname -> Term Bool -> ValueSet -> Specification
+readUntil :: Varname -> t Bool -> ValueSet -> Specification t
 readUntil xs p vs =
   tillExit $
     branch p

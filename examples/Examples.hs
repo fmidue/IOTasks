@@ -5,8 +5,8 @@ module Test.IOTest.Examples.Examples where
 
 import Prelude hiding (putStrLn, getLine, print)
 
+import Test.IOTest
 import Test.IOTest.IOrep
-import Test.IOTest.Language
 import Test.IOTest.Combinators
 import Test.IOTest.ValueSet
 import Test.IOTest.Term as T

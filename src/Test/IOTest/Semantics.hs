@@ -27,7 +27,8 @@ import Data.MonoTraversable.Unprefixed
 import Test.QuickCheck.GenT
 
 newtype Semantics m a = Semantics { runSemantics :: Environment -> m (Either Exit a, Environment) }
-  deriving (Functor, Applicative, Monad, MonadTeletype, MonadState Environment, MonadError Exit, MonadGen) via ExceptT Exit (StateT Environment m)
+  deriving (Functor, Applicative, Monad, MonadTeletype, MonadState Environment, MonadError Exit, MonadGen)
+    via ExceptT Exit (StateT Environment m)
 
 evalSemantics :: Monad m => Semantics m a -> Environment -> m (Either Exit a)
 evalSemantics m c = fst <$> runSemantics m c
@@ -39,9 +40,9 @@ instance Monad m => Monoid (Semantics m ()) where
   mempty = return ()
 
 interpret ::
-     Monad m
-  => (Action -> Semantics m ()) -- behavior for read and write actions
-  -> Specification -- specification
+     (Monad m, SemTerm t)
+  => (Action t -> Semantics m ()) -- behavior for read and write actions
+  -> Specification t -- specification
   -> Semantics m ()
 interpret sem =
   foldMap (\act -> case act of
@@ -51,17 +52,17 @@ interpret sem =
           )
 
 interpret' ::
-     Monad m
-  => ((Action, Semantics m ()) -> Semantics m ()) -- extra behavior for single action that can use or completly discard the structural interpretation
-  -> Specification -- specification
+     (Monad m, SemTerm t)
+  => ((Action t, Semantics m ()) -> Semantics m ()) -- extra behavior for single action that can use or completly discard the structural interpretation
+  -> Specification t -- specification
   -> Semantics m ()
 interpret' sem =
   foldMap (modifyInterpretation (structure (interpret' sem)) sem)
 
-modifyInterpretation :: (Action -> a) -> ((Action, a) -> b) -> Action -> b
+modifyInterpretation :: (Action t -> a) -> ((Action t, a) -> b) -> Action t -> b
 modifyInterpretation i f act = f (act, i act)
 
-structure :: Monad m => (Specification -> Semantics m ()) -> Action -> Semantics m ()
+structure :: (Monad m, SemTerm t) => (Specification t -> Semantics m ()) -> Action t -> Semantics m ()
 structure ff (TillE s) =
   let body = ff s
       loop = forever body -- repeat until the loop is terminated by an end marker

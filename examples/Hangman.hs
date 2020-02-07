@@ -5,8 +5,8 @@ module Test.IOTest.Examples.Hangman where
 
 import Prelude hiding (getLine, putStrLn, print)
 
+import Test.IOTest
 import Test.IOTest.IOrep
-import Test.IOTest.Language
 import Test.IOTest.Term as T
 
 -- possible elements to build the secret from

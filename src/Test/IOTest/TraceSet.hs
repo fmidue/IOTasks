@@ -16,19 +16,19 @@ import Test.IOTest.Pattern
 import Test.IOTest.Environment
 import Test.IOTest.ValueSet
 import Test.IOTest.Specification
-import Test.IOTest.Term (Term, evalTerm)
+import Test.IOTest.Term (SemTerm(..), TermVars, evalTerm)
 
 import Test.QuickCheck.GenT
 
 import qualified Data.Set as S
 import           Data.Maybe
 
-traceGen :: MonadGen m => Specification -> m GeneralizedTrace
-traceGen (Spec s) = traceSet s kTI (freshEnvironment (Spec s)) where
+traceGen :: (MonadGen m, SemTerm t, TermVars t) => Specification t -> m GeneralizedTrace
+traceGen (Spec s) = traceSet s kTI (freshEnvironment $ specVars (Spec s)) where
   kTI End  _ = return StopN
   kTI Exit _ = error "traceGen: 'throwError Exit' at toplevel"
 
-traceSet :: MonadGen m => [Action] -> (Cont -> Environment -> m GeneralizedTrace) -> Environment -> m GeneralizedTrace
+traceSet :: (MonadGen m, SemTerm t) => [Action t] -> (Cont -> Environment -> m GeneralizedTrace) -> Environment -> m GeneralizedTrace
 traceSet (ReadInput x ty : s') k e = do
   v <- valueOf ty
   let e' = fromMaybe (error "type mismatch on environment update") (storeValue x v e)

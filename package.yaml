@@ -40,6 +40,16 @@ library:
   source-dirs: src
   ghc-options:
   - -Wall
+  exposed-modules:
+  - Test.IOTest
+  - Test.IOTest.Language
+  - Test.IOTest.IOrep
+  - Test.IOTest.Term
+  - Test.IOTest.Term.ITerm
+  - Test.IOTest.Term.ATerm
+  - Test.IOTest.Term.ITerm.Prelude
+  - Test.IOTest.Artifacts
+  - Test.IOTest.Environment
 
 tests:
   IOTest-test:

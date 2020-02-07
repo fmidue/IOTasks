@@ -10,46 +10,53 @@ module Test.IOTest.Language
   , getCurrent, getAll
   , Pattern, buildPattern
   , TermPattern, buildTermPattern
+  , ValueSet
   , intValues
+  , values
+  , mkValueSet
   , ints
   , nats
+  , StringEmbedding
   ) where
+
+import Data.Dynamic (Typeable)
 
 import Test.IOTest.Utils
 import Test.IOTest.Specification
-import qualified Test.IOTest.Term as T
-import Test.IOTest.Term (Term)
+import Test.IOTest.Term
 import Test.IOTest.Environment (Varname)
 import Test.IOTest.ValueSet
 import Test.IOTest.Pattern
 
-import Data.Typeable
+import Test.QuickCheck (Gen, Arbitrary, elements)
 
-import Test.QuickCheck (Gen, elements)
 
-readInput :: Varname -> ValueSet -> Specification
+readInput :: Varname -> ValueSet -> Specification t
 readInput x vs = Spec [ReadInput x vs]
 
-writeOutput :: StringEmbedding a => [TermPattern] -> [Term a] -> Specification
+writeOutput :: StringEmbedding a => [TermPattern] -> [t a] -> Specification t
 writeOutput ps ts = Spec [WriteOutput False ps ts]
 
-writeFixedOutput :: [TermPattern] -> Specification
-writeFixedOutput ps = Spec [WriteOutput False ps ([] :: [Term String])]
+writeFixedOutput :: [TermPattern] -> Specification t
+writeFixedOutput ps = Spec [WriteOutput False ps ([] :: [t String])]
 
-branch :: Term Bool -> Specification -> Specification -> Specification
+branch :: t Bool -> Specification t -> Specification t -> Specification t
 branch t s1 s2 = Spec [Branch t s1 s2]
 
-tillExit :: Specification -> Specification
+tillExit :: Specification t -> Specification t
 tillExit s = Spec [TillE s]
 
-nop :: Specification
+nop :: Specification t
 nop = mempty
 
-exit :: Specification
+exit :: Specification t
 exit = Spec [E]
 
 intValues :: [Int] -> ValueSet
 intValues = valueSet
+
+values :: (Typeable a, Arbitrary a, StringEmbedding a, Eq a) => [a] -> ValueSet
+values = valueSet
 
 ints :: ValueSet
 ints = valueSet' (const True) gen where
@@ -61,8 +68,5 @@ nats = valueSet' (>= 0) gen where
   gen :: Gen Int
   gen = elements [0..10]
 
-getCurrent :: (Typeable a, StringEmbedding a) => Varname -> Term a
-getCurrent = T.getCurrent
-
-getAll :: (Typeable a, StringEmbedding a) => Varname -> Term [a]
-getAll = T.getAll
+mkValueSet :: (Typeable a, Arbitrary a, StringEmbedding a) => (a -> Bool) -> Gen a -> ValueSet
+mkValueSet = valueSet'

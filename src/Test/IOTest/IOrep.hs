@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 module Test.IOTest.IOrep (
   IOrep,
+  IOrep'(..),
   runProgram,
   MonadTeletype(..), print, readLn,
   Exit(..),
