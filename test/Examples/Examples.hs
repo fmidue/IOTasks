@@ -1,15 +1,13 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DataKinds #-}
-module Test.IOTest.Examples.Examples where
+module Examples.Examples where
 
 import Prelude hiding (putStrLn, getLine, print)
 
 import Test.IOTest
-import Test.IOTest.IOrep
-import Test.IOTest.Combinators
-import Test.IOTest.ValueSet
-import Test.IOTest.Term as T
+import Test.IOTest.Term.ITerm (ITerm, lit)
+import Test.IOTest.Term.ITerm.Prelude as T
 
 import Control.Monad (replicateM,replicateM_)
 
@@ -19,43 +17,43 @@ import Test.QuickCheck as QC (Positive(..))
 import Text.Read (readMaybe)
 
 -- read natural number n, then read n integers and sum them
-task1 :: Specification
+task1 :: Specification ITerm
 task1 =
   writeFixedOutput ["_"] <>
   readInput "n" nats <>
-  readTillFixedLength "n" ints "xs" <>
-  writeOutput ["#0"] [T.sum $ T.getAll @Int "xs"]
+  readTillFixedLength @Int T.length (T.==) "n" ints "xs" <>
+  writeOutput ["#0"] [T.sum $ getAll @Int "xs"]
 
-spec :: Specification
+spec :: Specification ITerm
 spec =
   writeFixedOutput ["_"] <>
   readInput "n" nats <>
   tillExit (
-    branch (T.length (T.getAll @Int "xs") T.== T.getCurrent "n")
-     ( writeOutput ["_#0_"] [T.length (T.getAll @Int "xs")] <>
+    branch (T.length (getAll @Int "xs") T.== getCurrent "n")
+     ( writeOutput ["_#0_"] [T.length (getAll @Int "xs")] <>
        readInput "xs" ints
      )
      exit
   ) <>
-  writeOutput ["_#0_"] [T.sum $ T.getAll @Int "xs"]
+  writeOutput ["_#0_"] [T.sum $ getAll @Int "xs"]
 
-spec' :: Specification
+spec' :: Specification ITerm
 spec' =
   readInput "n" (intValues [0..10]) <>
   tillExit (
-    branch ( T.length (T.getAll @Int "xs") T.== T.getCurrent "n")
+    branch ( T.length (getAll @Int "xs") T.== getCurrent "n")
      ( readInput "xs" (intValues [-10..10]) )
      exit
   ) <>
-  writeOutput ["#0"] [T.sum $ T.getAll @Int "xs"]
+  writeOutput ["#0"] [T.sum $ getAll @Int "xs"]
 
-task1' :: Specification
+task1' :: Specification ITerm
 task1' =
   optional (writeFixedOutput ["_"]) <>
   readInput "n" nats <>
-  optional (writeOutput ["_#0_"] [T.getCurrent @Int "n"]) <>
-  readTillFixedLength "n" ints "xs" <>
-  writeOutput ["_#0_"] [T.sum $ T.getAll @Int "xs"]
+  optional (writeOutput ["_#0_"] [getCurrent @Int "n"]) <>
+  readTillFixedLength @Int T.length (T.==) "n" ints "xs" <>
+  writeOutput ["_#0_"] [T.sum $ getAll @Int "xs"]
 
 solution1 :: IOrep ()
 solution1 = do
@@ -82,11 +80,11 @@ wrongSolution1 = do
   putStrLn "17"
 
 -- read till last two numbers sum to 0 than count positive numbers divisible by 3
-task2 :: Specification
+task2 :: Specification ITerm
 task2 =
   repeatSpec 2 (readInput "xs" ints) <> --otherwise the condition will throw an exception
-  readUntil "xs" (let xs = T.getAll "xs" in T.length xs T.> lit 1 T.&& (T.last xs T.+ T.last (T.init xs) T.== lit (0 :: Int)) ) ints <>
-  writeOutput ["_#0_"] [count $ T.getAll @Int "xs"]
+  readUntil "xs" (let xs = getAll "xs" in T.length xs T.> lit 1 T.&& (T.last xs T.+ T.last (T.init xs) T.== lit (0 :: Int)) ) ints <>
+  writeOutput ["_#0_"] [count $ getAll @Int "xs"]
   where count xs = T.length $ T.filter (\x -> x T.> lit 0 T.&& (x `T.mod` lit 3 T.== lit 0)) xs
 
 solution2 :: IOrep ()
@@ -100,18 +98,18 @@ solution2 = go [] Nothing Nothing where
         go (n:ns) (Just n) mX
 
 -- read till zero then sum
-task3 :: Specification
+task3 :: Specification ITerm
 task3 =
   tillExit $
     readInput "x" ints <>
-    when (lit 0 T.== T.getCurrent @Int "x")
-      (writeOutput ["_#0_"] [T.sum $ T.getAll @Int "x"] <> exit)
+    when (lit 0 T.== getCurrent @Int "x")
+      (writeOutput ["_#0_"] [T.sum $ getAll @Int "x"] <> exit)
 
-task3' :: Specification
+task3' :: Specification ITerm
 task3' =
   readInput "xs" ints <> --otherwise last will fail
-  readUntil "xs" (T.last (T.getAll @Int "xs") T.== lit 0) ints <>
-  writeOutput ["_#0_"] [T.sum $ T.getAll @Int "xs"]
+  readUntil "xs" (T.last (getAll @Int "xs") T.== lit 0) ints <>
+  writeOutput ["_#0_"] [T.sum $ getAll @Int "xs"]
 
 solution3 :: IOrep ()
 solution3 = go [] where
@@ -122,10 +120,10 @@ solution3 = go [] where
       else go $ n:xs
 
 -- read and reverse
-task4 ::Specification
+task4 ::Specification ITerm
 task4 =
-  readInput "line" (valueSet ("_" :: Pattern)) <>
-  writeOutput ["_#0_"] [T.reverse $ T.getCurrent @String "line"]
+  readInput "line" (stringValues ("_" :: Pattern)) <>
+  writeOutput ["_#0_"] [T.reverse $ getCurrent @String "line"]
 
 solution4 :: IOrep ()
 solution4 = (Prelude.reverse <$> getLine) >>= putStrLn
@@ -133,14 +131,14 @@ solution4 = (Prelude.reverse <$> getLine) >>= putStrLn
 wrongSolution4 :: IOrep ()
 wrongSolution4 = getLine >>= putStrLn
 
-scoping :: Specification
+scoping :: Specification ITerm
 scoping =
   readInput "x" ints <>
   (
     readInput "x" ints <>
-    writeOutput ["#0"] [T.getCurrent @Int "x"]
+    writeOutput ["#0"] [getCurrent @Int "x"]
   ) <>
-  writeOutput ["#0"] [T.getCurrent @Int "x"]
+  writeOutput ["#0"] [getCurrent @Int "x"]
 
 scopingRight :: IOrep ()
 scopingRight = do
@@ -156,7 +154,7 @@ scopingWrong = do
   print y
   print x
 
-printNSpec :: QC.Positive Int -> Int -> Specification
+printNSpec :: QC.Positive Int -> Int -> Specification ITerm
 printNSpec (QC.Positive n) x = repeatSpec n $ writeFixedOutput [buildTermPattern (show x)]
 
 printN :: Int -> Int -> IOrep ()

@@ -15,10 +15,16 @@ module Test.IOTest (
   ValueSet,
   intValues,
   values,
+  stringValues,
   mkValueSet,
   ints,
   nats,
   StringEmbedding,
+  -- * Combinators
+  readTillFixedLength,
+  readUntil,
+  repeatSpec,
+  when,
   -- * Terms
   Term(..),
   getCurrent,
@@ -45,6 +51,7 @@ module Test.IOTest (
 ) where
 
 import Test.IOTest.Language
+import Test.IOTest.Combinators
 import Test.IOTest.Term
 import Test.IOTest.IOrep
 import Test.IOTest.IOProperty

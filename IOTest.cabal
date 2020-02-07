@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: c8aaf7d44aa3a2de040f5a377fba8bf39fd6e00114c01aef80b830045779411a
+-- hash: 53a32c87a5efc7bdf83f2b698088ec98735cf67ca001a9f37611720556f63e36
 
 name:           IOTest
 version:        0.1.0.0
@@ -30,23 +30,24 @@ library
   exposed-modules:
       Test.IOTest
       Test.IOTest.Language
+      Test.IOTest.Combinators
       Test.IOTest.IOrep
       Test.IOTest.Term
+      Test.IOTest.Term.ITerm.SpecGen
       Test.IOTest.Term.ITerm
       Test.IOTest.Term.ATerm
       Test.IOTest.Term.ITerm.Prelude
       Test.IOTest.Artifacts
       Test.IOTest.Environment
+      Test.IOTest.TraceSet
+      Test.IOTest.Trace
   other-modules:
-      Test.IOTest.Combinators
       Test.IOTest.Interpreter
       Test.IOTest.IOProperty
       Test.IOTest.Pattern
       Test.IOTest.Python
       Test.IOTest.Semantics
       Test.IOTest.Specification
-      Test.IOTest.Trace
-      Test.IOTest.TraceSet
       Test.IOTest.Utils
       Test.IOTest.Value
       Test.IOTest.ValueSet
@@ -76,8 +77,9 @@ test-suite IOTest-test
   type: exitcode-stdio-1.0
   main-is: Tests.hs
   other-modules:
+      Examples.Examples
+      Examples.Hangman
       RegressionTests
-      SpecGen
       TestExamples
       Paths_IOTest
   hs-source-dirs:

@@ -43,13 +43,17 @@ library:
   exposed-modules:
   - Test.IOTest
   - Test.IOTest.Language
+  - Test.IOTest.Combinators
   - Test.IOTest.IOrep
   - Test.IOTest.Term
+  - Test.IOTest.Term.ITerm.SpecGen
   - Test.IOTest.Term.ITerm
   - Test.IOTest.Term.ATerm
   - Test.IOTest.Term.ITerm.Prelude
   - Test.IOTest.Artifacts
   - Test.IOTest.Environment
+  - Test.IOTest.TraceSet
+  - Test.IOTest.Trace
 
 tests:
   IOTest-test:

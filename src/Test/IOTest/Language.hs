@@ -13,6 +13,7 @@ module Test.IOTest.Language
   , ValueSet
   , intValues
   , values
+  , stringValues
   , mkValueSet
   , ints
   , nats
@@ -57,6 +58,9 @@ intValues = valueSet
 
 values :: (Typeable a, Arbitrary a, StringEmbedding a, Eq a) => [a] -> ValueSet
 values = valueSet
+
+stringValues :: Pattern -> ValueSet
+stringValues = valueSet
 
 ints :: ValueSet
 ints = valueSet' (const True) gen where

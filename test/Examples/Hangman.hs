@@ -1,32 +1,33 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
-module Test.IOTest.Examples.Hangman where
+module Examples.Hangman where
 
 import Prelude hiding (getLine, putStrLn, print)
 
 import Test.IOTest
 import Test.IOTest.IOrep
-import Test.IOTest.Term as T
+import Test.IOTest.Term.ITerm
+import Test.IOTest.Term.ITerm.Prelude as T
 
 -- possible elements to build the secret from
 hangmanDomain :: [Int]
 hangmanDomain = [0..9]
 
-hangmanSpec :: [Int] -> Specification
+hangmanSpec :: [Int] -> Specification ITerm
 hangmanSpec (lit -> word) =
   tillExit (
-       branch (winCondition $ T.getAll "guessed")
+       branch (winCondition $ getAll "guessed")
          nop
          (writeFixedOutput ["_correct_"] <> exit)
     <> writeFixedOutput ["Game state:_"]
     <> readInput "guessed" (intValues [0..9])
-    <> branch ((\gs -> (T.last gs `T.elem` word) T.&& (T.last gs `T.notElem` T.init gs)) $ T.getAll @Int "guessed")
+    <> branch ((\gs -> (T.last gs `T.elem` word) T.&& (T.last gs `T.notElem` T.init gs)) $ getAll @Int "guessed")
          (optional $ writeFixedOutput ["wrong!"])
          (optional $ writeFixedOutput ["good guess!"])
     )
   where
-    winCondition :: Term [Int] -> Term Bool
+    winCondition :: ITerm [Int] -> ITerm Bool
     winCondition xs = T.all (`T.elem` T.filter (`T.elem` word) xs) word
 
 

@@ -23,7 +23,7 @@ import Test.QuickCheck.GenT
 import qualified Data.Set as S
 import           Data.Maybe
 
-traceGen :: (MonadGen m, SemTerm t, TermVars t) => Specification t -> m GeneralizedTrace
+traceGen :: forall t m. (MonadGen m, SemTerm t, TermVars t) => Specification t -> m GeneralizedTrace
 traceGen (Spec s) = traceSet s kTI (freshEnvironment $ specVars (Spec s)) where
   kTI End  _ = return StopN
   kTI Exit _ = error "traceGen: 'throwError Exit' at toplevel"
@@ -54,7 +54,7 @@ v <.> t' = ProgWriteStopN v <> t'
 langConcat :: MergeSet Pattern -> MergeSet Pattern -> MergeSet Pattern
 langConcat = (<>)
 
--- only works as intended if the input trace has linebreaks after each previously seperate output
+-- | only works as intended if the input trace has linebreaks after each previously seperate output
 sampleNTrace ::  MonadGen m => GeneralizedTrace -> m OrdinaryTrace
 sampleNTrace (ProgReadN v t) = do
   t' <- sampleNTrace t

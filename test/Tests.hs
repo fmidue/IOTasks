@@ -3,7 +3,7 @@ import TestExamples
 import RegressionTests
 
 import Test.IOTest.IOrep
-import Test.IOTest.Examples.Hangman
+import Examples.Hangman
 
 import Test.Hspec (hspec, describe)
 import Test.Hspec.QuickCheck (prop)
