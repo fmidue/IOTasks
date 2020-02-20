@@ -1,19 +1,16 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TypeApplications #-}
 module TestExamples where
 
 import Prelude hiding (getLine, putStrLn, print)
 
-import Test.IOTest hiding (fulfills)
+import Test.IOTest
 import Test.IOTest.TraceSet
-import Test.IOTest.Term.ITerm
 import Test.IOTest.Term.ITerm.SpecGen
-import qualified Test.IOTest as IOP (fulfills)
 import Test.IOTest.Trace
 
-import Examples.Examples
+import Examples.SampleTasks
 
 import Test.Hspec
 import Test.Hspec.QuickCheck (prop)
@@ -22,60 +19,71 @@ import Test.QuickCheck
 import Control.DeepSeq
 import GHC.Generics
 
-fulfills :: IOrep () -> Specification ITerm -> Property
-fulfills = IOP.fulfills
+buildIOrepComputation :: (TermVars t, SemTerm t) => Specification t -> IOrep ()
+buildIOrepComputation = buildComputation
 
 testExamples :: Spec
 testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
-  prop "solution1 matches task1" $
-    solution1 `fulfills` task1
-  prop "solution1' does not match task1" $
-    expectFailure $ solution1' `fulfills` task1
-  prop "wrongSolution1 does not match task1" $
-    expectFailure $ wrongSolution1 `fulfills` task1
-  prop "solution1 matches task1'" $
-    solution1 `fulfills` task1'
+  -- Example 1
+  prop "solution1 matches ex1" $
+    solution1 `fulfills` ex1
+  prop "solution1 matches ex1Combinators" $
+    solution1 `fulfills` ex1Combinators
 
-  prop "solution1' matches task1'" $
-    solution1' `fulfills` task1'
-  prop "solution2 matches task2" $
-   solution2 `fulfills` task2
-  prop "solution3 matches task3" $
-    solution3 `fulfills` task3
-  prop "solution3 matches task3'" $
-    solution3 `fulfills` task3'
+  prop "solution1Pat matches ex1Pattern" $
+    solution1Pat `fulfills` ex1Pattern
+  prop "solution1PatCombinators matches ex1Pattern" $
+    solution1Pat `fulfills` ex1PatternCombinators
 
-  prop "program generated from task1 matches task1" $
-    buildComputation task1 `fulfills` task1
-  prop "program generated from task1' matches task1'" $
-    buildComputation task1' `fulfills` task1'
-  prop "program generated from task2 matches task2" $
-    buildComputation task2 `fulfills` task2
-  prop "program generated from task3 matches task3" $
-    buildComputation task3 `fulfills` task3
-  prop "program generated from task3' matches task3'" $
-    buildComputation task3' `fulfills` task3'
+  prop "wrongSolutionPat1 does not match ex1Pattern" $
+    expectFailure $ wrongSolutionPat1 `fulfills` ex1Pattern
+  prop "wrongSolutionPat1 does not match ex1PatternCombinators" $
+    expectFailure $ wrongSolutionPat1 `fulfills` ex1PatternCombinators
 
-  prop "Testing solution4 against task4" $
-    solution4 `fulfills` task4
-  prop "Testing wrongsolution4 against task4" $
-    expectFailure $ wrongSolution4 `fulfills` task4
+  prop "solution1Pat' matches ex1Pattern" $
+    solution1Pat' `fulfills` ex1Pattern
 
-  prop "correct handeling of scoping 1" $
-    scopingRight `fulfills` scoping
-  prop "correct handeling of scoping 2" $
-    expectFailure $ scopingWrong `fulfills` scoping
+  -- Example 2
+  prop "solution2 matches ex2" $
+   solution2 `fulfills` ex2
 
-  -- prop "multi parameter programs" $
-  --   printN `fulfills` printNSpec
+  -- Example 3
+  prop "solution3 matches ex3" $
+    solution3 `fulfills` ex3
+  prop "solution3 matches ex3Combinators" $
+    solution3 `fulfills` ex3Combinators
 
+  -- Example 4:
+  prop "solution4 matches ex4" $
+    solution4 `fulfills` ex4
+  prop "wrongSolution4 does not match ex4" $
+    expectFailure $ wrongSolution4 `fulfills` ex4
+
+  -- Example 5:
+  prop "multi parameter programs" $
+    printN `fulfills` printNSpec
+
+  -- Generation of programs
+  prop "program generated from ex1 matches ex1" $
+    buildIOrepComputation ex1 `fulfills` ex1
+  prop "program generated from ex1Combinators matches ex1Combinators" $
+    buildIOrepComputation ex1Combinators `fulfills` ex1Combinators
+  prop "program generated from ex1Pattern matches ex1Pattern" $
+    buildIOrepComputation ex1Pattern `fulfills` ex1Pattern
+  prop "program generated from ex1PatternCombinators matches ex1PatternCombinators" $
+    buildIOrepComputation ex1PatternCombinators `fulfills` ex1PatternCombinators
+  prop "program generated from ex2 matches ex2" $
+    buildIOrepComputation ex2 `fulfills` ex2
+  prop "program generated from ex3 matches ex3" $
+    buildIOrepComputation ex3 `fulfills` ex3
+  prop "program generated from ex3Combinators matches ex3Combinators" $
+    buildIOrepComputation ex3Combinators `fulfills` ex3Combinators
+  prop "program generated from ex4 matches ex4" $
+    buildIOrepComputation ex4 `fulfills` ex4
+
+  -- aditional general properties
   prop "programs built from a spec satisfy that spec" $
-    forAll specGen (\s -> buildComputation s `fulfills` s)
-
-  -- prop "programs built from a spec do not always satisfy that spec if they implement branches in 'reverse'" $
-  --   forAll specGen (\s ->
-  --     let prog = buildWrongComputation s
-  --     in  expectFailure $ prog `fulfills` s)
+    forAll specGen (\s -> buildIOrepComputation s `fulfills` s)
 
   prop "programs built from a spec dont go wrong on inputs generated from the same spec" $
     forAll specGen (\s ->
@@ -92,7 +100,7 @@ testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
   --   forAll specGen (\s ->
   --     forAll (traceGen s) (\t ->
   --       let is = inputsN t
-  --       in not (null is) ==> fulfillsNotFor (init is) (buildComputation @IOrep s) s))
+  --       in not (null is) ==> fulfillsNotFor @(IOrep ()) (init is) (buildComputation s) s))
 
   prop "tillExit s === tillExit (s <> tillExit s <> exit) " $
     forAll loopBodyGen $ \s -> testEquiv

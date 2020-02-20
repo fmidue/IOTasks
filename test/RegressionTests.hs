@@ -17,6 +17,7 @@ regressionTests = describe "Testing for regressions:" $ do
     let s = tillExit $ exit <> writeFixedOutput [buildTermPattern "X"]
         p = buildComputation @ATerm @IOrep s
     in within 1000000 $ fulfills @_ @(Specification ATerm) p s
+
   describe "fail with a runtime error for a toplevel 'throwError Exit' in traceGen and buildComputation" $ do
     specify "for buildComputation" $ buildComputation @ATerm exit `shouldThrow` anyErrorCall
     specify "for traceGen" $ sample (traceGen @ATerm exit) `shouldThrow` anyErrorCall

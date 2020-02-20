@@ -1,44 +1,22 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DataKinds #-}
-module Examples.Examples where
+module Examples.SampleTasks where
 
-import Prelude hiding (putStrLn, getLine, print)
+import Prelude hiding (putStrLn, getLine, readLn, print)
 
 import Test.IOTest
 import Test.IOTest.Term.ITerm (ITerm, lit)
-import Test.IOTest.Term.ITerm.Prelude as T
+import qualified Test.IOTest.Term.ITerm.Prelude as T
 
 import Control.Monad (replicateM,replicateM_)
 
-import Data.Maybe
-
 import Test.QuickCheck as QC (Positive(..))
-import Text.Read (readMaybe)
 
+-- Example 1:
 -- read natural number n, then read n integers and sum them
-task1 :: Specification ITerm
-task1 =
-  writeFixedOutput ["_"] <>
-  readInput "n" nats <>
-  readTillFixedLength @Int T.length (T.==) "n" ints "xs" <>
-  writeOutput ["#0"] [T.sum $ getAll @Int "xs"]
-
-spec :: Specification ITerm
-spec =
-  writeFixedOutput ["_"] <>
-  readInput "n" nats <>
-  tillExit (
-    branch (T.length (getAll @Int "xs") T.== getCurrent "n")
-     ( writeOutput ["_#0_"] [T.length (getAll @Int "xs")] <>
-       readInput "xs" ints
-     )
-     exit
-  ) <>
-  writeOutput ["_#0_"] [T.sum $ getAll @Int "xs"]
-
-spec' :: Specification ITerm
-spec' =
+ex1 :: Specification ITerm
+ex1 =
   readInput "n" (intValues [0..10]) <>
   tillExit (
     branch ( T.length (getAll @Int "xs") T.== getCurrent "n")
@@ -47,8 +25,8 @@ spec' =
   ) <>
   writeOutput ["#0"] [T.sum $ getAll @Int "xs"]
 
-task1' :: Specification ITerm
-task1' =
+ex1Combinators :: Specification ITerm
+ex1Combinators =
   optional (writeFixedOutput ["_"]) <>
   readInput "n" nats <>
   optional (writeOutput ["_#0_"] [getCurrent @Int "n"]) <>
@@ -57,31 +35,61 @@ task1' =
 
 solution1 :: IOrep ()
 solution1 = do
+  n <- readLn
+  let loop xs =
+        if length xs == n
+          then print (sum xs)
+          else do
+            v <- readLn
+            loop (xs ++ [v])
+  loop []
+
+-- With possible extra outputs
+ex1Pattern :: Specification ITerm
+ex1Pattern =
+  writeFixedOutput ["_"] <>
+  readInput "n" nats <>
+  tillExit (
+    branch (T.length (getAll @Int "xs") T.== getCurrent "n")
+     ( optional (writeOutput ["_#0_"] [T.length (getAll @Int "xs")]) <>
+       readInput "xs" ints
+     )
+     exit
+  ) <>
+  writeOutput ["_#0_"] [T.sum $ getAll @Int "xs"]
+
+ex1PatternCombinators :: Specification ITerm
+ex1PatternCombinators =
+  writeFixedOutput ["_"] <>
+  readInput "n" nats <>
+  readTillFixedLength @Int T.length (T.==) "n" ints "xs" <>
+  writeOutput ["#0"] [T.sum $ getAll @Int "xs"]
+
+solution1Pat :: IOrep ()
+solution1Pat = do
   putStrLn "> "
   n <- read @Int <$> getLine
   xs <- replicateM n $ read @Int <$> getLine
   print $ Prelude.sum xs
 
-solution1' :: IOrep ()
-solution1' = do
+solution1Pat' :: IOrep ()
+solution1Pat' = do
   putStrLn "> "
   n <- read @Int <$> getLine
-  putStrLn $ "You entered " ++ show n
   xs <- replicateM n $ read @Int <$> getLine
   putStrLn "Result: "
   print $ Prelude.sum xs
 
-wrongSolution1 :: IOrep ()
-wrongSolution1 = do
+wrongSolutionPat1 :: IOrep ()
+wrongSolutionPat1 = do
   putStrLn "> "
   n <- read @Int <$> getLine
-  --putStrLn $ "You entered " ++ show n
   replicateM_ n $ read @Int <$> getLine
   putStrLn "17"
 
 -- read till last two numbers sum to 0 than count positive numbers divisible by 3
-task2 :: Specification ITerm
-task2 =
+ex2 :: Specification ITerm
+ex2 =
   repeatSpec 2 (readInput "xs" ints) <> --otherwise the condition will throw an exception
   readUntil "xs" (let xs = getAll "xs" in T.length xs T.> lit 1 T.&& (T.last xs T.+ T.last (T.init xs) T.== lit (0 :: Int)) ) ints <>
   writeOutput ["_#0_"] [count $ getAll @Int "xs"]
@@ -97,16 +105,17 @@ solution2 = go [] Nothing Nothing where
         n <- read @Int <$> getLine
         go (n:ns) (Just n) mX
 
+-- Example 3:
 -- read till zero then sum
-task3 :: Specification ITerm
-task3 =
+ex3 :: Specification ITerm
+ex3 =
   tillExit $
     readInput "x" ints <>
     when (lit 0 T.== getCurrent @Int "x")
       (writeOutput ["_#0_"] [T.sum $ getAll @Int "x"] <> exit)
 
-task3' :: Specification ITerm
-task3' =
+ex3Combinators :: Specification ITerm
+ex3Combinators =
   readInput "xs" ints <> --otherwise last will fail
   readUntil "xs" (T.last (getAll @Int "xs") T.== lit 0) ints <>
   writeOutput ["_#0_"] [T.sum $ getAll @Int "xs"]
@@ -119,9 +128,10 @@ solution3 = go [] where
       then print $ Prelude.sum xs
       else go $ n:xs
 
+-- Example 4:
 -- read and reverse
-task4 ::Specification ITerm
-task4 =
+ex4 ::Specification ITerm
+ex4 =
   readInput "line" (stringValues ("_" :: Pattern)) <>
   writeOutput ["_#0_"] [T.reverse $ getCurrent @String "line"]
 
@@ -131,50 +141,10 @@ solution4 = (Prelude.reverse <$> getLine) >>= putStrLn
 wrongSolution4 :: IOrep ()
 wrongSolution4 = getLine >>= putStrLn
 
-scoping :: Specification ITerm
-scoping =
-  readInput "x" ints <>
-  (
-    readInput "x" ints <>
-    writeOutput ["#0"] [getCurrent @Int "x"]
-  ) <>
-  writeOutput ["#0"] [getCurrent @Int "x"]
-
-scopingRight :: IOrep ()
-scopingRight = do
-  _x <- read @Int <$> getLine
-  x <- read @Int <$> getLine
-  print x
-  print x
-
-scopingWrong :: IOrep ()
-scopingWrong = do
-  x <- read @Int <$> getLine
-  y <- read @Int <$> getLine
-  print y
-  print x
-
+-- Example 5:
+-- specificing parameterized tasks/programs
 printNSpec :: QC.Positive Int -> Int -> Specification ITerm
 printNSpec (QC.Positive n) x = repeatSpec n $ writeFixedOutput [buildTermPattern (show x)]
 
 printN :: Int -> Int -> IOrep ()
 printN n x = replicateM_ n $ print x
-
--- parseSumSpec :: (Term t, Functor t) => Specification t
--- parseSumSpec =
---   tillExit (
---     readInput "line" (valueSet ((show @Int <$> [1..10]) ++ (show <$> ['a'..'k']) ) ) <>
---     when ((==2) . length . filter isJust . fmap (readMaybe @Int) <$> getAll "line") exit
---   ) <>
---   writeOutput ["#0"] [sum . fmap fromJust . filter isJust . fmap (readMaybe @Int) <$> getAll "line"]
---
--- parseSum :: IOrep ()
--- parseSum = do
---   let go =
---         do mInt <- readMaybe @Int <$> getLine
---            case mInt of
---              Just n -> return n
---              Nothing -> go
---   x <- go
---   y <- go
---   print $ x + y

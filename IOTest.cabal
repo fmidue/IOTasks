@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 53a32c87a5efc7bdf83f2b698088ec98735cf67ca001a9f37611720556f63e36
+-- hash: cc5b5710fe7719a013e40a28ccfeb89a07f198c4d8347c88472176477d46d559
 
 name:           IOTest
 version:        0.1.0.0
@@ -77,8 +77,8 @@ test-suite IOTest-test
   type: exitcode-stdio-1.0
   main-is: Tests.hs
   other-modules:
-      Examples.Examples
       Examples.Hangman
+      Examples.SampleTasks
       RegressionTests
       TestExamples
       Paths_IOTest

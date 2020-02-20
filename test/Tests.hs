@@ -2,6 +2,7 @@
 import TestExamples
 import RegressionTests
 
+import Test.IOTest (fulfills)
 import Test.IOTest.IOrep
 import Examples.Hangman
 
