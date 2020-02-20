@@ -4,7 +4,7 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
-module Test.IOTest.Semantics (
+module Test.IOTasks.Semantics (
   Semantics(..),
   evalSemantics,
   interpret,
@@ -13,10 +13,10 @@ module Test.IOTest.Semantics (
 
 import Prelude hiding (foldMap)
 
-import Test.IOTest.IOrep
-import Test.IOTest.Environment
-import Test.IOTest.Specification
-import Test.IOTest.Term
+import Test.IOTasks.IOrep
+import Test.IOTasks.Environment
+import Test.IOTasks.Specification
+import Test.IOTasks.Term
 
 import Control.Monad.Extra (ifM)
 import Control.Monad.State

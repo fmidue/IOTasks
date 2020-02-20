@@ -1,21 +1,21 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-module Test.IOTest.IOProperty (
-  IOTestable(..),
+module Test.IOTasks.IOProperty (
+  IOTasksable(..),
   accept,
   matchesTrace,
   MatchResult(..),
 ) where
 
-import Test.IOTest.IOrep (IOrep, runProgram)
-import Test.IOTest.Specification
-import Test.IOTest.Trace
-import Test.IOTest.TraceSet
-import Test.IOTest.Environment
-import Test.IOTest.Term (SemTerm(..), TermVars(..))
-import Test.IOTest.Pattern
-import Test.IOTest.ValueSet
+import Test.IOTasks.IOrep (IOrep, runProgram)
+import Test.IOTasks.Specification
+import Test.IOTasks.Trace
+import Test.IOTasks.TraceSet
+import Test.IOTasks.Environment
+import Test.IOTasks.Term (SemTerm(..), TermVars(..))
+import Test.IOTasks.Pattern
+import Test.IOTasks.ValueSet
 
 import Data.Coerce
 import Data.Maybe (fromMaybe)
@@ -23,19 +23,19 @@ import Data.Maybe (fromMaybe)
 import Test.QuickCheck
 import Text.PrettyPrint.HughesPJClass hiding ((<>))
 
-class IOTestable a b where
+class IOTasksable a b where
   fulfills :: a -> b -> Property
   neverFulfills :: a -> b -> Property
   fulfillsNotFor :: [String] -> a -> b -> Property
 
-instance (SemTerm t, TermVars t) => IOTestable (IOrep ()) (Specification t) where
+instance (SemTerm t, TermVars t) => IOTasksable (IOrep ()) (Specification t) where
   fulfills prog spec = specProperty True spec prog
   neverFulfills prog spec = specProperty False spec prog
   fulfillsNotFor ins prog spec =
     let trace = runProgram ins prog
     in property . not $ spec `accept` trace
 
-instance (Show b, Arbitrary b, IOTestable a' b', Coercible b a) => IOTestable (a -> a') (b -> b') where
+instance (Show b, Arbitrary b, IOTasksable a' b', Coercible b a) => IOTasksable (a -> a') (b -> b') where
   fulfills f g = forAllShrink arbitrary shrink (\x -> f (coerce x) `fulfills` g x)
   neverFulfills f g = forAllShrink arbitrary shrink (\x -> f (coerce x) `neverFulfills` g x)
   fulfillsNotFor ins f g = forAllShrink arbitrary shrink (\x -> fulfillsNotFor ins (f (coerce x)) (g x))

@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE DeriveFunctor #-}
-module Test.IOTest.IOrep (
+module Test.IOTasks.IOrep (
   IOrep,
   IOrep'(..),
   runProgram,
@@ -11,7 +11,7 @@ module Test.IOTest.IOrep (
 
 import Prelude hiding (getLine, putStrLn, print, readLn)
 
-import Test.IOTest.Trace
+import Test.IOTasks.Trace
 import Control.Monad
 import Control.Monad.Trans.Except
 import Control.Monad.State

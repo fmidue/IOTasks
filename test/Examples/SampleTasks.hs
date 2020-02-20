@@ -5,9 +5,9 @@ module Examples.SampleTasks where
 
 import Prelude hiding (putStrLn, getLine, readLn, print)
 
-import Test.IOTest
-import Test.IOTest.Term.ITerm (ITerm, lit)
-import qualified Test.IOTest.Term.ITerm.Prelude as T
+import Test.IOTasks
+import Test.IOTasks.Term.ITerm (ITerm, lit)
+import qualified Test.IOTasks.Term.ITerm.Prelude as T
 
 import Control.Monad (replicateM,replicateM_)
 

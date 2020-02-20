@@ -1,8 +1,8 @@
 {-# LANGUAGE ViewPatterns #-}
-module Test.IOTest.Python where
+module Test.IOTasks.Python where
 
-import Test.IOTest.Specification
-import Test.IOTest.Term (AST(..),SynTerm(..), TermVars)
+import Test.IOTasks.Specification
+import Test.IOTasks.Term (AST(..),SynTerm(..), TermVars)
 
 import Text.PrettyPrint
 import Data.List ( intercalate )

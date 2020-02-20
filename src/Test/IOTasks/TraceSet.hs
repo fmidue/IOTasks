@@ -4,19 +4,19 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
-module Test.IOTest.TraceSet (
+module Test.IOTasks.TraceSet (
   traceGen,
   sampleNTrace,
 ) where
 
 import Prelude hiding (putStrLn, getLine, GT)
 
-import Test.IOTest.Trace
-import Test.IOTest.Pattern
-import Test.IOTest.Environment
-import Test.IOTest.ValueSet
-import Test.IOTest.Specification
-import Test.IOTest.Term (SemTerm(..), TermVars, evalTerm)
+import Test.IOTasks.Trace
+import Test.IOTasks.Pattern
+import Test.IOTasks.Environment
+import Test.IOTasks.ValueSet
+import Test.IOTasks.Specification
+import Test.IOTasks.Term (SemTerm(..), TermVars, evalTerm)
 
 import Test.QuickCheck.GenT
 

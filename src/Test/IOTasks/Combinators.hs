@@ -1,14 +1,14 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DataKinds #-}
-module Test.IOTest.Combinators (
+module Test.IOTasks.Combinators (
   readTillFixedLength,
   readUntil,
   repeatSpec,
   when,
 ) where
 
-import Test.IOTest.Language
+import Test.IOTasks.Language
 
 import Data.Dynamic (Typeable)
 

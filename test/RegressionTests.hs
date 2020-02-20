@@ -3,9 +3,9 @@ module RegressionTests where
 
 import Prelude hiding (getLine, putStrLn, print)
 
-import Test.IOTest
-import Test.IOTest.Term.ATerm
-import Test.IOTest.TraceSet
+import Test.IOTasks
+import Test.IOTasks.Term.ATerm
+import Test.IOTasks.TraceSet
 
 import Test.Hspec
 import Test.Hspec.QuickCheck (prop)

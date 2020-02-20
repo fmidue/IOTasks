@@ -7,21 +7,21 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DataKinds #-}
-module Test.IOTest.Interpreter (
+module Test.IOTasks.Interpreter (
   buildComputation,
   -- buildWrongComputation,
 ) where
 
-import Test.IOTest.Environment
-import Test.IOTest.Pattern
-import Test.IOTest.ValueSet
-import Test.IOTest.Utils
+import Test.IOTasks.Environment
+import Test.IOTasks.Pattern
+import Test.IOTasks.ValueSet
+import Test.IOTasks.Utils
 
 import Prelude hiding (putStrLn,getLine,print)
-import Test.IOTest.IOrep
-import Test.IOTest.Semantics
-import Test.IOTest.Specification
-import Test.IOTest.Term (SemTerm(..),TermVars)
+import Test.IOTasks.IOrep
+import Test.IOTasks.Semantics
+import Test.IOTasks.Specification
+import Test.IOTasks.Term (SemTerm(..),TermVars)
 
 import Data.Maybe
 import Data.Proxy

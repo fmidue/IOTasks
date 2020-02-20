@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DataKinds #-}
-module Test.IOTest.Utils (
+module Test.IOTasks.Utils (
   StringEmbedding(..),
   ) where
 

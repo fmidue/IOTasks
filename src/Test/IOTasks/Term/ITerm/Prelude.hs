@@ -1,8 +1,8 @@
-module Test.IOTest.Term.ITerm.Prelude where
+module Test.IOTasks.Term.ITerm.Prelude where
 
 import qualified Prelude
 import Prelude (Eq, Ord, Foldable, Num, Integral, Bool, Int, (.))
-import Test.IOTest.Term.ITerm
+import Test.IOTasks.Term.ITerm
 
 sum :: (Foldable t, Num a) => ITerm (t a) -> ITerm a
 sum = liftT (Prelude.sum,"sum")

@@ -5,7 +5,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
-module Test.IOTest.Trace (
+module Test.IOTasks.Trace (
   Trace(..),
   OrdinaryTrace,
   GeneralizedTrace,
@@ -22,7 +22,7 @@ module Test.IOTest.Trace (
 
 import Prelude hiding (GT)
 
-import Test.IOTest.Pattern
+import Test.IOTasks.Pattern
 
 import           Data.Set (Set)
 import qualified Data.Set as S

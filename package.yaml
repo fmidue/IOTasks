@@ -1,6 +1,6 @@
-name:                IOTest
+name:                IOTasks
 version:             0.1.0.0
-github:              "owestphal/IOTest"
+github:              "owestphal/IOTasks"
 license:             BSD3
 author:              "Oliver Westphal"
 maintainer:          "oliver.westphal@uni-due.de"
@@ -17,7 +17,7 @@ category:            Testing
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/owestphal/IOTest#readme>
+description:         Please see the README on GitHub at <https://github.com/owestphal/IOTasks#readme>
 
 dependencies:
 - base >= 4.7 && < 5
@@ -41,22 +41,22 @@ library:
   ghc-options:
   - -Wall
   exposed-modules:
-  - Test.IOTest
-  - Test.IOTest.Language
-  - Test.IOTest.Combinators
-  - Test.IOTest.IOrep
-  - Test.IOTest.Term
-  - Test.IOTest.Term.ITerm.SpecGen
-  - Test.IOTest.Term.ITerm
-  - Test.IOTest.Term.ATerm
-  - Test.IOTest.Term.ITerm.Prelude
-  - Test.IOTest.Artifacts
-  - Test.IOTest.Environment
-  - Test.IOTest.TraceSet
-  - Test.IOTest.Trace
+  - Test.IOTasks
+  - Test.IOTasks.Language
+  - Test.IOTasks.Combinators
+  - Test.IOTasks.IOrep
+  - Test.IOTasks.Term
+  - Test.IOTasks.Term.ITerm.SpecGen
+  - Test.IOTasks.Term.ITerm
+  - Test.IOTasks.Term.ATerm
+  - Test.IOTasks.Term.ITerm.Prelude
+  - Test.IOTasks.Artifacts
+  - Test.IOTasks.Environment
+  - Test.IOTasks.TraceSet
+  - Test.IOTasks.Trace
 
 tests:
-  IOTest-test:
+  IOTasks-test:
     main:                Tests.hs
     source-dirs:         test
     ghc-options:
@@ -65,6 +65,6 @@ tests:
     - -with-rtsopts=-N
     - -O2
     dependencies:
-    - IOTest
+    - IOTasks
     - hspec
     - deepseq

@@ -5,12 +5,12 @@ module Examples.Hangman where
 
 import Prelude hiding (getLine, putStrLn, print)
 
-import Test.IOTest
-import Test.IOTest.Term.ITerm
-import Test.IOTest.Term.ITerm.Prelude as T
+import Test.IOTasks
+import Test.IOTasks.Term.ITerm
+import Test.IOTasks.Term.ITerm.Prelude as T
 
 -- Specification and corresponding implementation of
--- a simple hangman game.  
+-- a simple hangman game.
 
 -- possible elements to build the secret from
 hangmanDomain :: [Int]

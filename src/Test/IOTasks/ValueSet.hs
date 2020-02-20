@@ -7,7 +7,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DataKinds #-}
-module Test.IOTest.ValueSet
+module Test.IOTasks.ValueSet
   ( ValueSet
   , Value(..)
   , valueSet
@@ -19,9 +19,9 @@ module Test.IOTest.ValueSet
   , Extract(..)
   ) where
 
-import Test.IOTest.Utils
-import Test.IOTest.Pattern
-import Test.IOTest.Value
+import Test.IOTasks.Utils
+import Test.IOTasks.Pattern
+import Test.IOTasks.Value
 
 import Data.Proxy
 import Data.Dynamic

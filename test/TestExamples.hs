@@ -5,10 +5,10 @@ module TestExamples where
 
 import Prelude hiding (getLine, putStrLn, print)
 
-import Test.IOTest
-import Test.IOTest.TraceSet
-import Test.IOTest.Term.ITerm.SpecGen
-import Test.IOTest.Trace
+import Test.IOTasks
+import Test.IOTasks.TraceSet
+import Test.IOTasks.Term.ITerm.SpecGen
+import Test.IOTasks.Trace
 
 import Examples.SampleTasks
 
@@ -23,7 +23,7 @@ buildIOrepComputation :: (TermVars t, SemTerm t) => Specification t -> IOrep ()
 buildIOrepComputation = buildComputation
 
 testExamples :: Spec
-testExamples = describe "Testing Test.IOTest.Examples.Examples:" $ do
+testExamples = describe "Testing Test.IOTasks.Examples.Examples:" $ do
   -- Example 1
   prop "solution1 matches ex1" $
     solution1 `fulfills` ex1

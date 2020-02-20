@@ -4,7 +4,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
-module Test.IOTest.Term (
+module Test.IOTasks.Term (
   Term(..),
   getCurrent,
   getAll,
@@ -20,7 +20,7 @@ import Data.Dynamic (Typeable)
 
 import Data.Kind
 
-import Test.IOTest.Environment (Varname, Environment)
+import Test.IOTasks.Environment (Varname, Environment)
 
 class Term (t :: * -> *) where
   getCurrent' :: Typeable a => Varname -> t a

@@ -2,8 +2,8 @@
 import TestExamples
 import RegressionTests
 
-import Test.IOTest (fulfills)
-import Test.IOTest.IOrep
+import Test.IOTasks (fulfills)
+import Test.IOTasks.IOrep
 import Examples.Hangman
 
 import Test.Hspec (hspec, describe)

@@ -8,7 +8,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PolyKinds #-}
-module Test.IOTest.Environment
+module Test.IOTasks.Environment
   (Environment
   , store
   , storeValue
@@ -20,8 +20,8 @@ module Test.IOTest.Environment
   , printLookupError
   ) where
 
-import Test.IOTest.Utils
-import Test.IOTest.Value
+import Test.IOTasks.Utils
+import Test.IOTasks.Value
 
 import Data.Dynamic
 import Data.Proxy

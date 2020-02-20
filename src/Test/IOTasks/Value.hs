@@ -1,8 +1,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Test.IOTest.Value where
+module Test.IOTasks.Value where
 
-import Test.IOTest.Utils
+import Test.IOTasks.Utils
 
 import Type.Reflection
 

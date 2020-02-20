@@ -5,7 +5,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
-module Test.IOTest.Pattern
+module Test.IOTasks.Pattern
   ( buildPattern
   , buildTermPattern
   , Pattern
@@ -16,9 +16,9 @@ module Test.IOTest.Pattern
   , isContainedIn
   ) where
 
-import Test.IOTest.Environment
-import Test.IOTest.Term (SemTerm(..))
-import Test.IOTest.Utils
+import Test.IOTasks.Environment
+import Test.IOTasks.Term (SemTerm(..))
+import Test.IOTasks.Utils
 
 import Data.String
 import Data.Functor

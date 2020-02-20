@@ -1,5 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-module Test.IOTest (
+module Test.IOTasks (
   -- * Language
   Specification,
   readInput,
@@ -41,7 +41,7 @@ module Test.IOTest (
   runProgram,
   MonadTeletype(..), print, readLn,
   -- * IOProperty
-  IOTestable(..),
+  IOTasksable(..),
   accept,
   matchesTrace,
   MatchResult(..),
@@ -50,9 +50,9 @@ module Test.IOTest (
   pythonCode,
 ) where
 
-import Test.IOTest.Language
-import Test.IOTest.Combinators
-import Test.IOTest.Term
-import Test.IOTest.IOrep
-import Test.IOTest.IOProperty
-import Test.IOTest.Artifacts
+import Test.IOTasks.Language
+import Test.IOTasks.Combinators
+import Test.IOTasks.Term
+import Test.IOTasks.IOrep
+import Test.IOTasks.IOProperty
+import Test.IOTasks.Artifacts

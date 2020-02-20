@@ -1,4 +1,4 @@
-module Test.IOTest.Term.ITerm (
+module Test.IOTasks.Term.ITerm (
   ITerm,
   evalClosed,
   isClosed,
@@ -17,8 +17,8 @@ import Data.List (nub)
 import Data.Proxy
 import Data.Dynamic (Typeable)
 
-import Test.IOTest.Term
-import Test.IOTest.Environment (Varname, Environment, lookupNameAtType, printLookupError)
+import Test.IOTasks.Term
+import Test.IOTasks.Environment (Varname, Environment, lookupNameAtType, printLookupError)
 
 data ITerm a = ITerm AST [Varname] (Environment -> a)
 

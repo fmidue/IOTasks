@@ -5,7 +5,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DataKinds #-}
-module Test.IOTest.Specification (
+module Test.IOTasks.Specification (
   Specification(..),
   Action (..),
   optional,
@@ -14,12 +14,12 @@ module Test.IOTest.Specification (
 
 import Prelude hiding (foldr)
 
-import Test.IOTest.Utils
-import Test.IOTest.Environment
-import Test.IOTest.Term (termVars, printTerm, SynTerm(..))
-import Test.IOTest.Term
-import Test.IOTest.Pattern
-import Test.IOTest.ValueSet
+import Test.IOTasks.Utils
+import Test.IOTasks.Environment
+import Test.IOTasks.Term (termVars, printTerm, SynTerm(..))
+import Test.IOTasks.Term
+import Test.IOTasks.Pattern
+import Test.IOTasks.ValueSet
 
 import Data.List (nub)
 import Data.MonoTraversable

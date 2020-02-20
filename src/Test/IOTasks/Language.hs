@@ -3,7 +3,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE MonoLocalBinds #-}
-module Test.IOTest.Language
+module Test.IOTasks.Language
   ( Specification, readInput, writeOutput, branch, tillExit, nop, exit
   , writeFixedOutput
   , Varname, Term, optional
@@ -22,12 +22,12 @@ module Test.IOTest.Language
 
 import Data.Dynamic (Typeable)
 
-import Test.IOTest.Utils
-import Test.IOTest.Specification
-import Test.IOTest.Term
-import Test.IOTest.Environment (Varname)
-import Test.IOTest.ValueSet
-import Test.IOTest.Pattern
+import Test.IOTasks.Utils
+import Test.IOTasks.Specification
+import Test.IOTasks.Term
+import Test.IOTasks.Environment (Varname)
+import Test.IOTasks.ValueSet
+import Test.IOTasks.Pattern
 
 import Test.QuickCheck (Gen, Arbitrary, elements)
 

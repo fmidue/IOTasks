@@ -1,12 +1,12 @@
-module Test.IOTest.Term.ATerm (
+module Test.IOTasks.Term.ATerm (
   ATerm,
 ) where
 
 import Data.List (nub)
 import Data.Proxy
 
-import Test.IOTest.Term
-import Test.IOTest.Environment (Varname, Environment, lookupNameAtType, printLookupError)
+import Test.IOTasks.Term
+import Test.IOTasks.Environment (Varname, Environment, lookupNameAtType, printLookupError)
 
 data ATerm a = ATerm { aTermVars :: [Varname], getTerm :: Environment -> a }
 

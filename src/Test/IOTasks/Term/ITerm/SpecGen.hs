@@ -1,14 +1,14 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeApplications #-}
-module Test.IOTest.Term.ITerm.SpecGen (specGen, loopBodyGen) where
+module Test.IOTasks.Term.ITerm.SpecGen (specGen, loopBodyGen) where
 
 
-import Test.IOTest.Environment (Varname)
-import Test.IOTest.ValueSet (ValueSet)
-import Test.IOTest.Specification
-import Test.IOTest.Language (exit, ints,nats, getCurrent, getAll, buildTermPattern)
-import Test.IOTest.Term.ITerm (ITerm, lit)
-import qualified Test.IOTest.Term.ITerm.Prelude as T
+import Test.IOTasks.Environment (Varname)
+import Test.IOTasks.ValueSet (ValueSet)
+import Test.IOTasks.Specification
+import Test.IOTasks.Language (exit, ints,nats, getCurrent, getAll, buildTermPattern)
+import Test.IOTasks.Term.ITerm (ITerm, lit)
+import qualified Test.IOTasks.Term.ITerm.Prelude as T
 
 import Test.QuickCheck (arbitrary, Gen)
 import Test.QuickCheck.GenT

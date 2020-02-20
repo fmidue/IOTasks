@@ -4,14 +4,14 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: cc5b5710fe7719a013e40a28ccfeb89a07f198c4d8347c88472176477d46d559
+-- hash: 182d36732b294fc53aadb25e34865d45fe4a19a4ddb584b062f777130af7b4c8
 
-name:           IOTest
+name:           IOTasks
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/owestphal/IOTest#readme>
+description:    Please see the README on GitHub at <https://github.com/owestphal/IOTasks#readme>
 category:       Testing
-homepage:       https://github.com/owestphal/IOTest#readme
-bug-reports:    https://github.com/owestphal/IOTest/issues
+homepage:       https://github.com/owestphal/IOTasks#readme
+bug-reports:    https://github.com/owestphal/IOTasks/issues
 author:         Oliver Westphal
 maintainer:     oliver.westphal@uni-due.de
 copyright:      2018 Oliver Westphal
@@ -24,34 +24,34 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/owestphal/IOTest
+  location: https://github.com/owestphal/IOTasks
 
 library
   exposed-modules:
-      Test.IOTest
-      Test.IOTest.Language
-      Test.IOTest.Combinators
-      Test.IOTest.IOrep
-      Test.IOTest.Term
-      Test.IOTest.Term.ITerm.SpecGen
-      Test.IOTest.Term.ITerm
-      Test.IOTest.Term.ATerm
-      Test.IOTest.Term.ITerm.Prelude
-      Test.IOTest.Artifacts
-      Test.IOTest.Environment
-      Test.IOTest.TraceSet
-      Test.IOTest.Trace
+      Test.IOTasks
+      Test.IOTasks.Language
+      Test.IOTasks.Combinators
+      Test.IOTasks.IOrep
+      Test.IOTasks.Term
+      Test.IOTasks.Term.ITerm.SpecGen
+      Test.IOTasks.Term.ITerm
+      Test.IOTasks.Term.ATerm
+      Test.IOTasks.Term.ITerm.Prelude
+      Test.IOTasks.Artifacts
+      Test.IOTasks.Environment
+      Test.IOTasks.TraceSet
+      Test.IOTasks.Trace
   other-modules:
-      Test.IOTest.Interpreter
-      Test.IOTest.IOProperty
-      Test.IOTest.Pattern
-      Test.IOTest.Python
-      Test.IOTest.Semantics
-      Test.IOTest.Specification
-      Test.IOTest.Utils
-      Test.IOTest.Value
-      Test.IOTest.ValueSet
-      Paths_IOTest
+      Test.IOTasks.Interpreter
+      Test.IOTasks.IOProperty
+      Test.IOTasks.Pattern
+      Test.IOTasks.Python
+      Test.IOTasks.Semantics
+      Test.IOTasks.Specification
+      Test.IOTasks.Utils
+      Test.IOTasks.Value
+      Test.IOTasks.ValueSet
+      Paths_IOTasks
   hs-source-dirs:
       src
   ghc-options: -Wall
@@ -73,7 +73,7 @@ library
     , unordered-containers
   default-language: Haskell2010
 
-test-suite IOTest-test
+test-suite IOTasks-test
   type: exitcode-stdio-1.0
   main-is: Tests.hs
   other-modules:
@@ -81,12 +81,12 @@ test-suite IOTest-test
       Examples.SampleTasks
       RegressionTests
       TestExamples
-      Paths_IOTest
+      Paths_IOTasks
   hs-source-dirs:
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -O2
   build-depends:
-      IOTest
+      IOTasks
     , QuickCheck
     , base >=4.7 && <5
     , containers
