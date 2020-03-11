@@ -14,7 +14,7 @@ import Test.QuickCheck (within, sample)
 regressionTests :: Spec
 regressionTests = describe "Testing for regressions:" $ do
   prop "correctly break loop on exit marker in interpretation" $
-    let s = tillExit $ exit <> writeFixedOutput [buildTermPattern "X"]
+    let s = tillExit $ exit <> writeFixedOutput [text "X"]
         p = buildComputation @ATerm @IOrep s
     in within 1000000 $ fulfills @_ @(Specification ATerm) p s
 

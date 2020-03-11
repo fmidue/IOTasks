@@ -21,7 +21,8 @@ import Data.Coerce
 import Data.Maybe (fromMaybe)
 
 import Test.QuickCheck
-import Text.PrettyPrint.HughesPJClass hiding ((<>))
+import Text.PrettyPrint.HughesPJClass (Doc)
+import qualified Text.PrettyPrint.HughesPJClass as PP
 
 class IOTasksable a b where
   fulfills :: a -> b -> Property
@@ -48,7 +49,7 @@ specProperty target spec program =
       prop tg = case program `matchesTrace` tg of
           (MatchSuccessfull,(len, trace)) -> addCounterexample MatchSuccessfull (len,trace) target
           (err, (len, trace)) -> addCounterexample err (len,trace) $ not target
-  in forAllShow gen (render . printGenNTraceInfo) prop
+  in forAllShow gen (PP.render . printGenNTraceInfo) prop
 
 matchesTrace :: IOrep () -> GeneralizedTrace -> (MatchResult, (Int, OrdinaryTrace))
 matchesTrace program tg =
@@ -59,12 +60,12 @@ matchesTrace program tg =
   in (result,(len,trace))
 
 addCounterexample :: Testable prop => MatchResult -> (Int,OrdinaryTrace) -> prop -> Property
-addCounterexample res (n,trace) = counterexample . render $
-  hang (text "Actual run:") 4
+addCounterexample res (n,trace) = counterexample . PP.render $
+  PP.hang (PP.text "Actual run:") 4
     (ppTrace n trace)
-  $$ hang (text "Error:") 4 errorMsg
+  PP.$$ PP.hang (PP.text "Error:") 4 errorMsg
   where errorMsg = case res of
-          MatchSuccessfull -> text "Expected error, but matching succeeded"
+          MatchSuccessfull -> PP.text "Expected error, but matching succeeded"
           err -> ppResult err
 
 accept :: (SemTerm t, TermVars t) => Specification t -> OrdinaryTrace -> Bool

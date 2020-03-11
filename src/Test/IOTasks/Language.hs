@@ -8,8 +8,9 @@ module Test.IOTasks.Language
   , writeFixedOutput
   , Varname, Term, optional
   , getCurrent, getAll
-  , Pattern, buildPattern
+  , FixedPattern, buildPattern
   , TermPattern, buildTermPattern
+  , Pattern (..), var
   , ValueSet
   , intValues
   , values
@@ -59,7 +60,7 @@ intValues = valueSet
 values :: (Typeable a, Arbitrary a, StringEmbedding a, Eq a) => [a] -> ValueSet
 values = valueSet
 
-stringValues :: Pattern -> ValueSet
+stringValues :: FixedPattern -> ValueSet
 stringValues = valueSet
 
 ints :: ValueSet

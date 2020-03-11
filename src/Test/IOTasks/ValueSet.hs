@@ -65,7 +65,7 @@ class Extract ts t | ts -> t where
 instance Extract [t] t where
   extract = elements
 
-instance Extract Pattern String where
+instance Extract FixedPattern String where
   extract p = do
     randomStrings <- listOf $ filter (/='_') <$> liftGen (listOf arbitraryPrintableChar)
     return $ replaceWildCards (unescapeNewline $ render $ pPrint p) randomStrings
@@ -81,8 +81,8 @@ class DecMem xs x | xs -> x where
 instance Eq x => DecMem [x] x where
   contains = flip elem
 
-instance DecMem Pattern String where
-  contains p x = buildPattern x `isSubPatternOf` p
+instance DecMem FixedPattern String where
+  contains = flip isContainedIn
 
 replaceWildCards :: String -> [String] -> String
 replaceWildCards "" _ = ""

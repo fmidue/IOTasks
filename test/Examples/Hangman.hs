@@ -21,12 +21,12 @@ hangmanSpec (lit -> word) =
   tillExit (
        branch (winCondition $ getAll "guessed")
          nop
-         (writeFixedOutput ["_correct_"] <> exit)
-    <> writeFixedOutput ["Game state:_"]
+         (writeFixedOutput [anything <> text "correct" <> anything] <> exit)
+    <> writeFixedOutput [text "Game state:" <> anything]
     <> readInput "guessed" (intValues [0..9])
     <> branch ((\gs -> (T.last gs `T.elem` word) T.&& (T.last gs `T.notElem` T.init gs)) $ getAll @Int "guessed")
-         (optional $ writeFixedOutput ["wrong!"])
-         (optional $ writeFixedOutput ["good guess!"])
+         (optional $ writeFixedOutput [text "wrong!"])
+         (optional $ writeFixedOutput [text "good guess!"])
     )
   where
     winCondition :: ITerm [Int] -> ITerm Bool

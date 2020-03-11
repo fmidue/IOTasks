@@ -23,15 +23,15 @@ ex1 =
      ( readInput "xs" (intValues [-10..10]) )
      exit
   ) <>
-  writeOutput ["#0"] [T.sum $ getAll @Int "xs"]
+  writeOutput [var 0] [T.sum $ getAll @Int "xs"]
 
 ex1Combinators :: Specification ITerm
 ex1Combinators =
-  optional (writeFixedOutput ["_"]) <>
+  optional (writeFixedOutput [anything]) <>
   readInput "n" nats <>
-  optional (writeOutput ["_#0_"] [getCurrent @Int "n"]) <>
+  optional (writeOutput [anything <> var 0 <> anything] [getCurrent @Int "n"]) <>
   readTillFixedLength @Int T.length (T.==) "n" ints "xs" <>
-  writeOutput ["_#0_"] [T.sum $ getAll @Int "xs"]
+  writeOutput [anything <> var 0 <> anything] [T.sum $ getAll @Int "xs"]
 
 solution1 :: IOrep ()
 solution1 = do
@@ -47,23 +47,23 @@ solution1 = do
 -- With possible extra outputs
 ex1Pattern :: Specification ITerm
 ex1Pattern =
-  writeFixedOutput ["_"] <>
+  writeFixedOutput [anything] <>
   readInput "n" nats <>
   tillExit (
     branch (T.length (getAll @Int "xs") T.== getCurrent "n")
-     ( optional (writeOutput ["_#0_"] [T.length (getAll @Int "xs")]) <>
+     ( optional (writeOutput [anything <> var 0 <> anything] [T.length (getAll @Int "xs")]) <>
        readInput "xs" ints
      )
      exit
   ) <>
-  writeOutput ["_#0_"] [T.sum $ getAll @Int "xs"]
+  writeOutput [anything <> var 0 <> anything] [T.sum $ getAll @Int "xs"]
 
 ex1PatternCombinators :: Specification ITerm
 ex1PatternCombinators =
-  writeFixedOutput ["_"] <>
+  writeFixedOutput [anything] <>
   readInput "n" nats <>
   readTillFixedLength @Int T.length (T.==) "n" ints "xs" <>
-  writeOutput ["#0"] [T.sum $ getAll @Int "xs"]
+  writeOutput [anything <> var 0 <> anything] [T.sum $ getAll @Int "xs"]
 
 solution1Pat :: IOrep ()
 solution1Pat = do
@@ -92,7 +92,7 @@ ex2 :: Specification ITerm
 ex2 =
   repeatSpec 2 (readInput "xs" ints) <> --otherwise the condition will throw an exception
   readUntil "xs" (let xs = getAll "xs" in T.length xs T.> lit 1 T.&& (T.last xs T.+ T.last (T.init xs) T.== lit (0 :: Int)) ) ints <>
-  writeOutput ["_#0_"] [count $ getAll @Int "xs"]
+  writeOutput [anything <> var 0 <> anything] [count $ getAll @Int "xs"]
   where count xs = T.length $ T.filter (\x -> x T.> lit 0 T.&& (x `T.mod` lit 3 T.== lit 0)) xs
 
 solution2 :: IOrep ()
@@ -112,13 +112,13 @@ ex3 =
   tillExit $
     readInput "x" ints <>
     when (lit 0 T.== getCurrent @Int "x")
-      (writeOutput ["_#0_"] [T.sum $ getAll @Int "x"] <> exit)
+      (writeOutput [anything <> var 0 <> anything] [T.sum $ getAll @Int "x"] <> exit)
 
 ex3Combinators :: Specification ITerm
 ex3Combinators =
   readInput "xs" ints <> --otherwise last will fail
   readUntil "xs" (T.last (getAll @Int "xs") T.== lit 0) ints <>
-  writeOutput ["_#0_"] [T.sum $ getAll @Int "xs"]
+  writeOutput [anything <> var 0 <> anything] [T.sum $ getAll @Int "xs"]
 
 solution3 :: IOrep ()
 solution3 = go [] where
@@ -132,8 +132,8 @@ solution3 = go [] where
 -- read and reverse
 ex4 ::Specification ITerm
 ex4 =
-  readInput "line" (stringValues ("_" :: Pattern)) <>
-  writeOutput ["_#0_"] [T.reverse $ getCurrent @String "line"]
+  readInput "line" (stringValues (anything :: FixedPattern)) <>
+  writeOutput [anything <> var 0 <> anything] [T.reverse $ getCurrent @String "line"]
 
 solution4 :: IOrep ()
 solution4 = (Prelude.reverse <$> getLine) >>= putStrLn
@@ -144,7 +144,7 @@ wrongSolution4 = getLine >>= putStrLn
 -- Example 5:
 -- specificing parameterized tasks/programs
 printNSpec :: QC.Positive Int -> Int -> Specification ITerm
-printNSpec (QC.Positive n) x = repeatSpec n $ writeFixedOutput [buildTermPattern (show x)]
+printNSpec (QC.Positive n) x = repeatSpec n $ writeFixedOutput [text (show x)]
 
 printN :: Int -> Int -> IOrep ()
 printN n x = replicateM_ n $ print x

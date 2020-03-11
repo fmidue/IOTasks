@@ -27,10 +27,11 @@ import Test.IOTasks.Pattern
 import           Data.Set (Set)
 import qualified Data.Set as S
 
-import Text.PrettyPrint.HughesPJClass hiding ((<>))
+import Text.PrettyPrint.HughesPJClass (Pretty,Doc)
+import qualified Text.PrettyPrint.HughesPJClass as PP
 
 type OrdinaryTrace = Trace String
-type GeneralizedTrace = NTrace (MergeSet Pattern)
+type GeneralizedTrace = NTrace (MergeSet FixedPattern)
 
 -- newtype wrapper for Set to control Semigroup/Monoid behavior
 newtype MergeSet a = MkMergeSet { fromMergeSet :: Set a }
@@ -92,11 +93,11 @@ data MatchResult
   deriving (Show, Eq)
 
 ppResult :: MatchResult -> Doc
-ppResult MatchSuccessfull = text $ show MatchSuccessfull
-ppResult (InputMismatch msg) = hang (text "InputMismatch:") 4 msg
-ppResult (OutputMismatch msg) = hang (text "OutputMismatch:") 4 msg
-ppResult (AlignmentMismatch msg) = hang (text "AlignmentMismatch:") 4 msg
-ppResult (TerminationMismatch msg) = hang (text "TerminationMismatch:") 4 msg
+ppResult MatchSuccessfull = PP.text $ show MatchSuccessfull
+ppResult (InputMismatch msg) = PP.hang (PP.text "InputMismatch:") 4 msg
+ppResult (OutputMismatch msg) = PP.hang (PP.text "OutputMismatch:") 4 msg
+ppResult (AlignmentMismatch msg) = PP.hang (PP.text "AlignmentMismatch:") 4 msg
+ppResult (TerminationMismatch msg) = PP.hang (PP.text "TerminationMismatch:") 4 msg
 
 isCoveredBy :: OrdinaryTrace -> GeneralizedTrace -> MatchResult
 isCoveredBy u v = isCoveredBy' (normalize u) v
@@ -107,11 +108,11 @@ isCoveredBy u v = isCoveredBy' (normalize u) v
       then t1' `isCoveredBy'` t2'
       else InputMismatch $ reportExpectationMismatch t2 t1
   t1@(ProgWriteReadN vs1 v1 t1') `isCoveredBy'` (ProgWriteReadN (MkMergeSet vs2) v2 t2')
-    | buildPattern vs1 `isSubPatternIn` vs2 = isCoveredBy' (ProgReadN v1 t1') (ProgReadN v2 t2')
+    | vs1 `isMatchesByOneOf` vs2 = isCoveredBy' (ProgReadN v1 t1') (ProgReadN v2 t2')
     | S.size vs2 == 1 && S.member emptyPattern vs2 = InputMismatch $ reportExpectationMismatch (ProgReadN v2 t2') t1
     | otherwise = OutputMismatch $ reportCoverageFailure vs1 vs2
   (ProgWriteStopN vs1) `isCoveredBy'` (ProgWriteStopN (MkMergeSet vs2))
-    | buildPattern vs1 `isSubPatternIn` vs2 = MatchSuccessfull
+    | vs1 `isMatchesByOneOf` vs2 = MatchSuccessfull
     | otherwise = OutputMismatch $ reportCoverageFailure vs1 vs2
   StopN `isCoveredBy'` StopN = MatchSuccessfull
   t1 `isCoveredBy'` (ProgWriteReadN (MkMergeSet vs2) v2 t2') | S.member emptyPattern vs2 = t1 `isCoveredBy'` ProgReadN v2 t2'
@@ -119,60 +120,57 @@ isCoveredBy u v = isCoveredBy' (normalize u) v
   t1 `isCoveredBy'` StopN = TerminationMismatch (reportTerminationMismatch t1)
   t1 `isCoveredBy'` t2 = AlignmentMismatch (reportExpectationMismatch t2 t1)
 
-isSubPatternIn :: Pattern -> Set Pattern -> Bool
-x `isSubPatternIn` y = all (\px -> any (\py -> px `isSubPatternOf` py) (S.toList y)) [x]
-                          -- '           '        '- such that
-                          -- '           '- there exist an element py in y
-                          -- '- forall elements px in x
+isMatchesByOneOf :: String -> Set FixedPattern -> Bool
+x `isMatchesByOneOf` xs = any (x `isContainedIn`) (S.toList xs)
 
-reportCoverageFailure :: String -> Set Pattern -> Doc
-reportCoverageFailure xs ys = text "the value" <+> text xs <+> text "is not covered by" <+> printSet ys
+reportCoverageFailure :: String -> Set FixedPattern -> Doc
+reportCoverageFailure xs ys = PP.text "the value" PP.<+> PP.text xs PP.<+> PP.text "is not covered by" PP.<+> printSet ys
 
 printSet :: Pretty a => Set a -> Doc
-printSet set = braces . hsep . punctuate (text ",") $ pPrint <$> S.toList set
+printSet set = PP.braces . PP.hsep . PP.punctuate (PP.text ",") $ PP.pPrint <$> S.toList set
 
 reportExpectationMismatch :: GeneralizedTrace -> NTrace String -> Doc
-reportExpectationMismatch t1 t2 = ppNTraceHead Expected t1 $$ ppTraceHead text Got t2
+reportExpectationMismatch t1 t2 = ppNTraceHead Expected t1 PP.$$ ppTraceHead PP.text Got t2
 
 reportTerminationMismatch :: NTrace a -> Doc
-reportTerminationMismatch t = ppNTraceHead Expected StopN $$ ppTraceHead (const $ text "...") Got t
+reportTerminationMismatch t = ppNTraceHead Expected StopN PP.$$ ppTraceHead (const $ PP.text "...") Got t
 
 instance Pretty a => Pretty (Trace a) where
   pPrint = ppTrace (-1) -- TODO: handle this in a less hacky way
 
 ppTrace :: Pretty a => Int -> Trace a -> Doc
-ppTrace 0 (ProgRead _ _) = text "..."
-ppTrace n (ProgRead v t) = hcat [text "?",pPrint v, text " ", ppTrace (n-1) t]
-ppTrace n (ProgWrite v t) = hcat [text "!", pPrint v, text " ", ppTrace n t]
-ppTrace _ Stop = text "stop"
+ppTrace 0 (ProgRead _ _) = PP.text "..."
+ppTrace n (ProgRead v t) = PP.hcat [PP.text "?",PP.pPrint v, PP.text " ", ppTrace (n-1) t]
+ppTrace n (ProgWrite v t) = PP.hcat [PP.text "!", PP.pPrint v, PP.text " ", ppTrace n t]
+ppTrace _ Stop = PP.text "stop"
 
 instance Pretty GeneralizedTrace where
   pPrint = ppNTrace
 
 ppTraceFF :: (NTrace a -> Doc) -> (a -> Doc) -> NTrace a -> Doc
-ppTraceFF ff _   (ProgReadN v t)         = (text "?" <> text v) <+> ff t
-ppTraceFF ff sho (ProgWriteReadN vs v t) = (text "!" <> sho vs) <+> (text "?" <> text v) <+> ff t
-ppTraceFF _  sho (ProgWriteStopN vs)     = (text "!" <> sho vs) <+> text "stop"
-ppTraceFF _  _   StopN                   = text "stop"
+ppTraceFF ff _   (ProgReadN v t)         = (PP.text "?" <> PP.text v) PP.<+> ff t
+ppTraceFF ff sho (ProgWriteReadN vs v t) = (PP.text "!" <> sho vs) PP.<+> (PP.text "?" <> PP.text v) PP.<+> ff t
+ppTraceFF _  sho (ProgWriteStopN vs)     = (PP.text "!" <> sho vs) PP.<+> PP.text "stop"
+ppTraceFF _  _   StopN                   = PP.text "stop"
 
 data ShowHeadType = Expected | Got | Plain
 
 ppTraceHead :: (a -> Doc) -> ShowHeadType -> NTrace a -> Doc
-ppTraceHead sho Expected t = text "Expected: " <> ppTraceHead sho Plain t
-ppTraceHead sho Got      t = text "Got: " <> ppTraceHead sho Plain t
-ppTraceHead sho Plain    t = ppTraceFF (const empty) sho t
+ppTraceHead sho Expected t = PP.text "Expected: " <> ppTraceHead sho Plain t
+ppTraceHead sho Got      t = PP.text "Got: " <> ppTraceHead sho Plain t
+ppTraceHead sho Plain    t = ppTraceFF (const mempty) sho t
 
 ppNTraceHead :: ShowHeadType -> GeneralizedTrace -> Doc
 ppNTraceHead = ppTraceHead (printSet . fromMergeSet)
 
 printGenNTraceInfo :: GeneralizedTrace -> Doc
-printGenNTraceInfo t = inputSequence $+$ generalizedRun
-  where inputSequence = hang (text "Input sequence:") 4 $ hsep $ (text . ('?' :)) <$> inputsN t
-        generalizedRun = hang (text "Expected run (generalized):") 4 $ ppNTrace t
+printGenNTraceInfo t = inputSequence PP.$+$ generalizedRun
+  where inputSequence = PP.hang (PP.text "Input sequence:") 4 $ PP.hsep $ (PP.text . ('?' :)) <$> inputsN t
+        generalizedRun = PP.hang (PP.text "Expected run (generalized):") 4 $ ppNTrace t
 
 -- ommit occurences of !{}
 ppNTrace :: GeneralizedTrace -> Doc
-ppNTrace = hsep . traceToStringSequence
+ppNTrace = PP.hsep . traceToStringSequence
 
 traceToStringSequence :: GeneralizedTrace -> [Doc]
 traceToStringSequence t@(ProgWriteReadN (MkMergeSet vs) _ t')

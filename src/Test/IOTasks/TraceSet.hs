@@ -46,12 +46,12 @@ traceSet [] k e = k End e
 
 data Cont = Exit | End
 
-(<.>) :: MergeSet Pattern -> GeneralizedTrace -> GeneralizedTrace
+(<.>) :: MergeSet FixedPattern -> GeneralizedTrace -> GeneralizedTrace
 vs <.> ProgWriteReadN vs' v' t'' = ProgWriteReadN (langConcat vs vs') v' t''
 vs <.> ProgWriteStopN vs' = ProgWriteStopN (langConcat vs vs')
 v <.> t' = ProgWriteStopN v <> t'
 
-langConcat :: MergeSet Pattern -> MergeSet Pattern -> MergeSet Pattern
+langConcat :: MergeSet FixedPattern -> MergeSet FixedPattern -> MergeSet FixedPattern
 langConcat = (<>)
 
 -- | only works as intended if the input trace has linebreaks after each previously seperate output

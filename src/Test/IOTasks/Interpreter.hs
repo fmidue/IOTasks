@@ -57,9 +57,12 @@ build _ (WriteOutput True _ _) =
   mempty
 build _ (WriteOutput False (p:_) ts) = do
   v <- gets (eval (p,ts))
-  putStrLn . render . pPrint $ v
+  putStrLn . fixLinebreaks . render . pPrint $ v
   where
     eval = fillHoles
+    fixLinebreaks = foldr f ""
+    f '\\' ('n':xs) = '\n':xs
+    f x xs          = x:xs 
 build _ _ = error "not a read or write action"
 
 buildWrongComputation :: (MonadTeletype m, SemTerm t, TermVars t) => Specification t -> m ()

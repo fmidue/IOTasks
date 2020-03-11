@@ -25,7 +25,8 @@ import Data.List (nub)
 import Data.MonoTraversable
 import Data.MonoTraversable.Unprefixed (foldr)
 
-import Text.PrettyPrint.Annotated.HughesPJClass hiding ((<>))
+import Text.PrettyPrint.Annotated.HughesPJClass (Pretty)
+import qualified Text.PrettyPrint.Annotated.HughesPJClass as PP
 
 newtype Specification t = Spec [Action t]
   deriving (Semigroup, Monoid, MonoFoldable) via [Action t]
@@ -41,21 +42,21 @@ data Action t where
   E :: Action t
 
 instance SynTerm t => Show (Specification t) where
-  show = render . pPrint
+  show = PP.render . PP.pPrint
 
 instance SynTerm t => Show (Action t) where
-  show = render . pPrint
+  show = PP.render . PP.pPrint
 
 instance SynTerm t => Pretty (Specification t) where
-  pPrint (Spec []) = text "0" $$ text " "
-  pPrint (Spec as) = vcat (pPrint <$> as) $$ text " "
+  pPrint (Spec []) = PP.text "0" PP.$$ PP.text " "
+  pPrint (Spec as) = PP.vcat (PP.pPrint <$> as) PP.$$ PP.text " "
 
 instance SynTerm t => Pretty (Action t) where
-  pPrint (ReadInput x _) = text "ReadInput" <+> text (show x) <+> text "_"
-  pPrint (WriteOutput b ps ts) = hsep [text "WriteOutput", text (show b), text (show ps), text (show (printTerm <$> ts))]
-  pPrint (Branch c s1 s2) = hang (text "Branch" <+> parens (text $ printTerm c)) 2 (parens (pPrint s1) $+$ parens (pPrint s2))
-  pPrint (TillE s) = hang (text "TillE") 2 (parens (pPrint s))
-  pPrint E = text "E"
+  pPrint (ReadInput x _) = PP.text "ReadInput" PP.<+> PP.text (show x) PP.<+> PP.text "_"
+  pPrint (WriteOutput b ps ts) = PP.hsep [PP.text "WriteOutput", PP.text (show b), PP.text (show ps), PP.text (show (printTerm <$> ts))]
+  pPrint (Branch c s1 s2) = PP.hang (PP.text "Branch" PP.<+> PP.parens (PP.text $ printTerm c)) 2 (PP.parens (PP.pPrint s1) PP.$+$ PP.parens (PP.pPrint s2))
+  pPrint (TillE s) = PP.hang (PP.text "TillE") 2 (PP.parens (PP.pPrint s))
+  pPrint E = PP.text "E"
 
 -- move into Combinators ?
 optional :: Specification t -> Specification t

@@ -1,18 +1,20 @@
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingVia #-}
 module Test.IOTasks.Pattern
-  ( buildPattern
+  ( Pattern (..)
+  , var
+  , buildPattern
   , buildTermPattern
-  , Pattern
+  , FixedPattern
   , TermPattern
   , fillHoles
   , emptyPattern
-  , isSubPatternOf
   , isContainedIn
   ) where
 
@@ -20,20 +22,26 @@ import Test.IOTasks.Environment
 import Test.IOTasks.Term (SemTerm(..))
 import Test.IOTasks.Utils
 
-import Data.String
-import Data.Functor
+import Data.List (intersperse)
+import Data.Maybe (isJust, fromJust)
 
 import Test.QuickCheck
 import Text.Parsec
+import Text.Parsec.Char (endOfLine)
 import Text.Parsec.String
-import Text.PrettyPrint.HughesPJClass hiding ((<>))
+import Text.PrettyPrint.HughesPJClass (Pretty)
+import qualified Text.PrettyPrint.HughesPJClass as PP
 
 -- ----------------------------- --
 -- TODO: reduce code duplication --
 -- ----------------------------- --
 
-newtype TermPattern = TermPattern [SimplePattern 'WithVars] deriving (Eq,Ord)
-newtype Pattern = Pattern [SimplePattern 'NoVars] deriving (Eq,Ord)
+newtype TermPattern = TermPattern [SimplePattern 'WithVars]
+  deriving (Eq,Ord)
+  deriving (Pretty, Semigroup, Monoid, Pattern) via (SimplePatternList 'WithVars)
+newtype FixedPattern = FixedPattern [SimplePattern 'NoVars]
+  deriving (Eq,Ord)
+  deriving (Pretty, Semigroup, Monoid, Pattern) via (SimplePatternList 'NoVars)
 -- Ord instances are mainly for putting pattern into Sets
 
 data PType = WithVars | NoVars
@@ -42,114 +50,159 @@ data SimplePattern (t :: PType) where
   WildCard :: SimplePattern t
   Literal :: String -> SimplePattern t
   Hole :: Int -> SimplePattern 'WithVars
+  Linebreak :: SimplePattern t
+  NoBreak :: SimplePattern t
 
 deriving instance Eq (SimplePattern t)
 deriving instance Ord (SimplePattern t)
 
-emptyPattern :: Pattern
+emptyPattern :: FixedPattern
 emptyPattern = mempty
 
-instance Pretty Pattern where
-  pPrint (Pattern []) = text "emptyPattern"
-  pPrint (Pattern xs) = foldr (\x ys -> pPrint x <> ys) mempty xs
+class Monoid p => Pattern p where
+  -- forced linebreak
+  infixl 6 $$
+  ($$) :: p -> p -> p
+  -- wildcard
+  anything :: p
+  -- literal, matches the given string even if its words are seperated by linebreaks
+  text :: String -> p
+  -- non breakable text (can not be interrupted by a linebreak)
+  lineText :: String -> p
+  -- composition with added whitespace
+  infixl 5 <+>
+  (<+>) :: p -> p -> p
+  -- non breaking composition with added whitespace
+  infixl 5 <~>
+  (<~>) :: p -> p -> p
+  -- linebreak
+  linebreak :: p
 
-instance Show Pattern where
-  show (Pattern []) = "emptyPattern"
-  show p = "buildPattern " <> render (doubleQuotes $ pPrint p)
+var :: Int -> TermPattern
+var n | n < 0     = error "var: negative variable index"
+      | otherwise = TermPattern [Hole n]
 
-instance Pretty TermPattern where
-  pPrint (TermPattern []) = text "emptyTermPattern"
-  pPrint (TermPattern xs) = foldr (\x ys -> pPrint x <> ys) mempty xs
+instance Pattern (SimplePatternList t) where
+  (SPList ps) $$ (SPList qs) = SPList (ps ++ [Linebreak] ++ qs)
+  anything = SPList [WildCard]
+  text s
+    | '\n' `elem` s = error "text: linebreaks in literals are not supported"
+    | otherwise = SPList [Literal s]
+  lineText s
+    | '\n' `elem` s = error "lineText: non breakable text can not contain linebreaks"
+    | otherwise  = SPList (intersperse NoBreak (map (\c -> Literal [c]) s))
+  p <+> q = p <> SPList [Literal " "] <> q
+  p <~> q = p <> SPList [NoBreak] <> q
+  linebreak = SPList [Linebreak]
+
+instance Show FixedPattern where
+  show (FixedPattern []) = "emptyPattern"
+  show p = "buildPattern " <> PP.render (PP.doubleQuotes $ PP.pPrint p)
 
 instance Show TermPattern where
-  show p = "buildTermPattern " <> render (doubleQuotes $ pPrint p)
+  show p = "buildTermPattern " <> PP.render (PP.doubleQuotes $ PP.pPrint p)
+
+instance Show (SimplePatternList t) where
+  show p = "buildPattern " <> PP.render (PP.doubleQuotes $ PP.pPrint p)
+
+instance Pretty (SimplePatternList t) where
+  pPrint (SPList []) = PP.text "emptyTermPattern"
+  pPrint (SPList xs) = foldr (\x ys -> PP.pPrint x <> ys) mempty xs
 
 instance Pretty (SimplePattern l) where
-  pPrint WildCard = text "_"
-  pPrint (Literal l) = text (escapeNewline l)
-  pPrint (Hole n) = text "#" <> pPrint n
+  pPrint WildCard = PP.text "_"
+  pPrint (Literal l) = PP.text (newlineToWhitespace l)
+  pPrint (Hole n) = PP.text "#" <> PP.pPrint n
+  pPrint Linebreak = PP.text "\\n"
+  pPrint NoBreak = PP.text "~"
 
-escapeNewline :: String -> String
-escapeNewline = concatMap (\c -> if c == '\n' then "\\n" else [c])
+newlineToWhitespace :: String -> String
+newlineToWhitespace = map (\c -> if c == '\n' then ' ' else c)
 
--- buildPattern always results in an non-emtpy Pattern
-buildPattern :: String -> Pattern
-buildPattern "_" = Pattern [WildCard]
-buildPattern ('_':xs) = Pattern [WildCard] <> buildPattern xs
-buildPattern xs =
-  let (lit,rest) = span (/= '_') xs
-  in if null rest
-    then Pattern [Literal lit]
-    else Pattern [Literal lit] <> buildPattern rest
+newtype SimplePatternList t = SPList { _fromSPList :: [SimplePattern t] }
 
--- buildTermPattern always results in an non-emtpy Pattern
-buildTermPattern :: String -> TermPattern
-buildTermPattern "_" = TermPattern [WildCard]
-buildTermPattern ('_':xs) = TermPattern [WildCard] <> buildTermPattern xs
-buildTermPattern ('#':n:xs) = TermPattern [Hole $ read [n]] <> buildTermPattern xs
-buildTermPattern xs =
-  let (lit,rest) = span (/= '_') xs
-  in if null rest
-    then TermPattern [Literal lit]
-    else TermPattern [Literal lit] <> buildTermPattern rest
-
-instance IsString Pattern where
-  fromString = buildPattern
-
-instance IsString TermPattern where
-  fromString = buildTermPattern
-
-instance Semigroup Pattern where
-  Pattern [] <> p = p
-  p <> Pattern [] = p
-  Pattern xs <> Pattern (y:ys) =
+instance Semigroup (SimplePatternList t) where
+  SPList [] <> p = p
+  p <> SPList [] = p
+  SPList xs <> SPList (y:ys) =
     let xs' = init xs
         x = last xs
-    in Pattern $ xs' ++ op x y ++ ys
-
-instance Monoid Pattern where
-  mempty = Pattern []
-
-instance Semigroup TermPattern where
-  TermPattern [] <> p = p
-  p <> TermPattern [] = p
-  TermPattern xs <> TermPattern (y:ys) =
-    let xs' = init xs
-        x = last xs
-    in TermPattern $ xs' ++ op x y ++ ys
-
-instance Monoid TermPattern where
-  mempty = TermPattern []
+    in SPList $ xs' ++ op x y ++ ys
 
 op :: SimplePattern t -> SimplePattern t -> [SimplePattern t]
 op WildCard WildCard = [WildCard]
 op (Literal l1) (Literal l2) = [Literal (l1 ++ l2)]
 op p1 p2 = [p1,p2]
 
-fillHoles :: (SemTerm t, StringEmbedding a) => (TermPattern, [t a]) -> Environment -> Pattern
-fillHoles (TermPattern xs, ts) d = Pattern $ (\s -> fillSimple (s, ts) d) <$> xs
+instance Monoid (SimplePatternList t) where
+  mempty = SPList []
+
+fillHoles :: (SemTerm t, StringEmbedding a) => (TermPattern, [t a]) -> Environment -> FixedPattern
+fillHoles (TermPattern xs, ts) d = FixedPattern $ (\s -> fillSimple (s, ts) d) <$> xs
 
 fillSimple :: (SemTerm t, StringEmbedding a) => (SimplePattern 'WithVars, [t a]) -> Environment -> SimplePattern 'NoVars
 fillSimple (WildCard, _) _ = WildCard
 fillSimple (Literal p, _) _ = Literal p
 fillSimple (Hole n, ts) d = Literal . pack $ evalTerm (ts !! n) d
+fillSimple (Linebreak, _) _ = Linebreak
+fillSimple (NoBreak, _) _ = NoBreak
 
-isSubPatternOf :: Pattern -> Pattern ->  Bool
-p1 `isSubPatternOf` p2 = parse (patternParser p2) "" (render $ pPrint p1) == Right ()
+isContainedIn :: String -> FixedPattern -> Bool
+isContainedIn s p = parse (patternParser p) "" s == Right ()
 
-isContainedIn :: String -> Pattern -> Bool
-isContainedIn s p = buildPattern s `isSubPatternOf` p
-
--- yields a parser that succesfully parses the string representation of a
--- pattern less general than the given pattern
-patternParser :: Pattern -> Parser ()
+-- yields a parser that succesfully parses a string matched by the given pattern
+patternParser :: FixedPattern -> Parser ()
 patternParser pat = patternParser' pat >> eof where
-  patternParser' (Pattern []) = void $ string ""
-  patternParser' (Pattern [Literal l]) = void $ string (escapeNewline l)
-  patternParser' (Pattern [WildCard]) = void $ many anyChar
-  patternParser' (Pattern (Literal l : p2)) = string (escapeNewline l) >> patternParser' (Pattern p2)
-  patternParser' p@(Pattern (WildCard : p2)) = try (anyChar >> patternParser' p) <|> patternParser' (Pattern p2)
+  patternParser' (FixedPattern []) = eof
+  patternParser' (FixedPattern [Literal l])       = mapM_ (\c -> if c == ' ' then char ' ' <|> endOfLine else char c) l >> ((char '\n' >> eof) <|> eof)
+  patternParser' (FixedPattern (Literal l : p2))  = mapM_ (\c -> if c == ' ' then char ' ' <|> endOfLine else char c) l >> patternParser' (FixedPattern p2)
+  patternParser' p@(FixedPattern (WildCard : p2)) = try (anyChar >> patternParser' p) <|> patternParser' (FixedPattern p2)
+  patternParser' (FixedPattern (Linebreak : p2))  = endOfLine >> patternParser' (FixedPattern p2)
+  patternParser' (FixedPattern (NoBreak : p2))    = char ' ' >> notFollowedBy endOfLine >> patternParser' (FixedPattern p2)
 
 -- tests
 _test :: IO ()
-_test = quickCheck $ \xs -> let str = concatMap @[] (\c -> if c == '#' then "#1" else [c]) xs in render (pPrint (fromString @Pattern str)) == str
+_test = quickCheck $ forAll (listOf $ elements ['A'..'~']) $ \xs ->
+  let str = mergeWildCards $ concatMap @[] (\c -> if c == '#' then "#1" else [c]) xs
+  in isJust (buildPattern str) ==> show (fromJust (buildPattern str)) == "buildPattern " ++ "\"" ++ str ++ "\""
+
+mergeWildCards :: String -> String
+mergeWildCards = foldr f "" where
+  f '_' ('_':xs) = '_':xs
+  f x   xs       = x:xs
+
+-- pattern construction from Strings
+buildPattern :: String -> Maybe FixedPattern
+buildPattern s = either (const Nothing) Just $ parse parsePattern "" s
+
+parsePattern :: Parser FixedPattern
+parsePattern =
+  (do
+    p <- parsePattern'
+    (%%) <- ((<~>) <$ char '~') <|> ((<+>) <$ char ' ') <|> ($$) <$ char '\n' <|> pure (<>)
+    q <- parsePattern
+    return $ p %% q)
+  <|> text "" <$ eof
+
+parsePattern' :: Parser FixedPattern
+parsePattern' =
+      anything <$ char '_'
+  <|> text <$> many1 (noneOf ['~',' ','_'])
+
+buildTermPattern :: String -> Maybe TermPattern
+buildTermPattern s = either (const Nothing) Just $ parse parseTermPattern "" s
+
+parseTermPattern :: Parser TermPattern
+parseTermPattern =
+  (do
+    p <- parseTermPattern'
+    (%%) <- ((<~>) <$ char '~') <|> ((<+>) <$ char ' ') <|> ($$) <$ char '\n' <|> pure (<>)
+    q <- parseTermPattern
+    return $ p %% q)
+  <|> text "" <$ eof
+
+parseTermPattern' :: Parser TermPattern
+parseTermPattern' =
+      anything <$ char '_'
+  <|> try (text <$> many1 (noneOf ['~',' ','_', '#']))
+  <|> var . read <$> (char '#' >> (string "0" <|> many1 digit))

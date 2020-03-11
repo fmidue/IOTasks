@@ -6,7 +6,8 @@ module Test.IOTasks.Term.ITerm.SpecGen (specGen, loopBodyGen) where
 import Test.IOTasks.Environment (Varname)
 import Test.IOTasks.ValueSet (ValueSet)
 import Test.IOTasks.Specification
-import Test.IOTasks.Language (exit, ints,nats, getCurrent, getAll, buildTermPattern)
+import Test.IOTasks.Language (exit, ints,nats, getCurrent, getAll, Pattern(..))
+import Test.IOTasks.Language as Pattern (var)
 import Test.IOTasks.Term.ITerm (ITerm, lit)
 import qualified Test.IOTasks.Term.ITerm.Prelude as T
 
@@ -73,7 +74,7 @@ output :: GenM (Action ITerm)
 output = do
   opt <- liftGen $ arbitrary @Bool
   n <- oneof [return 1, choose (2::Int,4)]
-  let ps = [ buildTermPattern $ '#':show i ++ "\n" | i <- [0 .. n-1] ]
+  let ps = [ Pattern.var i <> linebreak | i <- [0 .. n-1] ]
   ts <- vectorOf n term
   return $ WriteOutput opt ps ts
 
