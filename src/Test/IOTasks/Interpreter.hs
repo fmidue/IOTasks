@@ -60,9 +60,11 @@ build _ (WriteOutput False (p:_) ts) = do
   putStrLn . fixLinebreaks . render . pPrint $ v
   where
     eval = fillHoles
-    fixLinebreaks = foldr f ""
-    f '\\' ('n':xs) = '\n':xs
-    f x xs          = x:xs 
+    fixLinebreaks :: String -> String
+    fixLinebreaks "" = ""
+    fixLinebreaks ('\\':'\\':cs) = '\\' : fixLinebreaks cs
+    fixLinebreaks ('\\':'n':cs) = '\n' : fixLinebreaks cs
+    fixLinebreaks (c:cs) = c : fixLinebreaks cs
 build _ _ = error "not a read or write action"
 
 buildWrongComputation :: (MonadTeletype m, SemTerm t, TermVars t) => Specification t -> m ()

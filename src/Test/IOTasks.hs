@@ -12,7 +12,7 @@ module Test.IOTasks (
   Varname, optional,
   FixedPattern, buildPattern,
   TermPattern, buildTermPattern,
-  Pattern(..), var,
+  Pattern(..), var, whitespace,
   ValueSet,
   intValues,
   values,
@@ -37,8 +37,7 @@ module Test.IOTasks (
   printAST,
   printTerm,
   -- * IOrep
-  IOrep,
-  IOrep'(..),
+  IOrep(..),
   runProgram,
   MonadTeletype(..), print, readLn,
   -- * IOProperty

@@ -3,7 +3,7 @@
 {-# LANGUAGE DataKinds #-}
 module Examples.SampleTasks where
 
-import Prelude hiding (putStrLn, getLine, readLn, print)
+import Prelude hiding (putStrLn, getLine, readLn, print, putStr)
 
 import Test.IOTasks
 import Test.IOTasks.Term.ITerm (ITerm, lit)
@@ -38,7 +38,7 @@ solution1 = do
   n <- readLn
   let loop xs =
         if length xs == n
-          then print (sum xs)
+          then putStr (show $ sum xs)
           else do
             v <- readLn
             loop (xs ++ [v])
@@ -144,7 +144,7 @@ wrongSolution4 = getLine >>= putStrLn
 -- Example 5:
 -- specificing parameterized tasks/programs
 printNSpec :: QC.Positive Int -> Int -> Specification ITerm
-printNSpec (QC.Positive n) x = repeatSpec n $ writeFixedOutput [text (show x)]
+printNSpec (QC.Positive n) x = repeatSpec n $ writeFixedOutput [text (show x) <> linebreak]
 
 printN :: Int -> Int -> IOrep ()
 printN n x = replicateM_ n $ print x

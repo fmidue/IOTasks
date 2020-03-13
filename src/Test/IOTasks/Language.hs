@@ -10,7 +10,7 @@ module Test.IOTasks.Language
   , getCurrent, getAll
   , FixedPattern, buildPattern
   , TermPattern, buildTermPattern
-  , Pattern (..), var
+  , Pattern (..), var, whitespace
   , ValueSet
   , intValues
   , values

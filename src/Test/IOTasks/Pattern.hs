@@ -6,9 +6,11 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE LambdaCase #-}
 module Test.IOTasks.Pattern
   ( Pattern (..)
   , var
+  , whitespace
   , buildPattern
   , buildTermPattern
   , FixedPattern
@@ -22,6 +24,8 @@ import Test.IOTasks.Environment
 import Test.IOTasks.Term (SemTerm(..))
 import Test.IOTasks.Utils
 
+import Data.Coerce
+import Data.Functor (void)
 import Data.List (intersperse)
 import Data.Maybe (isJust, fromJust)
 
@@ -52,6 +56,7 @@ data SimplePattern (t :: PType) where
   Hole :: Int -> SimplePattern 'WithVars
   Linebreak :: SimplePattern t
   NoBreak :: SimplePattern t
+  Backslash :: SimplePattern t
 
 deriving instance Eq (SimplePattern t)
 deriving instance Ord (SimplePattern t)
@@ -78,6 +83,9 @@ class Monoid p => Pattern p where
   -- linebreak
   linebreak :: p
 
+whitespace :: Pattern p => p
+whitespace = text " "
+
 var :: Int -> TermPattern
 var n | n < 0     = error "var: negative variable index"
       | otherwise = TermPattern [Hole n]
@@ -85,15 +93,19 @@ var n | n < 0     = error "var: negative variable index"
 instance Pattern (SimplePatternList t) where
   (SPList ps) $$ (SPList qs) = SPList (ps ++ [Linebreak] ++ qs)
   anything = SPList [WildCard]
-  text s
-    | '\n' `elem` s = error "text: linebreaks in literals are not supported"
-    | otherwise = SPList [Literal s]
+  text = escapeLiteral
   lineText s
     | '\n' `elem` s = error "lineText: non breakable text can not contain linebreaks"
-    | otherwise  = SPList (intersperse NoBreak (map (\c -> Literal [c]) s))
+    | otherwise  = let SPList xs = escapeLiteral s in SPList (intersperse NoBreak xs)
   p <+> q = p <> SPList [Literal " "] <> q
   p <~> q = p <> SPList [NoBreak] <> q
   linebreak = SPList [Linebreak]
+
+escapeLiteral :: String -> SimplePatternList t
+escapeLiteral = foldMap $ \case
+  '\n' -> SPList [Linebreak]
+  '\\' -> SPList [Backslash]
+  c -> SPList [Literal [c]]
 
 instance Show FixedPattern where
   show (FixedPattern []) = "emptyPattern"
@@ -115,6 +127,7 @@ instance Pretty (SimplePattern l) where
   pPrint (Hole n) = PP.text "#" <> PP.pPrint n
   pPrint Linebreak = PP.text "\\n"
   pPrint NoBreak = PP.text "~"
+  pPrint Backslash = PP.text "\\\\"
 
 newlineToWhitespace :: String -> String
 newlineToWhitespace = map (\c -> if c == '\n' then ' ' else c)
@@ -138,14 +151,15 @@ instance Monoid (SimplePatternList t) where
   mempty = SPList []
 
 fillHoles :: (SemTerm t, StringEmbedding a) => (TermPattern, [t a]) -> Environment -> FixedPattern
-fillHoles (TermPattern xs, ts) d = FixedPattern $ (\s -> fillSimple (s, ts) d) <$> xs
+fillHoles (TermPattern xs, ts) d = mconcat $ (\s -> coerce $ fillSimple (s, ts) d) <$> xs
 
-fillSimple :: (SemTerm t, StringEmbedding a) => (SimplePattern 'WithVars, [t a]) -> Environment -> SimplePattern 'NoVars
-fillSimple (WildCard, _) _ = WildCard
-fillSimple (Literal p, _) _ = Literal p
-fillSimple (Hole n, ts) d = Literal . pack $ evalTerm (ts !! n) d
-fillSimple (Linebreak, _) _ = Linebreak
-fillSimple (NoBreak, _) _ = NoBreak
+fillSimple :: (SemTerm t, StringEmbedding a) => (SimplePattern 'WithVars, [t a]) -> Environment -> SimplePatternList 'NoVars
+fillSimple (WildCard, _) _ = SPList [WildCard]
+fillSimple (Literal p, _) _ = SPList [Literal p]
+fillSimple (Hole n, ts) d = text . pack $ evalTerm (ts !! n) d
+fillSimple (Linebreak, _) _ = SPList [Linebreak]
+fillSimple (NoBreak, _) _ = SPList [NoBreak]
+fillSimple (Backslash, _) _ = SPList [Backslash]
 
 isContainedIn :: String -> FixedPattern -> Bool
 isContainedIn s p = parse (patternParser p) "" s == Right ()
@@ -153,14 +167,18 @@ isContainedIn s p = parse (patternParser p) "" s == Right ()
 -- yields a parser that succesfully parses a string matched by the given pattern
 patternParser :: FixedPattern -> Parser ()
 patternParser pat = patternParser' pat >> eof where
-  patternParser' (FixedPattern []) = eof
-  patternParser' (FixedPattern [Literal l])       = mapM_ (\c -> if c == ' ' then char ' ' <|> endOfLine else char c) l >> ((char '\n' >> eof) <|> eof)
-  patternParser' (FixedPattern (Literal l : p2))  = mapM_ (\c -> if c == ' ' then char ' ' <|> endOfLine else char c) l >> patternParser' (FixedPattern p2)
+  patternParser' (FixedPattern [])                = void $ many endOfLine
+  -- patternParser' (FixedPattern [Literal l])       = mapM_ (\c -> if c == ' ' then char ' ' <|> ('\n' <$ many1 endOfLine) else char c) l >> (many endOfLine >> eof)
+  patternParser' (FixedPattern (Literal l : p2))  = mapM_ (\c -> if c == ' ' then char ' ' <|> ('\n' <$ many1 endOfLine) else char c <|> (('\n' <$ many1 endOfLine) >> char c)) l >> patternParser' (FixedPattern p2)
   patternParser' p@(FixedPattern (WildCard : p2)) = try (anyChar >> patternParser' p) <|> patternParser' (FixedPattern p2)
   patternParser' (FixedPattern (Linebreak : p2))  = endOfLine >> patternParser' (FixedPattern p2)
   patternParser' (FixedPattern (NoBreak : p2))    = char ' ' >> notFollowedBy endOfLine >> patternParser' (FixedPattern p2)
+  patternParser' (FixedPattern (Backslash : p2))  = string "\\" >> patternParser' (FixedPattern p2)
 
 -- tests
+_simpleProp :: IO ()
+_simpleProp = quickCheckWith stdArgs{maxSuccess = 1000} $ \xs -> isContainedIn xs (text xs)
+
 _test :: IO ()
 _test = quickCheck $ forAll (listOf $ elements ['A'..'~']) $ \xs ->
   let str = mergeWildCards $ concatMap @[] (\c -> if c == '#' then "#1" else [c]) xs

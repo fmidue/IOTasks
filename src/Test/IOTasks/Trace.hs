@@ -124,7 +124,11 @@ isMatchesByOneOf :: String -> Set FixedPattern -> Bool
 x `isMatchesByOneOf` xs = any (x `isContainedIn`) (S.toList xs)
 
 reportCoverageFailure :: String -> Set FixedPattern -> Doc
-reportCoverageFailure xs ys = PP.text "the value" PP.<+> PP.text xs PP.<+> PP.text "is not covered by" PP.<+> printSet ys
+reportCoverageFailure xs ys = PP.text "the value" PP.<+> PP.doubleQuotes (PP.text (fixLinebreaks xs)) PP.<+> PP.text "is not covered by" PP.<+> printSet ys
+  where
+    fixLinebreaks = foldr f ""
+    f '\n' cs = '\\':'n':cs
+    f c cs    = c:cs
 
 printSet :: Pretty a => Set a -> Doc
 printSet set = PP.braces . PP.hsep . PP.punctuate (PP.text ",") $ PP.pPrint <$> S.toList set
