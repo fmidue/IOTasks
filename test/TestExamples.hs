@@ -10,7 +10,7 @@ import Test.IOTasks.TraceSet
 import Test.IOTasks.Term.ITerm.SpecGen
 import Test.IOTasks.Trace
 
-import Examples.SampleTasks
+import Test.IOTasks.Examples.SampleTasks
 
 import Test.Hspec
 import Test.Hspec.QuickCheck (prop)

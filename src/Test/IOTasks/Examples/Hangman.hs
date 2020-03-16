@@ -1,7 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeApplications #-}
-module Examples.Hangman where
+module Test.IOTasks.Examples.Hangman where
 
 import Prelude hiding (getLine, putStrLn, print)
 

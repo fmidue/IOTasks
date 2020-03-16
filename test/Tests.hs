@@ -4,7 +4,7 @@ import RegressionTests
 
 import Test.IOTasks (fulfills)
 import Test.IOTasks.IOrep
-import Examples.Hangman
+import Test.IOTasks.Examples.Hangman
 
 import Test.Hspec (hspec, describe)
 import Test.Hspec.QuickCheck (prop)

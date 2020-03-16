@@ -56,6 +56,10 @@ library:
   - Test.IOTasks.Environment
   - Test.IOTasks.TraceSet
   - Test.IOTasks.Trace
+  - Test.IOTasks.Analysis
+  - Test.IOTasks.IR
+  - Test.IOTasks.Examples.SampleTasks
+  - Test.IOTasks.Examples.Hangman
 
 tests:
   IOTasks-test:

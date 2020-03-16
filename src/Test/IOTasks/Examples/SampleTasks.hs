@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DataKinds #-}
-module Examples.SampleTasks where
+module Test.IOTasks.Examples.SampleTasks where
 
 import Prelude hiding (putStrLn, getLine, readLn, print, putStr)
 

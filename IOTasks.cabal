@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 03b1accdf8fba0af4b51dccfb778573692ea7c95bd94214da0a4203edfe5b095
+-- hash: 9e336861b1b47d4a54f42612af8a2098b71f67951527597084e4d89cfaee4b47
 
 name:           IOTasks
 version:        0.1.0.0
@@ -41,11 +41,13 @@ library
       Test.IOTasks.Environment
       Test.IOTasks.TraceSet
       Test.IOTasks.Trace
-  other-modules:
       Test.IOTasks.Analysis
+      Test.IOTasks.IR
+      Test.IOTasks.Examples.SampleTasks
+      Test.IOTasks.Examples.Hangman
+  other-modules:
       Test.IOTasks.Interpreter
       Test.IOTasks.IOProperty
-      Test.IOTasks.IR
       Test.IOTasks.Pattern
       Test.IOTasks.Python
       Test.IOTasks.Semantics
@@ -81,8 +83,6 @@ test-suite IOTasks-test
   type: exitcode-stdio-1.0
   main-is: Tests.hs
   other-modules:
-      Examples.Hangman
-      Examples.SampleTasks
       RegressionTests
       TestExamples
       Paths_IOTasks
