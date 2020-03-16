@@ -4,10 +4,14 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ViewPatterns #-}
-module Test.IOTasks.Analysis (
-  printProgram,
-  programIR,
-  ) where
+module Test.IOTasks.Analysis
+  -- (
+  -- printProgram,
+  -- programIR,
+  -- )
+  where
+
+import Debug.Trace
 
 import Test.IOTasks.Specification
 import Test.IOTasks.Term
@@ -139,7 +143,9 @@ translate fs (AnnAction _ (ReadInput x _)) =
     Just A -> do
       xk <- currentName x
       xi <- freshName x
-      return $ READ "v" `SEQ` UPDATE xi (\xk v -> Infix (Leaf xk) "++" (Leaf $ "["++v++"]")) xk "v"
+      return $ case xk of
+        "[]" -> READ "v" `SEQ` UPDATE xi (\_ v -> Leaf $ "["++v++"]") xk "v"
+        _ -> READ "v" `SEQ` UPDATE xi (\xk' v -> Infix (Leaf xk') "++" (Leaf $ "["++v++"]")) xk "v"
     Nothing -> error "invalid spec"
 translate _ (AnnAction _ (WriteOutput True _ _)) = return NOP
 translate fs (AnnAction _ (WriteOutput False _ (t:_))) = do
@@ -199,7 +205,7 @@ adjustVars fs (Leaf s) = do
       "_C" ->
         case Map.lookup x fs of
           Just A -> Node "last" [Leaf xi]
-          Just C -> Leaf xi
+          Just C -> Leaf x
           Nothing -> error "invalid spec"
       "_A" -> Leaf xi
       _ -> Leaf s

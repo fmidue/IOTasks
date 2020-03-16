@@ -10,7 +10,8 @@ module Test.IOTasks.IR where
 import Test.IOTasks.Environment
 import Test.IOTasks.Term
 
-import Text.PrettyPrint.HughesPJClass
+import Text.PrettyPrint.HughesPJClass (Doc, Pretty)
+import qualified Text.PrettyPrint.HughesPJClass as PP
 import Data.List (intercalate)
 
 import Data.Tree (Tree)
@@ -101,7 +102,7 @@ topToBody (SEQ x1 x2) = SEQ (topToBody x1) (topToBody x2)
 topToBody NOP = NOP
 
 instance Pretty (IR l) where
-  pPrint = text . drawVerticalTree . toTree where
+  pPrint = PP.text . drawVerticalTree . toTree where
     toTree :: IR l -> Tree String
     toTree (READ x) = Tree.Node ("READ " ++ x) []
     toTree (UPDATE xk f xi v) = Tree.Node ("UPDATE " ++ xk ++ " := " ++ printAST (f xi v)) []
@@ -114,25 +115,32 @@ instance Pretty (IR l) where
     toTree NOP = Tree.Node "NOP" []
 
 printBasicProgram :: IR l -> Doc
-printBasicProgram (READ x) = text $ x ++ " <- readLn"
-printBasicProgram (UPDATE xi f xk v) = text $ "let " ++ xi ++ " = " ++ printAST (f xk v)
-printBasicProgram (PRINT ast) = text $ "print (" ++ printAST ast ++ ")"
+printBasicProgram (READ x) = PP.text $ x ++ " <- readLn"
+printBasicProgram (UPDATE xi f xk v) = PP.text $ "let " ++ xi ++ " = " ++ printAST (f xk v)
+printBasicProgram (PRINT ast) = PP.text $ "print " ++ formatParam CallParam [printAST ast]
 printBasicProgram (IF ast t e) =
-  hang (text $ "if " ++ printAST ast) 2 $
-     hang (text "then do") 2 (printBasicProgram t)
-  $$ hang (text "else do") 2 (printBasicProgram e)
+  PP.hang (PP.text $ "if " ++ printAST ast) 2 $
+     PP.hang (PP.text "then do") 2 (printBasicProgram t)
+  PP.$$ PP.hang (PP.text "else do") 2 (printBasicProgram e)
 printBasicProgram (DEFLOOP writeVars params [] p) =
-  hang (text $ "let loop " ++ unwords writeVars ++ " = do") 6
+  PP.hang (PP.text $ "let loop " ++ formatParam FunctionParam writeVars ++ " = do") 6
   (printBasicProgram p)
-  $$ text ("loop " ++ unwords params)
+  PP.$$ PP.text ("loop " ++ formatParam CallParam params)
 printBasicProgram (DEFLOOP writeVars params returnVars p) =
-  hang (text $ "let loop " ++ unwords writeVars ++ " = do") 6
+  PP.hang (PP.text $ "let loop " ++ formatParam FunctionParam writeVars ++ " = do") 6
   (printBasicProgram p)
-  $$ text (tupelize returnVars) <+> text ("<- loop " ++ unwords params)
-printBasicProgram (CALLLOOP xs) = text "loop" <+> text (tupelize xs)
-printBasicProgram (RETURN returnVars) = text "return" <+> text (tupelize returnVars)
-printBasicProgram (SEQ x y) = printBasicProgram x $$ printBasicProgram y
-printBasicProgram NOP = empty
+  PP.$$ PP.text (formatParam ReturnParam returnVars) PP.<+> PP.text ("<- loop " ++ formatParam CallParam params)
+printBasicProgram (CALLLOOP xs) = PP.text "loop" PP.<+> PP.text (formatParam CallParam xs)
+printBasicProgram (RETURN returnVars) = PP.text "return" PP.<+> PP.text (formatParam ReturnParam returnVars)
+printBasicProgram (SEQ x y) = printBasicProgram x PP.$$ printBasicProgram y
+printBasicProgram NOP = PP.empty
+
+data Mode = FunctionParam | CallParam | ReturnParam
+
+formatParam :: Mode -> [String] -> String
+formatParam FunctionParam xs = unwords xs
+formatParam CallParam xs = unwords $ map (\x -> if length (words x) > 1 then "("++ x ++")" else x) xs
+formatParam ReturnParam xs = tupelize xs
 
 tupelize :: [String] -> String
 tupelize [] = ""
@@ -147,14 +155,18 @@ optimize fs ir =
   let ir' = foldr cata ir fs
   in if ir == ir' then ir else optimize fs ir'
 
+-- replace list updates with an accumulating parameter based on the fact that the acumulated list is used with a fold.
+-- Assumption: the result of the loop is only uesed once.
 opt1 :: Algebra l
-opt1 (SEQF (DEFLOOP wVs _ rVs p) (SEQ (PRINT (algebra -> (f,c))) p')) = SEQ (DEFLOOP wVs [c] rVs (cata (changeToFold f) p)) (SEQ (PRINT (Leaf $ tupelize rVs)) p')
+opt1 (SEQF (DEFLOOP wVs _ rVs p) (SEQ (PRINT (extractAlgebra -> Just (f,c))) p')) = SEQ (DEFLOOP wVs [c] rVs (cata (changeToFold f) p)) (SEQ (PRINT (Leaf $ tupelize rVs)) p')
 opt1 x = embed x
 
+-- move print inside a loop in case the loop-result is printed directly after the loop.
 opt2 :: Algebra l
 opt2 (SEQF (DEFLOOP wVs ps [rV] p) (SEQ (PRINT (Leaf rV')) p')) | rV == rV' =  SEQ (DEFLOOP wVs ps [] (cata changeToPrintAcc p)) p'
 opt2 x = embed x
 
+-- merge update with following recursive call. (Current assumption: the value is only used in that call)
 opt3 :: Algebra l
 opt3 (SEQF (SEQ xx (UPDATE xk f xi v)) (SEQ (CALLLOOP [xk']) yy)) | xk == xk' = SEQ xx (SEQ (CALLLOOP [printAST $ f xi v]) yy)
 opt3 (DEFLOOPF wVs ps rVs p) = DEFLOOP wVs ps rVs (cata opt3 p)
@@ -168,7 +180,10 @@ changeToPrintAcc :: Algebra 'Body
 changeToPrintAcc (RETURNF [rV]) = PRINT $ Leaf rV
 changeToPrintAcc x = embed x
 
--- mock implementation
-algebra :: AST -> (String -> String -> AST, String)
-algebra _ = (ast,"0") where
-  ast a b = Infix (Leaf a) "+" (Leaf b)
+-- extractAlgebra t tries to extracts the algebra from an AST
+-- i.e. the parameters for expressing the represented term as a fold
+-- incomplete implementation. Currently not sure how to write this in a general way.
+extractAlgebra :: AST -> Maybe (String -> String -> AST, String)
+extractAlgebra (Node "sum" [_]) = Just (\a b -> Infix (Leaf a) "+" (Leaf b),"0")
+extractAlgebra (Node "length" [_]) = Just (\_ b -> Infix (Leaf "1") "+" (Leaf b),"0")
+extractAlgebra _ = Nothing

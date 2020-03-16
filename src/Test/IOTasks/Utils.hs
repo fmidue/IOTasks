@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -18,9 +19,13 @@ class StringEmbedding a where
   default unpack :: Read a => String -> a
   unpack = read
 
-instance StringEmbedding String where
+instance {-# OVERLAPPING #-} StringEmbedding String where
   pack = id
   unpack = id
 
 instance StringEmbedding Bool
 instance StringEmbedding Int
+
+instance StringEmbedding a => StringEmbedding [a] where
+  pack = show . map pack
+  unpack = map unpack . read @[String]
