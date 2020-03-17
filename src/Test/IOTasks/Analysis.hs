@@ -168,7 +168,7 @@ translate fs (AnnAction _ (TillE as)) = do
   leaveScope
   params <- mapM currentName writeVars
   returnVars <- mapM freshName writeVars
-  return $ DEFLOOP writeVars params returnVars body
+  return $ DEFLOOP "loop" writeVars returnVars body `SEQ` ENTERLOOP "loop" params returnVars
 translate _ (AnnAction _ E) = error "E at toplevel"
 translate _ EmptyAction = return NOP
 
@@ -176,7 +176,7 @@ translateLoop :: (TermVars t, SynTerm t)  => Facts Usage ->  [Varname] -> [AnnAc
 translateLoop fs wVars = (foldr SEQ NOP <$>) . mapM go where
   go EmptyAction = do
     params <- mapM currentName wVars
-    return $ CALLLOOP params
+    return $ RECCALL params
   go (AnnAction _ E) =
     return $ RETURN wVars
   go (AnnAction _ (Branch c as1 as2)) = do

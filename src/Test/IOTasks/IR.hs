@@ -33,8 +33,9 @@ data IR l where
   UPDATE :: Varname -> (Varname -> Varname -> AST) -> Varname -> Varname -> IR l -- UPDATE x f y v assigns the result f applied to y and v to x, ie. x := f y v
   PRINT :: AST -> IR l
   IF :: AST -> IR l -> IR l -> IR l
-  DEFLOOP :: [Varname] -> [Arg] -> [Varname] -> IR 'Body -> IR l -- define and call a loop
-  CALLLOOP :: [Varname] -> IR 'Body -- recursive call of the current loop
+  DEFLOOP :: Varname -> [Varname] -> [Varname] -> IR 'Body -> IR l -- define a loop
+  ENTERLOOP :: Varname -> [Arg] -> [Varname] -> IR l -- enter/call a loop and bind the result
+  RECCALL :: [Varname] -> IR 'Body -- recursive call of the current loop
   RETURN :: [Varname] -> IR 'Body -- finish current loop
   SEQ :: IR l -> IR l -> IR l
   NOP :: IR l
@@ -44,7 +45,8 @@ data IRF l x where
   UPDATEF :: Varname -> (Varname -> Varname -> AST) -> Varname -> Varname -> IRF l x -- UPDATE x f y v assigns the result f applied to y and v to x, ie. x := f y v
   PRINTF :: AST -> IRF l x
   IFF :: AST -> x -> x -> IRF l x
-  DEFLOOPF :: [Varname] -> [Arg] -> [Varname] -> IR 'Body -> IRF l x -- define and call a loop
+  DEFLOOPF :: Varname -> [Varname] -> [Varname] -> IR 'Body -> IRF l x -- define a loop
+  ENTERLOOPF :: Varname -> [Arg] -> [Varname] -> IRF l x -- enter/call a loop and bind the result
   CALLLOOPF :: [Varname] -> IRF 'Body x -- recursive call of the current loop
   RETURNF :: [Varname] -> IRF 'Body x -- finish current loop
   SEQF :: x -> x -> IRF l x
@@ -56,6 +58,7 @@ instance Functor (IRF l) where
   fmap _ (PRINTF x) = PRINTF x
   fmap f (IFF x1 x2 x3) = IFF x1 (f x2) (f x3)
   fmap f (DEFLOOPF x1 x2 x3 x4) = DEFLOOPF x1 x2 x3 x4
+  fmap f (ENTERLOOPF x1 x2 x3) = ENTERLOOPF x1 x2 x3
   fmap _ (CALLLOOPF x) = CALLLOOPF x
   fmap _ (RETURNF x) = RETURNF x
   fmap f (SEQF x1 x2) = SEQF (f x1) (f x2)
@@ -69,7 +72,8 @@ instance Recursive (IR l) where
   project (PRINT x) = PRINTF x
   project (IF x1 x2 x3) = IFF x1 x2 x3
   project (DEFLOOP x1 x2 x3 x4) = DEFLOOPF x1 x2 x3 x4
-  project (CALLLOOP x) = CALLLOOPF x
+  project (ENTERLOOP x1 x2 x3) = ENTERLOOPF x1 x2 x3
+  project (RECCALL x) = CALLLOOPF x
   project (RETURN x) = RETURNF x
   project (SEQ x1 x2) = SEQF x1 x2
   project NOP = NOPF
@@ -80,7 +84,8 @@ instance Corecursive (IR l) where
   embed (PRINTF x) = PRINT x
   embed (IFF x1 x2 x3) = IF x1 x2 x3
   embed (DEFLOOPF x1 x2 x3 x4) = DEFLOOP x1 x2 x3 x4
-  embed (CALLLOOPF x) = CALLLOOP x
+  embed (ENTERLOOPF x1 x2 x3) = ENTERLOOP x1 x2 x3
+  embed (CALLLOOPF x) = RECCALL x
   embed (RETURNF x) = RETURN x
   embed (SEQF x1 x2) = SEQ x1 x2
   embed NOPF = NOP
@@ -98,6 +103,7 @@ topToBody (UPDATE x1 x2 x3 x4) = UPDATE x1 x2 x3 x4
 topToBody (PRINT x) = PRINT x
 topToBody (IF x1 x2 x3) = IF x1 (topToBody x2) (topToBody x3)
 topToBody (DEFLOOP x1 x2 x3 x4) = DEFLOOP x1 x2 x3 x4
+topToBody (ENTERLOOP x1 x2 x3) = ENTERLOOP x1 x2 x3
 topToBody (SEQ x1 x2) = SEQ (topToBody x1) (topToBody x2)
 topToBody NOP = NOP
 
@@ -108,8 +114,9 @@ instance Pretty (IR l) where
     toTree (UPDATE xk f xi v) = Tree.Node ("UPDATE " ++ xk ++ " := " ++ printAST (f xi v)) []
     toTree (PRINT ast) = Tree.Node ("PRINT " ++ printAST ast) []
     toTree (IF c t e) = Tree.Node ("IF " ++ printAST c) [toTree t, toTree e]
-    toTree (DEFLOOP writeVars params returnVars p) = Tree.Node ("DEFLOOP " ++ show writeVars ++ show params ++ show returnVars) [toTree p]
-    toTree (CALLLOOP x) = Tree.Node ("CALLLOOP " ++ tupelize x) []
+    toTree (DEFLOOP ident writeVars returnVars p) = Tree.Node ("DEFLOOP " ++ ident ++ show writeVars ++ show returnVars) [toTree p]
+    toTree (ENTERLOOP ident params returnVars) = Tree.Node ("ENTERLOOP " ++ ident ++ show params ++ show returnVars) []
+    toTree (RECCALL x) = Tree.Node ("RECCALL " ++ tupelize x) []
     toTree (RETURN x) = Tree.Node ("RETURN " ++ tupelize x) []
     toTree (SEQ x1 x2) = Tree.Node "SEQ" (toTree <$> [x1,x2])
     toTree NOP = Tree.Node "NOP" []
@@ -122,15 +129,17 @@ printBasicProgram (IF ast t e) =
   PP.hang (PP.text $ "if " ++ printAST ast) 2 $
      PP.hang (PP.text "then do") 2 (printBasicProgram t)
   PP.$$ PP.hang (PP.text "else do") 2 (printBasicProgram e)
-printBasicProgram (DEFLOOP writeVars params [] p) =
-  PP.hang (PP.text $ "let loop " ++ formatParam FunctionParam writeVars ++ " = do") 6
+printBasicProgram (DEFLOOP ident writeVars [] p) =
+  PP.hang (PP.text $ "let " ++ ident ++ " " ++ formatParam FunctionParam writeVars ++ " = do") 6
   (printBasicProgram p)
-  PP.$$ PP.text ("loop " ++ formatParam CallParam params)
-printBasicProgram (DEFLOOP writeVars params returnVars p) =
-  PP.hang (PP.text $ "let loop " ++ formatParam FunctionParam writeVars ++ " = do") 6
+printBasicProgram (DEFLOOP ident writeVars returnVars p) =
+  PP.hang (PP.text $ "let " ++ ident ++ " " ++ formatParam FunctionParam writeVars ++ " = do") 6
   (printBasicProgram p)
-  PP.$$ PP.text (formatParam ReturnParam returnVars) PP.<+> PP.text ("<- loop " ++ formatParam CallParam params)
-printBasicProgram (CALLLOOP xs) = PP.text "loop" PP.<+> PP.text (formatParam CallParam xs)
+printBasicProgram (ENTERLOOP ident params []) =
+  PP.text (ident ++ " " ++ formatParam CallParam params)
+printBasicProgram (ENTERLOOP ident params returnVars) =
+  PP.text (formatParam ReturnParam returnVars) PP.<+> PP.text ("<- " ++ ident ++ " " ++ formatParam CallParam params)
+printBasicProgram (RECCALL xs) = PP.text "loop" PP.<+> PP.text (formatParam CallParam xs)
 printBasicProgram (RETURN returnVars) = PP.text "return" PP.<+> PP.text (formatParam ReturnParam returnVars)
 printBasicProgram (SEQ x y) = printBasicProgram x PP.$$ printBasicProgram y
 printBasicProgram NOP = PP.empty
@@ -158,18 +167,31 @@ optimize fs ir =
 -- replace list updates with an accumulating parameter based on the fact that the acumulated list is used with a fold.
 -- Assumption: the result of the loop is only uesed once.
 opt1 :: Algebra l
-opt1 (SEQF (DEFLOOP wVs _ rVs p) (SEQ (PRINT (extractAlgebra -> Just (f,c))) p')) = SEQ (DEFLOOP wVs [c] rVs (cata (changeToFold f) p)) (SEQ (PRINT (Leaf $ tupelize rVs)) p')
+opt1 (SEQF
+  (SEQ (DEFLOOP ident wVs rVs p)
+    (ENTERLOOP ident' _ rVs'))
+  (SEQ (PRINT (extractAlgebra -> Just (f,c))) p'))
+  | ident == ident' && rVs == rVs' =
+  SEQ
+    (SEQ (DEFLOOP ident wVs rVs (cata (changeToFold f) p))
+      (ENTERLOOP ident [c] rVs))
+    (SEQ (PRINT (Leaf $ tupelize rVs)) p')
 opt1 x = embed x
 
 -- move print inside a loop in case the loop-result is printed directly after the loop.
 opt2 :: Algebra l
-opt2 (SEQF (DEFLOOP wVs ps [rV] p) (SEQ (PRINT (Leaf rV')) p')) | rV == rV' =  SEQ (DEFLOOP wVs ps [] (cata changeToPrintAcc p)) p'
+opt2 (SEQF (SEQ (DEFLOOP ident wVs [rV] p) (ENTERLOOP ident' ps [rV'])) (SEQ (PRINT (Leaf rV'')) p'))
+  | rV == rV' && rV' == rV''
+  && ident == ident'
+  = SEQ
+      (SEQ (DEFLOOP ident wVs [] (cata changeToPrintAcc p)) (ENTERLOOP ident ps []))
+      p'
 opt2 x = embed x
 
 -- merge update with following recursive call. (Current assumption: the value is only used in that call)
 opt3 :: Algebra l
-opt3 (SEQF (SEQ xx (UPDATE xk f xi v)) (SEQ (CALLLOOP [xk']) yy)) | xk == xk' = SEQ xx (SEQ (CALLLOOP [printAST $ f xi v]) yy)
-opt3 (DEFLOOPF wVs ps rVs p) = DEFLOOP wVs ps rVs (cata opt3 p)
+opt3 (SEQF (SEQ xx (UPDATE xk f xi v)) (SEQ (RECCALL [xk']) yy)) | xk == xk' = SEQ xx (SEQ (RECCALL [printAST $ f xi v]) yy)
+opt3 (DEFLOOPF ident wVs rVs p) = DEFLOOP ident wVs rVs (cata opt3 p)
 opt3 x = embed x
 
 changeToFold :: (String -> String -> AST) -> Algebra 'Body
