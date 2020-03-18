@@ -41,7 +41,7 @@ module Test.IOTasks (
   runProgram,
   MonadTeletype(..), print, readLn,
   -- * IOProperty
-  IOTasksable(..),
+  IOTestable(..),
   accept,
   matchesTrace,
   MatchResult(..),

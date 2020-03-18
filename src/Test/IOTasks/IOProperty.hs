@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 module Test.IOTasks.IOProperty (
-  IOTasksable(..),
+  IOTestable(..),
   accept,
   matchesTrace,
   MatchResult(..),
@@ -21,22 +21,21 @@ import Data.Coerce
 import Data.Maybe (fromMaybe)
 
 import Test.QuickCheck
-import Text.PrettyPrint.HughesPJClass (Doc)
 import qualified Text.PrettyPrint.HughesPJClass as PP
 
-class IOTasksable a b where
+class IOTestable a b where
   fulfills :: a -> b -> Property
   neverFulfills :: a -> b -> Property
   fulfillsNotFor :: [String] -> a -> b -> Property
 
-instance (SemTerm t, TermVars t) => IOTasksable (IOrep ()) (Specification t) where
+instance (SemTerm t, TermVars t) => IOTestable (IOrep ()) (Specification t) where
   fulfills prog spec = specProperty True spec prog
   neverFulfills prog spec = specProperty False spec prog
   fulfillsNotFor ins prog spec =
     let trace = runProgram ins prog
     in property . not $ spec `accept` trace
 
-instance (Show b, Arbitrary b, IOTasksable a' b', Coercible b a) => IOTasksable (a -> a') (b -> b') where
+instance (Show b, Arbitrary b, IOTestable a' b', Coercible b a) => IOTestable (a -> a') (b -> b') where
   fulfills f g = forAllShrink arbitrary shrink (\x -> f (coerce x) `fulfills` g x)
   neverFulfills f g = forAllShrink arbitrary shrink (\x -> f (coerce x) `neverFulfills` g x)
   fulfillsNotFor ins f g = forAllShrink arbitrary shrink (\x -> fulfillsNotFor ins (f (coerce x)) (g x))
