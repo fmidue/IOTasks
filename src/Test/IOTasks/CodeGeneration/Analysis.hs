@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -90,59 +91,54 @@ printProgram :: (TermVars t, SynTerm t) => Specification t -> Doc
 printProgram = hang (text "p :: IO ()" $$ text "p = do") 2 . pPrint . programIR
 
 programIR :: (TermVars t, SynTerm t) => Specification t -> IR
-programIR s = foldr1 (<>) . fst $ runFreshVarM (mapM (translate (rootUsageFacts x)) x) (initState (specVars s))
+programIR s = foldr1 (<>) . fst $ runFreshVarM (mapM (translate (rootUsageFacts x)) x) initState
   where x = analyse s
 
 -- stores next fresh index and a stack of most recent indecies for the current/surounding scopes
 -- invariant: stack is never empty
-newtype FreshVarM a = FreshVarM { runFreshVarM :: [(Varname, IndexContext)] -> (a,[(Varname, IndexContext)]) }
-  deriving (Functor, Applicative, Monad, MonadState [(Varname, IndexContext)]) via (StateT [(Varname, IndexContext)] Identity)
+newtype FreshVarM a = FreshVarM { runFreshVarM :: [(Varname, Int)] -> (a,[(Varname, Int)]) }
+  deriving (Functor, Applicative, Monad, MonadState [(Varname, Int)]) via (StateT [(Varname, Int)] Identity)
 
-type IndexContext = (Int, [Int])
+initState :: [(Varname,Int)]
+initState = []
 
-initState :: [Varname] -> [(Varname,IndexContext)]
-initState = map (,defaultContext)
-
-defaultContext :: IndexContext
-defaultContext = (1,[-1])
-
-update :: Eq k => k -> (v -> v) -> [(k,v)] -> [(k,v)]
-update _ _ [] = []
-update k f ((k',v) : xs)
-  | k == k' = (k',f v) : update k f xs
-  | otherwise = (k',v) : update k f xs
+updateContext :: Eq k => (k, Int) -> [(k,Int)] -> [(k,Int)]
+updateContext (k,v) [] = [(k,v)]
+updateContext (k,v) ((k',v') : xs)
+  | k == k' = (k',v) : xs
+  | otherwise = (k',v') : updateContext (k,v) xs
 
 -- generating a fresh name under the assumption that user defined variables dont end in numberic sequences
+-- TODO: not a very good assumption
 freshName :: Varname -> FreshVarM Varname
 freshName v = do
-  i <- gets $ fst . fromMaybe defaultContext . lookup v
-  modify $ update v (\(next,_:xs) -> (next+1, next:xs))
+  i <- gets $ (+1) . fromMaybe 0 . lookup v
+  modify $ updateContext (v, i)
   return $ v ++ show i
 
 currentName :: Varname -> FreshVarM Varname
 currentName v = do
-  i <- gets $ head . snd . fromMaybe defaultContext . lookup v
+  i <- gets $ fromMaybe 0 . lookup v
   case i of
-    -1 -> return "[]" -- TODO: get rid of this encoding with better types!
-    0   -> return v
+    0 -> return "[]" -- TODO: get rid of this encoding with better types?
     _   -> return $ v ++ show i
 
-enterScope :: FreshVarM ()
-enterScope = modify $ map (second $ second (0:))
-
-leaveScope :: FreshVarM ()
-leaveScope = modify $ map (second $ second tail)
+currentIndex :: Varname -> FreshVarM Int
+currentIndex = _
 
 translate :: (TermVars t, SynTerm t) => Facts Usage -> AnnAction t (Facts (Usage, Modification)) -> FreshVarM IR
 translate fs (AnnAction _ (ReadInput x _)) =
   case Map.lookup x fs of
-    Just C -> return $ irRead x
+    Just C -> do
+      n <- freshName x
+      return $ irRead n
     Just A -> do
+      v <- freshName "v"
       xk <- currentName x
       xi <- freshName x
       return $ case xk of
-        "[]" -> irRead "v" <> irUpdate xi (\_ v -> Leaf $ "["++v++"]") xk "v"
-        _ -> irRead "v" <> irUpdate xi (\xk' v -> Infix (Leaf xk') "++" (Leaf $ "["++v++"]")) xk "v"
+        "[]" -> irRead v <> irUpdate xi (\_ v' -> Leaf $ "["++v'++"]") xk v
+        _ -> irRead v <> irUpdate xi (\xk' v' -> Infix (Leaf xk') "++" (Leaf $ "["++v'++"]")) xk v
     Nothing -> error "invalid spec"
 translate _ (AnnAction _ (WriteOutput True _ _)) = return irNOP
 translate fs (AnnAction _ (WriteOutput False _ (t:_))) = do
@@ -150,22 +146,18 @@ translate fs (AnnAction _ (WriteOutput False _ (t:_))) = do
   return $ irPrint ast
 translate _ (AnnAction _ (WriteOutput False _  [])) = error "invalid spec"
 translate fs (AnnAction _ (Branch c as1 as2)) = do
-  enterScope
-  x <- mapM (translate fs) as2
-  leaveScope
-  enterScope
-  y <- mapM (translate fs) as1
-  leaveScope
   ast <- adjustVars fs $ viewTerm c
+  x <- mapM (translate fs) as2
+  y <- mapM (translate fs) as1
   return $ irIf ast (mconcat x) (mconcat y)
 translate fs (AnnAction _ (TillE as)) = do
   let writeVars = Map.keys . Map.filter ((== W).snd) $ safeHeadFact as
-  enterScope
-  body <- translateLoop fs writeVars as
-  leaveScope
-  params <- mapM currentName writeVars
-  returnVars <- mapM freshName writeVars
-  return $ irDefLoop "loop" writeVars body <> irEnterLoop "loop" params returnVars
+  params <- mapM currentName writeVars -- 1. determine the names to call the loop with
+  l <- freshName "loop"
+  patternVars <- mapM freshName writeVars -- 2. get the next free names for the loop variables
+  body <- translateLoop fs writeVars as -- 3. translate the loop body
+  returnVars <- mapM freshName writeVars -- 4 get names to bind result to
+  return $ irDefLoop l patternVars body <> irEnterLoop l params returnVars
 translate _ (AnnAction _ E) = error "E at toplevel"
 translate _ EmptyAction = return irNOP
 
@@ -174,16 +166,13 @@ translateLoop fs wVars = (foldr (<>) irNOP <$>) . mapM go where
   go EmptyAction = do
     params <- mapM currentName wVars
     return $ irRecCall params
-  go (AnnAction _ E) =
-    return $ irReturn wVars
+  go (AnnAction _ E) = do
+    returnNames <- mapM currentName wVars
+    return $ irReturn returnNames
   go (AnnAction _ (Branch c as1 as2)) = do
-    enterScope
-    x <- translateLoop fs wVars as2
-    leaveScope
-    enterScope
-    y <- translateLoop fs wVars as1
-    leaveScope
     ast <- adjustVars fs $ viewTerm c
+    x <- translateLoop fs wVars as2
+    y <- translateLoop fs wVars as1
     return $ irIf ast x y
   go a = translate fs a
 
@@ -202,7 +191,7 @@ adjustVars fs (Leaf s) = do
       "_C" ->
         case Map.lookup x fs of
           Just A -> Node "last" [Leaf xi]
-          Just C -> Leaf x
+          Just C -> Leaf xi
           Nothing -> error "invalid spec"
       "_A" -> Leaf xi
       _ -> Leaf s
