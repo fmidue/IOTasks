@@ -4,19 +4,16 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ViewPatterns #-}
-module Test.IOTasks.Analysis
+module Test.IOTasks.CodeGeneration.Analysis
   -- (
   -- printProgram,
   -- programIR,
   -- )
   where
 
-import Debug.Trace
-
 import Test.IOTasks.Specification
 import Test.IOTasks.Term
-import Test.IOTasks.Utils
-import Test.IOTasks.IR
+import Test.IOTasks.CodeGeneration.IR
 
 import Control.Arrow ((***), second)
 import Control.Monad.State
@@ -92,8 +89,8 @@ rootUsageFacts = Map.map fst . safeHeadFact
 printProgram :: (TermVars t, SynTerm t) => Specification t -> Doc
 printProgram = hang (text "p :: IO ()" $$ text "p = do") 2 . pPrint . programIR
 
-programIR :: (TermVars t, SynTerm t) => Specification t -> IR 'Top
-programIR s = foldr1 SEQ . fst $ runFreshVarM (mapM (translate (rootUsageFacts x)) x) (initState (specVars s))
+programIR :: (TermVars t, SynTerm t) => Specification t -> IR
+programIR s = foldr1 (<>) . fst $ runFreshVarM (mapM (translate (rootUsageFacts x)) x) (initState (specVars s))
   where x = analyse s
 
 -- stores next fresh index and a stack of most recent indecies for the current/surounding scopes
@@ -136,21 +133,21 @@ enterScope = modify $ map (second $ second (0:))
 leaveScope :: FreshVarM ()
 leaveScope = modify $ map (second $ second tail)
 
-translate :: (TermVars t, SynTerm t) => Facts Usage -> AnnAction t (Facts (Usage, Modification)) -> FreshVarM (IR 'Top)
+translate :: (TermVars t, SynTerm t) => Facts Usage -> AnnAction t (Facts (Usage, Modification)) -> FreshVarM IR
 translate fs (AnnAction _ (ReadInput x _)) =
   case Map.lookup x fs of
-    Just C -> return $ READ x
+    Just C -> return $ irRead x
     Just A -> do
       xk <- currentName x
       xi <- freshName x
       return $ case xk of
-        "[]" -> READ "v" `SEQ` UPDATE xi (\_ v -> Leaf $ "["++v++"]") xk "v"
-        _ -> READ "v" `SEQ` UPDATE xi (\xk' v -> Infix (Leaf xk') "++" (Leaf $ "["++v++"]")) xk "v"
+        "[]" -> irRead "v" <> irUpdate xi (\_ v -> Leaf $ "["++v++"]") xk "v"
+        _ -> irRead "v" <> irUpdate xi (\xk' v -> Infix (Leaf xk') "++" (Leaf $ "["++v++"]")) xk "v"
     Nothing -> error "invalid spec"
-translate _ (AnnAction _ (WriteOutput True _ _)) = return NOP
+translate _ (AnnAction _ (WriteOutput True _ _)) = return irNOP
 translate fs (AnnAction _ (WriteOutput False _ (t:_))) = do
   ast <- adjustVars fs $ viewTerm t
-  return $ PRINT ast
+  return $ irPrint ast
 translate _ (AnnAction _ (WriteOutput False _  [])) = error "invalid spec"
 translate fs (AnnAction _ (Branch c as1 as2)) = do
   enterScope
@@ -160,7 +157,7 @@ translate fs (AnnAction _ (Branch c as1 as2)) = do
   y <- mapM (translate fs) as1
   leaveScope
   ast <- adjustVars fs $ viewTerm c
-  return $ IF ast (foldr1 SEQ x) (foldr1 SEQ y)
+  return $ irIf ast (mconcat x) (mconcat y)
 translate fs (AnnAction _ (TillE as)) = do
   let writeVars = Map.keys . Map.filter ((== W).snd) $ safeHeadFact as
   enterScope
@@ -168,17 +165,17 @@ translate fs (AnnAction _ (TillE as)) = do
   leaveScope
   params <- mapM currentName writeVars
   returnVars <- mapM freshName writeVars
-  return $ DEFLOOP "loop" writeVars returnVars body `SEQ` ENTERLOOP "loop" params returnVars
+  return $ irDefLoop "loop" writeVars body <> irEnterLoop "loop" params returnVars
 translate _ (AnnAction _ E) = error "E at toplevel"
-translate _ EmptyAction = return NOP
+translate _ EmptyAction = return irNOP
 
-translateLoop :: (TermVars t, SynTerm t)  => Facts Usage ->  [Varname] -> [AnnAction t (Facts (Usage, Modification))] -> FreshVarM (IR 'Body)
-translateLoop fs wVars = (foldr SEQ NOP <$>) . mapM go where
+translateLoop :: (TermVars t, SynTerm t)  => Facts Usage ->  [Varname] -> [AnnAction t (Facts (Usage, Modification))] -> FreshVarM IR
+translateLoop fs wVars = (foldr (<>) irNOP <$>) . mapM go where
   go EmptyAction = do
     params <- mapM currentName wVars
-    return $ RECCALL params
+    return $ irRecCall params
   go (AnnAction _ E) =
-    return $ RETURN wVars
+    return $ irReturn wVars
   go (AnnAction _ (Branch c as1 as2)) = do
     enterScope
     x <- translateLoop fs wVars as2
@@ -187,8 +184,8 @@ translateLoop fs wVars = (foldr SEQ NOP <$>) . mapM go where
     y <- translateLoop fs wVars as1
     leaveScope
     ast <- adjustVars fs $ viewTerm c
-    return $ IF ast x y
-  go a = topToBody <$> translate fs a
+    return $ irIf ast x y
+  go a = translate fs a
 
 adjustVars :: Facts Usage -> AST -> FreshVarM AST
 adjustVars fs (Node f xs) = do
