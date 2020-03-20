@@ -123,9 +123,6 @@ currentName v = do
     0 -> return "[]" -- TODO: get rid of this encoding with better types?
     _   -> return $ v ++ show i
 
-currentIndex :: Varname -> FreshVarM Int
-currentIndex = _
-
 translate :: (TermVars t, SynTerm t) => Facts Usage -> AnnAction t (Facts (Usage, Modification)) -> FreshVarM IR
 translate fs (AnnAction _ (ReadInput x _)) =
   case Map.lookup x fs of
