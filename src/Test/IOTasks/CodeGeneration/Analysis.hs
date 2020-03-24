@@ -58,6 +58,7 @@ termFacts :: SynTerm t => t a -> Facts Usage
 termFacts = go . viewTerm where
   go (Node _ ts) = joinFacts (go <$> ts)
   go (Infix x _ y) = joinFacts [go x, go y]
+  go (Lam _ t) = go t
   go (Leaf s) =
     case splitAt (length s - 2) s of
       (x,"_C") -> Map.singleton x C
@@ -110,18 +111,16 @@ updateContext (k,v) ((k',v') : xs)
 
 -- generating a fresh name under the assumption that user defined variables dont end in numberic sequences
 -- TODO: not a very good assumption
-freshName :: Varname -> FreshVarM Varname
+freshName :: Varname -> FreshVarM IndexedVar
 freshName v = do
   i <- gets $ (+1) . fromMaybe 0 . lookup v
   modify $ updateContext (v, i)
-  return $ v ++ show i
+  return $ IVar (v, i)
 
-currentName :: Varname -> FreshVarM Varname
+currentName :: Varname -> FreshVarM IndexedVar
 currentName v = do
   i <- gets $ fromMaybe 0 . lookup v
-  case i of
-    0 -> return "[]" -- TODO: get rid of this encoding with better types?
-    _   -> return $ v ++ show i
+  return $ IVar (v, i)
 
 translate :: (TermVars t, SynTerm t) => Facts Usage -> AnnAction t (Facts (Usage, Modification)) -> FreshVarM IR
 translate fs (AnnAction _ (ReadInput x _)) =
@@ -134,7 +133,7 @@ translate fs (AnnAction _ (ReadInput x _)) =
       xk <- currentName x
       xi <- freshName x
       return $ case xk of
-        "[]" -> irRead v <> irUpdate xi (\_ v' -> Leaf $ "["++v'++"]") xk v
+        IVar (_,0) -> irRead v <> irUpdate xi (\_ v' -> Leaf $ "["++v'++"]") xk v
         _ -> irRead v <> irUpdate xi (\xk' v' -> Infix (Leaf xk') "++" (Leaf $ "["++v'++"]")) xk v
     Nothing -> error "invalid spec"
 translate _ (AnnAction _ (WriteOutput True _ _)) = return irNOP
@@ -152,24 +151,24 @@ translate fs (AnnAction _ (TillE as)) = do
   params <- mapM currentName writeVars -- 1. determine the names to call the loop with
   l <- freshName "loop"
   patternVars <- mapM freshName writeVars -- 2. get the next free names for the loop variables
-  body <- translateLoop fs writeVars as -- 3. translate the loop body
+  body <- translateLoop fs l writeVars as -- 3. translate the loop body
   returnVars <- mapM freshName writeVars -- 4 get names to bind result to
-  return $ irDefLoop l patternVars body <> irEnterLoop l params returnVars
+  return $ irDefLoop l patternVars body <> irEnterLoop l (map (Leaf . name) params) returnVars
 translate _ (AnnAction _ E) = error "E at toplevel"
 translate _ EmptyAction = return irNOP
 
-translateLoop :: (TermVars t, SynTerm t)  => Facts Usage ->  [Varname] -> [AnnAction t (Facts (Usage, Modification))] -> FreshVarM IR
-translateLoop fs wVars = (foldr (<>) irNOP <$>) . mapM go where
+translateLoop :: (TermVars t, SynTerm t)  => Facts Usage -> IndexedVar -> [Varname] -> [AnnAction t (Facts (Usage, Modification))] -> FreshVarM IR
+translateLoop fs l wVars = (foldr (<>) irNOP <$>) . mapM go where
   go EmptyAction = do
     params <- mapM currentName wVars
-    return $ irRecCall params
+    return $ irRecCall l (map (Leaf . name) params)
   go (AnnAction _ E) = do
     returnNames <- mapM currentName wVars
     return $ irReturn returnNames
   go (AnnAction _ (Branch c as1 as2)) = do
     ast <- adjustVars fs $ viewTerm c
-    x <- translateLoop fs wVars as2
-    y <- translateLoop fs wVars as1
+    x <- translateLoop fs l wVars as2
+    y <- translateLoop fs l wVars as1
     return $ irIf ast x y
   go a = translate fs a
 
@@ -187,11 +186,14 @@ adjustVars fs (Leaf s) = do
     return $ case suff of
       "_C" ->
         case Map.lookup x fs of
-          Just A -> Node "last" [Leaf xi]
-          Just C -> Leaf xi
+          Just A -> Node "last" [Leaf $ name xi]
+          Just C -> Leaf $ name xi
           Nothing -> error "invalid spec"
-      "_A" -> Leaf xi
+      "_A" -> Leaf $ name xi
       _ -> Leaf s
+adjustVars fs (Lam xs t) = do
+  t' <- adjustVars fs t
+  return $ Lam xs t'
 
 normalizeSpec :: Specification t -> Specification t
 normalizeSpec (Spec as) = Spec $ go as where

@@ -14,6 +14,7 @@ module Test.IOTasks.Term (
   AST(..),
   printAST,
   printTerm,
+  leafs,
 ) where
 
 import Data.Dynamic (Typeable)
@@ -53,7 +54,13 @@ data AST
   | Infix AST String AST
   | Lam [Varname] AST
   | Leaf String
-  deriving Show
+  deriving (Eq,Show)
+
+leafs :: AST -> [String]
+leafs (Node _ ts) = concatMap leafs ts
+leafs (Infix l _ r) = leafs l ++ leafs r
+leafs (Lam _ t) = leafs t
+leafs (Leaf x) = [x]
 
 printAST :: AST -> String
 printAST = printAST' "" ""
