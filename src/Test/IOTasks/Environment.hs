@@ -8,13 +8,15 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE LambdaCase #-}
 module Test.IOTasks.Environment
   (Environment
   , store
   , storeValue
   , Value(..)
   , freshEnvironment
-  , lookupNameAtType
+  , lookupAllAtType
+  , lookupLastAtType
   , Varname
   , LookupError
   , printLookupError
@@ -31,29 +33,29 @@ import Data.Maybe
 import Control.Applicative
 import           Control.Monad                  ( (>=>) )
 import Data.List.NonEmpty as NonEmpty
-import Data.HashMap.Strict as Map
+import Data.Map as Map
 
 type Varname = String
 
 data Entry where
   EmptyEntry :: Entry
-  MkEntry :: StringEmbedding a => TypeRep a -> NonEmpty a -> Entry
+  MkEntry :: StringEmbedding a => TypeRep a -> a -> NonEmpty a -> Entry
 
 instance Show Entry where
   show EmptyEntry = "EmptyEntry"
-  show (MkEntry r vs) = "(" <> show r <> ", " <> show (pack <$> vs) <>")"
+  show (MkEntry r v vs) = "(" <> show r <> ", " <> pack v <> ", " <> show (pack <$> vs) <>")"
 
 newEntry :: (Typeable a, StringEmbedding a) => a -> Entry
-newEntry x = MkEntry typeRep (x :| [])
+newEntry x = MkEntry typeRep x (x :| [])
 
 addValue :: (Typeable a, StringEmbedding a) => a -> Entry -> Maybe Entry
 addValue x EmptyEntry = Just $ newEntry x
-addValue x (MkEntry r (hd :| tl)) =
+addValue x (MkEntry r _ (hd :| tl)) =
   case typeOf x `eqTypeRep` r of
-    Just HRefl -> Just $ MkEntry r (hd :| tl ++ [x])
+    Just HRefl -> Just $ MkEntry r x (hd :| tl ++ [x])
     Nothing -> Nothing
 
-newtype Environment = MkEnvironment (HashMap Varname Entry) deriving Show
+newtype Environment = MkEnvironment (Map Varname Entry) deriving Show
 
 newEnvironment :: Environment
 newEnvironment = MkEnvironment Map.empty
@@ -77,24 +79,33 @@ storeValue x (Value vRep v) (MkEnvironment es) =
   case Map.lookup x es of
     Nothing -> Nothing
     Just EmptyEntry -> updateEntry
-    Just (MkEntry eRep _) ->
+    Just (MkEntry eRep _ _) ->
       case vRep `eqTypeRep` eRep of
         Nothing -> Nothing
         Just HRefl -> updateEntry
   where updateEntry = Just $ MkEnvironment $ Map.update (\e -> addValue v e <|> Just e) x es
 
-lookupNameAtType :: Typeable a => Proxy a -> Varname -> Environment -> Either LookupError [a]
+lookupNameAtType :: Typeable a => Proxy a -> Varname -> Environment -> Either LookupError (Maybe a, [a])
 lookupNameAtType (_ :: Proxy a) x (MkEnvironment es) =
   case Map.lookup x es of
     Nothing -> Left $ NameNotFound $ x <> " in " <> show es
-    Just EmptyEntry -> Right []
-    Just (MkEntry r vs) ->
+    Just EmptyEntry -> Right (Nothing,[])
+    Just (MkEntry r v vs) ->
       case typeRep @a `eqTypeRep` r of
-        Just HRefl -> Right $ NonEmpty.toList vs
+        Just HRefl -> Right (Just v, NonEmpty.toList vs)
         Nothing -> Left $ WrongType $ x  <> " in " <> show es
 
-data LookupError = NameNotFound String | WrongType String deriving Show
+lookupAllAtType :: Typeable a => Proxy a -> Varname -> Environment -> Either LookupError [a]
+lookupAllAtType p v e = snd <$> lookupNameAtType p v e
+
+lookupLastAtType :: Typeable a => Proxy a -> Varname -> Environment -> Either LookupError a
+lookupLastAtType p x e@(MkEnvironment es) = lookupNameAtType p x e >>= \case
+  (Nothing,_) -> Left $ NoValuePresent $ x  <> " in " <> show es
+  (Just v,_) -> Right v
+
+data LookupError = NameNotFound String | WrongType String | NoValuePresent String deriving Show
 
 printLookupError :: LookupError -> String
 printLookupError (NameNotFound e) = "lookup error: name not found: " <> e
 printLookupError (WrongType e) = "lookup error: wrong type: " <> e
+printLookupError (NoValuePresent e) = "lookup error: no value present: " <> e

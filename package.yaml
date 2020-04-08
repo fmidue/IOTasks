@@ -26,7 +26,6 @@ dependencies:
 - transformers
 - mtl
 - containers
-- unordered-containers
 - recursion-schemes
 - regex-base
 - regex-posix
@@ -37,11 +36,13 @@ dependencies:
 - mono-traversable
 - lattices
 - pretty-tree
+- fgl
 
 library:
   source-dirs: src
   ghc-options:
   - -Wall
+  - -fdefer-typed-holes
   exposed-modules:
   - Test.IOTasks
   - Test.IOTasks.Language
@@ -58,7 +59,7 @@ library:
   - Test.IOTasks.Trace
   - Test.IOTasks.Examples.SampleTasks
   - Test.IOTasks.Examples.Hangman
-  - Test.IOTasks.CodeGeneration.IR
+  - Test.IOTasks.CodeGeneration.IRGraph
   - Test.IOTasks.CodeGeneration.Analysis
   - Test.IOTasks.CodeGeneration.Optimization
 
@@ -71,6 +72,7 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     - -O2
+    - -fdefer-typed-holes
     dependencies:
     - IOTasks
     - hspec
