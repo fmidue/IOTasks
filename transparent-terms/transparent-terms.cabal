@@ -1,0 +1,43 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.31.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 3b8146d301b57c9a9cec371e6f30369a543804c46628aa42402cbd449a60d04e
+
+name:           transparent-terms
+version:        0.0.1.0
+description:    Please see the README on GitHub at <https://github.com/owestphal/IOTasks#readme>
+category:       Reflection
+homepage:       https://github.com/owestphal/IOTasks#readme
+bug-reports:    https://github.com/owestphal/IOTasks/issues
+author:         Oliver Westphal
+maintainer:     oliver.westphal@uni-due.de
+copyright:      2020 Oliver Westphal
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+
+source-repository head
+  type: git
+  location: https://github.com/owestphal/IOTasks
+
+library
+  exposed-modules:
+      Data.Term
+      Data.Term.Class
+      Data.Term.ITerm
+      Data.Term.ATerm
+      Data.Term.ITerm.Prelude
+      Data.Term.AST
+      Data.Term.TAST
+  other-modules:
+      Paths_transparent_terms
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -fdefer-typed-holes
+  build-depends:
+      base >=4.7 && <5
+    , dynamic-environment
+  default-language: Haskell2010

@@ -1,7 +1,9 @@
 resolver: lts-14.22
 
 packages:
-- .
+- IOTasks
+- transparent-terms
+- dynamic-environment
 
 extra-deps:
 - quickcheck-transformer-0.3.1

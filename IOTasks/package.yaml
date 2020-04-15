@@ -1,0 +1,79 @@
+name:                IOTasks
+version:             0.1.0.0
+github:              "fmidue/IOTasks"
+license:             BSD3
+author:              "Oliver Westphal"
+maintainer:          "oliver.westphal@uni-due.de"
+copyright:           "2018 Oliver Westphal"
+
+extra-source-files:
+- ../README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+category:            Testing
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/fmidue/IOTasks#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- QuickCheck
+- quickcheck-transformer
+- transformers
+- mtl
+- containers
+- recursion-schemes
+- regex-base
+- regex-posix
+- random
+- parsec
+- pretty
+- extra
+- mono-traversable
+- lattices
+- pretty-tree
+- fgl
+
+library:
+  source-dirs: src
+  ghc-options:
+  - -Wall
+  - -fdefer-typed-holes
+  exposed-modules:
+  - Test.IOTasks
+  - Test.IOTasks.Language
+  - Test.IOTasks.Combinators
+  - Test.IOTasks.IOrep
+  - Test.IOTasks.Term
+  - Test.IOTasks.Term.ITerm.SpecGen
+  - Test.IOTasks.Term.ITerm
+  - Test.IOTasks.Term.ATerm
+  - Test.IOTasks.Term.ITerm.Prelude
+  - Test.IOTasks.Artifacts
+  - Test.IOTasks.Environment
+  - Test.IOTasks.TraceSet
+  - Test.IOTasks.Trace
+  - Test.IOTasks.Examples.SampleTasks
+  - Test.IOTasks.Examples.Hangman
+  # - Test.IOTasks.CodeGeneration.IRGraph
+  # - Test.IOTasks.CodeGeneration.Analysis
+  # - Test.IOTasks.CodeGeneration.Optimization
+
+tests:
+  IOTasks-test:
+    main:                Tests.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -O2
+    - -fdefer-typed-holes
+    dependencies:
+    - IOTasks
+    - hspec
+    - deepseq

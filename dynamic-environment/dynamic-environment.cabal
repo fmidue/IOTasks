@@ -1,0 +1,41 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.31.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 3861e6cf19f2604bfc24edf9843c6c1db7285640401f839de4a27ce709d2ead3
+
+name:           dynamic-environment
+version:        0.0.1.0
+description:    Please see the README on GitHub at <https://github.com/owestphal/IOTasks#readme>
+category:       Datastructure
+homepage:       https://github.com/owestphal/IOTasks#readme
+bug-reports:    https://github.com/owestphal/IOTasks/issues
+author:         Oliver Westphal
+maintainer:     oliver.westphal@uni-due.de
+copyright:      2020 Oliver Westphal
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/owestphal/IOTasks
+
+library
+  exposed-modules:
+      Data.Environment
+      Data.Environment.Class
+      Data.Environment.Value
+  other-modules:
+      Paths_dynamic_environment
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -fdefer-typed-holes
+  build-depends:
+      base >=4.7 && <5
+    , containers
+  default-language: Haskell2010
