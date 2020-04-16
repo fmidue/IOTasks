@@ -14,9 +14,9 @@ module Test.IOTasks.Semantics (
 import Prelude hiding (foldMap)
 
 import Test.IOTasks.IOrep
-import Test.IOTasks.Environment
+import Data.Environment
 import Test.IOTasks.Specification
-import Test.IOTasks.Term
+import Data.Term
 
 import Control.Monad.Extra (ifM)
 import Control.Monad.State
@@ -26,11 +26,11 @@ import Data.MonoTraversable.Unprefixed
 
 import Test.QuickCheck.GenT
 
-newtype Semantics m a = Semantics { runSemantics :: Environment -> m (Either Exit a, Environment) }
-  deriving (Functor, Applicative, Monad, MonadTeletype, MonadState Environment, MonadError Exit, MonadGen)
-    via ExceptT Exit (StateT Environment m)
+newtype Semantics m a = Semantics { runSemantics :: Environment Varname -> m (Either Exit a, Environment Varname) }
+  deriving (Functor, Applicative, Monad, MonadTeletype, MonadState (Environment Varname), MonadError Exit, MonadGen)
+    via ExceptT Exit (StateT (Environment Varname) m)
 
-evalSemantics :: Monad m => Semantics m a -> Environment -> m (Either Exit a)
+evalSemantics :: Monad m => Semantics m a -> (Environment Varname) -> m (Either Exit a)
 evalSemantics m c = fst <$> runSemantics m c
 
 instance Monad m => Semigroup (Semantics m ()) where
@@ -40,7 +40,7 @@ instance Monad m => Monoid (Semantics m ()) where
   mempty = return ()
 
 interpret ::
-     (Monad m, SemTerm t)
+     (Monad m, SemTerm t (Environment Varname))
   => (Action (Specification t) t -> Semantics m ()) -- behavior for read and write actions
   -> Specification t -- specification
   -> Semantics m ()
@@ -52,7 +52,7 @@ interpret sem =
           )
 
 interpret' ::
-     (Monad m, SemTerm t)
+     (Monad m, SemTerm t (Environment Varname))
   => ((Action (Specification t) t, Semantics m ()) -> Semantics m ()) -- extra behavior for single action that can use or completly discard the structural interpretation
   -> Specification t -- specification
   -> Semantics m ()
@@ -62,7 +62,7 @@ interpret' sem =
 modifyInterpretation :: (Action (Specification t) t -> a) -> ((Action (Specification t) t, a) -> b) -> Action (Specification t) t -> b
 modifyInterpretation i f act = f (act, i act)
 
-structure :: (Monad m, SemTerm t) => (Specification t -> Semantics m ()) -> Action (Specification t) t -> Semantics m ()
+structure :: (Monad m, SemTerm t (Environment Varname)) => (Specification t -> Semantics m ()) -> Action (Specification t) t -> Semantics m ()
 structure ff (TillE s) =
   let body = ff s
       loop = forever body -- repeat until the loop is terminated by an end marker

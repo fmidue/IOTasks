@@ -3,10 +3,11 @@
 {-# LANGUAGE DataKinds #-}
 module Test.IOTasks.CodeGeneration.Optimization where
 
-import Test.IOTasks.Term
+import Data.Term
+import Data.Term.AST
 import Test.IOTasks.CodeGeneration.IRGraph
 
-import Test.IOTasks.Environment (Varname)
+import Data.Environment (Varname)
 
 optExample = optimize [opt2,opt1]
 
@@ -43,10 +44,10 @@ opt1 ds =
 opt2 :: [Def] -> SpineFold IRSpine
 opt2 ds =
   let
-    enterLoop l ps [rV] (IRSpine (PRINT (Var rV') p') ds')
+    enterLoop l ps [rV] (IRSpine (PRINT (UVar rV') p') ds')
       | rV == rV' = IRSpine (ENTERLOOP l ps [] p') (updateDef l changeToPrintAcc ds')
-    enterLoop l ps rVs b = fEnterLoop (idFold ds) l ps rVs b
-  in (idFold ds){fEnterLoop = enterLoop}
+    enterLoop l ps rVs b = fEnterLoop (idFold ds) l ps _rVs b
+  in (idFold ds){fEnterLoop = _enterLoop}
 
 -- merge update with following recursive call. (Current assumption: the value is only used in that call)
 -- opt3 :: SpineFold
@@ -71,9 +72,9 @@ changeToFold f (DEFLOOP wVs (IRSpine s ds)) = DEFLOOP wVs $ IRSpine s (mapRhs (c
 changeToPrintAcc :: DefRhs -> DefRhs
 changeToPrintAcc (DEFLOOP wVs ir) =
   let
-  changeReturn [rV] = IRSpine (PRINT (Var rV) NOP) (defs ir)
-  changeReturn rVs = fReturn (idFold (defs ir)) rVs
-  in DEFLOOP wVs $ foldrSpine (\x -> (idFold x){fReturn = changeReturn}) ir
+  changeReturn [rV] = IRSpine (PRINT (UVar rV) NOP) (defs ir)
+  changeReturn rVs = fReturn (idFold (defs ir)) _rVs
+  in DEFLOOP wVs $ foldrSpine (\x -> (idFold x){fReturn = _changeReturn}) ir
 changeToPrintAcc x = x
 
 -- extractAlgebra t tries to extracts the algebra from an AST
@@ -82,7 +83,7 @@ changeToPrintAcc x = x
 -- especially the starting value is not correct in a general setting.
 extractAlgebra :: Expr -> Maybe (String -> String -> Expr, String)
 extractAlgebra (Node "sum" [_]) = Just (\a b -> Infix (Literal a) "+" (Literal b),"0")
-extractAlgebra (Node "length" [Var _]) = Just (\_ b -> Infix (Literal "1") "+" (Literal b),"0")
+extractAlgebra (Node "length" [UVar _]) = Just (\_ b -> Infix (Literal "1") "+" (Literal b),"0")
 extractAlgebra _ = Nothing
 
 -- swapping elements based on some binary predicate (True ~= swap)

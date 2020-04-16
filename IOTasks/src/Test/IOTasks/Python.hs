@@ -1,24 +1,29 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Test.IOTasks.Python where
 
 import Test.IOTasks.Specification
-import Test.IOTasks.Term (AST(..),SynTerm(..), TermVars, Usage(..), SpecVar)
+
+import Data.Term (SynTerm(..), VarListTerm, Usage(..))
+import Data.Term.AST (AST(..))
 
 import Text.PrettyPrint
-import Data.List ( intercalate )
+import Data.List (intercalate)
+
+type Varname = String
 
 renderProgramDoc :: Doc -> String
 renderProgramDoc = renderStyle (style {lineLength = 1000})
 
-pythonCode :: (SynTerm t, TermVars t) => Specification t -> Doc
+pythonCode :: (SynTerm t (AST Varname), VarListTerm t Varname) => Specification t -> Doc
 pythonCode s = decls $$ body
   where
     decls = Prelude.foldr (\v code -> text (v ++ "_A = []") $$ code) empty (specVars s)
     body = buildPythonProgram s
 
-buildPythonProgram :: SynTerm t => Specification t -> Doc
+buildPythonProgram :: SynTerm t (AST Varname) => Specification t -> Doc
 buildPythonProgram (Spec as) = Prelude.foldr (\a code -> pythonTranslation a $$ code) (text "pass") as
 
-pythonTranslation :: SynTerm t => Action (Specification t) t -> Doc
+pythonTranslation :: SynTerm t (AST Varname) => Action (Specification t) t -> Doc
 pythonTranslation (ReadInput x _) = text $ x ++ "_A += [int(input())]"
 pythonTranslation (WriteOutput True _ _) = text "pass"
 pythonTranslation (WriteOutput False _ (t:_)) = text $ "print(" ++ printPythonCode t ++ ")"
@@ -33,14 +38,15 @@ pythonTranslation (TillE s) =
     (buildPythonProgram s)
 pythonTranslation E = text "break"
 
-codeToString :: AST SpecVar -> String
+codeToString :: AST Varname -> String
 codeToString (Infix x op y) = codeToString x ++ " " ++ op ++ " " ++ codeToString y
 codeToString (Node "length" ts) = "len" ++ "(" ++ intercalate ", " (codeToString <$> ts) ++ ")"
 codeToString (Node s ts) = s ++ "(" ++ intercalate ", " (codeToString <$> ts) ++ ")"
-codeToString (Var (x,C)) = x ++ "_A[-1]"
-codeToString (Var (x,A)) = x ++ "_A"
+codeToString (UVar (x,Current)) = x ++ "_A[-1]"
+codeToString (UVar (x,All)) = x ++ "_A"
+codeToString (SVar x) = x
 codeToString (Literal s) = s
 codeToString (Lam _ _) = "<TODO>"
 
-printPythonCode :: SynTerm t => t SpecVar a -> String
+printPythonCode :: SynTerm t (AST Varname) => t a -> String
 printPythonCode = codeToString . viewTerm

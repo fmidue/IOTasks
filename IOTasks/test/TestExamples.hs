@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -7,10 +8,13 @@ import Prelude hiding (getLine, putStrLn, print)
 
 import Test.IOTasks
 import Test.IOTasks.TraceSet
-import Test.IOTasks.Term.ITerm.SpecGen
+import Test.IOTasks.SpecGen
 import Test.IOTasks.Trace
 
 import Test.IOTasks.Examples.SampleTasks
+
+import Data.Environment (Environment)
+import Data.Term.Class (SemTerm, VarListTerm)
 
 import Test.Hspec
 import Test.Hspec.QuickCheck (prop)
@@ -19,7 +23,7 @@ import Test.QuickCheck
 import Control.DeepSeq
 import GHC.Generics
 
-buildIOrepComputation :: (TermVars t, SemTerm t) => Specification t -> IOrep ()
+buildIOrepComputation :: (VarListTerm t Varname, SemTerm t (Environment Varname)) => Specification t -> IOrep ()
 buildIOrepComputation = buildComputation
 
 testExamples :: Spec
@@ -119,7 +123,7 @@ testExamples = describe "Testing Test.IOTasks.Examples.Examples:" $ do
         (tillExit (s1 <> exit))
         (tillExit (s1 <> exit <> s2))
 
-testEquiv :: (SemTerm t, TermVars t) => Specification t -> Specification t -> Property
+testEquiv :: (SemTerm t (Environment Varname), VarListTerm t Varname) => Specification t -> Specification t -> Property
 testEquiv s1 s2 = p1 .&&. p2 where
   p1 = s1 `testAgainst` s2
   p2 = s2 `testAgainst` s1

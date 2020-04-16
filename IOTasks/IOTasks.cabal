@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 1a8274c50f427fc0896c70977e9c4935b4ea6da4948c9c580a823f564e8a803d
+-- hash: b3716790a9c5eb4089e1096dbcee8d27d7ca71607a524f4e62031ec7eea6cf8a
 
 name:           IOTasks
 version:        0.1.0.0
@@ -19,7 +19,6 @@ license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
-    ../README.md
     ChangeLog.md
 
 source-repository head
@@ -32,15 +31,10 @@ library
       Test.IOTasks.Language
       Test.IOTasks.Combinators
       Test.IOTasks.IOrep
-      Test.IOTasks.Term
-      Test.IOTasks.Term.ITerm.SpecGen
-      Test.IOTasks.Term.ITerm
-      Test.IOTasks.Term.ATerm
-      Test.IOTasks.Term.ITerm.Prelude
       Test.IOTasks.Artifacts
-      Test.IOTasks.Environment
       Test.IOTasks.TraceSet
       Test.IOTasks.Trace
+      Test.IOTasks.SpecGen
       Test.IOTasks.Examples.SampleTasks
       Test.IOTasks.Examples.Hangman
   other-modules:
@@ -54,7 +48,6 @@ library
       Test.IOTasks.Pattern
       Test.IOTasks.Python
       Test.IOTasks.Semantics
-      Test.IOTasks.SpecGen
       Test.IOTasks.Specification
       Test.IOTasks.Utils
       Test.IOTasks.ValueSet
@@ -66,6 +59,7 @@ library
       QuickCheck
     , base >=4.7 && <5
     , containers
+    , dynamic-environment
     , extra
     , fgl
     , lattices
@@ -80,6 +74,7 @@ library
     , regex-base
     , regex-posix
     , transformers
+    , transparent-terms
   default-language: Haskell2010
 
 test-suite IOTasks-test
@@ -98,6 +93,7 @@ test-suite IOTasks-test
     , base >=4.7 && <5
     , containers
     , deepseq
+    , dynamic-environment
     , extra
     , fgl
     , hspec
@@ -113,4 +109,5 @@ test-suite IOTasks-test
     , regex-base
     , regex-posix
     , transformers
+    , transparent-terms
   default-language: Haskell2010

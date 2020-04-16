@@ -8,6 +8,7 @@ module Test.IOTasks (
   tillExit,
   nop,
   exit,
+  getCurrent, getAll,
   writeFixedOutput,
   Varname, optional,
   FixedPattern, buildPattern,
@@ -26,16 +27,6 @@ module Test.IOTasks (
   readUntil,
   repeatSpec,
   when,
-  -- * Terms
-  Term(..),
-  getCurrent,
-  getAll,
-  TermVars(..),
-  SynTerm(..),
-  SemTerm(..),
-  AST(..),
-  printAST,
-  printTerm,
   -- * IOrep
   IOrep(..),
   runProgram,
@@ -52,7 +43,6 @@ module Test.IOTasks (
 
 import Test.IOTasks.Language
 import Test.IOTasks.Combinators
-import Test.IOTasks.Term
 import Test.IOTasks.IOrep
 import Test.IOTasks.IOProperty
 import Test.IOTasks.Artifacts

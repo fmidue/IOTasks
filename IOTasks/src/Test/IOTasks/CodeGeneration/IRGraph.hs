@@ -30,8 +30,8 @@ module Test.IOTasks.CodeGeneration.IRGraph (
   IndexedVar(..),
   ) where
 
-import Test.IOTasks.Environment
-import Test.IOTasks.Term
+import Data.Environment
+import Data.Term.AST
 
 import Text.PrettyPrint.HughesPJClass (Doc)
 import qualified Text.PrettyPrint.HughesPJClass as PP

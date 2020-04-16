@@ -7,7 +7,6 @@ maintainer:          "oliver.westphal@uni-due.de"
 copyright:           "2018 Oliver Westphal"
 
 extra-source-files:
-- ../README.md
 - ChangeLog.md
 
 # Metadata used when publishing your package
@@ -37,6 +36,8 @@ dependencies:
 - lattices
 - pretty-tree
 - fgl
+- transparent-terms
+- dynamic-environment
 
 library:
   source-dirs: src
@@ -48,15 +49,10 @@ library:
   - Test.IOTasks.Language
   - Test.IOTasks.Combinators
   - Test.IOTasks.IOrep
-  - Test.IOTasks.Term
-  - Test.IOTasks.Term.ITerm.SpecGen
-  - Test.IOTasks.Term.ITerm
-  - Test.IOTasks.Term.ATerm
-  - Test.IOTasks.Term.ITerm.Prelude
   - Test.IOTasks.Artifacts
-  - Test.IOTasks.Environment
   - Test.IOTasks.TraceSet
   - Test.IOTasks.Trace
+  - Test.IOTasks.SpecGen
   - Test.IOTasks.Examples.SampleTasks
   - Test.IOTasks.Examples.Hangman
   # - Test.IOTasks.CodeGeneration.IRGraph

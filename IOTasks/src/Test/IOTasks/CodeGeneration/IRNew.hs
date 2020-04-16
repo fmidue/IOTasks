@@ -3,8 +3,9 @@ module Test.IOTasks.CodeGeneration.IRNew where
 
 import Data.Maybe (fromJust)
 
-import Test.IOTasks.Term
-import Test.IOTasks.Term.ITerm
+import Data.Environment
+import Data.Term
+import Data.Term.ITerm
 
 data Instruction
   = READ Var
@@ -18,11 +19,11 @@ data Instruction
 
 type Var = String
 
-type AM = ([Instruction],[Def],[Value],[[Var]],[Input],[Output])
+type AM = ([Instruction],[Def],[Val],[[Var]],[Input],[Output])
 
-type Value = (Var,Payload)
+type Val = (Var,Payload)
 type Def = (Var,DefRhs)
-data DefRhs = IntValueDef (ITerm Var Int) | BoolValueDef (ITerm Var Bool) | LoopDef [Var] [Instruction]
+data DefRhs = IntValueDef (ITerm Environment Var Int) | BoolValueDef (ITerm Environment Var Bool) | LoopDef [Var] [Instruction]
 data Payload = I Int | B Bool deriving (Show,Eq)
 type Input = Int
 data Output = R Int | W Int deriving (Show,Eq) -- simple trace elements
@@ -50,27 +51,27 @@ stepAM (RETURN xs:p',d,vs,rvs:rvss,i,o)
   | otherwise = error "wrong number of binders for returned values"
 stepAM (NOP:p',d,vs,rvs,i,o) = (p',d,vs,rvs,i,o)
 
-setParameters :: Var -> [Var] -> [Def] -> [Value] -> [Value]
+setParameters :: Var -> [Var] -> [Def] -> [Val] -> [Val]
 setParameters l xs ds vs = updateValues (zip xs (map (`getPayload` vs) (getParamNames l ds))) vs
 
-updateValues :: [Value] -> [Value] -> [Value]
+updateValues :: [Val] -> [Val] -> [Val]
 updateValues xs ys = foldr updateValue ys xs
 
-updateValue :: Value -> [Value] -> [Value]
+updateValue :: Val -> [Val] -> [Val]
 updateValue = (:) -- inefficient but should work
 
-getPayload :: Var -> [Value] -> Payload
+getPayload :: Var -> [Val] -> Payload
 getPayload x = fromJust . lookup x
 
-intValue :: Var -> [Def] -> [Value] -> Int
+intValue :: Var -> [Def] -> [Val] -> Int
 intValue x ds vs = case lookup x vs of
   Just (I i) -> i
   Nothing -> case lookup x ds of
-    Just (IntValueDef t) -> _ $ foldr (\x vs' -> intValue x ds vs) vs (termVars t)
+    Just (IntValueDef t) -> _ $ foldr (\x vs' -> intValue x ds vs) _vs (termVars t)
     _ -> error ""
   _ -> error "not an Int value"
 
-boolValue :: Var -> [Def] -> [Value] -> Bool
+boolValue :: Var -> [Def] -> [Val] -> Bool
 boolValue x ds vs = case lookup x vs of
   Just (B b) -> b
   _ -> error "not a Bool value"

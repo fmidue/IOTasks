@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DerivingVia #-}
@@ -13,7 +14,8 @@ module Test.IOTasks.CodeGeneration.Analysis
   where
 
 import Test.IOTasks.Specification
-import Test.IOTasks.Term
+import Data.Term
+import Data.Term.AST
 import Test.IOTasks.CodeGeneration.IRGraph
 
 import Control.Arrow ((***), second)
@@ -52,19 +54,20 @@ instance Lattice Modification where
 
 data Modification = R | W deriving (Show, Eq, Ord, Bounded)
 
-termFacts :: SynTerm t => t SpecVar a -> Facts Usage
+termFacts :: SynTerm t (AST Varname) => t a -> Facts Usage
 termFacts = go . viewTerm where
   go (Node _ ts) = joinFacts (go <$> ts)
   go (Infix x _ y) = joinFacts [go x, go y]
   go (Lam _ t) = go t
-  go (Var (x,C)) = Map.singleton x C
-  go (Var (x,A)) = Map.singleton x A
+  go (UVar (x,Current)) = Map.singleton x Current
+  go (UVar (x,All)) = Map.singleton x All
+  go (SVar x) = Map.empty
   go (Literal _) = Map.empty
 
-analyse :: (TermVars t, SynTerm t) => Specification t -> [AnnAction t (Facts (Usage, Modification))]
+analyse :: (VarListTerm t Varname, SynTerm t (AST Varname)) => Specification t -> [AnnAction t (Facts (Usage, Modification))]
 -- analyse (Spec as) = analyse' as
 analyse = annotateSpec $ combineTransfer usageTransfer modTransfer where
-  usageTransfer :: SynTerm t => Transfer t Usage
+  usageTransfer :: SynTerm t (AST Varname) => Transfer t Usage
   usageTransfer = Transfer
     { tRead = const id
     , tWrite = \ts is' -> let new = termFacts <$> ts in joinFacts (is':new)
@@ -72,11 +75,11 @@ analyse = annotateSpec $ combineTransfer usageTransfer modTransfer where
     , tTillE = \is is' -> joinFacts [is, is']
     , tE = Map.empty
     }
-  modTransfer :: TermVars t => Transfer t Modification
+  modTransfer :: VarListTerm t Varname => Transfer t Modification
   modTransfer = Transfer
     { tRead = \v is' -> joinFacts [Map.singleton v W, is']
-    , tWrite = \ts is' -> let new = [ (x,R) | x <- concatMap (map fst . termVars) ts ] in joinFacts [Map.fromList new, is']
-    , tBranch = \c is1 is2 is' -> let new = [ (x,R) | x <- map fst (termVars c) ] in joinFacts [Map.fromList new, is1, is2, is']
+    , tWrite = \ts is' -> let new = [ (x,R) | x <- concatMap termVars ts ] in joinFacts [Map.fromList new, is']
+    , tBranch = \c is1 is2 is' -> let new = [ (x,R) | x <- termVars c ] in joinFacts [Map.fromList new, is1, is2, is']
     , tTillE = \_ is' -> is' --ignore information inside the loop scope but propagate information following the loop
     , tE = Map.empty -- don't let any information from the outside scope in
   }
@@ -84,10 +87,10 @@ analyse = annotateSpec $ combineTransfer usageTransfer modTransfer where
 rootUsageFacts :: [AnnAction t (Facts (Usage, Modification))] -> Facts Usage
 rootUsageFacts = Map.map fst . safeHeadFact
 
-printProgram :: (TermVars t, SynTerm t) => Specification t -> Doc
+printProgram :: (VarListTerm t Varname, SynTerm t (AST Varname)) => Specification t -> Doc
 printProgram = hang (text "p :: IO ()" $$ text "p = do") 2 . printBasicProgram . programIR
 
-programIR :: (TermVars t, SynTerm t) => Specification t -> IRSpine
+programIR :: (VarListTerm t Varname, SynTerm t (AST Varname)) => Specification t -> IRSpine
 programIR s = foldr1 (<:>) . fst $ runFreshVarM (mapM (translate (rootUsageFacts x)) x) initState
   where x = analyse s
 
@@ -118,13 +121,13 @@ currentName v = do
   i <- gets $ fromMaybe 0 . lookup v
   return $ IVar (v, i)
 
-translate :: (TermVars t, SynTerm t) => Facts Usage -> AnnAction t (Facts (Usage, Modification)) -> FreshVarM IRSpine
+translate :: (VarListTerm t Varname, SynTerm t (AST Varname)) => Facts Usage -> AnnAction t (Facts (Usage, Modification)) -> FreshVarM IRSpine
 translate fs (AnnAction _ (ReadInput x _)) =
   case Map.lookup x fs of
-    Just C -> do
+    Just Current -> do
       n <- freshName x
       return $ irRead n
-    Just A -> do
+    Just All -> do
       v <- freshName "v"
       xk <- currentName x
       xi <- freshName x
@@ -149,15 +152,15 @@ translate fs (AnnAction _ (TillE as)) = do
   patternVars <- mapM freshName writeVars -- 2. get the next free names for the loop variables
   body <- translateLoop fs l writeVars as -- 3. translate the loop body
   returnVars <- mapM freshName writeVars -- 4 get names to bind result to
-  return $ irDefLoop l patternVars body <:> irEnterLoop l (map Var params) returnVars
+  return $ irDefLoop l patternVars body <:> irEnterLoop l (map SVar params) returnVars
 translate _ (AnnAction _ E) = error "E at toplevel"
 translate _ EmptyAction = return irNOP
 
-translateLoop :: (TermVars t, SynTerm t)  => Facts Usage -> IndexedVar -> [Varname] -> [AnnAction t (Facts (Usage, Modification))] -> FreshVarM IRSpine
+translateLoop :: (VarListTerm t Varname, SynTerm t (AST Varname))  => Facts Usage -> IndexedVar -> [Varname] -> [AnnAction t (Facts (Usage, Modification))] -> FreshVarM IRSpine
 translateLoop fs l wVars = (foldr (<:>) irNOP <$>) . mapM go where
   go EmptyAction = do
     params <- mapM currentName wVars
-    return $ irRecCall l (map Var params)
+    return $ irRecCall l (map SVar params)
   go (AnnAction _ E) = do
     returnNames <- mapM currentName wVars
     return $ irReturn returnNames
@@ -168,7 +171,7 @@ translateLoop fs l wVars = (foldr (<:>) irNOP <$>) . mapM go where
     return $ irIf ast x y
   go a = translate fs a
 
-adjustVars :: Facts Usage -> AST SpecVar -> FreshVarM (AST IndexedVar)
+adjustVars :: Facts Usage -> AST Varname -> FreshVarM (AST IndexedVar)
 adjustVars fs (Node f xs) = do
   ys <- mapM (adjustVars fs) xs
   return $ Node f ys
@@ -176,18 +179,21 @@ adjustVars fs (Infix x op y) = do
   x' <- adjustVars fs x
   y' <- adjustVars fs y
   return $ Infix x' op y'
-adjustVars fs (Var (x,u)) = do
+adjustVars fs (UVar (x,u)) = do
     xi <- currentName x
     return $ case u of
-      C ->
+      Current ->
         case Map.lookup x fs of
-          Just A -> Node "last" [Var xi]
-          Just C -> Var xi
+          Just All -> Node "last" [SVar xi]
+          Just Current -> SVar xi
           Nothing -> error "invalid spec"
-      A -> Var xi
+      All -> SVar xi
 adjustVars fs (Lam xs t) = do
   t' <- adjustVars fs t
   return $ Lam xs t'
+adjustVars _ (SVar x) = do
+  xi <- currentName x
+  return $ SVar xi
 adjustVars _ (Literal x) = return $ Literal x
 
 normalizeSpec :: Specification t -> Specification t
@@ -195,7 +201,7 @@ normalizeSpec (Spec as) = Spec $ go as where
   go (Branch c s1 s2 : as') = [Branch c (s1 <> Spec as') (s2 <> Spec as')]
   go x = x
 
-annotateSpec :: (Ord i, SynTerm t)
+annotateSpec :: (Ord i, SynTerm t (AST Varname))
   => Transfer t i
   -> Specification t
   -> [AnnAction t (Facts i)]
@@ -228,8 +234,8 @@ safeHeadFact (x:_) = getAnnotation x
 
 data Transfer t i = Transfer
   { tRead :: Varname -> Facts i -> Facts i
-  , tWrite :: forall a. [t SpecVar a] -> Facts i -> Facts i
-  , tBranch :: t SpecVar Bool -> Facts i -> Facts i -> Facts i -> Facts i
+  , tWrite :: forall a. [t a] -> Facts i -> Facts i
+  , tBranch :: t Bool -> Facts i -> Facts i -> Facts i -> Facts i
   , tTillE :: Facts i -> Facts i -> Facts i
   , tE :: Facts i
   }

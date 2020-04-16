@@ -21,7 +21,7 @@ module Test.IOTasks.ValueSet
 
 import Test.IOTasks.Utils
 import Test.IOTasks.Pattern
-import Test.IOTasks.Value
+import Data.Environment.Value
 
 import Data.Proxy
 import Data.Dynamic
@@ -45,16 +45,16 @@ valueSet' :: (Typeable a, Arbitrary a, StringEmbedding a) => (a -> Bool) -> Gen 
 valueSet' = MkValueSet typeRep
 
 valueOf :: MonadGen m => ValueSet -> m Value
-valueOf (MkValueSet r _ gen) = liftGen $ Value r <$> gen
+valueOf (MkValueSet r _ gen) = liftGen $ Value r pack <$> gen
 
 containsValue :: ValueSet -> Value -> Bool
-containsValue (MkValueSet r p _) (Value r' v) =
+containsValue (MkValueSet r p _) (Value r' _ v) =
   case r `eqTypeRep` r' of
     Just HRefl -> p v
     Nothing -> False
 
 valueFromString :: ValueSet -> String -> Value
-valueFromString (MkValueSet (_ :: TypeRep a) _ _) str = Value typeRep (unpack @a str)
+valueFromString (MkValueSet (_ :: TypeRep a) _ _) str = Value typeRep pack (unpack @a str)
 
 withProxy :: ValueSet -> (forall a. (Typeable a, Arbitrary a, StringEmbedding a) => Proxy a -> b) -> b
 withProxy (MkValueSet (_ :: TypeRep a) _ _) f = f (Proxy @a)

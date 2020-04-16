@@ -17,8 +17,11 @@ class VarTerm t v => PVarTerm t v where
 variable :: forall a t v. (VarTerm t v, Typeable a) => v -> t a
 variable = variable'
 
+variableAll :: forall a t v. (PVarTerm t v, Typeable a) => v -> t [a]
+variableAll = variableAll'
+
 -- | alias for variable
-variableCurrent :: (Typeable a, PVarTerm t v) => v -> t a
+variableCurrent :: forall a t v. (Typeable a, PVarTerm t v) => v -> t a
 variableCurrent = variable
 
 -- | extract variables used in a term

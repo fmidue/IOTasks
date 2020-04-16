@@ -24,8 +24,9 @@ module Test.IOTasks.CodeGeneration.IR (
   -- IndexedVar(..),
   ) where
 
-import Test.IOTasks.Environment
-import Test.IOTasks.Term
+import Data.Environment
+import Data.Term
+import Data.Term.AST
 
 import Text.PrettyPrint.HughesPJClass (Doc, Pretty)
 import qualified Text.PrettyPrint.HughesPJClass as PP

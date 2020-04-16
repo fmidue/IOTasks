@@ -13,22 +13,22 @@ import Prelude hiding (putStrLn, getLine, GT)
 
 import Test.IOTasks.Trace
 import Test.IOTasks.Pattern
-import Test.IOTasks.Environment
+import Data.Environment
 import Test.IOTasks.ValueSet
 import Test.IOTasks.Specification
-import Test.IOTasks.Term (SemTerm(..), TermVars, evalTerm)
+import Data.Term (SemTerm(..), VarListTerm, evalTerm)
 
 import Test.QuickCheck.GenT
 
 import qualified Data.Set as S
 import           Data.Maybe
 
-traceGen :: forall t m. (MonadGen m, SemTerm t, TermVars t) => Specification t -> m GeneralizedTrace
+traceGen :: forall t m. (MonadGen m, SemTerm t (Environment Varname), VarListTerm t Varname) => Specification t -> m GeneralizedTrace
 traceGen (Spec s) = traceSet s kTI (freshEnvironment $ specVars (Spec s)) where
   kTI End  _ = return StopN
   kTI Exit _ = error "traceGen: 'throwError Exit' at toplevel"
 
-traceSet :: SemTerm t => MonadGen m => [Action (Specification t) t] -> (Cont -> Environment -> m GeneralizedTrace) -> Environment -> m GeneralizedTrace
+traceSet :: SemTerm t (Environment Varname) => MonadGen m => [Action (Specification t) t] -> (Cont -> Environment Varname -> m GeneralizedTrace) -> Environment Varname -> m GeneralizedTrace
 traceSet (ReadInput x ty : s') k e = do
   v <- valueOf ty
   let e' = fromMaybe (error "type mismatch on environment update") (storeValue x v e)

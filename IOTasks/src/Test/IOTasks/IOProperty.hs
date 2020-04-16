@@ -1,3 +1,4 @@
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -12,8 +13,8 @@ import Test.IOTasks.IOrep (IOrep, runProgram)
 import Test.IOTasks.Specification
 import Test.IOTasks.Trace
 import Test.IOTasks.TraceSet
-import Test.IOTasks.Environment
-import Test.IOTasks.Term (SemTerm(..), TermVars(..))
+import Data.Environment
+import Data.Term (SemTerm(..), VarListTerm(..))
 import Test.IOTasks.Pattern
 import Test.IOTasks.ValueSet
 
@@ -28,7 +29,7 @@ class IOTestable a b where
   neverFulfills :: a -> b -> Property
   fulfillsNotFor :: [String] -> a -> b -> Property
 
-instance (SemTerm t, TermVars t) => IOTestable (IOrep ()) (Specification t) where
+instance (SemTerm t (Environment Varname), VarListTerm t Varname) => IOTestable (IOrep ()) (Specification t) where
   fulfills prog spec = specProperty True spec prog
   neverFulfills prog spec = specProperty False spec prog
   fulfillsNotFor ins prog spec =
@@ -42,7 +43,7 @@ instance (Show b, Arbitrary b, IOTestable a' b', Coercible b a) => IOTestable (a
 
 -- target represents the expected outcome of checking the property,
 -- i.e. the property is satisfied iff for all inputs the performed check returns target
-specProperty :: (SemTerm t, TermVars t) => Bool -> Specification t -> IOrep () -> Property
+specProperty :: (SemTerm t (Environment Varname), VarListTerm t Varname) => Bool -> Specification t -> IOrep () -> Property
 specProperty target spec program =
   let gen = traceGen spec
       prop tg = case program `matchesTrace` tg of
@@ -67,13 +68,13 @@ addCounterexample res (n,trace) = counterexample . PP.render $
           MatchSuccessfull -> PP.text "Expected error, but matching succeeded"
           err -> ppResult err
 
-accept :: (SemTerm t, TermVars t) => Specification t -> OrdinaryTrace -> Bool
+accept :: (SemTerm t (Environment Varname), VarListTerm t Varname) => Specification t -> OrdinaryTrace -> Bool
 accept s@(Spec as) t = accept' as kI t (freshEnvironment (specVars s)) where
   kI Exit _    _ = error "loop exit marker on toplevel"
   kI End  Stop _ = True
   kI End  _    _ = False
 
-accept' :: SemTerm t => [Action (Specification t) t] -> (Cont -> OrdinaryTrace -> Environment -> Bool) -> OrdinaryTrace -> Environment -> Bool
+accept' :: SemTerm t (Environment Varname) => [Action (Specification t) t] -> (Cont -> OrdinaryTrace -> Environment Varname -> Bool) -> OrdinaryTrace -> Environment Varname -> Bool
 accept' (ReadInput x ty : s') k (ProgRead v t') env =
   let val = valueFromString ty v
       env' = fromMaybe (error "accept: environment update failed") (storeValue x val env)

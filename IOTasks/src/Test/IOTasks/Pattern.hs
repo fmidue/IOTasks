@@ -20,8 +20,8 @@ module Test.IOTasks.Pattern
   , isContainedIn
   ) where
 
-import Test.IOTasks.Environment
-import Test.IOTasks.Term (SemTerm(..))
+import Data.Environment
+import Data.Term (SemTerm(..))
 import Test.IOTasks.Utils
 
 import Data.Coerce
@@ -150,10 +150,10 @@ op p1 p2 = [p1,p2]
 instance Monoid (SimplePatternList t) where
   mempty = SPList []
 
-fillHoles :: (SemTerm t, StringEmbedding a) => (TermPattern, [t v a]) -> Environment -> FixedPattern
+fillHoles :: (SemTerm t (Environment v), StringEmbedding a) => (TermPattern, [t a]) -> Environment v -> FixedPattern
 fillHoles (TermPattern xs, ts) d = mconcat $ (\s -> coerce $ fillSimple (s, ts) d) <$> xs
 
-fillSimple :: (SemTerm t, StringEmbedding a) => (SimplePattern 'WithVars, [t v a]) -> Environment -> SimplePatternList 'NoVars
+fillSimple :: (SemTerm t (Environment v), StringEmbedding a) => (SimplePattern 'WithVars, [t a]) -> Environment v -> SimplePatternList 'NoVars
 fillSimple (WildCard, _) _ = SPList [WildCard]
 fillSimple (Literal p, _) _ = SPList [Literal p]
 fillSimple (Hole n, ts) d = text . pack $ evalTerm (ts !! n) d

@@ -6,16 +6,20 @@ module Test.IOTasks.Examples.SampleTasks where
 import Prelude hiding (putStrLn, getLine, readLn, print, putStr)
 
 import Test.IOTasks
-import Test.IOTasks.Term.ITerm (ITerm, lit)
-import qualified Test.IOTasks.Term.ITerm.Prelude as T
+
+import Data.Environment (Environment)
+import Data.Term.ITerm (ITerm, lit)
+import qualified Data.Term.ITerm.Prelude as T
 
 import Control.Monad (replicateM,replicateM_)
 
 import Test.QuickCheck as QC (Positive(..))
 
+type SpecTerm = ITerm Environment Varname
+
 -- Example 1:
 -- read natural number n, then read n integers and sum them
-ex1 :: Specification ITerm
+ex1 :: Specification SpecTerm
 ex1 =
   readInput "n" (intValues [0..10]) <>
   tillExit (
@@ -25,7 +29,7 @@ ex1 =
   ) <>
   writeOutput [var 0] [T.sum $ getAll @Int "xs"]
 
-ex1Combinators :: Specification ITerm
+ex1Combinators :: Specification SpecTerm
 ex1Combinators =
   optional (writeFixedOutput [anything]) <>
   readInput "n" nats <>
@@ -45,7 +49,7 @@ solution1 = do
   loop []
 
 -- With possible extra outputs
-ex1Pattern :: Specification ITerm
+ex1Pattern :: Specification SpecTerm
 ex1Pattern =
   writeFixedOutput [anything] <>
   readInput "n" nats <>
@@ -58,7 +62,7 @@ ex1Pattern =
   ) <>
   writeOutput [anything <> var 0 <> anything] [T.sum $ getAll @Int "xs"]
 
-ex1PatternCombinators :: Specification ITerm
+ex1PatternCombinators :: Specification SpecTerm
 ex1PatternCombinators =
   writeFixedOutput [anything] <>
   readInput "n" nats <>
@@ -88,7 +92,7 @@ wrongSolutionPat1 = do
   putStrLn "17"
 
 -- read till last two numbers sum to 0 than count positive numbers divisible by 3
-ex2 :: Specification ITerm
+ex2 :: Specification SpecTerm
 ex2 =
   repeatSpec 2 (readInput "xs" ints) <> --otherwise the condition will throw an exception
   readUntil "xs" (let xs = getAll "xs" in T.length xs T.> lit 1 T.&& (T.last xs T.+ T.last (T.init xs) T.== lit (0 :: Int)) ) ints <>
@@ -107,14 +111,14 @@ solution2 = go [] Nothing Nothing where
 
 -- Example 3:
 -- read till zero then sum
-ex3 :: Specification ITerm
+ex3 :: Specification SpecTerm
 ex3 =
   tillExit $
     readInput "x" ints <>
     when (lit 0 T.== getCurrent @Int "x")
       (writeOutput [anything <> var 0 <> anything] [T.sum $ getAll @Int "x"] <> exit)
 
-ex3Combinators :: Specification ITerm
+ex3Combinators :: Specification SpecTerm
 ex3Combinators =
   readInput "xs" ints <> --otherwise last will fail
   readUntil "xs" (T.last (getAll @Int "xs") T.== lit 0) ints <>
@@ -130,7 +134,7 @@ solution3 = go [] where
 
 -- Example 4:
 -- read and reverse
-ex4 ::Specification ITerm
+ex4 ::Specification SpecTerm
 ex4 =
   readInput "line" (stringValues (anything :: FixedPattern)) <>
   writeOutput [anything <> var 0 <> anything] [T.reverse $ getCurrent @String "line"]
@@ -143,7 +147,7 @@ wrongSolution4 = getLine >>= putStrLn
 
 -- Example 5:
 -- specificing parameterized tasks/programs
-printNSpec :: QC.Positive Int -> Int -> Specification ITerm
+printNSpec :: QC.Positive Int -> Int -> Specification SpecTerm
 printNSpec (QC.Positive n) x = repeatSpec n $ writeFixedOutput [text (show x) <> linebreak]
 
 printN :: Int -> Int -> IOrep ()

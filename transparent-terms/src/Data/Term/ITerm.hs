@@ -34,10 +34,10 @@ plusT = TLam "x" $ \x -> TInfix x (TLit ("+",(+))) (TCVar "y")
 data ITerm env v a = ITerm (AST v) [(v,Usage)] (env v -> a)
 
 instance (VarEnv env v, Show v) => VarTerm (ITerm env v) v where
-  variable' x = ITerm (Var (x,Current)) [(x,Current)] (evalGetCurrent x)
+  variable' x = ITerm (UVar (x,Current)) [(x,Current)] (evalGetCurrent x)
 
 instance (PVarEnv env v, Show v) => PVarTerm (ITerm env v) v where
-  variableAll' x = ITerm (Var (x,All)) [(x,All)] (evalGetAll x)
+  variableAll' x = ITerm (UVar (x,All)) [(x,All)] (evalGetAll x)
 
 evalGetAll :: (PVarEnv env v, Show v, Typeable a) => v -> env v -> [a]
 evalGetAll x d =

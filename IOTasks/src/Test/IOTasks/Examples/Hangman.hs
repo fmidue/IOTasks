@@ -6,18 +6,21 @@ module Test.IOTasks.Examples.Hangman where
 import Prelude hiding (getLine, putStrLn, print)
 
 import Test.IOTasks
-import Test.IOTasks.Term (SpecVar)
-import Test.IOTasks.Term.ITerm
-import Test.IOTasks.Term.ITerm.Prelude as T
+
+import Data.Environment (Environment)
+import Data.Term.ITerm
+import Data.Term.ITerm.Prelude as T
 
 -- Specification and corresponding implementation of
 -- a simple hangman game.
+
+type SpecTerm = ITerm Environment Varname
 
 -- possible elements to build the secret from
 hangmanDomain :: [Int]
 hangmanDomain = [0..9]
 
-hangmanSpec :: [Int] -> Specification ITerm
+hangmanSpec :: [Int] -> Specification SpecTerm
 hangmanSpec (lit -> word) =
   tillExit (
        branch (winCondition $ getAll "guessed")
@@ -30,7 +33,7 @@ hangmanSpec (lit -> word) =
          (optional $ writeFixedOutput [text "good guess!" <> whitespace])
     )
   where
-    winCondition :: ITerm SpecVar [Int] -> ITerm SpecVar Bool
+    winCondition :: SpecTerm [Int] -> SpecTerm Bool
     winCondition xs = T.all (`T.elem` T.filter (`T.elem` word) xs) word
 
 
