@@ -17,7 +17,9 @@ description:         Please see the README on GitHub at <https://github.com/owes
 
 dependencies:
 - base >= 4.7 && < 5
+- containers
 - dynamic-environment
+- pretty-tree
 
 library:
   source-dirs: src
@@ -29,6 +31,7 @@ library:
   - Data.Term.Class
   - Data.Term.ITerm
   - Data.Term.ATerm
-  - Data.Term.ITerm.Prelude
+  - Data.Term.Liftable
+  - Data.Term.Liftable.Prelude
   - Data.Term.AST
-  - Data.Term.TAST
+  - Data.Term.Typed.AST

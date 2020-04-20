@@ -9,7 +9,7 @@ import Test.IOTasks
 
 import Data.Environment (Environment)
 import Data.Term.ITerm
-import Data.Term.ITerm.Prelude as T
+import Data.Term.Liftable.Prelude as T
 
 -- Specification and corresponding implementation of
 -- a simple hangman game.

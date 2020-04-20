@@ -4,16 +4,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Data.Term.ITerm (
   ITerm,
-  --
   lit,
-  liftT,
-  liftT2,
-  liftTInfix,
-  liftT3,
-  unHO,
-  unHO2,
-  unHO3,
-) where
+  ) where
 
 import Data.List (nub)
 import Data.Proxy
@@ -21,23 +13,17 @@ import Data.Dynamic (Typeable)
 import Data.Either (either)
 
 import Data.Term.Class
+import Data.Term.Liftable
 import Data.Term.AST
-import Data.Term.TAST
 import Data.Environment.Class
-
-plus :: AST v
-plus = Lam ["x","y"] $ Infix (Literal "x") "+" (Literal "y")
-
-plusT :: TAST String (Int -> Int)
-plusT = TLam "x" $ \x -> TInfix x (TLit ("+",(+))) (TCVar "y")
 
 data ITerm env v a = ITerm (AST v) [(v,Usage)] (env v -> a)
 
 instance (VarEnv env v, Show v) => VarTerm (ITerm env v) v where
-  variable' x = ITerm (UVar (x,Current)) [(x,Current)] (evalGetCurrent x)
+  variable' x _ = ITerm (UVar (x,Current)) [(x,Current)] (evalGetCurrent x)
 
 instance (PVarEnv env v, Show v) => PVarTerm (ITerm env v) v where
-  variableAll' x = ITerm (UVar (x,All)) [(x,All)] (evalGetAll x)
+  variableAll' x _ = ITerm (UVar (x,All)) [(x,All)] (evalGetAll x)
 
 evalGetAll :: (PVarEnv env v, Show v, Typeable a) => v -> env v -> [a]
 evalGetAll x d =
@@ -72,49 +58,34 @@ instance (PVarTerm env v, PVarEnv env v, Show v) => UsageTerm (ITerm env v) v wh
 varInfo :: ITerm env v a -> [(v,Usage)]
 varInfo (ITerm _ vs _) = vs
 
-lit :: Show a => a -> ITerm env v a
-lit x = embed x (Literal $ show x)
+lit :: (Eq v, Show a) => a -> ITerm env v a
+lit x = embedT (x,show x)
 
+instance Eq v => Liftable (ITerm env v) where
 -- might need some sanity checks if publicly exposed
-embed :: a -> AST v -> ITerm env v a
-embed x ast = ITerm ast [] (const x)
+  embedT (x,s) = ITerm (Literal s) [] (const x)
+  appT (ITerm ast1 vs1 f) (ITerm ast2 vs2 x) = ITerm (Node "app" [ast1, ast2]) (nub $ vs1 ++ vs2) (\e -> f e (x e))
 
-liftT :: (a -> b, String) -> ITerm env v a -> ITerm env v b
-liftT (f,name) (ITerm ast vs eval) = ITerm (Node name [ast]) vs (f . eval)
+  liftT (f,name) (ITerm ast vs eval) = ITerm (Node name [ast]) vs (f . eval)
+  liftT2 (f,name) (ITerm ast1 vs1 eval1) (ITerm ast2 vs2 eval2)  = ITerm (Node name [ast1, ast2]) (nub $ vs1 ++ vs2) (\d -> f (eval1 d) (eval2 d))
+  liftTInfix ((*$),name) (ITerm ast1 vs1 eval1) (ITerm ast2 vs2 eval2)  = ITerm (Infix ast1 name ast2) (nub $ vs1 ++ vs2) (\d -> eval1 d *$ eval2 d)
+  liftT3 (f,name) (ITerm ast1 vs1 eval1) (ITerm ast2 vs2 eval2) (ITerm ast3 vs3 eval3)
+    = ITerm (Node name [ast1, ast2, ast3]) (nub $ vs1 ++ vs2 ++ vs3) (\d -> f (eval1 d) (eval2 d) (eval3 d))
 
-liftT2 :: Eq v => (a -> b -> c, String) -> ITerm env v a -> ITerm env v b -> ITerm env v c
-liftT2 (f,name) (ITerm ast1 vs1 eval1) (ITerm ast2 vs2 eval2)  = ITerm (Node name [ast1, ast2]) (nub $ vs1 ++ vs2) (\d -> f (eval1 d) (eval2 d))
+  unHO f = ITerm
+    (funcAST f)
+    (varInfo (f dummyClosedITerm))
+    (\ d x -> evalTerm (f (dummyEvalITerm x)) d)
 
-liftTInfix :: Eq v => (a -> b -> c, String) -> ITerm env v a -> ITerm env v b -> ITerm env v c
-liftTInfix ((*$),name) (ITerm ast1 vs1 eval1) (ITerm ast2 vs2 eval2)  = ITerm (Infix ast1 name ast2) (nub $ vs1 ++ vs2) (\d -> eval1 d *$ eval2 d)
+  unHO2 f = ITerm
+    (funcAST2 f)
+    (varInfo (f dummyClosedITerm dummyClosedITerm))
+    (\ d x y -> evalTerm (f (dummyEvalITerm x) (dummyEvalITerm y)) d)
 
-liftT3 :: Eq v => (a -> b -> c -> d, String) -> ITerm env v a -> ITerm env v b -> ITerm env v c -> ITerm env v d
-liftT3 (f,name) (ITerm ast1 vs1 eval1) (ITerm ast2 vs2 eval2) (ITerm ast3 vs3 eval3)
-  = ITerm (Node name [ast1, ast2, ast3]) (nub $ vs1 ++ vs2 ++ vs3) (\d -> f (eval1 d) (eval2 d) (eval3 d))
-
--- | usfull for lifting higher order functions.
---
--- E.g. @'liftT2' ('map', "map") . 'unHO'@ lifts @'map'@
--- to type @('ITerm' a -> 'ITerm' b) -> 'ITerm' [a] -> 'ITerm' [b]@
---
--- while doing just @'liftT2' ('map', "map")@ would result in type @'ITerm'(a -> b) -> 'ITerm' [a] -> 'ITerm' [b]@
-unHO :: (ITerm env v a -> ITerm env v b) -> ITerm env v (a -> b)
-unHO f = ITerm
-  (funcAST f)
-  (varInfo (f dummyClosedITerm))
-  (\ d x -> evalTerm (f (dummyEvalITerm x)) d)
-
-unHO2 :: (ITerm env v a -> ITerm env v b -> ITerm env v c) -> ITerm env v (a -> b -> c)
-unHO2 f = ITerm
-  (funcAST2 f)
-  (varInfo (f dummyClosedITerm dummyClosedITerm))
-  (\ d x y -> evalTerm (f (dummyEvalITerm x) (dummyEvalITerm y)) d)
-
-unHO3 :: (ITerm env v a -> ITerm env v b -> ITerm env v c -> ITerm env v d) -> ITerm env v (a -> b -> c -> d)
-unHO3 f = ITerm
-  (funcAST3 f)
-  (varInfo (f dummyClosedITerm dummyClosedITerm dummyClosedITerm))
-  (\ d x y z -> evalTerm (f (dummyEvalITerm x) (dummyEvalITerm y) (dummyEvalITerm z)) d)
+  unHO3 f = ITerm
+    (funcAST3 f)
+    (varInfo (f dummyClosedITerm dummyClosedITerm dummyClosedITerm))
+    (\ d x y z -> evalTerm (f (dummyEvalITerm x) (dummyEvalITerm y) (dummyEvalITerm z)) d)
 
 -- internal helpers
 funcAST :: (ITerm env v a -> ITerm env v b) -> AST v

@@ -54,11 +54,11 @@ nop = mempty
 exit :: Specification t
 exit = Spec [E]
 
-getCurrent :: forall a t. (PVarTerm t Varname, Typeable a) => Varname -> t a
-getCurrent = variableCurrent
+getCurrent :: forall a t. (PVarTerm t Varname, Typeable a, Show a) => Varname -> t a
+getCurrent v = variableCurrent v show
 
-getAll :: forall a t. (PVarTerm t Varname, Typeable a) => Varname -> t [a]
-getAll = variableAll
+getAll :: forall a t. (PVarTerm t Varname, Typeable a, Show a) => Varname -> t [a]
+getAll v = variableAll v show
 
 intValues :: [Int] -> ValueSet
 intValues = valueSet

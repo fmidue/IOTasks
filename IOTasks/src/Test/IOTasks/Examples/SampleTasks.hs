@@ -9,7 +9,7 @@ import Test.IOTasks
 
 import Data.Environment (Environment)
 import Data.Term.ITerm (ITerm, lit)
-import qualified Data.Term.ITerm.Prelude as T
+import qualified Data.Term.Liftable.Prelude as T
 
 import Control.Monad (replicateM,replicateM_)
 

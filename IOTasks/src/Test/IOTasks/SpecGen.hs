@@ -8,7 +8,7 @@ import Test.IOTasks.Specification
 import Test.IOTasks.Language (exit, ints,nats, getCurrent, getAll, Pattern(..))
 import Test.IOTasks.Language as Pattern (var)
 
-import qualified Data.Term.ITerm.Prelude as T
+import qualified Data.Term.Liftable.Prelude as T
 import Data.Term.ITerm (ITerm, lit)
 
 import Test.QuickCheck (arbitrary, Gen)

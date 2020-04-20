@@ -3,25 +3,24 @@
 {-# LANGUAGE QuantifiedConstraints #-}
 module Data.Term.Class where
 
-import Data.Environment.Class (LookupError)
 import Type.Reflection
 
 -- | terms with variables
 class VarTerm t v where
-  variable' :: Typeable a => v -> t a
+  variable' :: Typeable a => v -> (a -> String) -> t a
 
 -- | terms with "persistent" variable access
 class VarTerm t v => PVarTerm t v where
-  variableAll' :: Typeable a => v -> t [a]
+  variableAll' :: Typeable a => v -> (a -> String) -> t [a]
 
-variable :: forall a t v. (VarTerm t v, Typeable a) => v -> t a
+variable :: forall a t v. (VarTerm t v, Typeable a) => v -> (a -> String) -> t a
 variable = variable'
 
-variableAll :: forall a t v. (PVarTerm t v, Typeable a) => v -> t [a]
+variableAll :: forall a t v. (PVarTerm t v, Typeable a) => v -> (a -> String) -> t [a]
 variableAll = variableAll'
 
 -- | alias for variable
-variableCurrent :: forall a t v. (Typeable a, PVarTerm t v) => v -> t a
+variableCurrent :: forall a t v. (Typeable a, PVarTerm t v) => v -> (a -> String) -> t a
 variableCurrent = variable
 
 -- | extract variables used in a term
