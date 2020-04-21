@@ -20,14 +20,14 @@ instance Eq v => Applicative (ATerm env v) where
   ATerm vs1 fab <*> ATerm vs2 fa = ATerm (nub $ vs1 ++ vs2) $ \d -> fab d $ fa d
 
 instance (VarEnv env v, Show v) => VarTerm (ATerm env v) v where
-  variable' x _ = ATerm [(x,Current)] $ \d ->
+  variable' x = ATerm [(x,Current)] $ \d ->
     let mv = lookupAtType Proxy x d in
     case mv of
       Left e -> error $ printLookupError e
       Right vs -> vs
 
 instance (PVarEnv env v, Show v) => PVarTerm (ATerm env v) v where
-  variableAll' x _ = ATerm [(x,All)] $ \d ->
+  variableAll' x = ATerm [(x,All)] $ \d ->
     let mVs = lookupAllAtType Proxy x d in
     case mVs of
       Left e -> error $ printLookupError e

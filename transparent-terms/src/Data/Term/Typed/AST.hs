@@ -17,7 +17,7 @@ import Data.Tree.Pretty
 data AST :: * -> * -> * where
   Leaf :: a -> String -> AST v a
   Lam :: Int -> (AST v x -> AST v a) -> AST v (x -> a)
-  Var :: Typeable a => v -> TypeRep a -> (a -> String) -> AST v a
+  Var :: Typeable a => v -> TypeRep a -> AST v a
   App :: AST v (a -> b) -> AST v a -> AST v b
 
 instance Liftable (AST v) where
@@ -51,10 +51,10 @@ reduceAp (App (Lam _ t) (Leaf y sy)) = t (Leaf y sy)
 reduceAp x = x
 
 reduceKnownVariable :: (VarEnv env v, Ord v) => AST v a -> env v -> AST v a
-reduceKnownVariable var@(Var x _ sho) e =
-  case lookupAtType Proxy x e of
+reduceKnownVariable var@(Var x _) e =
+  case lookupAtTypeWithShow Proxy x e of
     Left _ -> var
-    Right v -> Leaf v (sho v)
+    Right (v,sho) -> Leaf v (sho v)
 reduceKnownVariable x _ = x
 
 reduceT :: (VarEnv env v, Ord v) => env v -> AST v a -> AST v a
@@ -63,11 +63,15 @@ reduceT _ (Leaf x s) = Leaf x s
 reduceT e (Lam x t) = Lam x (reduceT e . t)
 reduceT e var@Var{} = reduceKnownVariable var e
 
+tryValue :: AST v a ->  Maybe a
+tryValue (Leaf x _) = Just x
+tryValue _ = Nothing
+
 printTree :: Show v => AST v a -> Tree String
 printTree (App tx ty) = Node "($)" [printTree tx, printTree ty]
 printTree (Leaf _ s) = Node s []
 printTree (Lam x t) = Node ("\\" ++ show x ++ " -> ") [printTree (t (Leaf undefined ("var " ++ show x)))]
-printTree (Var x ty _) = Node (show x ++ ":" ++ show ty) []
+printTree (Var x ty) = Node (show x ++ ":" ++ show ty) []
 
 pPrintTree :: Show v => AST v a -> String
 pPrintTree = drawVerticalTree . printTree
@@ -76,7 +80,7 @@ eval :: (VarEnv env v, Ord v, Show v) => env v -> AST v a -> a
 eval e (App tx ty) = eval e tx $ eval e ty
 eval _ (Leaf x _) = x
 eval e (Lam _ t) = \x -> eval e (t (Leaf x undefined))
-eval e (Var x _ _) =
+eval e (Var x _) =
   case lookupAtType Proxy x e of
     Left err -> error $ printLookupError err
     Right v -> v
@@ -84,5 +88,5 @@ eval e (Var x _ _) =
 vars :: AST v a -> [v]
 vars (Leaf _ _) = []
 vars (Lam _ t) = vars $ t (Leaf undefined undefined) -- local variables are not considered here
-vars (Var x _ _) = [x]
+vars (Var x _ ) = [x]
 vars (App f x) = vars f ++ vars x

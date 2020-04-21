@@ -12,8 +12,13 @@
 module Data.Environment (
   VarEnv(..),
   store,
+  lookupAtType,
+  lookupAtTypeWithShow,
   PVarEnv(..),
+  lookupAllAtType,
+  lookupAllAtTypeWithShow,
   lookupLastAtType,
+  lookupLastAtTypeWithShow,
   Environment,
   Value,
   value,
@@ -25,8 +30,6 @@ module Data.Environment (
 import Data.Environment.Class
 import Data.Environment.Value
 
-import Data.Dynamic
-import Data.Proxy
 import Type.Reflection
 
 import Data.Maybe
@@ -70,7 +73,7 @@ instance Ord v => VarEnv Environment v where
           Just HRefl -> updateEntry
     where updateEntry = Just $ MkEnvironment $ Map.update (\e -> addValue v e <|> Just e) x es
 
-  lookupAtType p x e = lookupNameAtType p x e >>= \case
+  lookupValue x e = lookupName x e >>= \case
     (Nothing,_) -> Left $ NoValuePresent x
     (Just v,_) -> Right v
 
@@ -81,7 +84,7 @@ instance Ord v => VarEnv Environment v where
   emptyEnvironment = MkEnvironment Map.empty
 
 instance Ord v => PVarEnv Environment v where
-  lookupAllAtType p v e = snd <$> lookupNameAtType p v e
+  lookupAll v e = snd <$> lookupName v e
 
 addName :: Ord v => v -> Environment v -> Maybe (Environment v)
 addName x (MkEnvironment xs) =
@@ -89,12 +92,9 @@ addName x (MkEnvironment xs) =
     Just _ -> Nothing
     Nothing -> Just $ MkEnvironment (Map.insert x EmptyEntry xs)
 
-lookupNameAtType :: (Typeable a, Ord v) => Proxy a -> v -> Environment v -> Either (LookupError v) (Maybe a, [a])
-lookupNameAtType (_ :: Proxy a) x (MkEnvironment es) =
+lookupName :: Ord v => v -> Environment v -> Either (LookupError v) (Maybe Value, [Value])
+lookupName x (MkEnvironment es) =
   case Map.lookup x es of
     Nothing -> Left $ NameNotFound x
     Just EmptyEntry -> Right (Nothing,[])
-    Just (MkEntry r v vs) ->
-      case typeRep @a `eqTypeRep` r of
-        Just HRefl -> Right (Just (unsafeExtract v), map unsafeExtract (NonEmpty.toList vs))
-        Nothing -> Left $ WrongType x
+    Just (MkEntry _ v vs) -> Right (Just v, NonEmpty.toList vs)
