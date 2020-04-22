@@ -55,10 +55,10 @@ exit :: Specification t
 exit = Spec [E]
 
 getCurrent :: forall a t. (PVarTerm t Varname, Typeable a, Show a) => Varname -> t a
-getCurrent v = variableCurrent v show
+getCurrent = variableCurrent
 
 getAll :: forall a t. (PVarTerm t Varname, Typeable a, Show a) => Varname -> t [a]
-getAll v = variableAll v show
+getAll = variableAll
 
 intValues :: [Int] -> ValueSet
 intValues = valueSet
