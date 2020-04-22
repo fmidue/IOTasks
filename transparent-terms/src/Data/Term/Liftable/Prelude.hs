@@ -32,6 +32,15 @@ mod = liftT2 (Prelude.mod, "mod")
 (<) :: Liftable term => Ord a => term a -> term a -> term Bool
 (<) = liftTInfix ((Prelude.<), "<")
 
+nil :: Liftable term => term [a]
+nil = embedT ([], "[]") 
+
+cons :: Liftable term => term a -> term [a] -> term [a]
+cons = liftTInfix ((:), ":")
+
+(++) :: Liftable term => term [a] -> term [a] -> term [a]
+(++) = liftTInfix ((Prelude.++), "++")
+
 length :: Liftable term => Foldable t => term (t a) -> term Int
 length = liftT (Prelude.length,"length")
 

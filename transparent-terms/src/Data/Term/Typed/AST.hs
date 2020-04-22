@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE KindSignatures #-}
@@ -16,7 +17,7 @@ import Data.Tree.Pretty
 
 data AST :: * -> * -> * where
   Leaf :: a -> String -> AST v a
-  Lam :: Int -> (AST v x -> AST v a) -> AST v (x -> a)
+  Lam :: Int -> ((x,String) -> AST v a) -> AST v (x -> a)
   Var :: Typeable a => v -> TypeRep a -> AST v a
   App :: AST v (a -> b) -> AST v a -> AST v b
 
@@ -27,9 +28,9 @@ instance Liftable (AST v) where
   -- TODO: improve this
   liftTInfix = liftT2
 
-  unHO = Lam 0
-  unHO2 f = Lam 1 $ \x -> Lam 0 $ f x
-  unHO3 f = Lam 2 $ \x -> Lam 1 $ \y -> Lam 0 $ f x y
+  unHO f = Lam 0 $ \(x,s) -> f $ Leaf x s
+  unHO2 f = Lam 1 $ \(x,sx) -> Lam 0 $ \(y,sy) -> f (Leaf x sx) (Leaf y sy)
+  unHO3 f = Lam 2 $ \(x,sx) -> Lam 1 $ \(y,sy) -> Lam 0 $ \(z,sz) -> f (Leaf x sx) (Leaf y sy) (Leaf z sz)
 
 instance VarTerm (AST v) v where
   variable' v = Var v typeRep
@@ -47,7 +48,7 @@ instance (VarEnv env v, Ord v, Show  v) => SemTerm (AST v) (env v) where
   evalTerm = flip eval
 
 reduceAp :: AST v a -> AST v a
-reduceAp (App (Lam _ t) (Leaf y sy)) = t (Leaf y sy)
+reduceAp (App (Lam _ t) (Leaf y sy)) = t (y,sy)
 reduceAp x = x
 
 reduceKnownVariable :: (VarEnv env v, Ord v) => AST v a -> env v -> AST v a
@@ -70,7 +71,7 @@ tryValue _ = Nothing
 printTree :: Show v => AST v a -> Tree String
 printTree (App tx ty) = Node "($)" [printTree tx, printTree ty]
 printTree (Leaf _ s) = Node s []
-printTree (Lam x t) = Node ("\\" ++ show x ++ " -> ") [printTree (t (Leaf undefined ("var " ++ show x)))]
+printTree (Lam x t) = Node ("\\" ++ show x ++ " -> ") [printTree (t (undefined,"var " ++ show x))]
 printTree (Var x ty) = Node (show x ++ ":" ++ show ty) []
 
 pPrintTree :: Show v => AST v a -> String
@@ -79,7 +80,7 @@ pPrintTree = drawVerticalTree . printTree
 eval :: (VarEnv env v, Ord v, Show v) => env v -> AST v a -> a
 eval e (App tx ty) = eval e tx $ eval e ty
 eval _ (Leaf x _) = x
-eval e (Lam _ t) = \x -> eval e (t (Leaf x undefined))
+eval e (Lam _ t) = \x -> eval e (t (x, undefined))
 eval e (Var x _) =
   case lookupAtType Proxy x e of
     Left err -> error $ printLookupError err
@@ -87,6 +88,18 @@ eval e (Var x _) =
 
 vars :: AST v a -> [v]
 vars (Leaf _ _) = []
-vars (Lam _ t) = vars $ t (Leaf undefined undefined) -- local variables are not considered here
+vars (Lam _ t) = vars $ t undefined -- local variables are not considered here
 vars (Var x _ ) = [x]
 vars (App f x) = vars f ++ vars x
+
+mapV :: (v -> v') -> AST v a -> AST v' a
+mapV _ (Leaf x s) = Leaf x s
+mapV f (Lam x t) = Lam x $ \x -> mapV f (t x)
+mapV f (Var x r) = Var (f x) r
+mapV f (App g x) = App (mapV f g) (mapV f x)
+
+replaceVar :: (forall a. v -> TypeRep a -> AST v' a) -> AST v a -> AST v' a
+replaceVar _ (Leaf x s) = Leaf x s
+replaceVar f (Lam x t) = Lam x $ \x -> replaceVar f (t x)
+replaceVar f (Var x r) = f x r
+replaceVar f (App g x) = App (replaceVar f g) (replaceVar f x)
