@@ -98,7 +98,7 @@ mapV f (Lam x t) = Lam x $ \x -> mapV f (t x)
 mapV f (Var x r) = Var (f x) r
 mapV f (App g x) = App (mapV f g) (mapV f x)
 
-replaceVar :: (forall a. v -> TypeRep a -> AST v' a) -> AST v a -> AST v' a
+replaceVar :: (forall a. Typeable a => v -> TypeRep a -> AST v' a) -> AST v a -> AST v' a
 replaceVar _ (Leaf x s) = Leaf x s
 replaceVar f (Lam x t) = Lam x $ \x -> replaceVar f (t x)
 replaceVar f (Var x r) = f x r
