@@ -36,7 +36,7 @@ import Test.QuickCheck (Gen, Arbitrary, elements)
 readInput :: Varname -> ValueSet -> Specification t
 readInput x vs = Spec [ReadInput x vs]
 
-writeOutput :: StringEmbedding a => [TermPattern] -> [t a] -> Specification t
+writeOutput :: (Typeable a, StringEmbedding a) => [TermPattern] -> [t a] -> Specification t
 writeOutput ps ts = Spec [WriteOutput False ps ts]
 
 writeFixedOutput :: [TermPattern] -> Specification t

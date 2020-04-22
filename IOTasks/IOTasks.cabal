@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b3716790a9c5eb4089e1096dbcee8d27d7ca71607a524f4e62031ec7eea6cf8a
+-- hash: b0edbe80178c763378b51fd6317dd3bc4a07995cd7249c1f43a3e4d2f425e7e5
 
 name:           IOTasks
 version:        0.1.0.0
@@ -43,6 +43,7 @@ library
       Test.IOTasks.CodeGeneration.IRGraph
       Test.IOTasks.CodeGeneration.IRNew
       Test.IOTasks.CodeGeneration.Optimization
+      Test.IOTasks.CodeGeneration.Translation
       Test.IOTasks.Interpreter
       Test.IOTasks.IOProperty
       Test.IOTasks.Pattern

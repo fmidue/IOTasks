@@ -27,6 +27,8 @@ import Data.List (nub)
 import Data.MonoTraversable
 import Data.MonoTraversable.Unprefixed (foldr)
 
+import Type.Reflection (Typeable)
+
 import Text.PrettyPrint.Annotated.HughesPJClass (Pretty)
 import qualified Text.PrettyPrint.Annotated.HughesPJClass as PP
 
@@ -38,7 +40,7 @@ type instance Element (Specification t) = Action (Specification t) t
 
 data Action r t where
   ReadInput :: Varname -> ValueSet -> Action r t
-  WriteOutput :: StringEmbedding a => Bool -> [TermPattern] -> [t a] -> Action r t
+  WriteOutput :: (Typeable a, StringEmbedding a) => Bool -> [TermPattern] -> [t a] -> Action r t
   Branch :: t Bool -> r -> r -> Action r t
   TillE :: r -> Action r t
   E :: Action r t

@@ -1,11 +1,23 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE DataKinds #-}
 module Test.IOTasks.CodeGeneration.IRNew where
 
-import Data.Maybe (fromJust)
+import Data.Maybe (fromJust, fromMaybe)
+import Data.List (sort, group)
+import Data.Proxy
+import Type.Reflection (Typeable, eqTypeRep, typeRep, (:~~:)(..))
 
 import Data.Environment
 import Data.Term
-import Data.Term.ITerm
+import Data.Term.Liftable
+import qualified Data.Term.Liftable.Prelude as T
+import Data.Term.Typed.AST
 
 data Instruction
   = READ Var
@@ -19,17 +31,61 @@ data Instruction
 
 type Var = String
 
-type AM = ([Instruction],[Def],[Val],[[Var]],[Input],[Output])
+type AM = ([Instruction],([Def ()],[F]),Vals,[[Var]],[Input],[Output])
 
-type Val = (Var,Payload)
-type Def = (Var,DefRhs)
-data DefRhs = IntValueDef (ITerm Environment Var Int) | BoolValueDef (ITerm Environment Var Bool) | LoopDef [Var] [Instruction]
-data Payload = I Int | B Bool deriving (Show,Eq)
+type IRProgram = ([Instruction], [Def ()], [F])
+type Vals = Environment Var
+type Def a = (Var,DefRhs a,Int)
+data DefRhs :: * -> * where
+  Forget :: Typeable a => DefRhs a -> DefRhs ()
+  U :: forall c a b. (Typeable a, Typeable b) => (AST Var a -> AST Var b -> AST Var c) -> Var -> Var -> DefRhs c
+  N1L :: forall c a b. (Typeable a, Typeable b) => (AST Var a -> AST Var b -> AST Var c) -> DefRhs a -> Var -> DefRhs c
+  N1R :: forall c a b. (Typeable a, Typeable b) => (AST Var a -> AST Var b -> AST Var c) -> Var -> DefRhs b -> DefRhs c
+  N2  :: forall c a b. (Typeable a, Typeable b) => (AST Var a -> AST Var b -> AST Var c) -> DefRhs a -> DefRhs b -> DefRhs c
+  Const :: AST Var a -> DefRhs a
+type F = (Var, [Var], [Instruction])
 type Input = Int
-data Output = R Int | W Int deriving (Show,Eq) -- simple trace elements
+data Output = I Int | O Int deriving (Show,Eq) -- simple trace elements
 
-runInstructions :: [Instruction] -> [Def] -> [Input] -> [Output]
-runInstructions p d i = let (_,_,_,_,_,o) = runAM (p,d,[],[],i,[]) in o
+-- very basic sequencing, assumes well-formed input, i.e. not duplicate varaiable definitions etc.
+(<:>) :: IRProgram -> IRProgram -> IRProgram
+(is1,ds1,fs1) <:> (is2,ds2,fs2) = (is1 ++ is2,foldr (\(x,d,_) -> addDef (x,d)) ds1 ds2,fs1 ++ fs2)
+
+readIR :: Var -> IRProgram
+readIR x = ([READ x],[],[])
+
+initialValueIR :: Typeable a => Var -> Var -> Var -> Proxy a -> IRProgram
+initialValueIR x y v (Proxy :: Proxy a) = ([],[(x,Forget $ U @[a] @[a] @a (const (`T.cons` T.nil)) y v,0)],[])
+
+updateIR :: Typeable a => Var -> Var -> Var -> Proxy a -> IRProgram
+updateIR x y v (Proxy :: Proxy a) = ([],[(x, Forget $ U @[a] (T.++) y v,0)],[])
+
+printIR :: Var -> IRProgram
+printIR x = ([PRINT x],[],[])
+
+valueDefIR :: Typeable a => Var -> AST Varname a -> IRProgram
+valueDefIR x t = ([],[(x,Forget $ Const t,0)],[])
+
+ifIR :: Var -> IRProgram -> IRProgram -> IRProgram
+ifIR c (is1,ds1,fs1) (is2,ds2,fs2) = ([IF c is1 is2],ds1 ++ ds2,fs1 ++ fs2)
+
+defLoopIR :: Var -> [Var] -> IRProgram -> IRProgram
+defLoopIR f xs (b,ds,fs) = ([],ds,(f,xs,b):fs)
+
+enterLoopIR :: Var -> [Var] -> [Var] -> IRProgram
+enterLoopIR f ps rvs = ([BINDCALL f ps rvs],[],[])
+
+recCallIR :: Var -> [Var] -> IRProgram
+recCallIR f ps = ([TAILCALL f ps],[],[])
+
+returnIR :: [Var] -> IRProgram
+returnIR rvs = ([RETURN rvs],[],[])
+
+nopIR :: IRProgram
+nopIR = ([NOP],[],[])
+
+runInstructions :: [Instruction] -> ([Def ()],[F]) -> [Input] -> [Output]
+runInstructions p d i = let (_,_,_,_,_,o) = runAM (p,d,emptyEnvironment,[],i,[]) in o
 
 runAM :: AM -> AM
 runAM ([],d,vs,rvs,i,o) = ([],d,vs,rvs,i,o)
@@ -38,50 +94,131 @@ runAM m = runAM $ stepAM m
 stepAM :: AM -> AM
 stepAM ([],_,_,_,_,_) = error "no instruction to execute"
 stepAM (READ _:_,_,_,_,[],_) = error "not enough inputs"
-stepAM (READ x:p',d,vs,rvs,i:is,o) = (p',d,updateValue (x,I i) vs,rvs,is,R i:o)
-stepAM (PRINT x:p',d,vs,rvs,i,o) = (p',d,vs,rvs,i,W (intValue x d vs):o)
+stepAM (READ x:p',d,vs,rvs,i:is,o) = (p',d,updateValue (x,i) vs,rvs,is,I i:o)
+stepAM (PRINT x:p',d,vs,rvs,i,o) = (p',d,vs,rvs,i,O (_intValue x d vs):o)
 stepAM (IF x t e:p',d,vs,rvs,i,o)
-  | boolValue x d vs = (t++p',d,vs,rvs,i,o)
+  | _boolValue x d vs = (t++p',d,vs,rvs,i,o)
   | otherwise = (e++p',d,vs,rvs,i,o)
-stepAM (TAILCALL l ps:p',d,vs,rvs,i,o) = (getInstructions l d ++ p',d,setParameters l ps d vs,rvs,i,o)
-stepAM (BINDCALL l ps bs:p',d,vs,rvs,i,o) = (getInstructions l d ++ p',d,setParameters l ps d vs,bs:rvs,i,o)
+stepAM (TAILCALL l ps:p',d,vs,rvs,i,o) = (_getInstructions l d ++ p',d,_setParameters l ps d vs,rvs,i,o)
+stepAM (BINDCALL l ps bs:p',d,vs,rvs,i,o) = (_getInstructions l d ++ p',d,_setParameters l ps d vs,bs:rvs,i,o)
 stepAM (RETURN _:_,_,_,[],_,_) = error "missing binders for returned values"
 stepAM (RETURN xs:p',d,vs,rvs:rvss,i,o)
-  | length vs == length rvs = (p', d,updateValues (zipWith (\x rv -> (rv,getPayload x vs)) xs rvs) vs,rvss,i,o)
+  | _length vs == length rvs = (p', d,updateValues (zipWith (\x rv -> (rv,_getPayload x vs)) xs rvs) vs,rvss,i,o)
   | otherwise = error "wrong number of binders for returned values"
 stepAM (NOP:p',d,vs,rvs,i,o) = (p',d,vs,rvs,i,o)
 
-setParameters :: Var -> [Var] -> [Def] -> [Val] -> [Val]
-setParameters l xs ds vs = updateValues (zip xs (map (`getPayload` vs) (getParamNames l ds))) vs
+updateValues :: [(Var, a)] -> Vals -> Vals
+updateValues xs ys = fromJust $ foldr _ (Just ys) xs
 
-updateValues :: [Val] -> [Val] -> [Val]
-updateValues xs ys = foldr updateValue ys xs
+updateValue :: (Typeable a, Show a) => (Var,a) -> Vals -> Vals
+updateValue (x,v) = fromJust . store x show v
 
-updateValue :: Val -> [Val] -> [Val]
-updateValue = (:) -- inefficient but should work
+-- printing programs
+printProgram :: IRProgram -> Doc
+printProgram = _
 
-getPayload :: Var -> [Val] -> Payload
-getPayload x = fromJust . lookup x
+-- manipulation of DefRhs
+printDef :: DefRhs a -> String
+printDef = pPrintTree . toAST
 
-intValue :: Var -> [Def] -> [Val] -> Int
-intValue x ds vs = case lookup x vs of
-  Just (I i) -> i
-  Nothing -> case lookup x ds of
-    Just (IntValueDef t) -> _ $ foldr (\x vs' -> intValue x ds vs) _vs (termVars t)
-    _ -> error ""
-  _ -> error "not an Int value"
+toAST :: DefRhs a -> AST Var a
+toAST (Forget x) = App (unHO $ \_ -> Leaf () "()") $ toAST x
+toAST (U f y v) = f (variable y) (variable v)
+toAST (N1L f y v) = f (toAST y) (variable v)
+toAST (N1R f y v) = f (variable y) (toAST v)
+toAST (N2 f y v) = f (toAST y) (toAST v)
 
-boolValue :: Var -> [Def] -> [Val] -> Bool
-boolValue x ds vs = case lookup x vs of
-  Just (B b) -> b
-  _ -> error "not a Bool value"
+instance Show (DefRhs a) where
+  show (Forget x) = "Forget " ++ show x
+  show (U f y v) = "U ? " ++ y ++ " " ++ v
+  show (N1L f y v) = "N1L ? " ++ v
+  show (N1R f y v) = "N1R ? " ++ y
+  show (N2 f y v) = "N2 ? "
 
-getInstructions :: Var -> [Def] -> [Instruction]
-getInstructions x ds = case fromJust $ lookup x ds of
-  LoopDef _ p -> p
-  _ -> error "variable is not a loop name"
+simplify :: (VarEnv env Var, Typeable a) => env Var -> [Def a] -> [Def a]
+simplify e ds = case inline1 ds of
+  Just ds' -> simplify e ds'
+  Nothing -> map (\(x,d,n) -> (x,reduceD e d,n)) ds
 
-getParamNames :: Var -> [Def] -> [Var]
-getParamNames x ds = case fromJust $ lookup x ds of
-  LoopDef xs _ -> xs
-  _ -> error "variable is not a loop name"
+reduceD :: VarEnv env Var => env Var -> DefRhs a -> DefRhs a
+reduceD e (Forget x) = Forget (reduceD e x)
+reduceD e (U f y v) = U (\y v  -> reduceT e $ f y v) y v
+reduceD e (N1L f y v) = N1L (\y v  -> reduceT e $ f y v) y v
+reduceD e (N1R f y v) = N1R (\y v  -> reduceT e $ f y v) y v
+reduceD e (N2 f y v) = N2 (\y v  -> reduceT e $ f y v) y v
+
+inline :: (Typeable x, Typeable a) => (Var,DefRhs x) -> DefRhs a -> Maybe (DefRhs a)
+inline (x,t :: DefRhs x) (Forget y) = Forget <$> inline (x,t) y
+inline (x,t :: DefRhs x) (U (f :: AST Var a -> AST Var b -> AST Var c) y v)
+  | x == y = case eqTypeRep (typeRep @x) (typeRep @a) of
+    Just HRefl -> Just $ N1L f t v
+    Nothing -> Nothing
+  | x == v = case eqTypeRep (typeRep @x) (typeRep @b) of
+    Just HRefl -> Just $ N1R f y t
+    Nothing -> Nothing
+  | otherwise = Nothing
+inline (x,t :: DefRhs x) (N1L (f :: AST Var a -> AST Var b -> AST Var c) y v)
+  | x == v = case eqTypeRep (typeRep @x) (typeRep @b) of
+    Just HRefl -> Just $ N2 f y t
+    Nothing -> Nothing
+  | otherwise = (\y' -> N1L f y' v) <$> inline (x,t) y
+inline (x,t :: DefRhs x) (N1R (f :: AST Var a -> AST Var b -> AST Var c) y v)
+  | x == y = case eqTypeRep (typeRep @x) (typeRep @a) of
+    Just HRefl -> Just $ N2 f t v
+    Nothing -> Nothing
+  | otherwise = N1R f y <$> inline (x,t) v
+inline (x,t) (N2 f y v)
+  = case (inline (x,t) y, inline (x,t) v) of
+    (Nothing, Nothing) -> Nothing
+    (Just y', Nothing) -> Just $ N2 f y' v
+    (Nothing, Just v') -> Just $ N2 f y v'
+    -- this probably does not happen, at least not
+    -- if only variables with 1 occurence are inlined
+    (Just y', Just v') -> Just $ N2 f y' v'
+
+inline1 :: Typeable a => [Def a] -> Maybe [Def a]
+inline1 ds =
+  case break (\(_,_,n) -> n == 1) ds of
+    (_,[]) -> Nothing
+    (xs,(x,Forget t,_):ys) -> Just $ foldr (f (x,t)) [] (xs++ys)
+    (xs,(x,t,_):ys) -> Just $ foldr (f (x,t)) [] (xs++ys)
+  where
+    f x (y,d,n) ds' = case inline x d of
+      Nothing -> (y,d,n) : ds'
+      Just d' -> (y,d',n) : ds'
+
+addDef :: (Var,DefRhs a) -> [Def a] -> [Def a]
+addDef (x,d) ds =
+  let n = fromMaybe 0 $ lookup x $ usedVars (map (\(_,d,_) -> d) ds)
+  in (x,d,n) : updateUseCount (usedVars [d]) ds
+
+updateUseCount :: [(Var,Int)] -> [Def a] -> [Def a]
+updateUseCount cs = foldr phi [] where
+  phi (x,d,n) ds = case lookup x cs of
+    Just m -> (x,d,n+m) : ds
+    Nothing -> (x,d,n) : ds
+
+definedVars :: [Def a] -> [Var]
+definedVars = map (\(x,_,_) -> x)
+
+usedVars :: [DefRhs a] -> [(Var,Int)]
+usedVars = map (\x -> (head x, length x)) . group . sort . concatMap go where
+  go :: DefRhs a -> [Var]
+  go (Forget d) = go d
+  go (U _ y v) = [y,v]
+  go (N1L _ y v) = v : go y
+  go (N1R _ y v) = y : go v
+  go (N2 _ y v) = go y ++ go v
+
+-- vorher
+ds  :: [Def ()]
+ds =
+  [ ("x", Forget $ U @Int (T.+) "v1" "y", 1)
+  , ("z", Forget $ U @Int (T.+) "a" "v3", 0)
+  , ("b", Forget $ U @Bool @Int (T.>) "x" "y1",0)
+  ]
+
+d = ("a", Forget $ U @Int (T.+) "z" "v2")
+-- nachher
+ds'  :: [Def ()]
+ds' = [ ("x", Forget $ N1L @Int (T.+) (N1L (T.+) (U (T.+) "a" "v3") "a") "v1" , 0) ]
