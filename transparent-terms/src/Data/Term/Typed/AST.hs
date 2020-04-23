@@ -21,15 +21,15 @@ data AST :: * -> * -> * where
   Leaf :: a -> String -> AST v a
   Lam :: Int -> ((x,String) -> AST v a) -> AST v (x -> a)
   Var :: Typeable a => v -> TypeRep a -> AST v a
-  VarA :: Typeable a => v -> TypeRep a -> AST v [a]
-  App :: AST v (a -> b) -> AST v a -> AST v b
+  VarA :: Typeable a => v -> TypeRep [a] -> AST v [a]
+  App :: AST v (a -> b) -> AST v a -> AST v b -- regular prefix application
+  PostApp :: AST v a -> AST v (a -> b) -> AST v b -- postfix application
 
 instance Liftable (AST v) where
   appT = App
   embedT (x,s) = Leaf x s
 
-  -- TODO: improve this
-  liftTInfix = liftT2
+  liftTInfix f = appT . flip PostApp (embedT f)
 
   unHO f = Lam 0 $ \(x,s) -> f $ Leaf x s
   unHO2 f = Lam 1 $ \(x,sx) -> Lam 0 $ \(y,sy) -> f (Leaf x sx) (Leaf y sy)
@@ -65,18 +65,20 @@ reduceKnownVariable var@(Var x _) e =
 reduceKnownVariable x _ = x
 
 reduceT :: (VarEnv env v, Ord v) => env v -> AST v a -> AST v a
-reduceT e (App x y) = reduceAp $ App (reduceT e x) (reduceT e y)
+reduceT e (App f x) = reduceAp $ App (reduceT e f) (reduceT e x)
+reduceT e (PostApp x f) = reduceAp $ PostApp (reduceT e x) (reduceT e f)
 reduceT _ (Leaf x s) = Leaf x s
 reduceT e (Lam x t) = Lam x (reduceT e . t)
 reduceT e var@Var{} = reduceKnownVariable var e
-reduceT e var@VarA{} = _ -- reduceKnownVariable var e
+reduceT _ VarA{} = error "TODO: implement" -- reduceKnownVariable var e
 
 tryValue :: AST v a ->  Maybe a
 tryValue (Leaf x _) = Just x
 tryValue _ = Nothing
 
 printTree :: Show v => AST v a -> Tree String
-printTree (App tx ty) = Node "($)" [printTree tx, printTree ty]
+printTree (App f x) = Node "($)" [printTree f, printTree x]
+printTree (PostApp x f) = Node "(&)" [printTree f, printTree x]
 printTree (Leaf _ s) = Node s []
 printTree (Lam x t) = Node ("\\" ++ show x ++ " -> ") [printTree (t (undefined,"var " ++ show x))]
 printTree (Var x ty) = Node (show x ++ ":" ++ show ty) []
@@ -85,15 +87,27 @@ printTree (VarA x ty) = Node (show x ++ "_A" ++ ":" ++ show ty) []
 pPrintTree :: Show v => AST v a -> String
 pPrintTree = drawVerticalTree . printTree
 
+printFlatS :: (v -> String) -> AST v a -> String
+printFlatS _ (Leaf _ s) = s
+printFlatS sho (Lam x t) = "(\\var" ++ show x ++ " -> " ++ printFlatS sho (t (undefined, "var" ++ show x)) ++ ")"
+printFlatS sho (Var x _) = sho x
+printFlatS sho (VarA x _) = sho x ++ "_A"
+printFlatS sho (App f (Leaf _ s)) = printFlatS sho f ++ " " ++ s
+printFlatS sho (App f (Var x _)) = printFlatS sho f ++ " " ++ sho x
+printFlatS sho (App f x) = printFlatS sho f ++ " (" ++ printFlatS sho x ++ ")"
+printFlatS sho (PostApp (Leaf _ s) f) = s ++ " " ++ printFlatS sho f
+printFlatS sho (PostApp (Var x _) f) = sho x ++ " " ++ printFlatS sho f
+printFlatS sho (PostApp x f) = "(" ++ printFlatS sho x ++ ") " ++ printFlatS sho f
+
 printFlat :: Show v => AST v a -> String
-printFlat (Leaf _ s) = s
-printFlat (Lam x t) = "\\" ++ show x ++ " -> " ++ printFlat (t (undefined, "var " ++ show x))
-printFlat (Var x r) = show x ++ ":" ++ show r
-printFlat (VarA x r) = show x ++ "_A" ++ ":" ++ show r
-printFlat (App f x) = "(" ++ printFlat f ++ ")(" ++ printFlat x ++ ")"
+printFlat = printFlatS show
+
+printFlat' :: AST String a -> String
+printFlat' = printFlatS id
 
 eval :: (PVarEnv env v, Ord v, Show v) => env v -> AST v a -> a
-eval e (App tx ty) = eval e tx $ eval e ty
+eval e (App f x) = eval e f $ eval e x
+eval e (PostApp x f) = eval e f $ eval e x
 eval _ (Leaf x _) = x
 eval e (Lam _ t) = \x -> eval e (t (x, undefined))
 eval e (Var x _) =
@@ -111,6 +125,7 @@ vars (Lam _ t) = vars $ t (undefined, undefined) -- local variables are not cons
 vars (Var x _ ) = [x]
 vars (VarA x _ ) = [x]
 vars (App f x) = vars f ++ vars x
+vars (PostApp x f) = vars x ++ vars f
 
 mapV :: (v -> v') -> AST v a -> AST v' a
 mapV _ (Leaf x s) = Leaf x s
@@ -118,9 +133,12 @@ mapV f (Lam x t) = Lam x $ \x -> mapV f (t x)
 mapV f (Var x r) = Var (f x) r
 mapV f (VarA x r) = VarA (f x) r
 mapV f (App g x) = App (mapV f g) (mapV f x)
+mapV f (PostApp x g) = PostApp (mapV f x) (mapV f g)
 
-replaceVar :: (forall a. Typeable a => v -> TypeRep a -> AST v' a) -> AST v a -> AST v' a
+replaceVar :: (forall a. Typeable a => v -> Usage -> TypeRep a -> AST v' a) -> AST v a -> AST v' a
 replaceVar _ (Leaf x s) = Leaf x s
 replaceVar f (Lam x t) = Lam x $ \x -> replaceVar f (t x)
-replaceVar f (Var x r) = f x r
+replaceVar f (Var x r) = f x Current r
+replaceVar f (VarA x r) = f x All r
 replaceVar f (App g x) = App (replaceVar f g) (replaceVar f x)
+replaceVar f (PostApp x g) = PostApp (replaceVar f x) (replaceVar f g)

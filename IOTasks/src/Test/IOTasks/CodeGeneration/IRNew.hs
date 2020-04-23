@@ -1,3 +1,4 @@
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeApplications #-}
@@ -12,6 +13,8 @@ import Data.Maybe (fromJust, fromMaybe)
 import Data.List (sort, group, intercalate)
 import Data.Proxy
 import Type.Reflection (Typeable, eqTypeRep, typeRep, (:~~:)(..))
+import Control.Monad.State (StateT(..), MonadState, get)
+import Data.Functor.Identity (Identity(..))
 
 import Data.Environment
 import Data.Term
@@ -140,14 +143,15 @@ printInstruction (YIELD rvs) = PP.text "RETURN " PP.<+> tupelize rvs
 printInstruction NOP = mempty
 
 printDef :: Def a -> Doc
-printDef (x,rhs,_) = PP.text (x ++ " :=") PP.<+> go rhs where
-  go :: DefRhs a -> Doc
-  go (Forget d) = go d
-  go (U f y v) = PP.text $ printFlat $ f (Leaf undefined y) (Leaf undefined v)
-  go (N1L f y v) = PP.text $ printFlat $ f (toAST y) (Leaf undefined v)
-  go (N1R f y v) = PP.text $ printFlat $ f (Leaf undefined y) (toAST v)
-  go (N2 f y v) = PP.text $ printFlat $ f (toAST y) (toAST v)
-  go (Const t) = PP.text $ printFlat t
+printDef (x,rhs,_) = PP.text (x ++ " :=") PP.<+> printDefRhs rhs
+
+printDefRhs :: DefRhs a -> Doc
+printDefRhs (Forget d) = printDefRhs d
+printDefRhs (U f y v) = PP.text $ printFlat' $ f (Leaf undefined y) (Leaf undefined v)
+printDefRhs (N1L f y v) = PP.text $ printFlat' $ f (toAST y) (Leaf undefined v)
+printDefRhs (N1R f y v) = PP.text $ printFlat' $ f (Leaf undefined y) (toAST v)
+printDefRhs (N2 f y v) = PP.text $ printFlat' $ f (toAST y) (toAST v)
+printDefRhs (Const t) = PP.text $ printFlat' t
 
 printF :: F -> Doc
 printF (f,xs,b) = PP.hang (PP.text f PP.<+> tupelize xs PP.<+> PP.text ":=") 2 $
@@ -261,15 +265,93 @@ usedVars = map (\x -> (head x, length x)) . group . sort . concatMap go where
   go (N2 _ y v) = go y ++ go v
   go (Const t) = termVars t
 
--- vorher
-ds  :: [Def ()]
-ds =
-  [ ("x", Forget $ U @Int (T.+) "v1" "y", 1)
-  , ("z", Forget $ U @Int (T.+) "a" "v3", 0)
-  , ("b", Forget $ U @Bool @Int (T.>) "x" "y1",0)
-  ]
+lookup2 :: Eq k => k -> [(k,a,b)] -> Maybe (a,b)
+lookup2 x ds = lookup x (map (\(x,d,n) -> (x,(d,n))) ds)
 
-d = ("a", Forget $ U @Int (T.+) "z" "v2")
--- nachher
-ds'  :: [Def ()]
-ds' = [ ("x", Forget $ N1L @Int (T.+) (N1L (T.+) (U (T.+) "a" "v3") "a") "v1" , 0) ]
+lookupDef :: Var -> [Def a] -> Maybe (DefRhs a,Int)
+lookupDef = lookup2
+
+lookupF :: Var -> [F] -> Maybe ([Var],[Instruction])
+lookupF = lookup2
+
+-- printing to Haskell
+newtype ScopeM a = ScopeM { runScopeM :: [Var] -> (a, [Var]) }
+  deriving (Functor, Applicative, Monad, MonadState [Var]) via (StateT [Var] Identity)
+
+evalScopeM :: ScopeM a -> [Var] -> a
+evalScopeM m = fst . runScopeM m
+
+haskellCode :: IRProgram -> Doc
+haskellCode (is,ds,fs) =
+        PP.text "prog :: IO ()"
+  PP.$$ PP.hang (PP.text "prog = do") 2
+    (PP.vcat $ evalScopeM (mapM (renderInstruction ds fs) is) [])
+
+renderInstruction :: [Def ()] -> [F] -> Instruction -> ScopeM Doc
+renderInstruction _ _ (READ x) = return $ PP.text $ x ++ " <- readLn"
+renderInstruction ds fs (PRINT t) = do
+  (argTerm, ctx) <- renderVar ds t
+  return $ ctx PP.$$ PP.text "print" PP.<+> argTerm
+renderInstruction ds fs (IF c t e) = do
+  (condition, ctx) <- renderVar ds c
+  thenBranch <- PP.vcat <$> mapM (renderInstruction ds fs) t
+  elseBranch <- PP.vcat <$> mapM (renderInstruction ds fs) e
+  return $ ctx PP.$$ PP.hang (PP.text "if" PP.<+> condition) 2
+    (       PP.hang (PP.text "then do") 2 thenBranch
+      PP.$$ PP.hang (PP.text "else do") 2 elseBranch
+    )
+renderInstruction ds _ (TAILCALL f ps) = do
+  (params,ctx) <- renderVars ds ps
+  return $ ctx PP.$$ PP.text f PP.<+> PP.hcat params
+renderInstruction ds fs (BINDCALL f ps rvs) = do
+  loopDef <- renderLoop f ds fs
+  (params, ctx) <- renderVars ds ps
+  return $
+    -- insert loop definition
+    loopDef
+    -- instert missing definitions
+    PP.$$ ctx
+    -- actual call
+    PP.$$ tupelize rvs PP.<+> PP.text ("<- " ++ f) PP.<+> PP.hcat params
+renderInstruction ds _ (YIELD rvs) = do
+  (params, ctx) <- renderVars ds rvs
+  return $ ctx PP.$$ PP.text "return" PP.<+> PP.hcat params
+renderInstruction _ _ NOP = return mempty
+
+renderLoop :: Var -> [Def ()] -> [F] -> ScopeM Doc
+renderLoop f ds fs = case lookupF f fs of
+  Just (ps,is) -> do
+    body <- PP.vcat <$> mapM (renderInstruction ds fs) is
+    return $ PP.hang (PP.text $ "let " ++ f ++ " " ++ unwords ps ++ " =") 6 body
+  Nothing -> error $ "can't find definition for " ++ f
+
+renderVars :: [Def ()] -> [Var] -> ScopeM ([Doc], Doc)
+renderVars _ [] = return ([],mempty)
+renderVars ds (v:vs) = do
+  (x,ctx) <- renderVar ds v
+  (xs,ctxs) <- renderVars ds vs
+  return (x:xs, ctx PP.$$ ctxs)
+
+-- returns the a Doc for the actual variable and one wiht the neccessary definitions
+renderVar :: [Def ()] -> Var -> ScopeM (Doc, Doc)
+renderVar ds x = do
+  ctx <- renderContext ds (neededVars ds x)
+  case lookupDef x ds of
+    Just (rhs,0) -> return (PP.parens (printDefRhs rhs), ctx)
+    Just (rhs,1) -> return (PP.parens (printDefRhs rhs), ctx)
+    Just _ -> return (PP.text x, ctx)
+    Nothing -> return (PP.text x, ctx)
+
+neededVars :: [Def ()] -> Var -> [Var]
+neededVars ds x = case lookupDef x ds of
+  Just (rhs,_) -> let us = map fst (usedVars [rhs]) in us ++ concatMap (neededVars ds) us
+  Nothing -> []
+
+renderContext :: [Def ()] -> [Var] -> ScopeM Doc
+renderContext ds xs = do
+  scope <- get
+  let notDef = foldr (\x ys -> if x `notElem` scope then maybe ys (\v -> (x,fst v):ys) $ lookupDef x ds else ys) [] xs
+  return $ PP.hcat $ map (uncurry renderAssignment) notDef
+
+renderAssignment :: Var -> DefRhs a -> Doc
+renderAssignment x rhs = PP.text ("let " ++ x ++ " =") PP.<+> printDefRhs rhs
