@@ -4,6 +4,9 @@ class Liftable t where
   embedT :: (a, String) -> t a
   appT :: t (a -> b) -> t a -> t b
 
+  litT :: Show a => a -> t a
+  litT x = embedT (x,show x)
+
   liftT :: (a -> b, String) -> t a -> t b
   liftT = appT . embedT
   liftT2 :: (a -> b -> c, String) -> t a -> t b -> t c

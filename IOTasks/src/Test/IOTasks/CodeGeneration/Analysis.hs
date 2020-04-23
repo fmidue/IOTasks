@@ -4,6 +4,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE StandaloneDeriving #-}
 module Test.IOTasks.CodeGeneration.Analysis
   -- (
   -- printProgram,
@@ -47,20 +48,18 @@ instance Lattice Modification where
 
 data Modification = R | W deriving (Show, Eq, Ord, Bounded)
 
-termFacts :: SynTermTyped t (AST Varname) => t a -> Facts Usage
+termFacts :: SynTermTyped t (AST (Varname,Usage)) => t a -> Facts Usage
 termFacts = go . viewTermTyped where
-  go :: AST Varname a -> Facts Usage
+  go :: AST (Varname,Usage) a -> Facts Usage
   go (Leaf _ _) = Map.empty
   go (Lam _ t) = go (t (undefined, undefined))
-  go (Var x _)
-    | "_A" `isSuffixOf` x = Map.singleton x All
-    | otherwise = Map.singleton x Current
+  go (Var (x,All) _) = Map.singleton x All
+  go (Var (x,Current) _) = Map.singleton x Current
   go (App f x) = joinFacts [go f, go x]
 
-analyse :: (VarListTerm t Varname, SynTermTyped t (AST Varname)) => Specification t -> [AnnAction t (Facts (Usage, Modification))]
--- analyse (Spec as) = analyse' as
+analyse :: (VarListTerm t Varname, SynTermTyped t (AST (Varname,Usage))) => Specification t -> [AnnAction t (Facts (Usage, Modification))]
 analyse = annotateSpec $ combineTransfer usageTransfer modTransfer where
-  usageTransfer :: SynTermTyped t (AST Varname) => Transfer t Usage
+  usageTransfer :: SynTermTyped t (AST (Varname,Usage)) => Transfer t Usage
   usageTransfer = Transfer
     { tRead = const id
     , tWrite = \ts is' -> let new = termFacts <$> ts in joinFacts (is':new)
@@ -85,7 +84,7 @@ normalizeSpec (Spec as) = Spec $ go as where
   go (Branch c s1 s2 : as') = [Branch c (s1 <> Spec as') (s2 <> Spec as')]
   go x = x
 
-annotateSpec :: (Ord i, SynTermTyped t (AST Varname))
+annotateSpec :: (Ord i, SynTermTyped t (AST (Varname,Usage)))
   => Transfer t i
   -> Specification t
   -> [AnnAction t (Facts i)]

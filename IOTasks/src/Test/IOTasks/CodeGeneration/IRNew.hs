@@ -9,7 +9,7 @@
 module Test.IOTasks.CodeGeneration.IRNew where
 
 import Data.Maybe (fromJust, fromMaybe)
-import Data.List (sort, group)
+import Data.List (sort, group, intercalate)
 import Data.Proxy
 import Type.Reflection (Typeable, eqTypeRep, typeRep, (:~~:)(..))
 
@@ -19,13 +19,16 @@ import Data.Term.Liftable
 import qualified Data.Term.Liftable.Prelude as T
 import Data.Term.Typed.AST
 
+import Text.PrettyPrint.HughesPJClass (Doc)
+import qualified Text.PrettyPrint.HughesPJClass as PP
+
 data Instruction
   = READ Var
   | PRINT Var
   | IF Var [Instruction] [Instruction]
   | TAILCALL Var [Var] -- TAILCALL f [x1,..,xn] => f x1 .. xn
   | BINDCALL Var [Var] [Var] -- BINDCALL f [x1,..,xn] [v1,..,vm] => (v1,..,vm) <- f x1 .. xn
-  | RETURN [Var]
+  | YIELD [Var]
   | NOP
   deriving (Show,Eq)
 
@@ -78,8 +81,8 @@ enterLoopIR f ps rvs = ([BINDCALL f ps rvs],[],[])
 recCallIR :: Var -> [Var] -> IRProgram
 recCallIR f ps = ([TAILCALL f ps],[],[])
 
-returnIR :: [Var] -> IRProgram
-returnIR rvs = ([RETURN rvs],[],[])
+yieldIR :: [Var] -> IRProgram
+yieldIR rvs = ([YIELD rvs],[],[])
 
 nopIR :: IRProgram
 nopIR = ([NOP],[],[])
@@ -101,8 +104,8 @@ stepAM (IF x t e:p',d,vs,rvs,i,o)
   | otherwise = (e++p',d,vs,rvs,i,o)
 stepAM (TAILCALL l ps:p',d,vs,rvs,i,o) = (_getInstructions l d ++ p',d,_setParameters l ps d vs,rvs,i,o)
 stepAM (BINDCALL l ps bs:p',d,vs,rvs,i,o) = (_getInstructions l d ++ p',d,_setParameters l ps d vs,bs:rvs,i,o)
-stepAM (RETURN _:_,_,_,[],_,_) = error "missing binders for returned values"
-stepAM (RETURN xs:p',d,vs,rvs:rvss,i,o)
+stepAM (YIELD _:_,_,_,[],_,_) = error "missing binders for returned values"
+stepAM (YIELD xs:p',d,vs,rvs:rvss,i,o)
   | _length vs == length rvs = (p', d,updateValues (zipWith (\x rv -> (rv,_getPayload x vs)) xs rvs) vs,rvss,i,o)
   | otherwise = error "wrong number of binders for returned values"
 stepAM (NOP:p',d,vs,rvs,i,o) = (p',d,vs,rvs,i,o)
@@ -114,12 +117,55 @@ updateValue :: (Typeable a, Show a) => (Var,a) -> Vals -> Vals
 updateValue (x,v) = fromJust . store x show v
 
 -- printing programs
-printProgram :: IRProgram -> Doc
-printProgram = _
+printIRProgram :: IRProgram -> Doc
+printIRProgram (is,ds,fs) =
+        PP.text "-- Main --"
+  PP.$$ PP.vcat (map printInstruction is)
+  PP.$$ PP.text "-- Defs --"
+  PP.$$ PP.vcat (map printDef ds)
+  PP.$$ PP.text "-- Loops --"
+  PP.$$ PP.vcat (map printF fs)
+
+printInstruction :: Instruction -> Doc
+printInstruction (READ x) = PP.text $ "READ " ++ x
+printInstruction (PRINT t) = PP.text $ "PRINT " ++ t
+printInstruction (IF c t e) =
+  PP.hang (PP.text ("IF " ++ c)) 2
+    ( PP.hang (PP.text "THEN") 2 (PP.vcat (map printInstruction t))
+    PP.$$ PP.hang (PP.text "ELSE") 2 (PP.vcat (map printInstruction e))
+    )
+printInstruction (TAILCALL f ps) = PP.text ("TAILCALL " ++ f) PP.<+> tupelize ps
+printInstruction (BINDCALL f ps rvs) = PP.text ("BINDCALL " ++ f) PP.<+> tupelize ps PP.<+> tupelize rvs
+printInstruction (YIELD rvs) = PP.text "RETURN " PP.<+> tupelize rvs
+printInstruction NOP = mempty
+
+printDef :: Def a -> Doc
+printDef (x,rhs,_) = PP.text (x ++ " :=") PP.<+> go rhs where
+  go :: DefRhs a -> Doc
+  go (Forget d) = go d
+  go (U f y v) = PP.text $ printFlat $ f (Leaf undefined y) (Leaf undefined v)
+  go (N1L f y v) = PP.text $ printFlat $ f (toAST y) (Leaf undefined v)
+  go (N1R f y v) = PP.text $ printFlat $ f (Leaf undefined y) (toAST v)
+  go (N2 f y v) = PP.text $ printFlat $ f (toAST y) (toAST v)
+  go (Const t) = PP.text $ printFlat t
+
+printF :: F -> Doc
+printF (f,xs,b) = PP.hang (PP.text f PP.<+> tupelize xs PP.<+> PP.text ":=") 2 $
+  PP.vcat (map printInstruction b)
+
+tupelize :: [String] -> Doc
+tupelize [] = PP.text ""
+tupelize [v] = PP.text v
+tupelize vs = PP.text $ "(" ++ intercalate "," vs ++ ")"
+
+-- optimizing IRProgram
+optimize :: IRProgram -> IRProgram
+optimize (i,d,f) = (i,d',f)
+  where d' = simplify (emptyEnvironment @Environment) d
 
 -- manipulation of DefRhs
-printDef :: DefRhs a -> String
-printDef = pPrintTree . toAST
+printDefTree :: DefRhs a -> String
+printDefTree = pPrintTree . toAST
 
 toAST :: DefRhs a -> AST Var a
 toAST (Forget x) = App (unHO $ \_ -> Leaf () "()") $ toAST x
@@ -127,13 +173,15 @@ toAST (U f y v) = f (variable y) (variable v)
 toAST (N1L f y v) = f (toAST y) (variable v)
 toAST (N1R f y v) = f (variable y) (toAST v)
 toAST (N2 f y v) = f (toAST y) (toAST v)
+toAST (Const t) = t
 
 instance Show (DefRhs a) where
   show (Forget x) = "Forget " ++ show x
   show (U f y v) = "U ? " ++ y ++ " " ++ v
   show (N1L f y v) = "N1L ? " ++ v
   show (N1R f y v) = "N1R ? " ++ y
-  show (N2 f y v) = "N2 ? "
+  show (N2 f y v) = "N2 ?"
+  show (Const t) = "Cosnt ?"
 
 simplify :: (VarEnv env Var, Typeable a) => env Var -> [Def a] -> [Def a]
 simplify e ds = case inline1 ds of
@@ -146,6 +194,7 @@ reduceD e (U f y v) = U (\y v  -> reduceT e $ f y v) y v
 reduceD e (N1L f y v) = N1L (\y v  -> reduceT e $ f y v) y v
 reduceD e (N1R f y v) = N1R (\y v  -> reduceT e $ f y v) y v
 reduceD e (N2 f y v) = N2 (\y v  -> reduceT e $ f y v) y v
+reduceD e (Const t) = Const (reduceT e t)
 
 inline :: (Typeable x, Typeable a) => (Var,DefRhs x) -> DefRhs a -> Maybe (DefRhs a)
 inline (x,t :: DefRhs x) (Forget y) = Forget <$> inline (x,t) y
@@ -175,6 +224,7 @@ inline (x,t) (N2 f y v)
     -- this probably does not happen, at least not
     -- if only variables with 1 occurence are inlined
     (Just y', Just v') -> Just $ N2 f y' v'
+inline _ (Const t) = Nothing
 
 inline1 :: Typeable a => [Def a] -> Maybe [Def a]
 inline1 ds =
@@ -209,6 +259,7 @@ usedVars = map (\x -> (head x, length x)) . group . sort . concatMap go where
   go (N1L _ y v) = v : go y
   go (N1R _ y v) = y : go v
   go (N2 _ y v) = go y ++ go v
+  go (Const t) = termVars t
 
 -- vorher
 ds  :: [Def ()]

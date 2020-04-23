@@ -20,16 +20,12 @@ import Control.Monad.State
 import Data.Functor.Identity
 import Data.Maybe (fromMaybe)
 import Data.List (isSuffixOf)
-import Data.Map (Map)
 import qualified Data.Map as Map
 
 import Type.Reflection (Typeable, typeRep, TypeRep)
 import Text.PrettyPrint.HughesPJClass hiding (first, (<>))
 
-printProgram :: (VarListTerm t Varname, SynTermTyped t (AST Varname)) => Specification t -> Doc
-printProgram = hang (text "p :: IO ()" $$ text "p = do") 2 . printProgram . programIR
-
-programIR :: (VarListTerm t Varname, SynTermTyped t (AST Varname)) => Specification t -> IRProgram
+programIR :: (VarListTerm t Varname, SynTermTyped t (AST (Varname,Usage))) => Specification t -> IRProgram
 programIR s = foldr1 (<:>) . fst $ runFreshVarM (mapM (translate (rootUsageFacts x)) x) initState
   where x = analyse s
 
@@ -67,12 +63,11 @@ currentName v = do
   i <- gets $ fromMaybe 0 . lookup v
   return $ IVar (v, i)
 
-translate :: (VarListTerm t Varname, SynTermTyped t (AST Varname)) => Facts Usage -> AnnAction t (Facts (Usage, Modification)) -> FreshVarM IRProgram
+translate :: (SynTermTyped t (AST (Varname,Usage))) => Facts Usage -> AnnAction t (Facts (Usage, Modification)) -> FreshVarM IRProgram
 translate fs (AnnAction _ (ReadInput x vs)) =
   case Map.lookup x fs of
-    Just Current -> do
-      n <- freshName x
-      return $ readIR (name n)
+    Just Current ->
+      return $ readIR x
     Just All -> do
       v <- freshName "v"
       xk <- currentName x
@@ -104,15 +99,15 @@ translate fs (AnnAction _ (TillE as)) = do
 translate _ (AnnAction _ E) = error "E at toplevel"
 translate _ EmptyAction = return nopIR
 
-translateLoop :: (VarListTerm t Varname, SynTermTyped t (AST Varname)) => Facts Usage -> IndexedVar -> [Varname] -> [AnnAction t (Facts (Usage, Modification))] -> FreshVarM IRProgram
+translateLoop :: (SynTermTyped t (AST (Varname,Usage))) => Facts Usage -> IndexedVar -> [Varname] -> [AnnAction t (Facts (Usage, Modification))] -> FreshVarM IRProgram
 translateLoop fs l wVars = (foldr1 (<:>) <$>) . mapM go where
-  go :: (VarListTerm t Varname, SynTermTyped t (AST Varname)) => AnnAction t (Facts (Usage, Modification)) -> FreshVarM IRProgram
+  go :: (SynTermTyped t (AST (Varname,Usage))) => AnnAction t (Facts (Usage, Modification)) -> FreshVarM IRProgram
   go EmptyAction = do
     params <- mapM currentName wVars
     return $ recCallIR (name l) (map name params)
   go (AnnAction _ E) = do
     returnNames <- mapM currentName wVars
-    return $ returnIR (map name returnNames)
+    return $ yieldIR (map name returnNames)
   go (AnnAction _ (Branch c as1 as2)) = do
     ast <- adjustVars fs $ viewTermTyped c
     var <- name <$> freshName "cond"
@@ -121,16 +116,15 @@ translateLoop fs l wVars = (foldr1 (<:>) <$>) . mapM go where
     return $ ifIR var x y <:> valueDefIR var ast
   go a = translate fs a
 
-adjustVars :: Facts Usage -> AST Varname a -> FreshVarM (AST Varname a)
+adjustVars :: Facts Usage -> AST (Varname,Usage) a -> FreshVarM (AST Varname a)
 adjustVars fs t = do
   st <- get
   let
     currentName' x = fst $ runFreshVarM (name <$> currentName x) st
-    f :: forall a. Typeable a => Varname -> TypeRep a -> AST Varname a
-    f x r
-      | "_A" `isSuffixOf` x = Var (currentName' $ take (length x - 2) x) r
-      | otherwise = case Map.lookup x fs of
+    f :: forall a. Typeable a => (Varname, Usage) -> TypeRep a -> AST Varname a
+    f (x, All) r = Var (currentName' x) r
+    f (x, Current) r = case Map.lookup x fs of
           Just All -> App (unHO T.last) (Var (currentName' x) (typeRep @[a]))
-          Just Current -> Var (currentName' x) r
+          Just Current -> Var x r
           Nothing -> error "invalid spec"
   return $ replaceVar f t

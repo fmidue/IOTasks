@@ -7,15 +7,15 @@ import Prelude hiding (putStrLn, getLine, readLn, print, putStr)
 
 import Test.IOTasks
 
-import Data.Environment (Environment)
-import Data.Term.ITerm (ITerm, lit)
+import Data.Term.Typed.AST (AST)
+import Data.Term.Liftable (litT)
 import qualified Data.Term.Liftable.Prelude as T
 
 import Control.Monad (replicateM,replicateM_)
 
 import Test.QuickCheck as QC (Positive(..))
 
-type SpecTerm = ITerm Environment Varname
+type SpecTerm = AST Varname
 
 -- Example 1:
 -- read natural number n, then read n integers and sum them
@@ -95,9 +95,9 @@ wrongSolutionPat1 = do
 ex2 :: Specification SpecTerm
 ex2 =
   repeatSpec 2 (readInput "xs" ints) <> --otherwise the condition will throw an exception
-  readUntil "xs" (let xs = getAll "xs" in T.length xs T.> lit 1 T.&& (T.last xs T.+ T.last (T.init xs) T.== lit (0 :: Int)) ) ints <>
+  readUntil "xs" (let xs = getAll "xs" in T.length xs T.> litT 1 T.&& (T.last xs T.+ T.last (T.init xs) T.== litT (0 :: Int)) ) ints <>
   writeOutput [anything <> var 0 <> anything] [count $ getAll @Int "xs"]
-  where count xs = T.length $ T.filter (\x -> x T.> lit 0 T.&& (x `T.mod` lit 3 T.== lit 0)) xs
+  where count xs = T.length $ T.filter (\x -> x T.> litT 0 T.&& (x `T.mod` litT 3 T.== litT 0)) xs
 
 solution2 :: IOrep ()
 solution2 = go [] Nothing Nothing where
@@ -115,13 +115,13 @@ ex3 :: Specification SpecTerm
 ex3 =
   tillExit $
     readInput "x" ints <>
-    when (lit 0 T.== getCurrent @Int "x")
+    when (litT 0 T.== getCurrent @Int "x")
       (writeOutput [anything <> var 0 <> anything] [T.sum $ getAll @Int "x"] <> exit)
 
 ex3Combinators :: Specification SpecTerm
 ex3Combinators =
   readInput "xs" ints <> --otherwise last will fail
-  readUntil "xs" (T.last (getAll @Int "xs") T.== lit 0) ints <>
+  readUntil "xs" (T.last (getAll @Int "xs") T.== litT 0) ints <>
   writeOutput [anything <> var 0 <> anything] [T.sum $ getAll @Int "xs"]
 
 solution3 :: IOrep ()
