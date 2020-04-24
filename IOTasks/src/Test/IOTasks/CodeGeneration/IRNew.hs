@@ -1,3 +1,5 @@
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators #-}
@@ -24,6 +26,8 @@ import Data.Term.Typed.AST
 
 import Text.PrettyPrint.HughesPJClass (Doc)
 import qualified Text.PrettyPrint.HughesPJClass as PP
+
+import Debug.Trace
 
 data Instruction
   = READ Var
@@ -185,7 +189,7 @@ instance Show (DefRhs a) where
   show (N1L f y v) = "N1L ? " ++ v
   show (N1R f y v) = "N1R ? " ++ y
   show (N2 f y v) = "N2 ?"
-  show (Const t) = "Cosnt ?"
+  show (Const t) = "Const ?"
 
 simplify :: (VarEnv env Var, Typeable a) => env Var -> [Def a] -> [Def a]
 simplify e ds = case inline1 ds of
@@ -274,6 +278,12 @@ lookupDef = lookup2
 lookupF :: Var -> [F] -> Maybe ([Var],[Instruction])
 lookupF = lookup2
 
+updateF :: Var -> [Instruction] -> [F] -> [F]
+updateF _ _ [] = []
+updateF f bf ((g,ps,bg):fs)
+  | f == g = (f,ps,bf) : fs
+  | otherwise = (g,ps,bg) : updateF f bf fs
+
 -- printing to Haskell
 newtype ScopeM a = ScopeM { runScopeM :: [Var] -> (a, [Var]) }
   deriving (Functor, Applicative, Monad, MonadState [Var]) via (StateT [Var] Identity)
@@ -312,7 +322,7 @@ renderInstruction ds fs (BINDCALL f ps rvs) = do
     -- instert missing definitions
     PP.$$ ctx
     -- actual call
-    PP.$$ tupelize rvs PP.<+> PP.text ("<- " ++ f) PP.<+> PP.hcat params
+    PP.$$ (if null rvs then id else (tupelize rvs PP.<+> PP.text "<-" PP.<+>)) (PP.text f PP.<+> PP.hcat params)
 renderInstruction ds _ (YIELD rvs) = do
   (params, ctx) <- renderVars ds rvs
   return $ ctx PP.$$ PP.text "return" PP.<+> PP.hcat params
@@ -355,3 +365,111 @@ renderContext ds xs = do
 
 renderAssignment :: Var -> DefRhs a -> Doc
 renderAssignment x rhs = PP.text ("let " ++ x ++ " =") PP.<+> printDefRhs rhs
+
+-- further optimizations
+
+-- NOTE: there is a naming issue here if we do this for a loop with more then one
+-- retrun point (or a program that uses the name t', which should not happen, because of IndexedVar)
+inlinePrint :: IRProgram -> IRProgram
+inlinePrint ([],ds,fs) = ([],ds,fs)
+inlinePrint p@(BINDCALL f ps [rv] : PRINT t : is,ds,fs) =
+  case lookupDef t ds of
+    Just (Forget (Const tRhs),n) | n <= 1 && termVars tRhs == [rv] ->
+      let
+        r y = mapV (\x -> if x == rv then y else x) tRhs
+        (_,b) = fromJust $ lookupF f fs
+        (b',ds',fs') = transformProgram tr (b,ds,fs)
+        tr ds fs = (idFold ds fs){ fYield = trYield ds fs }
+        trYield ds fs [rv] = ([PRINT (t++"'")], (t++"'",Forget $ Const (r rv),1) : ds ,fs)
+        trYield ds fs rvs = ([YIELD rvs], ds, fs)
+      in (BINDCALL f ps [] : is,ds',updateF f b' fs')
+    _ -> p
+inlinePrint (i:is,ds,fs) = let (is',ds',fs') = inlinePrint (is,ds,fs) in (i:is',ds',fs')
+
+data InstFold a = InstFold
+  { fRead :: Var -> a
+  , fPrint :: Var -> a
+  , fIf :: Var -> a -> a -> a
+  , fTailCall :: Var -> [Var] -> a
+  , fBindCall :: Var -> [Var] -> [Var] -> a
+  , fYield :: [Var] -> a
+  , fNop :: a
+  }
+
+idFold :: [Def ()] -> [F] -> InstFold IRProgram
+idFold ds fs =
+  let
+    fIf c (t,_,_) (e,ds',fs') = ([IF c t e], ds', fs')
+    fRead x = ([READ x], ds, fs)
+    fPrint x = ([PRINT x], ds, fs)
+    fTailCall x y = ([TAILCALL x y], ds, fs)
+    fBindCall x y z = ([BINDCALL x y z], ds, fs)
+    fYield x = ([YIELD x], ds, fs)
+    fNop = ([NOP], ds, fs)
+  in InstFold{..}
+
+transformProgram :: ([Def ()] -> [F] -> InstFold IRProgram) -> IRProgram -> IRProgram
+transformProgram f ([],ds,fs) = ([],ds,fs)
+transformProgram f (i:is,ds,fs) =
+  let
+    InstFold{..} = f ds fs
+    (is',ds',fs') = case i of
+      READ x -> fRead x
+      PRINT x -> fPrint x
+      IF c t e ->
+        let
+          (t',ds',fs') = transformProgram f (t,ds,fs)
+          (e',ds'',fs'') = transformProgram f (e,ds',fs')
+        in fIf c (t',ds'',fs'') (e',ds'',fs'')
+      TAILCALL f ps -> fTailCall f ps
+      BINDCALL f ps rvs -> fBindCall f ps rvs
+      YIELD ps -> fYield ps
+      NOP -> fNop
+    (is'',ds'',fs'') = transformProgram f (is,ds',fs')
+  in (is' ++ is'', ds'', fs'')
+
+-- "inlining" fold optimization sketch
+opt :: IRProgram -> IRProgram
+opt ([],ds,fs) = ([],ds,fs)
+opt (BINDCALL f ps [rv] : PRINT t : is,ds,fs) =
+  case lookupDef t ds of
+    Just (Forget (rhs :: DefRhs a),1) -> case _extractAlgebra (toAST rhs) rv of
+      Just (g,_) -> ([BINDCALL f ps [_], PRINT rv],(_,_,1) : _toFoldAccum g f fs ds,fs)
+      _ -> _
+    _ -> _
+opt (i:is,ds,fs) = let (is',ds',fs') = opt (is,ds,fs) in (i:is',ds',fs')
+
+-- NOTE: This is only sound if the accumulation parameter is not printed out!
+toFoldAccum :: (Typeable a, Typeable b) => (AST Var a -> AST Var b -> AST Var b) -> Var -> [F] -> [Def ()] -> [Def ()]
+toFoldAccum g f fs ds =
+  let
+    (_,b) = fromJust $ lookupF f fs
+    xs = leavingVars b
+  in foldr (\x ds' -> fromMaybe ds' $ changeUpdate x g ds') ds xs
+
+changeUpdate :: (Typeable a, Typeable b) => Var -> (AST Var a -> AST Var b -> AST Var b) -> [Def ()] -> Maybe [Def ()]
+changeUpdate x g ds = case break (\(z,_,_) -> x == z) ds of
+  (d1, (x,Forget (U _ y v),n):d2) ->
+    case changeUpdate y g $ d1 ++ (x,Forget $ U g y v,n) : d2 of
+      Just ds' -> Just ds'
+      Nothing -> Just $ d1 ++ (x,Forget $ U g y v,n) : d2
+  _ -> Nothing
+
+leavingVars :: [Instruction] -> [Var]
+leavingVars = concatMap f where
+  f :: Instruction -> [Var]
+  f (READ _) = []
+  f (PRINT _) = []
+  f (IF _ t e) = leavingVars t ++ leavingVars e
+  f (TAILCALL _ ps) = ps
+  f (BINDCALL _ ps _) = ps -- note that BINDCALL normaly should not appear inside a body
+  f (YIELD ps) = ps
+  f NOP = []
+
+-- extractAlgebra t tries to extracts the algebra from an AST
+-- i.e. the parameters for expressing the represented term as a fold
+-- incomplete implementation. Currently not sure how to write this in a general way.
+-- especially the starting value is not correct in a general setting.
+extractAlgebra :: (Typeable a, Typeable b) => AST Var b -> Var -> Maybe (AST Var a -> AST Var b -> AST Var b, AST Var b)
+extractAlgebra (App (Leaf _ "sum") (Var x _)) y | x == y = Just (_,_)
+extractAlgebra _ _ = Nothing
