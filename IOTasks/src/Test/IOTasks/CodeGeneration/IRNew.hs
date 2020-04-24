@@ -68,7 +68,7 @@ initialValueIR :: Typeable a => Var -> Var -> Var -> Proxy a -> IRProgram
 initialValueIR x y v (Proxy :: Proxy a) = ([],[(x,Forget $ U @[a] @[a] @a (const (`T.cons` T.nil)) y v,0)],[])
 
 updateIR :: Typeable a => Var -> Var -> Var -> Proxy a -> IRProgram
-updateIR x y v (Proxy :: Proxy a) = ([],[(x, Forget $ U @[a] (T.++) y v,0)],[])
+updateIR x y v (Proxy :: Proxy a) = ([],[(x, Forget $ U @[a] (\y v -> y T.++ (v `T.cons` T.nil)) y v,0)],[])
 
 printIR :: Var -> IRProgram
 printIR x = ([PRINT x],[],[])
