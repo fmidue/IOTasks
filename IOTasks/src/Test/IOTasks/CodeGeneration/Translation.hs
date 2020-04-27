@@ -7,7 +7,7 @@ module Test.IOTasks.CodeGeneration.Translation where
 
 import Test.IOTasks.Specification
 import Test.IOTasks.ValueSet (withProxy)
-import Test.IOTasks.CodeGeneration.IRNew
+import Test.IOTasks.CodeGeneration.IR
 import Test.IOTasks.CodeGeneration.Analysis
 
 import Data.Term

@@ -1,108 +1,183 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 module Test.IOTasks.CodeGeneration.Optimization where
 
-import Data.Term
-import Data.Term.AST
-import Test.IOTasks.CodeGeneration.IRGraph
+import Data.Maybe (fromMaybe, fromJust)
 
-import Data.Environment (Varname)
+import Data.Term (termVars)
+import Data.Term.Typed.AST
+import Data.Environment
 
-optExample = optimize [opt2,opt1]
+import Type.Reflection (Typeable,(:~~:)(..), typeRep, eqTypeRep)
 
-optimize :: [[Def] -> SpineFold IRSpine] -> IRSpine -> IRSpine
-optimize fs ir =
-  let ir' = foldr foldrSpine ir fs
-  in if ir == ir' then ir else optimize fs ir'
+import Test.IOTasks.CodeGeneration.IR
 
-idFold :: [Def] -> SpineFold IRSpine
-idFold ds =
+-- optimizing IRProgram
+optimize :: IRProgram -> IRProgram
+optimize (i,d,f) = (i,d',f)
+  where d' = simplify (emptyEnvironment @Environment) d
+
+simplify :: (VarEnv env Var, Typeable a) => env Var -> [Def a] -> [Def a]
+simplify e ds = case inline1 ds of
+  Just ds' -> simplify e ds'
+  Nothing -> map (\(x,d,n) -> (x,reduceD e d,n)) ds
+
+reduceD :: VarEnv env Var => env Var -> DefRhs a -> DefRhs a
+reduceD e (Forget x) = Forget (reduceD e x)
+reduceD e (U f y v) = U (\y v  -> reduceT e $ f y v) y v
+reduceD e (N1L f y v) = N1L (\y v  -> reduceT e $ f y v) y v
+reduceD e (N1R f y v) = N1R (\y v  -> reduceT e $ f y v) y v
+reduceD e (N2 f y v) = N2 (\y v  -> reduceT e $ f y v) y v
+reduceD e (Const t) = Const (reduceT e t)
+
+inline :: (Typeable x, Typeable a) => (Var,DefRhs x) -> DefRhs a -> Maybe (DefRhs a)
+inline (x,t :: DefRhs x) (Forget y) = Forget <$> inline (x,t) y
+inline (x,t :: DefRhs x) (U (f :: AST Var a -> AST Var b -> AST Var c) y v)
+  | x == y = case eqTypeRep (typeRep @x) (typeRep @a) of
+    Just HRefl -> Just $ N1L f t v
+    Nothing -> Nothing
+  | x == v = case eqTypeRep (typeRep @x) (typeRep @b) of
+    Just HRefl -> Just $ N1R f y t
+    Nothing -> Nothing
+  | otherwise = Nothing
+inline (x,t :: DefRhs x) (N1L (f :: AST Var a -> AST Var b -> AST Var c) y v)
+  | x == v = case eqTypeRep (typeRep @x) (typeRep @b) of
+    Just HRefl -> Just $ N2 f y t
+    Nothing -> Nothing
+  | otherwise = (\y' -> N1L f y' v) <$> inline (x,t) y
+inline (x,t :: DefRhs x) (N1R (f :: AST Var a -> AST Var b -> AST Var c) y v)
+  | x == y = case eqTypeRep (typeRep @x) (typeRep @a) of
+    Just HRefl -> Just $ N2 f t v
+    Nothing -> Nothing
+  | otherwise = N1R f y <$> inline (x,t) v
+inline (x,t) (N2 f y v)
+  = case (inline (x,t) y, inline (x,t) v) of
+    (Nothing, Nothing) -> Nothing
+    (Just y', Nothing) -> Just $ N2 f y' v
+    (Nothing, Just v') -> Just $ N2 f y v'
+    -- this probably does not happen, at least not
+    -- if only variables with 1 occurence are inlined
+    (Just y', Just v') -> Just $ N2 f y' v'
+inline _ (Const t) = Nothing
+
+inline1 :: Typeable a => [Def a] -> Maybe [Def a]
+inline1 ds =
+  case break (\(_,_,n) -> n == 1) ds of
+    (_,[]) -> Nothing
+    (xs,(x,Forget t,_):ys) -> Just $ foldr (f (x,t)) [] (xs++ys)
+    (xs,(x,t,_):ys) -> Just $ foldr (f (x,t)) [] (xs++ys)
+  where
+    f x (y,d,n) ds' = case inline x d of
+      Nothing -> (y,d,n) : ds'
+      Just d' -> (y,d',n) : ds'
+
+-- further optimizations
+
+-- NOTE: there is a naming issue here if we do this for a loop with more then one
+-- retrun point (or a program that uses the name t', which should not happen, because of IndexedVar)
+inlinePrint :: IRProgram -> IRProgram
+inlinePrint ([],ds,fs) = ([],ds,fs)
+inlinePrint p@(BINDCALL f ps [rv] : PRINT t : is,ds,fs) =
+  case lookupDef t ds of
+    Just (Forget (Const tRhs),n) | n <= 1 && termVars tRhs == [rv] ->
+      let
+        r y = mapV (\x -> if x == rv then y else x) tRhs
+        (_,b) = fromJust $ lookupF f fs
+        (b',ds',fs') = transformProgram tr (b,ds,fs)
+        tr ds fs = (idFold ds fs){ fYield = trYield ds fs }
+        trYield ds fs [rv] = ([PRINT (t++"'")], (t++"'",Forget $ Const (r rv),1) : ds ,fs)
+        trYield ds fs rvs = ([YIELD rvs], ds, fs)
+      in (BINDCALL f ps [] : is,ds',updateF f b' fs')
+    _ -> p
+inlinePrint (i:is,ds,fs) = let (is',ds',fs') = inlinePrint (is,ds,fs) in (i:is',ds',fs')
+
+data InstFold a = InstFold
+  { fRead :: Var -> a
+  , fPrint :: Var -> a
+  , fIf :: Var -> a -> a -> a
+  , fTailCall :: Var -> [Var] -> a
+  , fBindCall :: Var -> [Var] -> [Var] -> a
+  , fYield :: [Var] -> a
+  , fNop :: a
+  }
+
+idFold :: [Def ()] -> [F] -> InstFold IRProgram
+idFold ds fs =
   let
-    fRead v (IRSpine s ds') = IRSpine (READ v s) ds'
-    fPrint ast (IRSpine s ds') = IRSpine (PRINT ast s) ds'
-    fEnterLoop l ps rVs (IRSpine s ds') = IRSpine (ENTERLOOP l ps rVs s) ds'
-    fIf c (IRSpine s1 ds') (IRSpine s2 _) = IRSpine (IF c s1 s2) ds'
-    fReturn rVs = IRSpine (RETURN rVs) ds
-    fRecCall l ps = IRSpine (RECCALL l ps) ds
-    fNop = IRSpine NOP ds
-  in SpineFold{..}
+    fIf c (t,_,_) (e,ds',fs') = ([IF c t e], ds', fs')
+    fRead x = ([READ x], ds, fs)
+    fPrint x = ([PRINT x], ds, fs)
+    fTailCall x y = ([TAILCALL x y], ds, fs)
+    fBindCall x y z = ([BINDCALL x y z], ds, fs)
+    fYield x = ([YIELD x], ds, fs)
+    fNop = ([NOP], ds, fs)
+  in InstFold{..}
 
--- replace list updates with an accumulating parameter based on the fact that the acumulated list is used with a fold.
--- Assumption: the result of the loop is only used once.
-opt1 :: [Def] -> SpineFold IRSpine
-opt1 ds =
+transformProgram :: ([Def ()] -> [F] -> InstFold IRProgram) -> IRProgram -> IRProgram
+transformProgram f ([],ds,fs) = ([],ds,fs)
+transformProgram f (i:is,ds,fs) =
   let
-    enterLoop l _ rVs (IRSpine (PRINT (extractAlgebra -> Just (f,c)) p') ds') =
-      IRSpine
-        (ENTERLOOP l [Literal c] rVs $ PRINT (Literal . tupelize $ map name rVs) p')
-        (updateDef l (changeToFold f) ds')
-    enterLoop l ps rVs b = fEnterLoop (idFold ds) l ps rVs b
-  in (idFold ds){fEnterLoop = enterLoop}
+    InstFold{..} = f ds fs
+    (is',ds',fs') = case i of
+      READ x -> fRead x
+      PRINT x -> fPrint x
+      IF c t e ->
+        let
+          (t',ds',fs') = transformProgram f (t,ds,fs)
+          (e',ds'',fs'') = transformProgram f (e,ds',fs')
+        in fIf c (t',ds'',fs'') (e',ds'',fs'')
+      TAILCALL f ps -> fTailCall f ps
+      BINDCALL f ps rvs -> fBindCall f ps rvs
+      YIELD ps -> fYield ps
+      NOP -> fNop
+    (is'',ds'',fs'') = transformProgram f (is,ds',fs')
+  in (is' ++ is'', ds'', fs'')
 
--- move print inside a loop in case the loop-result is printed directly after the loop.
-opt2 :: [Def] -> SpineFold IRSpine
-opt2 ds =
+-- "inlining" fold optimization sketch
+opt :: IRProgram -> IRProgram
+opt ([],ds,fs) = ([],ds,fs)
+opt (BINDCALL f ps [rv] : PRINT t : is,ds,fs) =
+  case lookupDef t ds of
+    Just (Forget (rhs :: DefRhs a),1) -> case _extractAlgebra (toAST rhs) rv of
+      Just (g,_) -> ([BINDCALL f ps [_], PRINT rv],(_,_,1) : _toFoldAccum g f fs ds,fs)
+      _ -> _
+    _ -> _
+opt (i:is,ds,fs) = let (is',ds',fs') = opt (is,ds,fs) in (i:is',ds',fs')
+
+-- NOTE: This is only sound if the accumulation parameter is not printed out!
+toFoldAccum :: (Typeable a, Typeable b) => (AST Var a -> AST Var b -> AST Var b) -> Var -> [F] -> [Def ()] -> [Def ()]
+toFoldAccum g f fs ds =
   let
-    enterLoop l ps [rV] (IRSpine (PRINT (UVar rV') p') ds')
-      | rV == rV' = IRSpine (ENTERLOOP l ps [] p') (updateDef l changeToPrintAcc ds')
-    enterLoop l ps rVs b = fEnterLoop (idFold ds) l ps _rVs b
-  in (idFold ds){fEnterLoop = _enterLoop}
+    (_,b) = fromJust $ lookupF f fs
+    xs = leavingVars b
+  in foldr (\x ds' -> fromMaybe ds' $ changeUpdate x g ds') ds xs
 
--- merge update with following recursive call. (Current assumption: the value is only used in that call)
--- opt3 :: SpineFold
--- opt3 (UPDATE xk f xi v) (IR (RECCALL l [xk'] : p'))
---   | name xk == printAST xk'
---   = IR $ RECCALL l [f (name xi) (name v)] : p'
--- opt3 (DEFLOOP ident wVs p) (IR xs) = IR $ DEFLOOP ident wVs (irfoldSpine opt3 irNOP p) : xs
--- opt3 (IF c t e) (IR xs) = IR $ IF c (irfoldSpine opt3 irNOP t) (irfoldSpine opt3 irNOP e) : xs
--- opt3 x (IR xs) = IR (x:xs)
+changeUpdate :: (Typeable a, Typeable b) => Var -> (AST Var a -> AST Var b -> AST Var b) -> [Def ()] -> Maybe [Def ()]
+changeUpdate x g ds = case break (\(z,_,_) -> x == z) ds of
+  (d1, (x,Forget (U _ y v),n):d2) ->
+    case changeUpdate y g $ d1 ++ (x,Forget $ U g y v,n) : d2 of
+      Just ds' -> Just ds'
+      Nothing -> Just $ d1 ++ (x,Forget $ U g y v,n) : d2
+  _ -> Nothing
 
--- merge updates
--- we know that once a variable is updated the previous version is not used anymore and can be deleted
--- opt4 :: SpineFold
--- opt4 (UPDATE x1 f1 y1 v1) (IR (UPDATE x2 f2 y2 v2 : p'))
---   | y2 == x1 = IR $ UPDATE x2 (\_ v -> f2 (printAST (f1 (name y1) (name v1))) v) y2 v2 : p'
--- opt4 x (IR xs) = IR (x:xs)
---
-changeToFold :: (String -> String -> Expr) -> DefRhs -> DefRhs
-changeToFold f (UPDATE _ xi v) = UPDATE f xi v
-changeToFold f (DEFLOOP wVs (IRSpine s ds)) = DEFLOOP wVs $ IRSpine s (mapRhs (changeToFold f) ds)
-
-changeToPrintAcc :: DefRhs -> DefRhs
-changeToPrintAcc (DEFLOOP wVs ir) =
-  let
-  changeReturn [rV] = IRSpine (PRINT (UVar rV) NOP) (defs ir)
-  changeReturn rVs = fReturn (idFold (defs ir)) _rVs
-  in DEFLOOP wVs $ foldrSpine (\x -> (idFold x){fReturn = _changeReturn}) ir
-changeToPrintAcc x = x
+leavingVars :: [Instruction] -> [Var]
+leavingVars = concatMap f where
+  f :: Instruction -> [Var]
+  f (READ _) = []
+  f (PRINT _) = []
+  f (IF _ t e) = leavingVars t ++ leavingVars e
+  f (TAILCALL _ ps) = ps
+  f (BINDCALL _ ps _) = ps -- note that BINDCALL normaly should not appear inside a body
+  f (YIELD ps) = ps
+  f NOP = []
 
 -- extractAlgebra t tries to extracts the algebra from an AST
 -- i.e. the parameters for expressing the represented term as a fold
 -- incomplete implementation. Currently not sure how to write this in a general way.
 -- especially the starting value is not correct in a general setting.
-extractAlgebra :: Expr -> Maybe (String -> String -> Expr, String)
-extractAlgebra (Node "sum" [_]) = Just (\a b -> Infix (Literal a) "+" (Literal b),"0")
-extractAlgebra (Node "length" [UVar _]) = Just (\_ b -> Infix (Literal "1") "+" (Literal b),"0")
-extractAlgebra _ = Nothing
-
--- swapping elements based on some binary predicate (True ~= swap)
-bubble :: (a -> a -> Bool) -> [a] -> [a]
-bubble (~>) = foldr f [] where
-  f x [] = [x]
-  f x (y:ys)
-    | x ~> y     = y : x : ys
-    | otherwise = x : y : ys
-
-reorder :: Eq a => (a -> a -> Bool) -> [a] -> [a]
-reorder f xs =
-  let xs' = bubble f xs
-  in if xs == xs'
-    then xs'
-    else reorder f xs'
-
-baseName :: IndexedVar -> Varname
-baseName (IVar (x,_)) = x
-
-bubbleSort :: Ord a => [a] -> [a]
-bubbleSort = reorder (>)
+extractAlgebra :: (Typeable a, Typeable b) => AST Var b -> Var -> Maybe (AST Var a -> AST Var b -> AST Var b, AST Var b)
+extractAlgebra (App (Leaf _ "sum") (Var x _)) y | x == y = Just (_,_)
+extractAlgebra _ _ = Nothing
