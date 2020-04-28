@@ -74,7 +74,11 @@ reduceT _ VarA{} = error "TODO: implement" -- reduceKnownVariable var e
 
 tryValue :: AST v a ->  Maybe a
 tryValue (Leaf x _) = Just x
-tryValue _ = Nothing
+tryValue (App f x) = tryValue f <*> tryValue x
+tryValue (PostApp x f) = tryValue f <*> tryValue x
+tryValue (Lam _ _) = Nothing -- not easily possible due to PHOAS encoding (easier if we encode at the type level that a AST is closed )
+tryValue Var{} = Nothing
+tryValue VarA{} = Nothing
 
 printTree :: Show v => AST v a -> Tree String
 printTree (App f x) = Node "($)" [printTree f, printTree x]
@@ -104,6 +108,9 @@ printFlat = printFlatS show
 
 printFlat' :: AST String a -> String
 printFlat' = printFlatS id
+
+printFlatClosed :: AST v a -> String
+printFlatClosed = printFlatS undefined
 
 eval :: (PVarEnv env v, Ord v, Show v) => env v -> AST v a -> a
 eval e (App f x) = eval e f $ eval e x

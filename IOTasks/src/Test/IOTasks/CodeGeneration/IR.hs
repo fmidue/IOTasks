@@ -216,13 +216,36 @@ lookup2 x ds = lookup x (map (\(x,d,n) -> (x,(d,n))) ds)
 lookupDef :: Var -> [Def a] -> Maybe (DefRhs a,Int)
 lookupDef = lookup2
 
+updateDef :: (Var,DefRhs a) -> [Def a] -> [Def a]
+updateDef (x,newRhs) = (\(ds',vs) -> updateUseCount vs ds') . updateDef' ([],[]) where
+  updateDef' (ds',vs) [] = (ds',vs)
+  updateDef' (ds',vs) ((y,oldRhs,n):ds)
+    | x == y =
+      let
+        newUsed = usedVars [newRhs]
+        oldUsed = usedVars [oldRhs]
+        diff = usageDiff newUsed oldUsed
+      in (ds'++(x,newRhs,n):ds,diff)
+    | otherwise = updateDef' ((y,oldRhs,n):ds',vs) ds
+
+-- 1st arg = new, 2nd arg = old
+-- assumes ordered lists (like the ones produced by usedVars)
+usageDiff :: [(Var,Int)] -> [(Var,Int)] -> [(Var,Int)]
+usageDiff [] [] = []
+usageDiff xs [] = xs
+usageDiff [] ys = map (\(y,m) -> (y, negate m)) ys
+usageDiff ((x,n):xs) ((y,m):ys)
+  | x == y = (x,n-m) : usageDiff xs ys
+  | x > y = (y,negate m) : usageDiff ((x,n):xs) ys
+  | otherwise = (x,n) : usageDiff xs ((y,m):ys)
+
 lookupF :: Var -> [F] -> Maybe ([Var],[Instruction])
 lookupF = lookup2
 
-updateF :: Var -> [Instruction] -> [F] -> [F]
+updateF :: Var -> ([Instruction] -> [Instruction]) -> [F] -> [F]
 updateF _ _ [] = []
 updateF f bf ((g,ps,bg):fs)
-  | f == g = (f,ps,bf) : fs
+  | f == g = (f,ps,bf bg) : fs
   | otherwise = (g,ps,bg) : updateF f bf fs
 
 -- printing to Haskell

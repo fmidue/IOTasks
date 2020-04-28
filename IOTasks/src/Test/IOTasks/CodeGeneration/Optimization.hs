@@ -1,16 +1,21 @@
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE LambdaCase #-}
 module Test.IOTasks.CodeGeneration.Optimization where
 
 import Data.Maybe (fromMaybe, fromJust)
 
 import Data.Term (termVars)
 import Data.Term.Typed.AST
+import Data.Term.Liftable (litT)
+import qualified Data.Term.Liftable.Prelude as T
 import Data.Environment
 
+import Data.Proxy
 import Type.Reflection (Typeable,(:~~:)(..), typeRep, eqTypeRep)
 
 import Test.IOTasks.CodeGeneration.IR
@@ -80,18 +85,27 @@ inline1 ds =
 -- retrun point (or a program that uses the name t', which should not happen, because of IndexedVar)
 inlinePrint :: IRProgram -> IRProgram
 inlinePrint ([],ds,fs) = ([],ds,fs)
-inlinePrint p@(BINDCALL f ps [rv] : PRINT t : is,ds,fs) =
-  case lookupDef t ds of
-    Just (Forget (Const tRhs),n) | n <= 1 && termVars tRhs == [rv] ->
-      let
-        r y = mapV (\x -> if x == rv then y else x) tRhs
-        (_,b) = fromJust $ lookupF f fs
-        (b',ds',fs') = transformProgram tr (b,ds,fs)
-        tr ds fs = (idFold ds fs){ fYield = trYield ds fs }
-        trYield ds fs [rv] = ([PRINT (t++"'")], (t++"'",Forget $ Const (r rv),1) : ds ,fs)
-        trYield ds fs rvs = ([YIELD rvs], ds, fs)
-      in (BINDCALL f ps [] : is,ds',updateF f b' fs')
-    _ -> p
+inlinePrint p@(BINDCALL f ps [rv] : PRINT t : is,ds,fs)
+  | rv == t =
+    let
+      (_,b) = fromJust $ lookupF f fs
+      (b',ds',fs') = transformProgram tr (b,ds,fs)
+      tr ds fs = (idFold ds fs){ fYield = trYield ds fs }
+      trYield ds fs [rv'] = ([PRINT rv'], ds ,fs)
+      trYield ds fs rvs = ([YIELD rvs], ds, fs)
+    in (BINDCALL f ps [] : is,ds',updateF f (const b') fs')
+  | otherwise =
+    case lookupDef t ds of
+      Just (Forget (Const tRhs),n) | n <= 1 && termVars tRhs == [rv] ->
+        let
+          r y = mapV (\x -> if x == rv then y else x) tRhs
+          (_,b) = fromJust $ lookupF f fs
+          (b',ds',fs') = transformProgram tr (b,ds,fs)
+          tr ds fs = (idFold ds fs){ fYield = trYield ds fs }
+          trYield ds fs [rv'] = ([PRINT (t++"'")], (t++"'",Forget $ Const (r rv'),1) : ds ,fs)
+          trYield ds fs rvs = ([YIELD rvs], ds, fs)
+        in (BINDCALL f ps [] : is,ds',updateF f (const b') fs')
+      _ -> p
 inlinePrint (i:is,ds,fs) = let (is',ds',fs') = inlinePrint (is,ds,fs) in (i:is',ds',fs')
 
 data InstFold a = InstFold
@@ -137,15 +151,18 @@ transformProgram f (i:is,ds,fs) =
   in (is' ++ is'', ds'', fs'')
 
 -- "inlining" fold optimization sketch
-opt :: IRProgram -> IRProgram
-opt ([],ds,fs) = ([],ds,fs)
-opt (BINDCALL f ps [rv] : PRINT t : is,ds,fs) =
+foldOpt :: IRProgram -> IRProgram
+foldOpt ([],ds,fs) = ([],ds,fs)
+foldOpt (BINDCALL f [p] [rv] : PRINT t : is,ds,fs) =
   case lookupDef t ds of
-    Just (Forget (rhs :: DefRhs a),1) -> case _extractAlgebra (toAST rhs) rv of
-      Just (g,_) -> ([BINDCALL f ps [_], PRINT rv],(_,_,1) : _toFoldAccum g f fs ds,fs)
-      _ -> _
-    _ -> _
-opt (i:is,ds,fs) = let (is',ds',fs') = opt (is,ds,fs) in (i:is',ds',fs')
+    Just (Forget (rhs :: DefRhs a),0) ->
+      case extractAlgebra (toAST rhs) rv p of
+        Just (Algebra g x) ->
+          let (is',ds',fs') = foldOpt (is,updateDef (t,Forget $ Const x) $ toFoldAccum g f fs ds, fs)
+          in (BINDCALL f [t] [rv] : PRINT rv : is', ds',fs')
+        _ -> let (is',ds',fs') = foldOpt (is,ds,fs) in (BINDCALL f [p] [rv] : PRINT t : is',ds',fs')
+    _ -> error "no definition found"
+foldOpt (i:is,ds,fs) = let (is',ds',fs') = foldOpt (is,ds,fs) in (i:is',ds',fs')
 
 -- NOTE: This is only sound if the accumulation parameter is not printed out!
 toFoldAccum :: (Typeable a, Typeable b) => (AST Var a -> AST Var b -> AST Var b) -> Var -> [F] -> [Def ()] -> [Def ()]
@@ -178,6 +195,24 @@ leavingVars = concatMap f where
 -- i.e. the parameters for expressing the represented term as a fold
 -- incomplete implementation. Currently not sure how to write this in a general way.
 -- especially the starting value is not correct in a general setting.
-extractAlgebra :: (Typeable a, Typeable b) => AST Var b -> Var -> Maybe (AST Var a -> AST Var b -> AST Var b, AST Var b)
-extractAlgebra (App (Leaf _ "sum") (Var x _)) y | x == y = Just (_,_)
-extractAlgebra _ _ = Nothing
+extractAlgebra :: Typeable a => AST Var a -> Var -> Var -> Maybe (Algebra a)
+extractAlgebra (App (Leaf (f :: x -> a) name) (Var x _)) rv p | x == rv =
+  case typeRep @a `eqTypeRep` typeRep @Int of
+    Just HRefl -> case name of
+      -- folds to Int
+      "sum" -> Just $ Algebra (\b a -> b T.+ coerseAST a Proxy) (initialAccum f name p)
+      "length" -> Just $ Algebra (\b _ -> b T.+ litT 1) (initialAccum f name p)
+      _ -> Nothing
+    Nothing -> Nothing
+extractAlgebra _ _ _ = Nothing
+
+initialAccum :: Typeable x => (x -> a) -> String -> Var -> AST Var a
+initialAccum f name p = App (Leaf f name) (Var p typeRep)
+
+data Algebra b = Algebra { c :: forall a. Typeable a => AST Var b -> AST Var a -> AST Var b, n :: AST Var b }
+
+coerseAST :: (Typeable a, Typeable b) => AST Var a -> Proxy b -> AST Var b
+coerseAST (x :: AST Var a) (Proxy :: Proxy b) =
+  case typeRep @a `eqTypeRep` typeRep @b of
+    Just HRefl -> x
+    Nothing -> error $ "coersion failed from " ++ show (typeRep @a) ++ " to " ++ show (typeRep @b)
