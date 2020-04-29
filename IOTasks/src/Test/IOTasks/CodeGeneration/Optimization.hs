@@ -4,7 +4,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE LambdaCase #-}
 module Test.IOTasks.CodeGeneration.Optimization where
 
 import Data.Maybe (fromMaybe, fromJust)
@@ -150,7 +149,7 @@ transformProgram f (i:is,ds,fs) =
     (is'',ds'',fs'') = transformProgram f (is,ds',fs')
   in (is' ++ is'', ds'', fs'')
 
--- "inlining" fold optimization sketch
+-- "inlining" fold optimization
 foldOpt :: IRProgram -> IRProgram
 foldOpt ([],ds,fs) = ([],ds,fs)
 foldOpt (BINDCALL f [p] [rv] : PRINT t : is,ds,fs) =
@@ -197,11 +196,14 @@ leavingVars = concatMap f where
 -- especially the starting value is not correct in a general setting.
 extractAlgebra :: Typeable a => AST Var a -> Var -> Var -> Maybe (Algebra a)
 extractAlgebra (App (Leaf (f :: x -> a) name) (Var x _)) rv p | x == rv =
-  case typeRep @a `eqTypeRep` typeRep @Int of
+  let
+    initialV :: Show a => a -> AST Var a
+    initialV v = if p == "[]" then Leaf v (show v) else initialAccum f name p
+  in case typeRep @a `eqTypeRep` typeRep @Int of
     Just HRefl -> case name of
       -- folds to Int
-      "sum" -> Just $ Algebra (\b a -> b T.+ coerseAST a Proxy) (initialAccum f name p)
-      "length" -> Just $ Algebra (\b _ -> b T.+ litT 1) (initialAccum f name p)
+      "sum" -> Just $ Algebra (\b a -> b T.+ coerseAST a Proxy) (initialV 0)
+      "length" -> Just $ Algebra (\b _ -> b T.+ litT 1) (initialV 0)
       _ -> Nothing
     Nothing -> Nothing
 extractAlgebra _ _ _ = Nothing
