@@ -20,10 +20,10 @@ import Data.Environment.Class
 data ITerm env v a = ITerm (AST v) [(v,Usage)] (env v -> a)
 
 instance (VarEnv env v, Show v) => VarTerm (ITerm env v) v where
-  variable' x = ITerm (UVar (x,Current)) [(x,Current)] (evalGetCurrent x)
+  variable' x = ITerm (Var x) [(x,Current)] (evalGetCurrent x)
 
 instance (PVarEnv env v, Show v) => PVarTerm (ITerm env v) v where
-  variableAll' x = ITerm (UVar (x,All)) [(x,All)] (evalGetAll x)
+  variableAll' x = ITerm (VarA x) [(x,All)] (evalGetAll x)
 
 evalGetAll :: (PVarEnv env v, Show v, Typeable a) => v -> env v -> [a]
 evalGetAll x d =
@@ -63,14 +63,11 @@ lit x = embedT (x,show x)
 
 instance Eq v => Liftable (ITerm env v) where
 -- might need some sanity checks if publicly exposed
-  embedT (x,s) = ITerm (Literal s) [] (const x)
-  appT (ITerm ast1 vs1 f) (ITerm ast2 vs2 x) = ITerm (Node "app" [ast1, ast2]) (nub $ vs1 ++ vs2) (\e -> f e (x e))
+  embedT (x,s) = ITerm (Leaf s) [] (const x)
+  appT (ITerm ast1 vs1 f) (ITerm ast2 vs2 x) = ITerm (App ast1 ast2) (nub $ vs1 ++ vs2) (\e -> f e (x e))
 
-  liftT (f,name) (ITerm ast vs eval) = ITerm (Node name [ast]) vs (f . eval)
-  liftT2 (f,name) (ITerm ast1 vs1 eval1) (ITerm ast2 vs2 eval2)  = ITerm (Node name [ast1, ast2]) (nub $ vs1 ++ vs2) (\d -> f (eval1 d) (eval2 d))
-  liftTInfix ((*$),name) (ITerm ast1 vs1 eval1) (ITerm ast2 vs2 eval2)  = ITerm (Infix ast1 name ast2) (nub $ vs1 ++ vs2) (\d -> eval1 d *$ eval2 d)
-  liftT3 (f,name) (ITerm ast1 vs1 eval1) (ITerm ast2 vs2 eval2) (ITerm ast3 vs3 eval3)
-    = ITerm (Node name [ast1, ast2, ast3]) (nub $ vs1 ++ vs2 ++ vs3) (\d -> f (eval1 d) (eval2 d) (eval3 d))
+  liftTInfix (f,name) (ITerm ast1 vs1 eval1) =
+    appT (ITerm (PostApp (Leaf name) ast1) vs1 (f . eval1))
 
   unHO f = ITerm
     (funcAST f)
@@ -89,13 +86,14 @@ instance Eq v => Liftable (ITerm env v) where
 
 -- internal helpers
 funcAST :: (ITerm env v a -> ITerm env v b) -> AST v
-funcAST f = Lam ["x"] (viewTerm $ f (dummyViewITerm (Literal "x")))
+funcAST f = Lam 0 (viewTerm . f . dummyViewITerm . Leaf)
+-- funcAST f = Lam ["x"] (viewTerm $ f (dummyViewITerm (Leaf "x")))
 
 funcAST2 :: (ITerm env v a -> ITerm env v b -> ITerm env v c) -> AST v
-funcAST2 f = Lam ["x","y"] (viewTerm $ f (dummyViewITerm (Literal "x")) (dummyViewITerm (Literal "y")))
+funcAST2 f = Lam 1 $ \x -> Lam 0 $ \y -> viewTerm $ f (dummyViewITerm (Leaf x)) (dummyViewITerm (Leaf y))
 
 funcAST3 :: (ITerm env v a -> ITerm env v b -> ITerm env v c -> ITerm env v d) -> AST v
-funcAST3 f = Lam ["x","y","z"] (viewTerm $ f (dummyViewITerm (Literal "x")) (dummyViewITerm (Literal "y")) (dummyViewITerm (Literal "z")))
+funcAST3 f = Lam 2 $ \x -> Lam 1 $ \y -> Lam 0 $ \z -> viewTerm $ f (dummyViewITerm (Leaf x)) (dummyViewITerm (Leaf y)) (dummyViewITerm (Leaf z))
 
 -- usefull for when a ITerm with just a value is needed to evaluate a function on ITerms
 dummyEvalITerm :: a -> ITerm env v a

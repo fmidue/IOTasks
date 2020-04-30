@@ -7,12 +7,13 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Data.Term.Typed.AST where
 
-import Type.Reflection (Typeable , TypeRep, typeRep)
+import Type.Reflection (Typeable , TypeRep, typeRep, eqTypeRep, (:~~:)(HRefl))
 import Data.Proxy
 import Data.Environment
 
 import Data.Term.Liftable
 import Data.Term.Class
+import qualified Data.Term.AST as Untyped
 
 import Data.Tree
 import Data.Tree.Pretty
@@ -46,6 +47,17 @@ instance VarListTerm (AST v) v where
 
 instance Show v => SynTerm (AST v) (Tree String) where
   viewTerm = printTree
+
+instance Show v => SynTerm (AST v) (Untyped.AST v) where
+  viewTerm = dropTypes
+
+dropTypes :: AST v a -> Untyped.AST v
+dropTypes (Leaf _ s) = Untyped.Leaf s
+dropTypes (Lam x t) = Untyped.Lam x (\x -> dropTypes $ t (undefined, x))
+dropTypes (Var x _) = Untyped.Var x
+dropTypes (VarA x _) = Untyped.VarA x
+dropTypes (App f x) = Untyped.App (dropTypes f) (dropTypes x)
+dropTypes (PostApp x f) = Untyped.PostApp (dropTypes x) (dropTypes f)
 
 instance SynTermTyped (AST v) (AST v) where
   viewTermTyped = id
@@ -149,3 +161,9 @@ replaceVar f (Var x r) = f x Current r
 replaceVar f (VarA x r) = f x All r
 replaceVar f (App g x) = App (replaceVar f g) (replaceVar f x)
 replaceVar f (PostApp x g) = PostApp (replaceVar f x) (replaceVar f g)
+
+coerseAST :: (Typeable a, Typeable b) => AST v a -> Proxy b -> AST v b
+coerseAST (x :: AST v a) (Proxy :: Proxy b) =
+  case typeRep @a `eqTypeRep` typeRep @b of
+    Just HRefl -> x
+    Nothing -> error $ "coersion failed from " ++ show (typeRep @a) ++ " to " ++ show (typeRep @b)
