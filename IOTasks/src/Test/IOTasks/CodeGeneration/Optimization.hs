@@ -189,10 +189,10 @@ initialAccum :: String -> Var -> AST Var
 initialAccum name p = App (Leaf name) (Var p)
 
 introLenParameter :: Var -> AST Var -> AST Var
-introLenParameter xs (Leaf s) = Leaf s
+introLenParameter _ (Leaf s) = Leaf s
 introLenParameter xs (Lam x t) = Lam x (introLenParameter xs . t)
-introLenParameter xs (Var x) = Var x
-introLenParameter xs (VarA x) = VarA x
+introLenParameter _ (Var x) = Var x
+introLenParameter _ (VarA x) = VarA x
 introLenParameter xs (App (Leaf "length") (Var x)) | xs == x = Var "l"
 introLenParameter xs (App f x) = App (introLenParameter xs f) (introLenParameter xs x)
 introLenParameter xs (PostApp x f) = PostApp (introLenParameter xs x) (introLenParameter xs f)
