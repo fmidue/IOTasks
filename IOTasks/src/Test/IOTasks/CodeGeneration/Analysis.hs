@@ -13,7 +13,7 @@ module Test.IOTasks.CodeGeneration.Analysis
   where
 
 import Data.Term
-import Data.Term.Typed.AST
+import Data.Term.AST
 
 import Test.IOTasks.Specification
 
@@ -47,19 +47,19 @@ instance Lattice Modification where
 
 data Modification = R | W deriving (Show, Eq, Ord, Bounded)
 
-termFacts :: SynTermTyped t (AST Varname) => t a -> Facts Usage
-termFacts = go . viewTermTyped where
-  go :: AST Varname a -> Facts Usage
-  go (Leaf _ _) = Map.empty
-  go (Lam _ t) = go (t (undefined, undefined))
-  go (Var x _) = Map.singleton x Current
-  go (VarA x _) = Map.singleton x All
+termFacts :: SynTerm t (AST Varname) => t a -> Facts Usage
+termFacts = go . viewTerm where
+  go :: AST Varname -> Facts Usage
+  go (Leaf _) = Map.empty
+  go (Lam _ t) = go (t undefined)
+  go (Var x) = Map.singleton x Current
+  go (VarA x) = Map.singleton x All
   go (App f x) = joinFacts [go f, go x]
   go (PostApp x f) = joinFacts [go x, go f]
 
-analyse :: (VarListTerm t Varname, SynTermTyped t (AST Varname)) => Specification t -> [AnnAction t (Facts (Usage, Modification))]
+analyse :: (VarListTerm t Varname, SynTerm t (AST Varname)) => Specification t -> [AnnAction t (Facts (Usage, Modification))]
 analyse = annotateSpec $ combineTransfer usageTransfer modTransfer where
-  usageTransfer :: SynTermTyped t (AST Varname) => Transfer t Usage
+  usageTransfer :: SynTerm t (AST Varname) => Transfer t Usage
   usageTransfer = Transfer
     { tRead = const id
     , tWrite = \ts is' -> let new = termFacts <$> ts in joinFacts (is':new)
@@ -84,7 +84,7 @@ normalizeSpec (Spec as) = Spec $ go as where
   go (Branch c s1 s2 : as') = [Branch c (s1 <> Spec as') (s2 <> Spec as')]
   go x = x
 
-annotateSpec :: (Ord i, SynTermTyped t (AST Varname))
+annotateSpec :: (Ord i, SynTerm t (AST Varname))
   => Transfer t i
   -> Specification t
   -> [AnnAction t (Facts i)]

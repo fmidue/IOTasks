@@ -4,7 +4,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 module Data.Term.ITerm (
   ITerm,
-  lit,
   ) where
 
 import Data.List (nub)
@@ -57,9 +56,6 @@ instance (PVarTerm env v, PVarEnv env v, Show v) => UsageTerm (ITerm env v) v wh
 
 varInfo :: ITerm env v a -> [(v,Usage)]
 varInfo (ITerm _ vs _) = vs
-
-lit :: (Eq v, Show a) => a -> ITerm env v a
-lit x = embedT (x,show x)
 
 instance Eq v => Liftable (ITerm env v) where
 -- might need some sanity checks if publicly exposed

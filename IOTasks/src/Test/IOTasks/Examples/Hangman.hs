@@ -9,6 +9,7 @@ import Test.IOTasks
 
 import Data.Environment (Environment)
 import Data.Term.ITerm
+import Data.Term.Liftable (litT)
 import qualified Data.Term.Liftable.Prelude as T
 
 -- Specification and corresponding implementation of
@@ -21,7 +22,7 @@ hangmanDomain :: [Int]
 hangmanDomain = [0..9]
 
 hangmanSpec :: [Int] -> Specification SpecTerm
-hangmanSpec (lit -> word) =
+hangmanSpec (litT -> word) =
   tillExit (
        branch (winCondition $ getAll "guessed")
          nop

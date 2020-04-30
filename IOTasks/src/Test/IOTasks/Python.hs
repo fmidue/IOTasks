@@ -3,12 +3,10 @@ module Test.IOTasks.Python where
 
 import Test.IOTasks.Specification
 
-import Data.Term (SynTerm(..), VarListTerm, Usage(..))
+import Data.Term (SynTerm(..), VarListTerm)
 import Data.Term.AST (AST(..))
 
 import Text.PrettyPrint
-import Data.List (intercalate)
-
 type Varname = String
 
 renderProgramDoc :: Doc -> String
@@ -39,13 +37,12 @@ pythonTranslation (TillE s) =
 pythonTranslation E = text "break"
 
 codeToString :: AST Varname -> String
-codeToString (Infix x op y) = codeToString x ++ " " ++ op ++ " " ++ codeToString y
-codeToString (Node "length" ts) = "len" ++ "(" ++ intercalate ", " (codeToString <$> ts) ++ ")"
-codeToString (Node s ts) = s ++ "(" ++ intercalate ", " (codeToString <$> ts) ++ ")"
-codeToString (UVar (x,Current)) = x ++ "_A[-1]"
-codeToString (UVar (x,All)) = x ++ "_A"
-codeToString (SVar x) = x
-codeToString (Literal s) = s
+codeToString (App (PostApp x (Leaf op)) y) = codeToString x ++ " " ++ op ++ " " ++ codeToString y
+codeToString (App (Leaf "length") ts) = "len" ++ "(" ++ codeToString ts ++ ")"
+codeToString (App (Leaf s) ts) = s ++ "(" ++ codeToString ts ++ ")"
+codeToString (Var x) = x ++ "_A[-1]"
+codeToString (VarA x) = x ++ "_A"
+codeToString (Leaf s) = s
 codeToString (Lam _ _) = "<TODO>"
 
 printPythonCode :: SynTerm t (AST Varname) => t a -> String

@@ -16,6 +16,18 @@ data AST v
   | App (AST v) (AST v)
   | PostApp (AST v) (AST v)
 
+embed :: String -> AST v
+embed = Leaf
+
+lit :: Show a => a -> AST v
+lit = embed . show
+
+app :: AST v -> AST v -> AST v
+app = App
+
+infixApp :: AST v -> String -> AST v -> AST v
+infixApp x = App . PostApp x . Leaf
+
 printTree :: Show v => AST v -> Tree String
 printTree (App f x) = Node "($)" [printTree f, printTree x]
 printTree (PostApp x f) = Node "(&)" [printTree f, printTree x]

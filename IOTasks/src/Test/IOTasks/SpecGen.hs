@@ -8,8 +8,9 @@ import Test.IOTasks.Specification
 import Test.IOTasks.Language (exit, ints,nats, getCurrent, getAll, Pattern(..))
 import Test.IOTasks.Language as Pattern (var)
 
+import Data.Term.Liftable (litT)
 import qualified Data.Term.Liftable.Prelude as T
-import Data.Term.ITerm (ITerm, lit)
+import Data.Term.ITerm (ITerm)
 
 import Test.QuickCheck (arbitrary, Gen)
 import Test.QuickCheck.GenT
@@ -152,7 +153,7 @@ loopCondition = do
   vs <- asks fst
   x <- elements vs
   n <- choose (0,10)
-  return (T.length (getAll @Int x) T.> lit n, x)
+  return (T.length (getAll @Int x) T.> litT n, x)
 
 insert :: Action (Specification SpecTerm) SpecTerm -> Specification SpecTerm -> GenM (Specification SpecTerm)
 insert a (Spec as) = do

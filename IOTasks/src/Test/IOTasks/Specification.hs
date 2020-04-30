@@ -20,7 +20,7 @@ import Test.IOTasks.Utils
 import Data.Environment
 import Test.IOTasks.Pattern
 import Test.IOTasks.ValueSet
-import Data.Term.AST (AST, printAST)
+import Data.Term.AST (AST, printFlat')
 import Data.Term
 
 import Data.List (nub)
@@ -57,8 +57,8 @@ instance SynTerm t (AST Varname) => Pretty (Specification t) where
 
 instance (Pretty r, SynTerm t (AST Varname)) => Pretty (Action r t) where
   pPrint (ReadInput x _) = PP.text "ReadInput" PP.<+> PP.text (show x) PP.<+> PP.text "_"
-  pPrint (WriteOutput b ps ts) = PP.hsep [PP.text "WriteOutput", PP.text (show b), PP.text (show ps), PP.text (show (printAST . viewTerm @_ @(AST Varname) <$> ts))]
-  pPrint (Branch c s1 s2) = PP.hang (PP.text "Branch" PP.<+> PP.parens (PP.text $ printAST $ viewTerm @_ @(AST Varname) c)) 2 (PP.parens (PP.pPrint s1) PP.$+$ PP.parens (PP.pPrint s2))
+  pPrint (WriteOutput b ps ts) = PP.hsep [PP.text "WriteOutput", PP.text (show b), PP.text (show ps), PP.text (show (printFlat' . viewTerm @_ @(AST Varname) <$> ts))]
+  pPrint (Branch c s1 s2) = PP.hang (PP.text "Branch" PP.<+> PP.parens (PP.text $ printFlat' $ viewTerm @_ @(AST Varname) c)) 2 (PP.parens (PP.pPrint s1) PP.$+$ PP.parens (PP.pPrint s2))
   pPrint (TillE s) = PP.hang (PP.text "TillE") 2 (PP.parens (PP.pPrint s))
   pPrint E = PP.text "E"
 

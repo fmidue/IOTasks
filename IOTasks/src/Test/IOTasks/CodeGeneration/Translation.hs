@@ -1,31 +1,22 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 module Test.IOTasks.CodeGeneration.Translation where
 
 import Test.IOTasks.Specification
-import Test.IOTasks.ValueSet (withProxy)
 import Test.IOTasks.CodeGeneration.IR
 import Test.IOTasks.CodeGeneration.Analysis
 
 import Data.Term
-import Data.Term.Typed.AST
-import Data.Term.Liftable (unHO)
-import qualified Data.Term.Liftable.Prelude as T (last)
+import Data.Term.AST
 
 import Control.Monad.State
 
 import Data.Functor.Identity
 import Data.Maybe (fromMaybe)
-import Data.List (isSuffixOf)
 import qualified Data.Map as Map
 
-import Type.Reflection (Typeable, typeRep, TypeRep)
-import Text.PrettyPrint.HughesPJClass hiding (first, (<>))
-
-programIR :: (VarListTerm t Varname, SynTermTyped t (AST Varname)) => Specification t -> IRProgram
+programIR :: (VarListTerm t Varname, SynTerm t (AST Varname)) => Specification t -> IRProgram
 programIR s = foldr1 (<:>) . fst $ runFreshVarM (mapM (translate (rootUsageFacts x)) x) initState
   where x = analyse s
 
@@ -63,7 +54,7 @@ currentName v = do
   i <- gets $ fromMaybe 0 . lookup v
   return $ IVar (v, i)
 
-translate :: (SynTermTyped t (AST Varname)) => Facts Usage -> AnnAction t (Facts (Usage, Modification)) -> FreshVarM IRProgram
+translate :: (SynTerm t (AST Varname)) => Facts Usage -> AnnAction t (Facts (Usage, Modification)) -> FreshVarM IRProgram
 translate fs (AnnAction _ (ReadInput x vs)) =
   case Map.lookup x fs of
     Just Current ->
@@ -73,17 +64,17 @@ translate fs (AnnAction _ (ReadInput x vs)) =
       xk <- currentName x
       xi <- freshName x
       return $ case xk of
-        IVar (_,0) -> readIR (name v) <:> withProxy vs (initialValueIR (name xi) (name xk) (name v))
-        _ -> readIR (name v) <:> withProxy vs (updateIR (name xi) (name xk) (name v))
+        IVar (_,0) -> readIR (name v) <:> initialValueIR (name xi) (name xk) (name v)
+        _ -> readIR (name v) <:> updateIR (name xi) (name xk) (name v)
     Nothing -> error "invalid spec"
 translate _ (AnnAction _ (WriteOutput True _ _)) = return nopIR
 translate fs (AnnAction _ (WriteOutput False _ (t:_))) = do
-  ast <- adjustVars fs $ viewTermTyped t
+  ast <- adjustVars fs $ viewTerm t
   x <- freshName "t" -- TODO: find way to make this generic
   return $ printIR (name x) <:> valueDefIR (name x) ast
 translate _ (AnnAction _ (WriteOutput False _  [])) = error "invalid spec"
 translate fs (AnnAction _ (Branch c as1 as2)) = do
-  ast <- adjustVars fs $ viewTermTyped c
+  ast <- adjustVars fs $ viewTerm c
   var <- name <$> freshName "cond"
   x <- mapM (translate fs) as2
   y <- mapM (translate fs) as1
@@ -99,9 +90,9 @@ translate fs (AnnAction _ (TillE as)) = do
 translate _ (AnnAction _ E) = error "E at toplevel"
 translate _ EmptyAction = return nopIR
 
-translateLoop :: (SynTermTyped t (AST Varname)) => Facts Usage -> IndexedVar -> [Varname] -> [AnnAction t (Facts (Usage, Modification))] -> FreshVarM IRProgram
+translateLoop :: (SynTerm t (AST Varname)) => Facts Usage -> IndexedVar -> [Varname] -> [AnnAction t (Facts (Usage, Modification))] -> FreshVarM IRProgram
 translateLoop fs l wVars = (foldr1 (<:>) <$>) . mapM go where
-  go :: (SynTermTyped t (AST Varname)) => AnnAction t (Facts (Usage, Modification)) -> FreshVarM IRProgram
+  go :: (SynTerm t (AST Varname)) => AnnAction t (Facts (Usage, Modification)) -> FreshVarM IRProgram
   go EmptyAction = do
     params <- mapM currentName wVars
     return $ recCallIR (name l) (map name params)
@@ -109,22 +100,22 @@ translateLoop fs l wVars = (foldr1 (<:>) <$>) . mapM go where
     returnNames <- mapM currentName wVars
     return $ yieldIR (map name returnNames)
   go (AnnAction _ (Branch c as1 as2)) = do
-    ast <- adjustVars fs $ viewTermTyped c
+    ast <- adjustVars fs $ viewTerm c
     var <- name <$> freshName "cond"
     x <- translateLoop fs l wVars as2
     y <- translateLoop fs l wVars as1
     return $ ifIR var x y <:> valueDefIR var ast
   go a = translate fs a
 
-adjustVars :: Facts Usage -> AST Varname a -> FreshVarM (AST Varname a)
+adjustVars :: Facts Usage -> AST Varname -> FreshVarM (AST Varname)
 adjustVars fs t = do
   st <- get
   let
     currentName' x = fst $ runFreshVarM (name <$> currentName x) st
-    f :: forall a. Typeable a => Varname -> Usage -> TypeRep a -> AST Varname a
-    f x All r = Var (currentName' x) r
-    f x Current r = case Map.lookup x fs of
-          Just All -> App (unHO T.last) (Var (currentName' x) (typeRep @[a]))
-          Just Current -> Var x r
+    f :: Varname -> Usage -> AST Varname
+    f x All = Var (currentName' x)
+    f x Current = case Map.lookup x fs of
+          Just All -> App (Leaf "last") (Var (currentName' x))
+          Just Current -> Var x
           Nothing -> error "invalid spec"
   return $ replaceVar f t

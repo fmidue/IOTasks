@@ -14,15 +14,12 @@ module Test.IOTasks.CodeGeneration.IR where
 import Data.Maybe (fromJust, fromMaybe)
 import Data.List (sort, group, intercalate)
 import Data.Proxy
-import Type.Reflection (Typeable, eqTypeRep, typeRep, (:~~:)(..))
-import Control.Monad.State (StateT(..), MonadState, get)
-import Data.Functor.Identity (Identity(..))
 
 import Data.Environment
 import Data.Term
 import Data.Term.Liftable
 import qualified Data.Term.Liftable.Prelude as T
-import Data.Term.Typed.AST
+import Data.Term.AST
 
 import Text.PrettyPrint.HughesPJClass (Doc)
 import qualified Text.PrettyPrint.HughesPJClass as PP
@@ -41,18 +38,17 @@ data Instruction
 
 type Var = String
 
-type AM = ([Instruction],([Def ()],[F]),Vals,[[Var]],[Input],[Output])
+type AM = ([Instruction],([Def],[F]),Vals,[[Var]],[Input],[Output])
 
-type IRProgram = ([Instruction], [Def ()], [F])
+type IRProgram = ([Instruction], [Def], [F])
 type Vals = Environment Var
-type Def a = (Var,DefRhs a,Int)
-data DefRhs :: * -> * where
-  Forget :: Typeable a => DefRhs a -> DefRhs ()
-  U :: forall c a b. (Typeable a, Typeable b) => (AST Var a -> AST Var b -> AST Var c) -> Var -> Var -> DefRhs c
-  N1L :: forall c a b. (Typeable a, Typeable b) => (AST Var a -> AST Var b -> AST Var c) -> DefRhs a -> Var -> DefRhs c
-  N1R :: forall c a b. (Typeable a, Typeable b) => (AST Var a -> AST Var b -> AST Var c) -> Var -> DefRhs b -> DefRhs c
-  N2  :: forall c a b. (Typeable a, Typeable b) => (AST Var a -> AST Var b -> AST Var c) -> DefRhs a -> DefRhs b -> DefRhs c
-  Const :: AST Var a -> DefRhs a
+type Def = (Var,DefRhs,Int)
+data DefRhs where
+  U :: (AST Var -> AST Var -> AST Var) -> Var -> Var -> DefRhs
+  N1L :: (AST Var -> AST Var -> AST Var) -> DefRhs -> Var -> DefRhs
+  N1R :: (AST Var -> AST Var -> AST Var) -> Var -> DefRhs -> DefRhs
+  N2  :: (AST Var -> AST Var -> AST Var) -> DefRhs -> DefRhs -> DefRhs
+  Const :: AST Var -> DefRhs
 type F = (Var, [Var], [Instruction])
 type Input = Int
 data Output = I Int | O Int deriving (Show,Eq) -- simple trace elements
@@ -64,17 +60,17 @@ data Output = I Int | O Int deriving (Show,Eq) -- simple trace elements
 readIR :: Var -> IRProgram
 readIR x = ([READ x],[],[])
 
-initialValueIR :: Typeable a => Var -> Var -> Var -> Proxy a -> IRProgram
-initialValueIR x y v (Proxy :: Proxy a) = ([],[(x,Forget $ U @[a] @[a] @a (const (`T.cons` T.nil)) y v,0)],[])
+initialValueIR :: Var -> Var -> Var -> IRProgram
+initialValueIR x y v = ([],[(x,U (\_ v -> App (PostApp v (Leaf ":")) (Leaf "[]")) y v,0)],[])
 
-updateIR :: Typeable a => Var -> Var -> Var -> Proxy a -> IRProgram
-updateIR x y v (Proxy :: Proxy a) = ([],[(x, Forget $ U @[a] (\y v -> y T.++ (v `T.cons` T.nil)) y v,0)],[])
+updateIR :: Var -> Var -> Var -> IRProgram
+updateIR x y v = ([],[(x,U (\y v -> App (PostApp y (Leaf "++")) (App (PostApp v (Leaf ":")) (Leaf "[]"))) y v,0)],[])
 
 printIR :: Var -> IRProgram
 printIR x = ([PRINT x],[],[])
 
-valueDefIR :: Typeable a => Var -> AST Varname a -> IRProgram
-valueDefIR x t = ([],[(x,Forget $ Const t,0)],[])
+valueDefIR :: Var -> AST Var -> IRProgram
+valueDefIR x t = ([],[(x,Const t,0)],[])
 
 ifIR :: Var -> IRProgram -> IRProgram -> IRProgram
 ifIR c (is1,ds1,fs1) (is2,ds2,fs2) = ([IF c is1 is2],ds1 ++ ds2,fs1 ++ fs2)
@@ -93,35 +89,6 @@ yieldIR rvs = ([YIELD rvs],[],[])
 
 nopIR :: IRProgram
 nopIR = ([NOP],[],[])
-
-runInstructions :: [Instruction] -> ([Def ()],[F]) -> [Input] -> [Output]
-runInstructions p d i = let (_,_,_,_,_,o) = runAM (p,d,emptyEnvironment,[],i,[]) in o
-
-runAM :: AM -> AM
-runAM ([],d,vs,rvs,i,o) = ([],d,vs,rvs,i,o)
-runAM m = runAM $ stepAM m
-
-stepAM :: AM -> AM
-stepAM ([],_,_,_,_,_) = error "no instruction to execute"
-stepAM (READ _:_,_,_,_,[],_) = error "not enough inputs"
-stepAM (READ x:p',d,vs,rvs,i:is,o) = (p',d,updateValue (x,i) vs,rvs,is,I i:o)
-stepAM (PRINT x:p',d,vs,rvs,i,o) = (p',d,vs,rvs,i,O (_intValue x d vs):o)
-stepAM (IF x t e:p',d,vs,rvs,i,o)
-  | _boolValue x d vs = (t++p',d,vs,rvs,i,o)
-  | otherwise = (e++p',d,vs,rvs,i,o)
-stepAM (TAILCALL l ps:p',d,vs,rvs,i,o) = (_getInstructions l d ++ p',d,_setParameters l ps d vs,rvs,i,o)
-stepAM (BINDCALL l ps bs:p',d,vs,rvs,i,o) = (_getInstructions l d ++ p',d,_setParameters l ps d vs,bs:rvs,i,o)
-stepAM (YIELD _:_,_,_,[],_,_) = error "missing binders for returned values"
-stepAM (YIELD xs:p',d,vs,rvs:rvss,i,o)
-  | _length vs == length rvs = (p', d,updateValues (zipWith (\x rv -> (rv,_getPayload x vs)) xs rvs) vs,rvss,i,o)
-  | otherwise = error "wrong number of binders for returned values"
-stepAM (NOP:p',d,vs,rvs,i,o) = (p',d,vs,rvs,i,o)
-
-updateValues :: [(Var, a)] -> Vals -> Vals
-updateValues xs ys = fromJust $ foldr _ (Just ys) xs
-
-updateValue :: (Typeable a, Show a) => (Var,a) -> Vals -> Vals
-updateValue (x,v) = fromJust . store x show v
 
 -- printing programs
 printIRProgram :: IRProgram -> Doc
@@ -146,14 +113,13 @@ printInstruction (BINDCALL f ps rvs) = PP.text ("BINDCALL " ++ f) PP.<+> tupeliz
 printInstruction (YIELD rvs) = PP.text "RETURN " PP.<+> tupelize rvs
 printInstruction NOP = mempty
 
-printDef :: Def a -> Doc
+printDef :: Def -> Doc
 printDef (x,rhs,_) = PP.text (x ++ " :=") PP.<+> printDefRhs rhs
 
-printDefRhs :: DefRhs a -> Doc
-printDefRhs (Forget d) = printDefRhs d
-printDefRhs (U f y v) = PP.text $ printFlat' $ f (Leaf undefined y) (Leaf undefined v)
-printDefRhs (N1L f y v) = PP.text $ printFlat' $ f (toAST y) (Leaf undefined v)
-printDefRhs (N1R f y v) = PP.text $ printFlat' $ f (Leaf undefined y) (toAST v)
+printDefRhs :: DefRhs -> Doc
+printDefRhs (U f y v) = PP.text $ printFlat' $ f (Leaf y) (Leaf v)
+printDefRhs (N1L f y v) = PP.text $ printFlat' $ f (toAST y) (Leaf v)
+printDefRhs (N1R f y v) = PP.text $ printFlat' $ f (Leaf y) (toAST v)
 printDefRhs (N2 f y v) = PP.text $ printFlat' $ f (toAST y) (toAST v)
 printDefRhs (Const t) = PP.text $ printFlat' t
 
@@ -167,56 +133,53 @@ tupelize [v] = PP.text v
 tupelize vs = PP.text $ "(" ++ intercalate "," vs ++ ")"
 
 -- manipulation of DefRhs
-printDefTree :: DefRhs a -> String
+printDefTree :: DefRhs -> String
 printDefTree = pPrintTree . toAST
 
-toAST :: DefRhs a -> AST Var a
-toAST (Forget x) = App (unHO $ \_ -> Leaf () "()") $ toAST x
-toAST (U f y v) = f (variable y) (variable v)
-toAST (N1L f y v) = f (toAST y) (variable v)
-toAST (N1R f y v) = f (variable y) (toAST v)
+toAST :: DefRhs -> AST Var
+toAST (U f y v) = f (Leaf y) (Leaf v)
+toAST (N1L f y v) = f (toAST y) (Leaf v)
+toAST (N1R f y v) = f (Leaf y) (toAST v)
 toAST (N2 f y v) = f (toAST y) (toAST v)
 toAST (Const t) = t
 
-instance Show (DefRhs a) where
-  show (Forget x) = "Forget " ++ show x
+instance Show DefRhs where
   show (U f y v) = "U ? " ++ y ++ " " ++ v
   show (N1L f y v) = "N1L ? " ++ v
   show (N1R f y v) = "N1R ? " ++ y
   show (N2 f y v) = "N2 ?"
   show (Const t) = "Const ?"
 
-addDef :: (Var,DefRhs a) -> [Def a] -> [Def a]
+addDef :: (Var,DefRhs) -> [Def] -> [Def]
 addDef (x,d) ds =
   let n = fromMaybe 0 $ lookup x $ usedVars (map (\(_,d,_) -> d) ds)
   in (x,d,n) : updateUseCount (usedVars [d]) ds
 
-updateUseCount :: [(Var,Int)] -> [Def a] -> [Def a]
+updateUseCount :: [(Var,Int)] -> [Def] -> [Def]
 updateUseCount cs = foldr phi [] where
   phi (x,d,n) ds = case lookup x cs of
     Just m -> (x,d,n+m) : ds
     Nothing -> (x,d,n) : ds
 
-definedVars :: [Def a] -> [Var]
+definedVars :: [Def] -> [Var]
 definedVars = map (\(x,_,_) -> x)
 
-usedVars :: [DefRhs a] -> [(Var,Int)]
+usedVars :: [DefRhs] -> [(Var,Int)]
 usedVars = map (\x -> (head x, length x)) . group . sort . concatMap go where
-  go :: DefRhs a -> [Var]
-  go (Forget d) = go d
+  go :: DefRhs -> [Var]
   go (U _ y v) = [y,v]
   go (N1L _ y v) = v : go y
   go (N1R _ y v) = y : go v
   go (N2 _ y v) = go y ++ go v
-  go (Const t) = termVars t
+  go (Const t) = vars t
 
 lookup2 :: Eq k => k -> [(k,a,b)] -> Maybe (a,b)
 lookup2 x ds = lookup x (map (\(x,d,n) -> (x,(d,n))) ds)
 
-lookupDef :: Var -> [Def a] -> Maybe (DefRhs a,Int)
+lookupDef :: Var -> [Def] -> Maybe (DefRhs,Int)
 lookupDef = lookup2
 
-updateDef :: (Var,DefRhs a) -> [Def a] -> [Def a]
+updateDef :: (Var,DefRhs) -> [Def] -> [Def]
 updateDef (x,newRhs) = (\(ds',vs) -> updateUseCount vs ds') . updateDef' ([],[]) where
   updateDef' (ds',vs) [] = (ds',vs)
   updateDef' (ds',vs) ((y,oldRhs,n):ds)

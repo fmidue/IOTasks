@@ -3,8 +3,6 @@
 {-# LANGUAGE RecordWildCards #-}
 module Test.IOTasks.CodeGeneration.Render where
 
-import Data.Maybe (fromJust)
-
 import Test.IOTasks.CodeGeneration.IR
 
 import Data.Functor.Identity
@@ -24,7 +22,7 @@ data Render = Render
   , renderYield :: ([Doc],Doc) -> Doc -- (params,ctx)
   , renderNop :: Doc
   , renderLoop :: Var -> [Var] -> Doc -> Doc
-  , renderAssignment :: forall a. Var -> DefRhs a -> Doc
+  , renderAssignment :: Var -> DefRhs -> Doc
 
   }
 
@@ -41,7 +39,7 @@ renderCode :: Render -> IRProgram -> Doc
 renderCode r@Render{..} (is,ds,fs) =
     renderProg $ PP.vcat $ evalScopeM (mapM (renderInstruction r ds fs) is) []
 
-renderInstruction :: Render -> [Def ()] -> [F] -> Instruction -> ScopeM Doc
+renderInstruction :: Render -> [Def] -> [F] -> Instruction -> ScopeM Doc
 renderInstruction r@Render{..} ds fs i =
   case i of
     READ x -> return $ renderRead x
@@ -68,7 +66,7 @@ renderInstruction r@Render{..} ds fs i =
     YIELD rvs -> renderYield <$> renderVars r ds rvs
     NOP -> return renderNop
 
-renderVars :: Render -> [Def ()] -> [Var] -> ScopeM ([Doc], Doc)
+renderVars :: Render -> [Def] -> [Var] -> ScopeM ([Doc], Doc)
 renderVars _ _ [] = return ([],mempty)
 renderVars r ds (v:vs) = do
   (x,ctx) <- renderVar r ds v
@@ -76,7 +74,7 @@ renderVars r ds (v:vs) = do
   return (x:xs, ctx PP.$$ ctxs)
 
 -- returns the a Doc for the actual variable and one wiht the neccessary definitions
-renderVar :: Render -> [Def ()] -> Var -> ScopeM (Doc, Doc)
+renderVar :: Render -> [Def] -> Var -> ScopeM (Doc, Doc)
 renderVar r ds x = do
   ctx <- renderContext r ds (neededVars ds x)
   case lookupDef x ds of
@@ -85,12 +83,12 @@ renderVar r ds x = do
     Just _ -> return (PP.text x, ctx)
     Nothing -> return (PP.text x, ctx)
 
-neededVars :: [Def ()] -> Var -> [Var]
+neededVars :: [Def] -> Var -> [Var]
 neededVars ds x = case lookupDef x ds of
   Just (rhs,_) -> let us = map fst (usedVars [rhs]) in us ++ concatMap (neededVars ds) us
   Nothing -> []
 
-renderContext :: Render -> [Def ()] -> [Var] -> ScopeM Doc
+renderContext :: Render -> [Def] -> [Var] -> ScopeM Doc
 renderContext Render{..} ds xs = do
   scope <- get
   let notDef = foldr (\x ys -> if x `notElem` scope then maybe ys (\v -> (x,fst v):ys) $ lookupDef x ds else ys) [] xs
