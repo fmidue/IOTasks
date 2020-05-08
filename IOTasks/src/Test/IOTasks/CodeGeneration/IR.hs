@@ -205,8 +205,8 @@ usageDiff ((x,n):xs) ((y,m):ys)
 lookupF :: Var -> [F] -> Maybe ([Var],[Instruction])
 lookupF = lookup2
 
-updateF :: Var -> ([Instruction] -> [Instruction]) -> [F] -> [F]
+updateF :: Var -> (F -> F) -> [F] -> [F]
 updateF _ _ [] = []
-updateF f bf ((g,ps,bg):fs)
-  | f == g = (f,ps,bf bg) : fs
-  | otherwise = (g,ps,bg) : updateF f bf fs
+updateF f df ((g,ps,bg):fs)
+  | f == g = df (f,ps,bg) : fs
+  | otherwise = (g,ps,bg) : updateF f df fs

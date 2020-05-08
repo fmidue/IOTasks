@@ -107,15 +107,15 @@ haskellRender =
         (       PP.hang (PP.text "then do") 2 thenBranch
           PP.$$ PP.hang (PP.text "else do") 2 elseBranch
         )
-    renderTailCall (params,ctx) f _ = ctx PP.$$ PP.text f PP.<+> PP.hcat params
+    renderTailCall (params,ctx) f _ = ctx PP.$$ PP.text f PP.<+> PP.hsep params
     renderBindCall (params,ctx) (loopDef,_) f rvs =
       -- loop definition
       loopDef
       -- missing definitions
       PP.$$ ctx
       -- actual call
-      PP.$$ (if null rvs then id else (tupelize rvs PP.<+> PP.text "<-" PP.<+>)) (PP.text f PP.<+> PP.hcat params)
-    renderYield (params,ctx) = ctx PP.$$ PP.text "return" PP.<+> PP.hcat params
+      PP.$$ (if null rvs then id else (tupelize rvs PP.<+> PP.text "<-" PP.<+>)) (PP.text f PP.<+> PP.hsep params)
+    renderYield (params,ctx) = ctx PP.$$ PP.text "return" PP.<+> PP.hsep params
     renderNop = mempty
     renderLoop f ps body = PP.hang (PP.text $ "let " ++ f ++ " " ++ unwords ps ++ " =") 6 body
     renderAssignment x rhs = PP.text ("let " ++ x ++ " =") PP.<+> printDefRhs rhs

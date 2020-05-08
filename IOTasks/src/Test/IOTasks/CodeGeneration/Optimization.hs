@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE LambdaCase #-}
 module Test.IOTasks.CodeGeneration.Optimization where
 
 import Data.Maybe (fromMaybe, fromJust)
@@ -14,6 +15,8 @@ import Data.Term.AST
 import Data.Environment
 
 import Test.IOTasks.CodeGeneration.IR
+
+import Debug.Trace
 
 -- optimizing IRProgram
 optimize :: IRProgram -> IRProgram
@@ -71,7 +74,7 @@ inlinePrint p@(BINDCALL f ps [rv] : PRINT t : is,ds,fs)
       tr ds fs = (idFold ds fs){ fYield = trYield ds fs }
       trYield ds fs [rv'] = ([PRINT rv'], ds ,fs)
       trYield ds fs rvs = ([YIELD rvs], ds, fs)
-    in (BINDCALL f ps [] : is,ds',updateF f (const b') fs')
+    in (BINDCALL f ps [] : is,ds',updateF f (\(f,p,_) -> (f,p,b')) fs')
   | otherwise =
     case lookupDef t ds of
       Just (Const tRhs,n) | n <= 1 && vars tRhs == [rv] ->
@@ -82,7 +85,7 @@ inlinePrint p@(BINDCALL f ps [rv] : PRINT t : is,ds,fs)
           tr ds fs = (idFold ds fs){ fYield = trYield ds fs }
           trYield ds fs [rv'] = ([PRINT (t++"'")], (t++"'",Const (r rv'),1) : ds ,fs)
           trYield ds fs rvs = ([YIELD rvs], ds, fs)
-        in (BINDCALL f ps [] : is,ds',updateF f (const b') fs')
+        in (BINDCALL f ps [] : is,ds',updateF f (\(f,p,_) -> (f,p,b')) fs')
       _ -> p
 inlinePrint (i:is,ds,fs) = let (is',ds',fs') = inlinePrint (is,ds,fs) in (i:is',ds',fs')
 
@@ -136,26 +139,38 @@ foldOpt (BINDCALL f [p] [rv] : PRINT t : is,ds,fs) =
     Just (rhs,0) ->
       case extractAlgebra (toAST rhs) rv p of
         Just (g, x) ->
-          let (is',ds',fs') = foldOpt (is,updateDef (t,Const x) $ toFoldAccum g f fs ds, fs)
-          in (BINDCALL f [t] [rv] : PRINT rv : is', ds',fs')
+          let (is',ds',fs') = foldOpt (is,
+                              ("li", Const (Leaf "0"),0) : changeUsage "length" "xs1" "l" (updateDef (t,Const x) $ toFoldAccum Replace g f fs ds),
+                              addParameter f "l" fs)
+          in (BINDCALL f [t, "li"] [rv] : PRINT rv : is', ds',fs')
         _ -> let (is',ds',fs') = foldOpt (is,ds,fs) in (BINDCALL f [p] [rv] : PRINT t : is',ds',fs')
     _ -> error "no definition found"
 foldOpt (i:is,ds,fs) = let (is',ds',fs') = foldOpt (is,ds,fs) in (i:is',ds',fs')
 
+data ChangeMode = Add Var | Replace
+
 -- NOTE: This is only sound if the accumulation parameter is not printed out!
-toFoldAccum :: (AST Var -> AST Var -> AST Var) -> Var -> [F] -> [Def] -> [Def]
-toFoldAccum g f fs ds =
+toFoldAccum :: ChangeMode -> (AST Var -> AST Var -> AST Var) -> Var -> [F] -> [Def] -> [Def]
+toFoldAccum m g f fs ds =
   let
     (_,b) = fromJust $ lookupF f fs
     xs = leavingVars b
-  in foldr (\x ds' -> fromMaybe ds' $ changeUpdate x g ds') ds xs
+  in foldr (\x ds' -> fromMaybe ds' $ changeUpdate m x g ds') ds xs
 
-changeUpdate :: Var -> (AST Var -> AST Var -> AST Var) -> [Def] -> Maybe [Def]
-changeUpdate x g ds = case break (\(z,_,_) -> x == z) ds of
-  (d1, (x,(U _ y v),n):d2) ->
-    case changeUpdate y g $ d1 ++ (x,U g y v,n) : d2 of
-      Just ds' -> Just ds'
-      Nothing -> Just $ d1 ++ (x,U g y v,n) : d2
+changeUpdate :: ChangeMode -> Var -> (AST Var -> AST Var -> AST Var) -> [Def] -> Maybe [Def]
+changeUpdate m x g ds = case break (\(z,_,_) -> x == z) ds of
+  (d1, (x,U f y v,n):d2) ->
+    case m of
+      Replace ->
+        case changeUpdate m y g $ d1 ++ (x,U g y v,n) : d2 of
+          Just ds' -> Just ds'
+          Nothing -> Just $ d1 ++ (x,U g y v,n) : d2
+      Add p -> case changeUpdate m y g $ d1 ++ (p,U g y v,n) : (x,U f y v,n) : d2 of
+        Just ds' -> Just ds'
+        Nothing -> Just $ d1 ++ (p,U g y v,n): (x,U f y v,n) : d2
+  (_, (_,N1L{},_):_) -> error "implemented changeUpdate for N1L"
+  (_, (_,N1R{},_):_) -> error "implemented changeUpdate for N1R"
+  (_, (_,N2{},_):_) -> error "implemented changeUpdate for N2"
   _ -> Nothing
 
 leavingVars :: [Instruction] -> [Var]
@@ -188,11 +203,64 @@ extractAlgebra _ _ _ = Nothing
 initialAccum :: String -> Var -> AST Var
 initialAccum name p = App (Leaf name) (Var p)
 
-introLenParameter :: Var -> AST Var -> AST Var
-introLenParameter _ (Leaf s) = Leaf s
-introLenParameter xs (Lam x t) = Lam x (introLenParameter xs . t)
-introLenParameter _ (Var x) = Var x
-introLenParameter _ (VarA x) = VarA x
-introLenParameter xs (App (Leaf "length") (Var x)) | xs == x = Var "l"
-introLenParameter xs (App f x) = App (introLenParameter xs f) (introLenParameter xs x)
-introLenParameter xs (PostApp x f) = PostApp (introLenParameter xs x) (introLenParameter xs f)
+-- change usage of a variable expressable by "folding accumulation" into an additional loop parameter
+accumOpt :: IRProgram -> IRProgram
+accumOpt (is,ds,[f]) =
+  let
+    (ds',f') = introAccum ds f
+  in (is,ds',[f'])
+
+introAccum :: [Def] -> F -> ([Def],F)
+introAccum ds (f,p:ps,is) =
+  case usedOn p ds of
+    (Leaf "length":_) ->
+      case changeUpdate (Add "l") "xs2" (\y _ -> App (PostApp y (Leaf "+")) (Leaf "1")) ds of
+        Just ds' -> (changeUsage "length" "xs1" "l" ds',(f,p:ps ++ ["l"],addNewParameter "l" f is))
+        Nothing -> (ds,(f,p:ps,is))
+    _ -> (ds,(f,p:ps,is))
+introAccum ds f = (ds,f)
+
+addNewParameter :: Var -> Var -> [Instruction] -> [Instruction]
+addNewParameter p f = map $ \case
+  READ x -> READ x
+  PRINT x -> PRINT x
+  IF c t e -> IF c (addNewParameter p f t) (addNewParameter p f e)
+  TAILCALL g ps -> if f == g then TAILCALL f (ps ++ [p]) else TAILCALL g ps
+  BINDCALL g ps rvs -> BINDCALL g ps rvs
+  YIELD x -> YIELD x
+  NOP -> NOP
+
+addParameter :: Var -> Var -> [F] -> [F]
+addParameter f p = updateF f $ \(f,ps,b) -> (f,ps ++ [p],b)
+
+usedOn :: Var -> [Def] -> [AST Var]
+usedOn _ [] = []
+usedOn x ((_,U f y v,_):ds) = usedOn' x (f (Var y) (Var v)) ++ usedOn x ds
+usedOn x ((_,N1L f y v,_):ds) = usedOn' x (f (toAST y) (Var v)) ++ usedOn x ds
+usedOn x ((_,N1R f y v,_):ds) = usedOn' x (f (Var y) (toAST v)) ++ usedOn x ds
+usedOn x ((_,N2 f y v,_):ds) = usedOn' x (f (toAST y) (toAST v)) ++ usedOn x ds
+usedOn x ((_,Const t,_):ds) = usedOn' x t ++ usedOn x ds
+
+usedOn' :: Var -> AST Var -> [AST Var]
+usedOn' _ (Leaf _) = []
+usedOn' x (Lam _ t) = usedOn' x $ t ""
+usedOn' _ (Var _) = []
+usedOn' _ (VarA _) = []
+usedOn' x (App f (Var y)) | x == y = f : usedOn' x f
+usedOn' x (App f y) = usedOn' x f ++ usedOn' x y
+usedOn' x (PostApp (Var y) f) | x == y = f : usedOn' x f
+usedOn' x (PostApp y f) = usedOn' x y ++ usedOn' x f
+
+replaceFunctionUsage :: (String,Var) -> Var -> AST Var -> AST Var
+replaceFunctionUsage _ _ (Leaf s) = Leaf s
+replaceFunctionUsage (f,x) p (Lam y t) = Lam y (replaceFunctionUsage (f,x) p . t)
+replaceFunctionUsage _ _ (Var x) = Var x
+replaceFunctionUsage _ _ (VarA x) = VarA x
+replaceFunctionUsage (f,x) p (App (Leaf g) (Var y)) | (f,x) == (g,y) = Var p
+replaceFunctionUsage (f,x) p (App g y) = App (replaceFunctionUsage (f,x) p g) (replaceFunctionUsage (f,x) p y)
+replaceFunctionUsage (f,x) p (PostApp y g) = PostApp (replaceFunctionUsage (f,x) p y) (replaceFunctionUsage (f,x) p g)
+
+changeUsage :: String -> Var -> Var -> [Def] -> [Def]
+changeUsage f x p ds = flip concatMap ds $ \case
+  (y,Const t,n) -> [(y,Const $ replaceFunctionUsage (f,x) p t,n)]
+  (y,d,n) -> [(y,d,n)]

@@ -10,6 +10,7 @@ import Test.IOTasks.CodeGeneration.Analysis
 import Data.Term
 import Data.Term.AST
 
+import Control.Arrow (first)
 import Control.Monad.State
 
 import Data.Functor.Identity
@@ -17,7 +18,10 @@ import Data.Maybe (fromMaybe)
 import qualified Data.Map as Map
 
 programIR :: (VarListTerm t Varname, SynTerm t (AST Varname)) => Specification t -> IRProgram
-programIR s = foldr1 (<:>) . fst $ runFreshVarM (mapM (translate (rootUsageFacts x)) x) initState
+programIR = fst . programIR'
+
+programIR' :: (VarListTerm t Varname, SynTerm t (AST Varname)) => Specification t -> (IRProgram,[(Varname,Int)])
+programIR' s = first (foldr1 (<:>)) $ runFreshVarM (mapM (translate (rootUsageFacts x)) x) initState
   where x = analyse s
 
 newtype IndexedVar = IVar (Varname,Int) deriving (Eq,Ord,Show)
