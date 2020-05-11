@@ -52,7 +52,7 @@ renderInstruction r@Render{..} ds fs i =
     TAILCALL f ps ->
       case lookupF f fs of
         Just (pts,_) -> renderTailCall <$> renderVars r ds ps <*> pure f <*> pure pts
-        Nothing -> error $ "can't find definition for " ++ f
+        Nothing -> error $ "can't find definition for " ++ name f
     BINDCALL f ps rvs ->
       case lookupF f fs of
         Just (pts,is) -> do
@@ -62,7 +62,7 @@ renderInstruction r@Render{..} ds fs i =
             <*> pure (renderLoop f pts body, pts)
             <*> pure f
             <*> pure rvs
-        Nothing -> error $ "can't find definition for " ++ f
+        Nothing -> error $ "can't find definition for " ++ name f
     YIELD rvs -> renderYield <$> renderVars r ds rvs
     NOP -> return renderNop
 
@@ -80,8 +80,8 @@ renderVar r ds x = do
   case lookupDef x ds of
     Just (rhs,0) -> return (PP.parens (printDefRhs rhs), ctx)
     Just (rhs,1) -> return (PP.parens (printDefRhs rhs), ctx)
-    Just _ -> return (PP.text x, ctx)
-    Nothing -> return (PP.text x, ctx)
+    Just _ -> return (PP.text $ name x, ctx)
+    Nothing -> return (PP.text $ name x, ctx)
 
 neededVars :: [Def] -> Var -> [Var]
 neededVars ds x = case lookupDef x ds of
@@ -100,25 +100,25 @@ haskellRender =
   let
     renderProg p = PP.text "prog :: IO ()"
       PP.$$ PP.hang (PP.text "prog = do") 2 p
-    renderRead x = PP.text $ x ++ " <- readLn"
+    renderRead x = PP.text $ name x ++ " <- readLn"
     renderPrint (argTerm,ctx) = ctx PP.$$ PP.text "print" PP.<+> argTerm
     renderIf (cond,ctx) thenBranch elseBranch =
       ctx PP.$$ PP.hang (PP.text "if" PP.<+> cond) 2
         (       PP.hang (PP.text "then do") 2 thenBranch
           PP.$$ PP.hang (PP.text "else do") 2 elseBranch
         )
-    renderTailCall (params,ctx) f _ = ctx PP.$$ PP.text f PP.<+> PP.hsep params
+    renderTailCall (params,ctx) f _ = ctx PP.$$ PP.text (name f) PP.<+> PP.hsep params
     renderBindCall (params,ctx) (loopDef,_) f rvs =
       -- loop definition
       loopDef
       -- missing definitions
       PP.$$ ctx
       -- actual call
-      PP.$$ (if null rvs then id else (tupelize rvs PP.<+> PP.text "<-" PP.<+>)) (PP.text f PP.<+> PP.hsep params)
+      PP.$$ (if null rvs then id else (tupelize rvs PP.<+> PP.text "<-" PP.<+>)) (PP.text (name f) PP.<+> PP.hsep params)
     renderYield (params,ctx) = ctx PP.$$ PP.text "return" PP.<+> PP.hsep params
     renderNop = mempty
-    renderLoop f ps body = PP.hang (PP.text $ "let " ++ f ++ " " ++ unwords ps ++ " =") 6 body
-    renderAssignment x rhs = PP.text ("let " ++ x ++ " =") PP.<+> printDefRhs rhs
+    renderLoop f ps body = PP.hang (PP.text $ "let " ++ name f ++ " " ++ unwords (map name ps) ++ " =") 6 body
+    renderAssignment x rhs = PP.text ("let " ++ name x ++ " =") PP.<+> printDefRhs rhs
   in Render{..}
 
 -- printing to imperative pseudo-code
@@ -129,7 +129,7 @@ pseudoRender :: Render
 pseudoRender =
   let
     renderProg = id
-    renderRead x = PP.text $ x ++ " := input();"
+    renderRead x = PP.text $ name x ++ " := input();"
     renderPrint (argTerm,ctx) = PP.text "print" <> PP.parens argTerm <> PP.text ";"
     renderIf (cond,ctx) thenBranch elseBranch =
       (PP.text "if" PP.<+> cond PP.<+> PP.text "{")
@@ -137,14 +137,14 @@ pseudoRender =
         PP.$$ PP.text "} else {"
         PP.$$ PP.nest 2 elseBranch
         PP.$$ PP.text "}"
-    renderTailCall ([ps],ctx) f [pt] = PP.text (pt ++ " := ") <> ps <> PP.text ";"
+    renderTailCall ([ps],ctx) f [pt] = PP.text (name pt ++ " := ") <> ps <> PP.text ";"
     renderBindCall ([ps],ctx) (loopDef,[ps']) f rvs =
-      PP.text (ps' ++ " :=") PP.<+> ps
+      PP.text (name ps' ++ " :=") PP.<+> ps
         PP.$$ loopDef
     renderYield (params,ctx) = PP.text "break;"
     renderNop = mempty
     renderLoop f ps body =
       PP.hang (PP.text "while True {") 2 body
         PP.$$ PP.text "}"
-    renderAssignment x rhs = PP.text (x ++ " :=") PP.<+> printDefRhs rhs
+    renderAssignment x rhs = PP.text (name x ++ " :=") PP.<+> printDefRhs rhs
   in Render{..}

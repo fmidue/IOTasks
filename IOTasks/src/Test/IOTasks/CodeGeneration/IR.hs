@@ -36,7 +36,26 @@ data Instruction
   | NOP
   deriving (Show,Eq)
 
-type Var = String
+type Var = IndexedVar
+data IndexedVar
+  = Initial Varname
+  | Plain Varname
+  | Indexed Varname Int
+  deriving (Eq,Ord)
+
+instance Show IndexedVar where
+  show = name
+
+-- !!! not necessarily unique in the sense that one can define ("x1",1) and ("x",11)
+name :: IndexedVar -> String
+name (Initial _) = "[]"
+name (Plain x) = x
+name (Indexed x i) = x ++ show i
+
+inc :: IndexedVar -> Int -> IndexedVar
+inc (Initial x) n = Indexed x n
+inc (Indexed x i) n = Indexed x (i+n)
+inc (Plain _) _ = error "can not increase index of plain variable"
 
 type AM = ([Instruction],([Def],[F]),Vals,[[Var]],[Input],[Output])
 
@@ -101,52 +120,52 @@ printIRProgram (is,ds,fs) =
   PP.$$ PP.vcat (map printF fs)
 
 printInstruction :: Instruction -> Doc
-printInstruction (READ x) = PP.text $ "READ " ++ x
-printInstruction (PRINT t) = PP.text $ "PRINT " ++ t
+printInstruction (READ x) = PP.text $ "READ " ++ name x
+printInstruction (PRINT t) = PP.text $ "PRINT " ++ name t
 printInstruction (IF c t e) =
-  PP.hang (PP.text ("IF " ++ c)) 2
+  PP.hang (PP.text ("IF " ++ name c)) 2
     ( PP.hang (PP.text "THEN") 2 (PP.vcat (map printInstruction t))
     PP.$$ PP.hang (PP.text "ELSE") 2 (PP.vcat (map printInstruction e))
     )
-printInstruction (TAILCALL f ps) = PP.text ("TAILCALL " ++ f) PP.<+> tupelize ps
-printInstruction (BINDCALL f ps rvs) = PP.text ("BINDCALL " ++ f) PP.<+> tupelize ps PP.<+> tupelize rvs
+printInstruction (TAILCALL f ps) = PP.text ("TAILCALL " ++ name f) PP.<+> tupelize ps
+printInstruction (BINDCALL f ps rvs) = PP.text ("BINDCALL " ++ name f) PP.<+> tupelize ps PP.<+> tupelize rvs
 printInstruction (YIELD rvs) = PP.text "RETURN " PP.<+> tupelize rvs
 printInstruction NOP = mempty
 
 printDef :: Def -> Doc
-printDef (x,rhs,_) = PP.text (x ++ " :=") PP.<+> printDefRhs rhs
+printDef (x,rhs,_) = PP.text (name x ++ " :=") PP.<+> printDefRhs rhs
 
 printDefRhs :: DefRhs -> Doc
-printDefRhs (U f y v) = PP.text $ printFlat' $ f (Leaf y) (Leaf v)
-printDefRhs (N1L f y v) = PP.text $ printFlat' $ f (toAST y) (Leaf v)
-printDefRhs (N1R f y v) = PP.text $ printFlat' $ f (Leaf y) (toAST v)
-printDefRhs (N2 f y v) = PP.text $ printFlat' $ f (toAST y) (toAST v)
-printDefRhs (Const t) = PP.text $ printFlat' t
+printDefRhs (U f y v) = PP.text $ printFlat $ f (Leaf $ name y) (Leaf $ name v)
+printDefRhs (N1L f y v) = PP.text $ printFlat $ f (toAST y) (Leaf $ name v)
+printDefRhs (N1R f y v) = PP.text $ printFlat $ f (Leaf $ name y) (toAST v)
+printDefRhs (N2 f y v) = PP.text $ printFlat $ f (toAST y) (toAST v)
+printDefRhs (Const t) = PP.text $ printFlat t
 
 printF :: F -> Doc
-printF (f,xs,b) = PP.hang (PP.text f PP.<+> tupelize xs PP.<+> PP.text ":=") 2 $
+printF (f,xs,b) = PP.hang (PP.text (name f) PP.<+> tupelize xs PP.<+> PP.text ":=") 2 $
   PP.vcat (map printInstruction b)
 
-tupelize :: [String] -> Doc
+tupelize :: [Var] -> Doc
 tupelize [] = PP.text ""
-tupelize [v] = PP.text v
-tupelize vs = PP.text $ "(" ++ intercalate "," vs ++ ")"
+tupelize [v] = PP.text $ name v
+tupelize vs = PP.text $ "(" ++ intercalate "," (map name vs) ++ ")"
 
 -- manipulation of DefRhs
 printDefTree :: DefRhs -> String
 printDefTree = pPrintTree . toAST
 
 toAST :: DefRhs -> AST Var
-toAST (U f y v) = f (Leaf y) (Leaf v)
-toAST (N1L f y v) = f (toAST y) (Leaf v)
-toAST (N1R f y v) = f (Leaf y) (toAST v)
+toAST (U f y v) = f (Leaf $ name y) (Leaf $ name v)
+toAST (N1L f y v) = f (toAST y) (Leaf $ name v)
+toAST (N1R f y v) = f (Leaf $ name y) (toAST v)
 toAST (N2 f y v) = f (toAST y) (toAST v)
 toAST (Const t) = t
 
 instance Show DefRhs where
-  show (U f y v) = "U ? " ++ y ++ " " ++ v
-  show (N1L f y v) = "N1L ? " ++ v
-  show (N1R f y v) = "N1R ? " ++ y
+  show (U f y v) = "U ? " ++ name y ++ " " ++ name v
+  show (N1L f y v) = "N1L ? " ++ name v
+  show (N1R f y v) = "N1R ? " ++ name y
   show (N2 f y v) = "N2 ?"
   show (Const t) = "Const ?"
 

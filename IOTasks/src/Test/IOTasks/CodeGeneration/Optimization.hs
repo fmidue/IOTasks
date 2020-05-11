@@ -83,7 +83,7 @@ inlinePrint p@(BINDCALL f ps [rv] : PRINT t : is,ds,fs)
           (_,b) = fromJust $ lookupF f fs
           (b',ds',fs') = transformProgram tr (b,ds,fs)
           tr ds fs = (idFold ds fs){ fYield = trYield ds fs }
-          trYield ds fs [rv'] = ([PRINT (t++"'")], (t++"'",Const (r rv'),1) : ds ,fs)
+          trYield ds fs [rv'] = ([PRINT (inc t 100)], (inc t 100,Const (r rv'),1) : ds ,fs)
           trYield ds fs rvs = ([YIELD rvs], ds, fs)
         in (BINDCALL f ps [] : is,ds',updateF f (\(f,p,_) -> (f,p,b')) fs')
       _ -> p
@@ -140,9 +140,9 @@ foldOpt (BINDCALL f [p] [rv] : PRINT t : is,ds,fs) =
       case extractAlgebra (toAST rhs) rv p of
         Just (g, x) ->
           let (is',ds',fs') = foldOpt (is,
-                              ("li", Const (Leaf "0"),0) : changeUsage "length" "xs1" "l" (updateDef (t,Const x) $ toFoldAccum Replace g f fs ds),
-                              addParameter f "l" fs)
-          in (BINDCALL f [t, "li"] [rv] : PRINT rv : is', ds',fs')
+                              (Indexed "l" 1, Const (Leaf "0"),0) : changeUsage "length" (Indexed "xs" 1) (Indexed "l" 2) (updateDef (t,Const x) $ toFoldAccum Replace g f fs ds),
+                              addParameter f (Indexed "l" 2) fs)
+          in (BINDCALL f [t, Indexed "l" 1] [rv] : PRINT rv : is', ds',fs')
         _ -> let (is',ds',fs') = foldOpt (is,ds,fs) in (BINDCALL f [p] [rv] : PRINT t : is',ds',fs')
     _ -> error "no definition found"
 foldOpt (i:is,ds,fs) = let (is',ds',fs') = foldOpt (is,ds,fs) in (i:is',ds',fs')
@@ -189,11 +189,11 @@ leavingVars = concatMap f where
 -- incomplete implementation. Currently not sure how to write this in a general way.
 -- especially the starting value is not correct in a general setting.
 extractAlgebra :: AST Var -> Var -> Var -> Maybe (AST Var -> AST Var -> AST Var, AST Var)
-extractAlgebra (App (Leaf name) (Var x)) rv p | x == rv =
+extractAlgebra (App (Leaf f) (Var x)) rv p | x == rv =
   let
     initialV :: Show a => a -> AST Var
-    initialV v = if p == "[]" then Leaf (show v) else initialAccum name p
-  in case name of
+    initialV v = if (name p) == "[]" then Leaf (show v) else initialAccum f p
+  in case f of
     -- folds to Int
     "sum" -> Just (\b a -> App (PostApp b (Leaf "+")) a, initialV 0)
     "length" -> Just (\b _ -> App (PostApp b (Leaf "+")) (Leaf "1"), initialV 0)
@@ -214,8 +214,8 @@ introAccum :: [Def] -> F -> ([Def],F)
 introAccum ds (f,p:ps,is) =
   case usedOn p ds of
     (Leaf "length":_) ->
-      case changeUpdate (Add "l") "xs2" (\y _ -> App (PostApp y (Leaf "+")) (Leaf "1")) ds of
-        Just ds' -> (changeUsage "length" "xs1" "l" ds',(f,p:ps ++ ["l"],addNewParameter "l" f is))
+      case changeUpdate (Add (Indexed "l" 2)) (Indexed "xs" 2) (\y _ -> App (PostApp y (Leaf "+")) (Leaf "1")) ds of
+        Just ds' -> (changeUsage "length" (Indexed "xs" 1) (Indexed "l" 2) ds',(f,p:ps ++ [(Indexed "l" 2)],addNewParameter (Indexed "l" 2) f is))
         Nothing -> (ds,(f,p:ps,is))
     _ -> (ds,(f,p:ps,is))
 introAccum ds f = (ds,f)
