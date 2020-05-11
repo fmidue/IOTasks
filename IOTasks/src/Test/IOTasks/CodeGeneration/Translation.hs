@@ -1,57 +1,25 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DerivingVia #-}
 module Test.IOTasks.CodeGeneration.Translation where
 
 import Test.IOTasks.Specification
 import Test.IOTasks.CodeGeneration.IR
 import Test.IOTasks.CodeGeneration.Analysis
+import Test.IOTasks.CodeGeneration.FreshVar
+
+import Control.Monad.State
 
 import Data.Term
 import Data.Term.AST
 
-import Control.Arrow (first)
-import Control.Monad.State
-
-import Data.Functor.Identity
-import Data.Maybe (fromMaybe)
 import qualified Data.Map as Map
 
 programIR :: (VarListTerm t Varname, SynTerm t (AST Varname)) => Specification t -> IRProgram
-programIR = fst . programIR'
+programIR s = fst $ runFreshVarM (programIR' s) initState
 
-programIR' :: (VarListTerm t Varname, SynTerm t (AST Varname)) => Specification t -> (IRProgram,[(Varname,Int)])
-programIR' s = first (foldr1 (<:>)) $ runFreshVarM (mapM (translate (rootUsageFacts x)) x) initState
+programIR' :: (VarListTerm t Varname, SynTerm t (AST Varname)) => Specification t -> FreshVarM IRProgram
+programIR' s = foldr1 (<:>) <$> mapM (translate (rootUsageFacts x)) x
   where x = analyse s
-
--- stores next fresh index and a stack of most recent indecies for the current/surounding scopes
--- invariant: stack is never empty
-newtype FreshVarM a = FreshVarM { runFreshVarM :: [(Varname, Int)] -> (a,[(Varname, Int)]) }
-  deriving (Functor, Applicative, Monad, MonadState [(Varname, Int)]) via (StateT [(Varname, Int)] Identity)
-
-initState :: [(Varname,Int)]
-initState = []
-
-updateContext :: Eq k => (k, Int) -> [(k,Int)] -> [(k,Int)]
-updateContext (k,v) [] = [(k,v)]
-updateContext (k,v) ((k',v') : xs)
-  | k == k' = (k',v) : xs
-  | otherwise = (k',v') : updateContext (k,v) xs
-
--- generating a fresh name under the assumption that user defined variables dont end in numberic sequences
--- TODO: not a very good assumption
-freshName :: Varname -> FreshVarM IndexedVar
-freshName v = do
-  i <- gets $ (+1) . fromMaybe 0 . lookup v
-  modify $ updateContext (v, i)
-  return $ Indexed v i
-
-currentName :: Varname -> FreshVarM IndexedVar
-currentName v = do
-  i <- gets $ fromMaybe 0 . lookup v
-  case i of
-    0 -> return $ Initial v
-    _ -> return $ Indexed v i
 
 translate :: (SynTerm t (AST Varname)) => Facts Usage -> AnnAction t (Facts (Usage, Modification)) -> FreshVarM IRProgram
 translate fs (AnnAction _ (ReadInput x _)) =

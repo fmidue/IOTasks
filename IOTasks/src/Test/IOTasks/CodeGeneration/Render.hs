@@ -4,6 +4,7 @@
 module Test.IOTasks.CodeGeneration.Render where
 
 import Test.IOTasks.CodeGeneration.IR
+import Test.IOTasks.CodeGeneration.FreshVar (name)
 
 import Data.Functor.Identity
 import Control.Monad.State
@@ -117,7 +118,7 @@ haskellRender =
       PP.$$ (if null rvs then id else (tupelize rvs PP.<+> PP.text "<-" PP.<+>)) (PP.text (name f) PP.<+> PP.hsep params)
     renderYield (params,ctx) = ctx PP.$$ PP.text "return" PP.<+> PP.hsep params
     renderNop = mempty
-    renderLoop f ps body = PP.hang (PP.text $ "let " ++ name f ++ " " ++ unwords (map name ps) ++ " =") 6 body
+    renderLoop f ps = PP.hang (PP.text $ "let " ++ name f ++ " " ++ unwords (map name ps) ++ " =") 6
     renderAssignment x rhs = PP.text ("let " ++ name x ++ " =") PP.<+> printDefRhs rhs
   in Render{..}
 

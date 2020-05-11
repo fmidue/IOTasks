@@ -1,9 +1,5 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE GADTs #-}
@@ -11,20 +7,16 @@
 {-# LANGUAGE DataKinds #-}
 module Test.IOTasks.CodeGeneration.IR where
 
-import Data.Maybe (fromJust, fromMaybe)
+import Data.Maybe (fromMaybe)
 import Data.List (sort, group, intercalate)
-import Data.Proxy
 
 import Data.Environment
-import Data.Term
-import Data.Term.Liftable
-import qualified Data.Term.Liftable.Prelude as T
 import Data.Term.AST
 
 import Text.PrettyPrint.HughesPJClass (Doc)
 import qualified Text.PrettyPrint.HughesPJClass as PP
 
-import Debug.Trace
+import Test.IOTasks.CodeGeneration.FreshVar
 
 data Instruction
   = READ Var
@@ -37,25 +29,6 @@ data Instruction
   deriving (Show,Eq)
 
 type Var = IndexedVar
-data IndexedVar
-  = Initial Varname
-  | Plain Varname
-  | Indexed Varname Int
-  deriving (Eq,Ord)
-
-instance Show IndexedVar where
-  show = name
-
--- !!! not necessarily unique in the sense that one can define ("x1",1) and ("x",11)
-name :: IndexedVar -> String
-name (Initial _) = "[]"
-name (Plain x) = x
-name (Indexed x i) = x ++ show i
-
-inc :: IndexedVar -> Int -> IndexedVar
-inc (Initial x) n = Indexed x n
-inc (Indexed x i) n = Indexed x (i+n)
-inc (Plain _) _ = error "can not increase index of plain variable"
 
 type AM = ([Instruction],([Def],[F]),Vals,[[Var]],[Input],[Output])
 

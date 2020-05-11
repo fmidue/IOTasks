@@ -10,11 +10,13 @@
 module Test.IOTasks.CodeGeneration.Optimization where
 
 import Data.Maybe (fromMaybe, fromJust)
+import Data.List (nub)
 
 import Data.Term.AST
 import Data.Environment
 
 import Test.IOTasks.CodeGeneration.IR
+import Test.IOTasks.CodeGeneration.FreshVar
 
 import Debug.Trace
 
@@ -131,18 +133,19 @@ transformProgram f (i:is,ds,fs) =
     (is'',ds'',fs'') = transformProgram f (is,ds',fs')
   in (is' ++ is'', ds'', fs'')
 
+-- TODO: generalize to all parameters
 -- "inlining" fold optimization
 foldOpt :: IRProgram -> IRProgram
 foldOpt ([],ds,fs) = ([],ds,fs)
-foldOpt (BINDCALL f [p] [rv] : PRINT t : is,ds,fs) =
+foldOpt (BINDCALL f (p:ps) [rv] : PRINT t : is,ds,fs) =
   case lookupDef t ds of
     Just (rhs,0) ->
       case extractAlgebra (toAST rhs) rv p of
         Just (g, x) ->
           let (is',ds',fs') = foldOpt (is,
-                              (Indexed "l" 1, Const (Leaf "0"),0) : changeUsage "length" (Indexed "xs" 1) (Indexed "l" 2) (updateDef (t,Const x) $ toFoldAccum Replace g f fs ds),
-                              addParameter f (Indexed "l" 2) fs)
-          in (BINDCALL f [t, Indexed "l" 1] [rv] : PRINT rv : is', ds',fs')
+                              updateDef (t,Const x) $ toFoldAccum g f fs ds,
+                              fs)
+          in (BINDCALL f (t:ps) [rv] : PRINT rv : is', ds',fs')
         _ -> let (is',ds',fs') = foldOpt (is,ds,fs) in (BINDCALL f [p] [rv] : PRINT t : is',ds',fs')
     _ -> error "no definition found"
 foldOpt (i:is,ds,fs) = let (is',ds',fs') = foldOpt (is,ds,fs) in (i:is',ds',fs')
@@ -150,12 +153,12 @@ foldOpt (i:is,ds,fs) = let (is',ds',fs') = foldOpt (is,ds,fs) in (i:is',ds',fs')
 data ChangeMode = Add Var | Replace
 
 -- NOTE: This is only sound if the accumulation parameter is not printed out!
-toFoldAccum :: ChangeMode -> (AST Var -> AST Var -> AST Var) -> Var -> [F] -> [Def] -> [Def]
-toFoldAccum m g f fs ds =
+toFoldAccum :: (AST Var -> AST Var -> AST Var) -> Var -> [F] -> [Def] -> [Def]
+toFoldAccum g f fs ds =
   let
     (_,b) = fromJust $ lookupF f fs
     xs = leavingVars b
-  in foldr (\x ds' -> fromMaybe ds' $ changeUpdate m x g ds') ds xs
+  in foldr (\x ds' -> fromMaybe ds' $ changeUpdate Replace x g ds') ds xs
 
 changeUpdate :: ChangeMode -> Var -> (AST Var -> AST Var -> AST Var) -> [Def] -> Maybe [Def]
 changeUpdate m x g ds = case break (\(z,_,_) -> x == z) ds of
@@ -165,9 +168,9 @@ changeUpdate m x g ds = case break (\(z,_,_) -> x == z) ds of
         case changeUpdate m y g $ d1 ++ (x,U g y v,n) : d2 of
           Just ds' -> Just ds'
           Nothing -> Just $ d1 ++ (x,U g y v,n) : d2
-      Add p -> case changeUpdate m y g $ d1 ++ (p,U g y v,n) : (x,U f y v,n) : d2 of
+      Add p -> case changeUpdate m y g $ d1 ++ (p,U g (changeBaseName y (baseName p)) v,n) : (x,U f y v,n) : d2 of
         Just ds' -> Just ds'
-        Nothing -> Just $ d1 ++ (p,U g y v,n): (x,U f y v,n) : d2
+        Nothing -> Just $ d1 ++ (p,U g (changeBaseName y (baseName p)) v,n) : (x,U f y v,n) : d2
   (_, (_,N1L{},_):_) -> error "implemented changeUpdate for N1L"
   (_, (_,N1R{},_):_) -> error "implemented changeUpdate for N1R"
   (_, (_,N2{},_):_) -> error "implemented changeUpdate for N2"
@@ -192,7 +195,7 @@ extractAlgebra :: AST Var -> Var -> Var -> Maybe (AST Var -> AST Var -> AST Var,
 extractAlgebra (App (Leaf f) (Var x)) rv p | x == rv =
   let
     initialV :: Show a => a -> AST Var
-    initialV v = if (name p) == "[]" then Leaf (show v) else initialAccum f p
+    initialV v = if name p == "[]" then Leaf (show v) else initialAccum f p
   in case f of
     -- folds to Int
     "sum" -> Just (\b a -> App (PostApp b (Leaf "+")) a, initialV 0)
@@ -204,28 +207,43 @@ initialAccum :: String -> Var -> AST Var
 initialAccum name p = App (Leaf name) (Var p)
 
 -- change usage of a variable expressable by "folding accumulation" into an additional loop parameter
-accumOpt :: IRProgram -> IRProgram
-accumOpt (is,ds,[f]) =
-  let
-    (ds',f') = introAccum ds f
-  in (is,ds',[f'])
+accumOpt :: IRProgram -> FreshVarM IRProgram
+accumOpt (is,ds,[f]) = do
+    (ds',f'@(fName,_,_)) <- introAccum ds f
+    return (addArgument fName (Indexed "l" 3) is, (Indexed "l" 3,Const (Leaf "0"),0) : ds',[f'])
 
-introAccum :: [Def] -> F -> ([Def],F)
+addArgument :: Var -> Var -> [Instruction] -> [Instruction]
+addArgument f p = map $ \case
+  BINDCALL g ps rvs -> BINDCALL g (if f == g then ps ++ [p] else ps) rvs
+  x -> x
+
+-- TODO: generalize to more than one parameter
+introAccum :: [Def] -> F -> FreshVarM ([Def],F)
 introAccum ds (f,p:ps,is) =
   case usedOn p ds of
-    (Leaf "length":_) ->
-      case changeUpdate (Add (Indexed "l" 2)) (Indexed "xs" 2) (\y _ -> App (PostApp y (Leaf "+")) (Leaf "1")) ds of
-        Just ds' -> (changeUsage "length" (Indexed "xs" 1) (Indexed "l" 2) ds',(f,p:ps ++ [(Indexed "l" 2)],addNewParameter (Indexed "l" 2) f is))
-        Nothing -> (ds,(f,p:ps,is))
-    _ -> (ds,(f,p:ps,is))
-introAccum ds f = (ds,f)
+    (Leaf "length":_) -> do
+      l1 <- freshName "l"
+      l2 <- freshName "l"
+      l3 <- freshName "l"
+      let [xs] = nub $ filter (\x -> baseName x == baseName p && x /= p) $ leavingVars is
+      case changeUpdate (Add l2) xs (\y _ -> App (PostApp y (Leaf "+")) (Leaf "1")) ds of
+        Just ds' -> return (changeUsage "length" p l1 ds',(f,p:ps ++ [l1],addNewParameter (baseName l1,baseName p) f is))
+        Nothing -> return (ds,(f,p:ps,is))
+    _ -> return (ds,(f,p:ps,is))
+introAccum ds f = return (ds,f)
 
-addNewParameter :: Var -> Var -> [Instruction] -> [Instruction]
-addNewParameter p f = map $ \case
+-- first parameter are the basenames of the new accumulation parameter and the old one it is derived from
+addNewParameter :: (String,String) -> Var -> [Instruction] -> [Instruction]
+addNewParameter (new,old) f = map $ \case
   READ x -> READ x
   PRINT x -> PRINT x
-  IF c t e -> IF c (addNewParameter p f t) (addNewParameter p f e)
-  TAILCALL g ps -> if f == g then TAILCALL f (ps ++ [p]) else TAILCALL g ps
+  IF c t e -> IF c (addNewParameter (new,old) f t) (addNewParameter (new,old) f e)
+  TAILCALL g ps ->
+    if f == g
+      then
+        let [Indexed _ i] = filter (\x -> old == baseName x) ps -- ASSUMPTION: tailcalls dont have two parameters with the same baseName
+        in TAILCALL f (ps ++ [Indexed new i])
+      else TAILCALL g ps
   BINDCALL g ps rvs -> BINDCALL g ps rvs
   YIELD x -> YIELD x
   NOP -> NOP
