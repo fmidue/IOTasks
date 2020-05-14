@@ -9,6 +9,8 @@
 {-# LANGUAGE LambdaCase #-}
 module Test.IOTasks.CodeGeneration.Optimization where
 
+import Control.Monad (foldM)
+
 import Data.Maybe (fromMaybe, fromJust)
 import Data.List (nub)
 
@@ -168,12 +170,13 @@ changeUpdate m x g ds = case break (\(z,_,_) -> x == z) ds of
         case changeUpdate m y g $ d1 ++ (x,U g y v,n) : d2 of
           Just ds' -> Just ds'
           Nothing -> Just $ d1 ++ (x,U g y v,n) : d2
+      -- TODO: This is not quite correct!
       Add p -> case changeUpdate m y g $ d1 ++ (p,U g (changeBaseName y (baseName p)) v,n) : (x,U f y v,n) : d2 of
         Just ds' -> Just ds'
         Nothing -> Just $ d1 ++ (p,U g (changeBaseName y (baseName p)) v,n) : (x,U f y v,n) : d2
-  (_, (_,N1L{},_):_) -> error "implemented changeUpdate for N1L"
-  (_, (_,N1R{},_):_) -> error "implemented changeUpdate for N1R"
-  (_, (_,N2{},_):_) -> error "implemented changeUpdate for N2"
+  (_, (_,N1L{},_):_) -> error "not implemented changeUpdate for N1L"
+  (_, (_,N1R{},_):_) -> error "not implemented changeUpdate for N1R"
+  (_, (_,N2{},_):_) -> error "not implemented changeUpdate for N2"
   _ -> Nothing
 
 leavingVars :: [Instruction] -> [Var]
@@ -193,44 +196,61 @@ leavingVars = concatMap f where
 -- especially the starting value is not correct in a general setting.
 extractAlgebra :: AST Var -> Var -> Var -> Maybe (AST Var -> AST Var -> AST Var, AST Var)
 extractAlgebra (App (Leaf f) (Var x)) rv p | x == rv =
-  let
-    initialV :: Show a => a -> AST Var
-    initialV v = if name p == "[]" then Leaf (show v) else initialAccum f p
-  in case f of
+  case f of
     -- folds to Int
-    "sum" -> Just (\b a -> App (PostApp b (Leaf "+")) a, initialV 0)
-    "length" -> Just (\b _ -> App (PostApp b (Leaf "+")) (Leaf "1"), initialV 0)
+    "sum" -> Just (\b a -> App (PostApp b (Leaf "+")) a, initialAccum f "0" p)
+    "length" -> Just (\b _ -> App (PostApp b (Leaf "+")) (Leaf "1"), initialAccum f "0" p)
     _ -> Nothing
 extractAlgebra _ _ _ = Nothing
 
-initialAccum :: String -> Var -> AST Var
-initialAccum name p = App (Leaf name) (Var p)
+initialAccum :: String -> String -> Var -> AST Var
+initialAccum _ i (Initial _) = Leaf i
+initialAccum f i p = App (Leaf f) (Leaf $ name p)
 
 -- change usage of a variable expressable by "folding accumulation" into an additional loop parameter
 accumOpt :: IRProgram -> FreshVarM IRProgram
-accumOpt (is,ds,[f]) = do
-    (ds',f'@(fName,_,_)) <- introAccum ds f
-    return (addArgument fName (Indexed "l" 3) is, (Indexed "l" 3,Const (Leaf "0"),0) : ds',[f'])
+accumOpt (is,ds,fs) =
+  foldM (\(is',ds',fs') f -> do
+    (is'',ds'',f') <- introAccums is' ds' f
+    return (is'',ds'',fs'++[f'])
+    ) (is,ds,[]) fs
 
-addArgument :: Var -> Var -> [Instruction] -> [Instruction]
-addArgument f p = map $ \case
-  BINDCALL g ps rvs -> BINDCALL g (if f == g then ps ++ [p] else ps) rvs
-  x -> x
+addArguments :: Var -> [Maybe (Var -> Def)] -> [Instruction] -> ([Instruction],[Def])
+addArguments f p = foldr (\case
+  BINDCALL g ps rvs ->
+    let vds = concat $ zipWith (\g x -> maybe [] pure (g <*> pure x)) p ps
+        newVs = map (\(x,_,_) -> x) vds
+    in \(is,ds) -> (BINDCALL g (if f == g then ps ++ newVs else ps) rvs : is, vds ++ ds)
+  x -> \(is,ds) -> (x:is,ds)) ([],[])
 
 -- TODO: generalize to more than one parameter
-introAccum :: [Def] -> F -> FreshVarM ([Def],F)
-introAccum ds (f,p:ps,is) =
-  case usedOn p ds of
-    (Leaf "length":_) -> do
-      l1 <- freshName "l"
-      l2 <- freshName "l"
-      l3 <- freshName "l"
-      let [xs] = nub $ filter (\x -> baseName x == baseName p && x /= p) $ leavingVars is
-      case changeUpdate (Add l2) xs (\y _ -> App (PostApp y (Leaf "+")) (Leaf "1")) ds of
-        Just ds' -> return (changeUsage "length" p l1 ds',(f,p:ps ++ [l1],addNewParameter (baseName l1,baseName p) f is))
-        Nothing -> return (ds,(f,p:ps,is))
-    _ -> return (ds,(f,p:ps,is))
-introAccum ds f = return (ds,f)
+introAccums :: [Instruction] -> [Def] -> F -> FreshVarM ([Instruction],[Def],F)
+introAccums gis ds (f,ps,fis) = do
+  (gis',ds',(ps',fis')) <- foldM (\(gis',ds',(ps',fis')) p -> do
+      (ds',ivs,ys,fis') <- introSingleAccum ds' f p fis'
+      let (is,ds'') = addArguments f ivs gis'
+      return (is, ds' ++ ds'',(ps' ++ ys ,fis'))
+    ) (gis,ds,(ps,fis)) ps
+  return (gis',ds',(f,ps',fis'))
+
+introSingleAccum :: [Def] -> Var -> Var -> [Instruction] -> FreshVarM ([Def],[Maybe (Var -> Def)],[Var],[Instruction])
+introSingleAccum ds fVar p is =
+    foldM (\(ds',xs,ys,is') f ->
+      case foldParameters f of
+        Just (g,v) -> do
+          x1 <- freshName "acc"
+          x2 <- freshName "acc"
+          xp <- freshName "acc"
+          let [os] = nub $ filter (\x -> baseName x == baseName p && x /= p) $ leavingVars is
+          case changeUpdate (Add x2) os g ds' of
+            Just ds' -> return (changeUsage f p x1 ds',xs++[Just $ \x -> (xp,Const (v x),0)],ys++[x1],addNewParameter (baseName x1,baseName p) fVar is')
+            Nothing -> return (ds',xs++[Nothing],ys,is')
+        Nothing -> return (ds',xs++[Nothing],ys,is')
+    ) (ds,[],[],is) (map printFlat $ usedOn p ds)
+
+foldParameters :: String -> Maybe (AST Var -> AST Var -> AST Var, Var -> AST Var)
+foldParameters "length" = Just (\y _ -> App (PostApp y (Leaf "+")) (Leaf "1"), initialAccum "length" "0")
+foldParameters _ = Nothing
 
 -- first parameter are the basenames of the new accumulation parameter and the old one it is derived from
 addNewParameter :: (String,String) -> Var -> [Instruction] -> [Instruction]
