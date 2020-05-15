@@ -137,47 +137,51 @@ transformProgram f (i:is,ds,fs) =
 
 -- TODO: generalize to all parameters
 -- "inlining" fold optimization
-foldOpt :: IRProgram -> IRProgram
-foldOpt ([],ds,fs) = ([],ds,fs)
+foldOpt :: IRProgram -> FreshVarM IRProgram
+foldOpt ([],ds,fs) = return ([],ds,fs)
 foldOpt (BINDCALL f (p:ps) [rv] : PRINT t : is,ds,fs) =
   case lookupDef t ds of
     Just (rhs,0) ->
       case extractAlgebra (toAST rhs) rv p of
-        Just (g, x) ->
-          let (is',ds',fs') = foldOpt (is,
-                              updateDef (t,Const x) $ toFoldAccum g f fs ds,
-                              fs)
-          in (BINDCALL f (t:ps) [rv] : PRINT rv : is', ds',fs')
-        _ -> let (is',ds',fs') = foldOpt (is,ds,fs) in (BINDCALL f [p] [rv] : PRINT t : is',ds',fs')
+        Just (g, x) -> do
+          r <- toFoldAccum g f fs ds
+          (is',ds',fs') <- foldOpt (is,
+                           updateDef (t,Const x) r,
+                           fs)
+          return (BINDCALL f (t:ps) [rv] : PRINT rv : is', ds',fs')
+        _ -> do
+          (is',ds',fs') <- foldOpt (is,ds,fs)
+          return (BINDCALL f [p] [rv] : PRINT t : is',ds',fs')
     _ -> error "no definition found"
-foldOpt (i:is,ds,fs) = let (is',ds',fs') = foldOpt (is,ds,fs) in (i:is',ds',fs')
+foldOpt (i:is,ds,fs) = do
+  (is',ds',fs') <- foldOpt (is,ds,fs)
+  return (i:is',ds',fs')
 
-data ChangeMode = Add Var | Replace
+data ChangeMode = Add Varname | Replace
 
 -- NOTE: This is only sound if the accumulation parameter is not printed out!
-toFoldAccum :: (AST Var -> AST Var -> AST Var) -> Var -> [F] -> [Def] -> [Def]
+toFoldAccum :: (AST Var -> AST Var -> AST Var) -> Var -> [F] -> [Def] -> FreshVarM [Def]
 toFoldAccum g f fs ds =
   let
     (_,b) = fromJust $ lookupF f fs
     xs = leavingVars b
-  in foldr (\x ds' -> fromMaybe ds' $ changeUpdate Replace x g ds') ds xs
+  in foldM (\ds' x -> fromMaybe ds' <$> changeUpdate Replace x g ds') ds xs
 
-changeUpdate :: ChangeMode -> Var -> (AST Var -> AST Var -> AST Var) -> [Def] -> Maybe [Def]
+changeUpdate :: ChangeMode -> Var -> (AST Var -> AST Var -> AST Var) -> [Def] -> FreshVarM (Maybe [Def])
 changeUpdate m x g ds = case break (\(z,_,_) -> x == z) ds of
-  (d1, (x,U f y v,n):d2) ->
+  (d1, (x,U f y v,n):d2) -> do
+    d1' <- fromMaybe d1 <$> changeUpdate m y g d1
+    d2' <- fromMaybe d1 <$> changeUpdate m y g d2
     case m of
-      Replace ->
-        case changeUpdate m y g $ d1 ++ (x,U g y v,n) : d2 of
-          Just ds' -> Just ds'
-          Nothing -> Just $ d1 ++ (x,U g y v,n) : d2
-      -- TODO: This is not quite correct!
-      Add p -> case changeUpdate m y g $ d1 ++ (p,U g (changeBaseName y (baseName p)) v,n) : (x,U f y v,n) : d2 of
-        Just ds' -> Just ds'
-        Nothing -> Just $ d1 ++ (p,U g (changeBaseName y (baseName p)) v,n) : (x,U f y v,n) : d2
+      Replace -> return . Just $ d1' ++ (x,U g y v,n) : d2'
+      Add base -> do
+        accC <- currentName base
+        accF <- freshName base
+        return . Just $ d1' ++ [(x,U f y v,n),(accF,U g accC v,n)] ++ d2'
   (_, (_,N1L{},_):_) -> error "not implemented changeUpdate for N1L"
   (_, (_,N1R{},_):_) -> error "not implemented changeUpdate for N1R"
   (_, (_,N2{},_):_) -> error "not implemented changeUpdate for N2"
-  _ -> Nothing
+  _ -> return Nothing
 
 leavingVars :: [Instruction] -> [Var]
 leavingVars = concatMap f where
@@ -239,18 +243,25 @@ introSingleAccum ds fVar p is =
       case foldParameters f of
         Just (g,v) -> do
           x1 <- freshName "acc"
-          x2 <- freshName "acc"
-          xp <- freshName "acc"
           let [os] = nub $ filter (\x -> baseName x == baseName p && x /= p) $ leavingVars is
-          case changeUpdate (Add x2) os g ds' of
-            Just ds' -> return (changeUsage f p x1 ds',xs++[Just $ \x -> (xp,Const (v x),0)],ys++[x1],addNewParameter (baseName x1,baseName p) fVar is')
-            Nothing -> return (ds',xs++[Nothing],ys,is')
+          changeUpdate (Add "acc") os g ds'
+            >>= \case
+              Just ds' -> do
+                xp <- freshName "acc"
+                return (changeUsage f p x1 ds',xs++[Just $ \x -> (xp,Const (v x),0)],ys++[x1],addNewParameter (baseName x1,baseName p) fVar is')
+              Nothing -> return (ds',xs++[Nothing],ys,is')
         Nothing -> return (ds',xs++[Nothing],ys,is')
     ) (ds,[],[],is) (map printFlat $ usedOn p ds)
 
 foldParameters :: String -> Maybe (AST Var -> AST Var -> AST Var, Var -> AST Var)
 foldParameters "length" = Just (\y _ -> App (PostApp y (Leaf "+")) (Leaf "1"), initialAccum "length" "0")
 foldParameters _ = Nothing
+
+
+caseM :: Monad m => m t -> (t -> m b) -> m b
+caseM m f = do
+  r <- m
+  f r
 
 -- first parameter are the basenames of the new accumulation parameter and the old one it is derived from
 addNewParameter :: (String,String) -> Var -> [Instruction] -> [Instruction]
