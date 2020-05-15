@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE GADTs #-}
@@ -11,7 +12,7 @@ module Test.IOTasks.CodeGeneration.Optimization where
 
 import Control.Monad (foldM)
 
-import Data.Maybe (fromMaybe, fromJust)
+import Data.Maybe (fromMaybe, fromJust, isJust)
 import Data.List (nub)
 
 import Data.Term.AST
@@ -21,6 +22,48 @@ import Test.IOTasks.CodeGeneration.IR
 import Test.IOTasks.CodeGeneration.FreshVar
 
 import Debug.Trace
+
+data Rewrite m = Rewrite
+  { rewrite :: IRProgram -> Maybe (IRProgram -> m IRProgram)
+  , desc :: String
+  }
+
+applyRewrite :: Applicative m => Rewrite m -> IRProgram -> m (Maybe IRProgram)
+applyRewrite r x = traverse ($ x) (rewrite r x)
+
+isApplicable :: Rewrite m -> IRProgram -> Bool
+isApplicable r x = isJust $ rewrite r x
+
+-- interactive rewriting
+globalRewrites :: [Rewrite FreshVarM]
+globalRewrites =
+  [ Rewrite (\(_,ds,_) -> (\(is,_,fs) -> return . (is,,fs) . fromJust $ inline1 ds) <$ inline1 ds ) "inline intermediate definitions"
+  ]
+
+loopRewrites :: F -> [Rewrite FreshVarM]
+loopRewrites (f,ps,is) =
+  [ Rewrite (const $ Just accumOpt) ("introduce accumulation parameters for " ++ name f)
+  , Rewrite (const $ Just foldOpt) ("inline 'external' accumulation for " ++ name f)
+  ]
+
+rewriteOptions :: IRProgram -> [Rewrite FreshVarM]
+rewriteOptions ir@(_,_,fs) =
+  filter (`isApplicable` ir) $ globalRewrites ++ concatMap loopRewrites fs
+
+rewriteRepl :: IRProgram -> [(Varname, Int)] -> IO IRProgram
+rewriteRepl p env = do
+  putStrLn "Current program:"
+  print $ printIRProgram p
+  let opts = rewriteOptions p
+      n = length opts
+  putStrLn $ "Choose rewrite (1-" ++ show n ++ ") or finish (q)"
+  putStrLn . unlines $ zipWith (\i d -> i ++ ": " ++ d) (map show [1..n]) (map desc opts)
+  inp <- getLine
+  if inp == "q"
+    then return p
+    else
+      let (Just p',env') = runFreshVarM  (applyRewrite (opts !! (read @Int inp - 1)) p) env
+      in rewriteRepl p' env'
 
 -- optimizing IRProgram
 optimize :: IRProgram -> IRProgram
@@ -57,7 +100,6 @@ inline1 :: [Def] -> Maybe [Def]
 inline1 ds =
   case break (\(_,_,n) -> n == 1) ds of
     (_,[]) -> Nothing
-    (xs,(x,t,_):ys) -> Just $ foldr (f (x,t)) [] (xs++ys)
     (xs,(x,t,_):ys) -> Just $ foldr (f (x,t)) [] (xs++ys)
   where
     f x (y,d,n) ds' = case inline x d of
@@ -227,7 +269,6 @@ addArguments f p = foldr (\case
     in \(is,ds) -> (BINDCALL g (if f == g then ps ++ newVs else ps) rvs : is, vds ++ ds)
   x -> \(is,ds) -> (x:is,ds)) ([],[])
 
--- TODO: generalize to more than one parameter
 introAccums :: [Instruction] -> [Def] -> F -> FreshVarM ([Instruction],[Def],F)
 introAccums gis ds (f,ps,fis) = do
   (gis',ds',(ps',fis')) <- foldM (\(gis',ds',(ps',fis')) p -> do
@@ -256,12 +297,6 @@ introSingleAccum ds fVar p is =
 foldParameters :: String -> Maybe (AST Var -> AST Var -> AST Var, Var -> AST Var)
 foldParameters "length" = Just (\y _ -> App (PostApp y (Leaf "+")) (Leaf "1"), initialAccum "length" "0")
 foldParameters _ = Nothing
-
-
-caseM :: Monad m => m t -> (t -> m b) -> m b
-caseM m f = do
-  r <- m
-  f r
 
 -- first parameter are the basenames of the new accumulation parameter and the old one it is derived from
 addNewParameter :: (String,String) -> Var -> [Instruction] -> [Instruction]
