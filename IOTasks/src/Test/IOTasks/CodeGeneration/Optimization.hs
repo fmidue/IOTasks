@@ -194,23 +194,23 @@ toFoldAccum g f fs ds =
   let
     (_,b) = fromJust $ lookupF f fs
     xs = leavingVars b
-  in foldM (\ds' x -> fromMaybe ds' <$> changeUpdate Replace x g ds') ds xs
+  in foldM (\ds' x -> maybe ds' fst <$> changeUpdate Replace x g ds') ds xs
 
-changeUpdate :: ChangeMode -> Var -> (AST Var -> AST Var -> AST Var) -> [Def] -> FreshVarM (Maybe [Def])
+changeUpdate :: ChangeMode -> Var -> (AST Var -> AST Var -> AST Var) -> [Def] -> FreshVarM (Maybe ([Def],Var))
 changeUpdate m x g ds = case break (\(z,_,_) -> x == z) ds of
   (d1, (x,rhs,n):d2) -> do
     (d1',d2') <- case baseVar rhs of
       Just y -> do
-        d1' <- fromMaybe d1 <$> changeUpdate m y g d1
-        d2' <- fromMaybe d1 <$> changeUpdate m y g d2
+        d1' <- maybe d1 fst <$> changeUpdate m y g d1
+        d2' <- maybe d1 fst <$> changeUpdate m y g d2
         return (d1',d2')
       Nothing -> return (d1,d2)
     case m of
-      Replace -> return . Just $ d1' ++ (x,replaceUpdate g rhs,n) : d2'
+      Replace -> return $ Just (d1' ++ (x,replaceUpdate g rhs,n) : d2',x)
       Add base -> do
         accC <- currentName base
         accF <- freshName base
-        return . Just $ d1' ++ [(x,rhs,n),(accF,replaceUpdate g (changeBaseVar accC rhs),n)] ++ d2'
+        return $ Just (d1' ++ [(x,rhs,n),(accF,replaceUpdate g (changeBaseVar accC rhs),n)] ++ d2',accF)
   _ -> return Nothing
 
 replaceUpdate :: (AST Var -> AST Var -> AST Var) -> DefRhs -> DefRhs
@@ -291,9 +291,9 @@ introSingleAccum ds fVar p is =
           let [os] = nub $ filter (\x -> baseName x == baseName p && x /= p) $ leavingVars is
           changeUpdate (Add "acc") os g ds'
             >>= \case
-              Just ds' -> do
+              Just (ds',xNew) -> do
                 xp <- freshName "acc"
-                return (changeUsage f p x1 ds',xs++[Just $ \x -> (xp,Const (v x),0)],ys++[x1],addNewParameter (baseName x1,baseName p) fVar is')
+                return (changeUsage f p x1 ds',xs++[Just $ \x -> (xp,Const (v x),0)],ys++[x1],addNewParameter xNew fVar is')
               Nothing -> return (ds',xs++[Nothing],ys,is')
         Nothing -> return (ds',xs++[Nothing],ys,is')
     ) (ds,[],[],is) (map printFlat $ usedOn p ds)
@@ -303,16 +303,14 @@ foldParameters "length" = Just (\y _ -> App (PostApp y (Leaf "+")) (Leaf "1"), i
 foldParameters _ = Nothing
 
 -- first parameter are the basenames of the new accumulation parameter and the old one it is derived from
-addNewParameter :: (String,String) -> Var -> [Instruction] -> [Instruction]
-addNewParameter (new,old) f = map $ \case
+addNewParameter :: Var -> Var -> [Instruction] -> [Instruction]
+addNewParameter new f = map $ \case
   READ x -> READ x
   PRINT x -> PRINT x
-  IF c t e -> IF c (addNewParameter (new,old) f t) (addNewParameter (new,old) f e)
+  IF c t e -> IF c (addNewParameter new f t) (addNewParameter new f e)
   TAILCALL g ps ->
     if f == g
-      then
-        let [Indexed _ i] = filter (\x -> old == baseName x) ps -- ASSUMPTION: tailcalls dont have two parameters with the same baseName
-        in TAILCALL f (ps ++ [Indexed new i])
+      then TAILCALL f (ps ++ [new])
       else TAILCALL g ps
   BINDCALL g ps rvs -> BINDCALL g ps rvs
   YIELD x -> YIELD x
