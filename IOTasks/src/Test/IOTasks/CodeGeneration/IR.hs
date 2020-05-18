@@ -36,10 +36,10 @@ type IRProgram = ([Instruction], [Def], [F])
 type Vals = Environment Var
 type Def = (Var,DefRhs,Int)
 data DefRhs where
+  -- updates
   U :: (AST Var -> AST Var -> AST Var) -> Var -> Var -> DefRhs
-  N1L :: (AST Var -> AST Var -> AST Var) -> DefRhs -> Var -> DefRhs
-  N1R :: (AST Var -> AST Var -> AST Var) -> Var -> DefRhs -> DefRhs
-  N2  :: (AST Var -> AST Var -> AST Var) -> DefRhs -> DefRhs -> DefRhs
+  -- nested updates
+  N :: (AST Var -> AST Var -> AST Var) -> DefRhs -> Var -> DefRhs
   Const :: AST Var -> DefRhs
 type F = (Var, [Var], [Instruction])
 type Input = Int
@@ -110,9 +110,7 @@ printDef (x,rhs,_) = PP.text (name x ++ " :=") PP.<+> printDefRhs rhs
 
 printDefRhs :: DefRhs -> Doc
 printDefRhs (U f y v) = PP.text $ printFlat $ f (Leaf $ name y) (Leaf $ name v)
-printDefRhs (N1L f y v) = PP.text $ printFlat $ f (toAST y) (Leaf $ name v)
-printDefRhs (N1R f y v) = PP.text $ printFlat $ f (Leaf $ name y) (toAST v)
-printDefRhs (N2 f y v) = PP.text $ printFlat $ f (toAST y) (toAST v)
+printDefRhs (N f y v) = PP.text $ printFlat $ f (toAST y) (Leaf $ name v)
 printDefRhs (Const t) = PP.text $ printFlat t
 
 printF :: F -> Doc
@@ -130,16 +128,12 @@ printDefTree = pPrintTree . toAST
 
 toAST :: DefRhs -> AST Var
 toAST (U f y v) = f (Leaf $ name y) (Leaf $ name v)
-toAST (N1L f y v) = f (toAST y) (Leaf $ name v)
-toAST (N1R f y v) = f (Leaf $ name y) (toAST v)
-toAST (N2 f y v) = f (toAST y) (toAST v)
+toAST (N f y v) = f (toAST y) (Leaf $ name v)
 toAST (Const t) = t
 
 instance Show DefRhs where
   show (U f y v) = "U ? " ++ name y ++ " " ++ name v
-  show (N1L f y v) = "N1L ? " ++ name v
-  show (N1R f y v) = "N1R ? " ++ name y
-  show (N2 f y v) = "N2 ?"
+  show (N f y v) = "N ? " ++ name v
   show (Const t) = "Const ?"
 
 addDef :: (Var,DefRhs) -> [Def] -> [Def]
@@ -160,9 +154,7 @@ usedVars :: [DefRhs] -> [(Var,Int)]
 usedVars = map (\x -> (head x, length x)) . group . sort . concatMap go where
   go :: DefRhs -> [Var]
   go (U _ y v) = [y,v]
-  go (N1L _ y v) = v : go y
-  go (N1R _ y v) = y : go v
-  go (N2 _ y v) = go y ++ go v
+  go (N _ y v) = v : go y
   go (Const t) = vars t
 
 lookup2 :: Eq k => k -> [(k,a,b)] -> Maybe (a,b)

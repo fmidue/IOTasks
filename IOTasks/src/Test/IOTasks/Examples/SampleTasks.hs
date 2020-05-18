@@ -29,6 +29,17 @@ ex1 =
   ) <>
   writeOutput [var 0] [T.sum $ getAll @Int "xs"]
 
+ex1' :: Specification SpecTerm
+ex1' =
+  readInput "n" (intValues [0..10]) <>
+  tillExit (
+    branch ( T.length (getAll @Int "xs") T.> getCurrent "n")
+     ( readInput "xs" (intValues [-10..10]) <>
+       readInput "xs" (intValues [-10..10]) )
+     exit
+  ) <>
+  writeOutput [var 0] [T.sum $ getAll @Int "xs"]
+
 ex1Combinators :: Specification SpecTerm
 ex1Combinators =
   optional (writeFixedOutput [anything]) <>

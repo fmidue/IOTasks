@@ -1,4 +1,3 @@
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE GADTs #-}
@@ -37,7 +36,7 @@ isApplicable r x = isJust $ rewrite r x
 -- interactive rewriting
 globalRewrites :: [Rewrite FreshVarM]
 globalRewrites =
-  [ Rewrite (\(_,ds,_) -> (\(is,_,fs) -> return . (is,,fs) . fromJust $ inline1 ds) <$ inline1 ds ) "inline intermediate definitions"
+  [ Rewrite (\(_,ds,_) -> (\(is,_,fs) -> return (is,inlineAll ds,fs)) <$ inline1 ds ) "inline intermediate definitions"
   ]
 
 loopRewrites :: F -> [Rewrite FreshVarM]
@@ -68,32 +67,20 @@ rewriteRepl p env = do
 -- optimizing IRProgram
 optimize :: IRProgram -> IRProgram
 optimize (i,d,f) = (i,d',f)
-  where d' = simplify (emptyEnvironment @Environment) d
+  where d' = inlineAll d
 
-simplify :: VarEnv env Var => env Var -> [Def] -> [Def]
-simplify e ds = case inline1 ds of
-  Just ds' -> simplify e ds'
+inlineAll :: [Def] -> [Def]
+inlineAll ds = case inline1 ds of
+  Just ds' -> inlineAll ds'
   Nothing -> map (\(x,d,n) -> (x,d,n)) ds
 
 inline :: (Var,DefRhs) -> DefRhs -> Maybe DefRhs
 inline (x,t) (U f y v)
-  | x == y = Just $ N1L f t v
-  | x == v = Just $ N1R f y t
+  | x == y = Just $ N f t v
   | otherwise = Nothing
-inline (x,t) (N1L f y v)
-  | x == v = Just $ N2 f y t
-  | otherwise = (\y' -> N1L f y' v) <$> inline (x,t) y
-inline (x,t) (N1R f y v)
-  | x == y = Just $ N2 f t v
-  | otherwise = N1R f y <$> inline (x,t) v
-inline (x,t) (N2 f y v)
-  = case (inline (x,t) y, inline (x,t) v) of
-    (Nothing, Nothing) -> Nothing
-    (Just y', Nothing) -> Just $ N2 f y' v
-    (Nothing, Just v') -> Just $ N2 f y v'
-    -- this probably does not happen, at least not
-    -- if only variables with 1 occurence are inlined
-    (Just y', Just v') -> Just $ N2 f y' v'
+inline (x,t) (N f y v) = do
+  y' <- inline (x,t) y
+  return $ N f y' v
 inline _ (Const t) = Nothing
 
 inline1 :: [Def] -> Maybe [Def]
@@ -211,19 +198,36 @@ toFoldAccum g f fs ds =
 
 changeUpdate :: ChangeMode -> Var -> (AST Var -> AST Var -> AST Var) -> [Def] -> FreshVarM (Maybe [Def])
 changeUpdate m x g ds = case break (\(z,_,_) -> x == z) ds of
-  (d1, (x,U f y v,n):d2) -> do
-    d1' <- fromMaybe d1 <$> changeUpdate m y g d1
-    d2' <- fromMaybe d1 <$> changeUpdate m y g d2
+  (d1, (x,rhs,n):d2) -> do
+    (d1',d2') <- case baseVar rhs of
+      Just y -> do
+        d1' <- fromMaybe d1 <$> changeUpdate m y g d1
+        d2' <- fromMaybe d1 <$> changeUpdate m y g d2
+        return (d1',d2')
+      Nothing -> return (d1,d2)
     case m of
-      Replace -> return . Just $ d1' ++ (x,U g y v,n) : d2'
+      Replace -> return . Just $ d1' ++ (x,replaceUpdate g rhs,n) : d2'
       Add base -> do
         accC <- currentName base
         accF <- freshName base
-        return . Just $ d1' ++ [(x,U f y v,n),(accF,U g accC v,n)] ++ d2'
-  (_, (_,N1L{},_):_) -> error "not implemented changeUpdate for N1L"
-  (_, (_,N1R{},_):_) -> error "not implemented changeUpdate for N1R"
-  (_, (_,N2{},_):_) -> error "not implemented changeUpdate for N2"
+        return . Just $ d1' ++ [(x,rhs,n),(accF,replaceUpdate g (changeBaseVar accC rhs),n)] ++ d2'
   _ -> return Nothing
+
+replaceUpdate :: (AST Var -> AST Var -> AST Var) -> DefRhs -> DefRhs
+replaceUpdate f (U _ y v) = U f y v
+replaceUpdate f (N _ y v) = N f (replaceUpdate f y) v
+replaceUpdate _ (Const t) = Const t
+
+-- the base variable which this rhs updates or Nothing if it is a constant
+baseVar :: DefRhs -> Maybe Var
+baseVar (U _ y _) = Just y
+baseVar (N _ y _) = baseVar y
+baseVar (Const _) = Nothing
+
+changeBaseVar :: Var -> DefRhs -> DefRhs
+changeBaseVar x (U f _ v) = U f x v
+changeBaseVar x (N f y v) = N f (changeBaseVar x y) v
+changeBaseVar _ (Const t) = Const t
 
 leavingVars :: [Instruction] -> [Var]
 leavingVars = concatMap f where
@@ -320,9 +324,7 @@ addParameter f p = updateF f $ \(f,ps,b) -> (f,ps ++ [p],b)
 usedOn :: Var -> [Def] -> [AST Var]
 usedOn _ [] = []
 usedOn x ((_,U f y v,_):ds) = usedOn' x (f (Var y) (Var v)) ++ usedOn x ds
-usedOn x ((_,N1L f y v,_):ds) = usedOn' x (f (toAST y) (Var v)) ++ usedOn x ds
-usedOn x ((_,N1R f y v,_):ds) = usedOn' x (f (Var y) (toAST v)) ++ usedOn x ds
-usedOn x ((_,N2 f y v,_):ds) = usedOn' x (f (toAST y) (toAST v)) ++ usedOn x ds
+usedOn x ((_,N f y v,_):ds) = usedOn' x (f (toAST y) (Var v)) ++ usedOn x ds
 usedOn x ((_,Const t,_):ds) = usedOn' x t ++ usedOn x ds
 
 usedOn' :: Var -> AST Var -> [AST Var]
