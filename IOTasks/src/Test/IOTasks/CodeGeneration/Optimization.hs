@@ -11,7 +11,7 @@ module Test.IOTasks.CodeGeneration.Optimization where
 
 import Control.Monad (foldM)
 
-import Data.Maybe (fromMaybe, fromJust, isJust)
+import Data.Maybe (fromJust, isJust)
 import Data.List (nub)
 
 import Data.Term.AST
@@ -19,8 +19,6 @@ import Data.Environment
 
 import Test.IOTasks.CodeGeneration.IR
 import Test.IOTasks.CodeGeneration.FreshVar
-
-import Debug.Trace
 
 data Rewrite m = Rewrite
   { rewrite :: IRProgram -> Maybe (IRProgram -> m IRProgram)
@@ -40,7 +38,7 @@ globalRewrites =
   ]
 
 loopRewrites :: F -> [Rewrite FreshVarM]
-loopRewrites (f,ps,is) =
+loopRewrites (f,_ps,_is) =
   [ Rewrite (const $ Just accumOpt) ("introduce accumulation parameters for " ++ name f)
   , Rewrite (const $ Just foldOpt) ("inline 'external' accumulation for " ++ name f)
   ]
@@ -81,7 +79,7 @@ inline (x,t) (U f y v)
 inline (x,t) (N f y v) = do
   y' <- inline (x,t) y
   return $ N f y' v
-inline _ (Const t) = Nothing
+inline _ (Const _) = Nothing
 
 inline1 :: [Def] -> Maybe [Def]
 inline1 ds =
@@ -145,7 +143,7 @@ idFold ds fs =
   in InstFold{..}
 
 transformProgram :: ([Def] -> [F] -> InstFold IRProgram) -> IRProgram -> IRProgram
-transformProgram f ([],ds,fs) = ([],ds,fs)
+transformProgram _ ([],ds,fs) = ([],ds,fs)
 transformProgram f (i:is,ds,fs) =
   let
     InstFold{..} = f ds fs
@@ -255,7 +253,7 @@ extractAlgebra _ _ _ = Nothing
 
 initialAccum :: String -> String -> Var -> AST Var
 initialAccum _ i (Initial _) = Leaf i
-initialAccum f i p = App (Leaf f) (Leaf $ name p)
+initialAccum f _ p = App (Leaf f) (Leaf $ name p)
 
 -- change usage of a variable expressable by "folding accumulation" into an additional loop parameter
 accumOpt :: IRProgram -> FreshVarM IRProgram
