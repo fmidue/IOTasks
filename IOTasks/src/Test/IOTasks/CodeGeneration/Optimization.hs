@@ -11,14 +11,16 @@ module Test.IOTasks.CodeGeneration.Optimization where
 
 import Control.Monad (foldM)
 
-import Data.Maybe (fromJust, isJust)
-import Data.List (nub)
+import Data.Maybe (fromMaybe, fromJust, isJust)
+import Data.List (nub,find)
 
 import Data.Term.AST
 import Data.Environment
 
 import Test.IOTasks.CodeGeneration.IR
 import Test.IOTasks.CodeGeneration.FreshVar
+
+import Debug.Trace
 
 data Rewrite m = Rewrite
   { rewrite :: IRProgram -> Maybe (IRProgram -> m IRProgram)
@@ -34,7 +36,8 @@ isApplicable r x = isJust $ rewrite r x
 -- interactive rewriting
 globalRewrites :: [Rewrite FreshVarM]
 globalRewrites =
-  [ Rewrite (\(_,ds,_) -> (\(is,_,fs) -> return (is,inlineAll ds,fs)) <$ inline1 ds ) "inline intermediate definitions"
+  -- [ Rewrite (\(_,ds,_) -> (\(is,_,fs) -> return (is,inlineAll ds,fs)) <$ inline1 ds ) "inline intermediate definitions"
+  [ Rewrite (\_ -> Just $ \(is,ds,fs) -> return (is,inlineAll ds,fs)) "inline intermediate definitions"
   ]
 
 loopRewrites :: F -> [Rewrite FreshVarM]
@@ -171,7 +174,7 @@ foldOpt (BINDCALL f (p:ps) [rv] : PRINT t : is,ds,fs) =
     Just (rhs,0) ->
       case extractAlgebra (toAST rhs) rv p of
         Just (g, x) -> do
-          r <- toFoldAccum g f fs ds
+          r <- toFoldAccum g f 0 fs ds
           (is',ds',fs') <- foldOpt (is,
                            updateDef (t,Const x) r,
                            fs)
@@ -187,12 +190,24 @@ foldOpt (i:is,ds,fs) = do
 data ChangeMode = Add Varname | Replace
 
 -- NOTE: This is only sound if the accumulation parameter is not printed out!
-toFoldAccum :: (AST Var -> AST Var -> AST Var) -> Var -> [F] -> [Def] -> FreshVarM [Def]
-toFoldAccum g f fs ds =
+toFoldAccum :: (AST Var -> AST Var -> AST Var) -> Var -> Int -> [F] -> [Def] -> FreshVarM [Def]
+toFoldAccum g f i fs ds =
   let
-    (_,b) = fromJust $ lookupF f fs
-    xs = leavingVars b
+    (ps,b) = fromJust $ lookupF f fs
+    xs = filterJust (inputDependency ps ds) (==(ps !! i)) $ leavingVars b
   in foldM (\ds' x -> maybe ds' fst <$> changeUpdate Replace x g ds') ds xs
+
+filterJust :: (a -> Maybe b) -> (b -> Bool) -> [a] -> [a]
+filterJust f p = filter (maybe False p . f)
+
+inputDependency :: [Var] -> [Def] -> Var -> Maybe Var
+inputDependency ps ds x = find (== rootVar ds x) ps
+
+rootVar :: [Def] -> Var -> Var
+rootVar ds x = fromMaybe x $ do
+  (rhs,_) <- lookupDef x ds
+  y <- baseVar rhs
+  return $ rootVar ds y
 
 changeUpdate :: ChangeMode -> Var -> (AST Var -> AST Var -> AST Var) -> [Def] -> FreshVarM (Maybe ([Def],Var))
 changeUpdate m x g ds = case break (\(z,_,_) -> x == z) ds of
@@ -200,7 +215,7 @@ changeUpdate m x g ds = case break (\(z,_,_) -> x == z) ds of
     (d1',d2') <- case baseVar rhs of
       Just y -> do
         d1' <- maybe d1 fst <$> changeUpdate m y g d1
-        d2' <- maybe d1 fst <$> changeUpdate m y g d2
+        d2' <- maybe d2 fst <$> changeUpdate m y g d2
         return (d1',d2')
       Nothing -> return (d1,d2)
     case m of
