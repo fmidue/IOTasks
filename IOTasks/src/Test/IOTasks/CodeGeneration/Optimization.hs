@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE GADTs #-}
@@ -36,15 +37,12 @@ isApplicable r x = isJust $ rewrite r x
 -- interactive rewriting
 globalRewrites :: [Rewrite FreshVarM]
 globalRewrites =
-  -- [ Rewrite (\(_,ds,_) -> (\(is,_,fs) -> return (is,inlineAll ds,fs)) <$ inline1 ds ) "inline intermediate definitions"
-  [ Rewrite (\_ -> Just $ \(is,ds,fs) -> return (is,inlineAll ds,fs)) "inline intermediate definitions"
-  ]
+  [ inlineRewrite ]
 
 loopRewrites :: F -> [Rewrite FreshVarM]
-loopRewrites (f,_ps,_is) =
-  [ Rewrite (const $ Just accumOpt) ("introduce accumulation parameters for " ++ name f)
-  , Rewrite (const $ Just foldOpt) ("inline 'external' accumulation for " ++ name f)
-  ]
+loopRewrites (f,ps,_is) =
+     [ Rewrite (const $ Just accumOpt) ("introduce accumulation parameters for " ++ name f) | i <- [0..length ps -1] ]
+  ++ [ foldRewrite f i | i <- [0..length ps -1] ]
 
 rewriteOptions :: IRProgram -> [Rewrite FreshVarM]
 rewriteOptions ir@(_,_,fs) =
@@ -70,10 +68,16 @@ optimize :: IRProgram -> IRProgram
 optimize (i,d,f) = (i,d',f)
   where d' = inlineAll d
 
+inlineRewrite :: Applicative m => Rewrite m
+inlineRewrite = Rewrite t "inline intermediate definitions" where
+    t (_,ds,_) = do
+      _ <- inline1 ds -- try if there is at least one inline possibility
+      return $ \(is,ds,fs) -> pure (is,inlineAll ds,fs)
+
 inlineAll :: [Def] -> [Def]
 inlineAll ds = case inline1 ds of
   Just ds' -> inlineAll ds'
-  Nothing -> map (\(x,d,n) -> (x,d,n)) ds
+  Nothing -> map (\(x,d,n,scp) -> (x,d,n,scp)) ds
 
 inline :: (Var,DefRhs) -> DefRhs -> Maybe DefRhs
 inline (x,t) (U f y v)
@@ -86,13 +90,13 @@ inline _ (Const _) = Nothing
 
 inline1 :: [Def] -> Maybe [Def]
 inline1 ds =
-  case break (\(_,_,n) -> n == 1) ds of
+  case break (\(_,_,n,_) -> n == 1) ds of
     (_,[]) -> Nothing
-    (xs,(x,t,_):ys) -> Just $ foldr (f (x,t)) [] (xs++ys)
+    (xs,(x,t,_,_):ys) -> Just $ foldr (f (x,t)) [] (xs++ys)
   where
-    f x (y,d,n) ds' = case inline x d of
-      Nothing -> (y,d,n) : ds'
-      Just d' -> (y,d',n) : ds'
+    f x (y,d,n,scp) ds' = case inline x d of
+      Nothing -> (y,d,n,scp) : ds'
+      Just d' -> (y,d',n,scp) : ds'
 
 -- further optimizations
 
@@ -111,13 +115,13 @@ inlinePrint p@(BINDCALL f ps [rv] : PRINT t : is,ds,fs)
     in (BINDCALL f ps [] : is,ds',updateF f (\(f,p,_) -> (f,p,b')) fs')
   | otherwise =
     case lookupDef t ds of
-      Just (Const tRhs,n) | n <= 1 && vars tRhs == [rv] ->
+      Just (Const tRhs,n,_) | n <= 1 && vars tRhs == [rv] ->
         let
           r y = mapV (\x -> if x == rv then y else x) tRhs
           (_,b) = fromJust $ lookupF f fs
           (b',ds',fs') = transformProgram tr (b,ds,fs)
           tr ds fs = (idFold ds fs){ fYield = trYield ds fs }
-          trYield ds fs [rv'] = ([PRINT (inc t 100)], (inc t 100,Const (r rv'),1) : ds ,fs)
+          trYield ds fs [rv'] = ([PRINT (inc t 100)], (inc t 100,Const (r rv'),1,_) : ds ,fs)
           trYield ds fs rvs = ([YIELD rvs], ds, fs)
         in (BINDCALL f ps [] : is,ds',updateF f (\(f,p,_) -> (f,p,b')) fs')
       _ -> p
@@ -165,27 +169,58 @@ transformProgram f (i:is,ds,fs) =
     (is'',ds'',fs'') = transformProgram f (is,ds',fs')
   in (is' ++ is'', ds'', fs'')
 
+foldRewrite :: Var -> Int ->  Rewrite FreshVarM
+foldRewrite f i = Rewrite t $ "inline 'external' accumulation for paramter " ++ show i ++ " of " ++ name f
+  where
+    t (is,ds,fs) =
+      -- this condition is quite conservative right now to avoid complexity
+      let bCs = bindCalls is
+          [(_,rvs)] = bCs
+          -- ASSUMPTION: BINDCALL as generated from specifications have the same number of parameters and return variables
+          -- this rules out application of this transformation on newly introduced accumulators
+          isBaseParam = i < length rvs
+          -- check how many different functions are used on the accumulation parameters inside the function
+          -- if its just one (++) than we can apply the transformation
+          notUsedOtherwise =  maybe False ((== 1) . length . (\x -> usedOnBaseInScope (baseName x) (name f) ds) . (!! i) . fst) $ lookupF f fs
+          uc = fromMaybe 0 $ lookup (rvs !! i) . usedVars $ map (\(_,x,_,_) -> x) ds
+      in if length bCs == 1 && isBaseParam && notUsedOtherwise && uc == 1 && isJust (lookupF f fs)
+        then Just $ foldOpt f i
+        else Nothing
+    bindCalls = concatMap @[] (\case BINDCALL g ps rvs -> [(ps,rvs) | f == g]; _ -> [])
+
 -- TODO: generalize to all parameters
 -- "inlining" fold optimization
-foldOpt :: IRProgram -> FreshVarM IRProgram
-foldOpt ([],ds,fs) = return ([],ds,fs)
-foldOpt (BINDCALL f (p:ps) [rv] : PRINT t : is,ds,fs) =
+foldOpt :: Var -> Int -> IRProgram -> FreshVarM IRProgram
+foldOpt _ _ ([],ds,fs) = return ([],ds,fs)
+-- again, this pattern is conservative to reduce complexity
+foldOpt f n (BINDCALL g (elemAt n -> (ps1,p,ps2)) rvs : PRINT t : is,ds,fs)
+  | f == g =
   case lookupDef t ds of
-    Just (rhs,0) ->
-      case extractAlgebra (toAST rhs) rv p of
+    Just (rhs,1,_) ->
+      case extractAlgebra (toAST rhs) (rvs !! n) p of
         Just (g, x) -> do
-          r <- toFoldAccum g f 0 fs ds
-          (is',ds',fs') <- foldOpt (is,
+          r <- toFoldAccum g f n fs ds
+          (is',ds',fs') <- foldOpt f n (is,
                            updateDef (t,Const x) r,
                            fs)
-          return (BINDCALL f (t:ps) [rv] : PRINT rv : is', ds',fs')
+          return (BINDCALL f (ps1++t:ps2) rvs : PRINT (rvs !! n) : is', ds',fs')
         _ -> do
-          (is',ds',fs') <- foldOpt (is,ds,fs)
-          return (BINDCALL f [p] [rv] : PRINT t : is',ds',fs')
+          (is',ds',fs') <- foldOpt f n (is,ds,fs)
+          return (BINDCALL f [p] rvs : PRINT t : is',ds',fs')
     _ -> error "no definition found"
-foldOpt (i:is,ds,fs) = do
-  (is',ds',fs') <- foldOpt (is,ds,fs)
+  | otherwise = do
+    (is',ds',fs') <- foldOpt f n (is,ds,fs)
+    return (BINDCALL g (ps1++p:ps2) rvs : PRINT t : is',ds',fs')
+foldOpt f n (i:is,ds,fs) = do
+  (is',ds',fs') <- foldOpt f n (is,ds,fs)
   return (i:is',ds',fs')
+
+elemAt :: Int -> [a] -> ([a],a,[a])
+elemAt n xs
+  | length xs > n =
+    let (as,b:bs) = splitAt n xs
+    in (as,b,bs)
+  | otherwise = error "elemAt: index to large"
 
 data ChangeMode = Add Varname | Replace
 
@@ -205,13 +240,13 @@ inputDependency ps ds x = find (== rootVar ds x) ps
 
 rootVar :: [Def] -> Var -> Var
 rootVar ds x = fromMaybe x $ do
-  (rhs,_) <- lookupDef x ds
+  (rhs,_,_) <- lookupDef x ds
   y <- baseVar rhs
   return $ rootVar ds y
 
 changeUpdate :: ChangeMode -> Var -> (AST Var -> AST Var -> AST Var) -> [Def] -> FreshVarM (Maybe ([Def],Var))
-changeUpdate m x g ds = case break (\(z,_,_) -> x == z) ds of
-  (d1, (x,rhs,n):d2) -> do
+changeUpdate m x g ds = case break (\(z,_,_,_) -> x == z) ds of
+  (d1, (x,rhs,n,scp):d2) -> do
     (d1',d2') <- case baseVar rhs of
       Just y -> do
         d1' <- maybe d1 fst <$> changeUpdate m y g d1
@@ -219,11 +254,11 @@ changeUpdate m x g ds = case break (\(z,_,_) -> x == z) ds of
         return (d1',d2')
       Nothing -> return (d1,d2)
     case m of
-      Replace -> return $ Just (d1' ++ (x,replaceUpdate g rhs,n) : d2',x)
+      Replace -> return $ Just (d1' ++ (x,replaceUpdate g rhs,n,scp) : d2',x)
       Add base -> do
         accC <- currentName base
         accF <- freshName base
-        return $ Just (d1' ++ [(x,rhs,n),(accF,replaceUpdate g (changeBaseVar accC rhs),n)] ++ d2',accF)
+        return $ Just (d1' ++ [(x,rhs,n,scp),(accF,replaceUpdate g (changeBaseVar accC rhs),n,scp)] ++ d2',accF)
   _ -> return Nothing
 
 replaceUpdate :: (AST Var -> AST Var -> AST Var) -> DefRhs -> DefRhs
@@ -282,7 +317,7 @@ addArguments :: Var -> [Maybe (Var -> Def)] -> [Instruction] -> ([Instruction],[
 addArguments f p = foldr (\case
   BINDCALL g ps rvs ->
     let vds = concat $ zipWith (\g x -> maybe [] pure (g <*> pure x)) p ps
-        newVs = map (\(x,_,_) -> x) vds
+        newVs = map (\(x,_,_,_) -> x) vds
     in \(is,ds) -> (BINDCALL g (if f == g then ps ++ newVs else ps) rvs : is, vds ++ ds)
   x -> \(is,ds) -> (x:is,ds)) ([],[])
 
@@ -306,7 +341,7 @@ introSingleAccum ds fVar p is =
             >>= \case
               Just (ds',xNew) -> do
                 xp <- freshName "acc"
-                return (changeUsage f p x1 ds',xs++[Just $ \x -> (xp,Const (v x),0)],ys++[x1],addNewParameter xNew fVar is')
+                return (changeUsage f p x1 ds',xs++[Just $ \x -> (xp,Const (v x),0,"main")],ys++[x1],addNewParameter xNew fVar is')
               Nothing -> return (ds',xs++[Nothing],ys,is')
         Nothing -> return (ds',xs++[Nothing],ys,is')
     ) (ds,[],[],is) (map printFlat $ usedOn p ds)
@@ -332,11 +367,14 @@ addNewParameter new f = map $ \case
 addParameter :: Var -> Var -> [F] -> [F]
 addParameter f p = updateF f $ \(f,ps,b) -> (f,ps ++ [p],b)
 
+usedOnBaseInScope :: Varname -> Varname -> [Def] -> [AST Var]
+usedOnBaseInScope x scp ds = flip usedOn ds =<< filter ((== x) . baseName) (allVarsInScope scp ds)
+
 usedOn :: Var -> [Def] -> [AST Var]
 usedOn _ [] = []
-usedOn x ((_,U f y v,_):ds) = usedOn' x (f (Var y) (Var v)) ++ usedOn x ds
-usedOn x ((_,N f y v,_):ds) = usedOn' x (f (toAST y) (Var v)) ++ usedOn x ds
-usedOn x ((_,Const t,_):ds) = usedOn' x t ++ usedOn x ds
+usedOn x ((_,U f y v,_,_):ds) = usedOn' x (f (Var y) (Var v)) ++ usedOn x ds
+usedOn x ((_,N f y v,_,_):ds) = usedOn' x (f (toAST y) (Var v)) ++ usedOn x ds
+usedOn x ((_,Const t,_,_):ds) = usedOn' x t ++ usedOn x ds
 
 usedOn' :: Var -> AST Var -> [AST Var]
 usedOn' _ (Leaf _) = []
@@ -359,5 +397,5 @@ replaceFunctionUsage (f,x) p (PostApp y g) = PostApp (replaceFunctionUsage (f,x)
 
 changeUsage :: String -> Var -> Var -> [Def] -> [Def]
 changeUsage f x p ds = flip concatMap ds $ \case
-  (y,Const t,n) -> [(y,Const $ replaceFunctionUsage (f,x) p t,n)]
-  (y,d,n) -> [(y,d,n)]
+  (y,Const t,n,scp) -> [(y,Const $ replaceFunctionUsage (f,x) p t,n,scp)]
+  (y,d,n,scp) -> [(y,d,n,scp)]

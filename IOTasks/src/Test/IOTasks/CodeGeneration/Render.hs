@@ -79,20 +79,20 @@ renderVar :: Render -> [Def] -> Var -> ScopeM (Doc, Doc)
 renderVar r ds x = do
   ctx <- renderContext r ds (neededVars ds x)
   case lookupDef x ds of
-    Just (rhs,0) -> return (PP.parens (printDefRhs rhs), ctx)
-    Just (rhs,1) -> return (PP.parens (printDefRhs rhs), ctx)
+    Just (rhs,0,_) -> return (PP.parens (printDefRhs rhs), ctx)
+    Just (rhs,1,_) -> return (PP.parens (printDefRhs rhs), ctx)
     Just _ -> return (PP.text $ name x, ctx)
     Nothing -> return (PP.text $ name x, ctx)
 
 neededVars :: [Def] -> Var -> [Var]
 neededVars ds x = case lookupDef x ds of
-  Just (rhs,_) -> let us = map fst (usedVars [rhs]) in us ++ concatMap (neededVars ds) us
+  Just (rhs,_,_) -> let us = map fst (usedVars [rhs]) in us ++ concatMap (neededVars ds) us
   Nothing -> []
 
 renderContext :: Render -> [Def] -> [Var] -> ScopeM Doc
 renderContext Render{..} ds xs = do
   scope <- get
-  let notDef = foldr (\x ys -> if x `notElem` scope then maybe ys (\v -> (x,fst v):ys) $ lookupDef x ds else ys) [] xs
+  let notDef = foldr (\x ys -> if x `notElem` scope then maybe ys (\v -> (x,(\(a,_,_) -> a) v):ys) $ lookupDef x ds else ys) [] xs
   return $ PP.hcat $ map (uncurry renderAssignment) notDef
 
 -- printing to Haskell

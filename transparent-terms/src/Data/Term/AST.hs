@@ -2,6 +2,7 @@
 {-# LANGUAGE QuantifiedConstraints #-}
 module Data.Term.AST  where
 
+import Data.Function (on)
 import Data.Tree
 import Data.Tree.Pretty
 
@@ -83,3 +84,7 @@ replaceVar f (Var x) = f x Current
 replaceVar f (VarA x) = f x All
 replaceVar f (App g x) = App (replaceVar f g) (replaceVar f x)
 replaceVar f (PostApp x g) = PostApp (replaceVar f x) (replaceVar f g)
+
+-- not quite lawfull, can be broken by certain function inside Lam
+instance Show v => Eq (AST v) where
+  (==) = (==) `on` printTree
