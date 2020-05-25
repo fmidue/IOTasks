@@ -52,8 +52,10 @@ rewriteRepl p env = do
   print $ printIRProgram p
   let opts = rewriteOptions p
       n = length opts
-  putStrLn $ "Choose rewrite (1-" ++ show n ++ ") or finish (q)"
-  putStrLn . unlines $ zipWith (\i d -> i ++ ": " ++ d) (map show [1..n]) (map desc opts)
+  if n > 0
+    then do putStrLn $ "Choose rewrite (1-" ++ show n ++ ") or finish (q)"
+            putStrLn . unlines $ zipWith (\i d -> i ++ ": " ++ d) (map show [1..n]) (map desc opts)
+    else putStrLn "No rewrite options, press q to exit"
   inp <- getLine
   if inp == "q"
     then return p
