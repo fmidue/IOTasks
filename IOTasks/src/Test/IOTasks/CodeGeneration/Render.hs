@@ -86,7 +86,7 @@ renderVar r ds x = do
 
 neededVars :: [Def] -> Var -> [Var]
 neededVars ds x = case lookupDef x ds of
-  Just (rhs,_,_) -> let us = map fst (usedVars [rhs]) in us ++ concatMap (neededVars ds) us
+  Just (rhs,_,_) -> let us = map fst (usedVars' [rhs]) in us ++ concatMap (neededVars ds) us
   Nothing -> []
 
 renderContext :: Render -> [Def] -> [Var] -> ScopeM Doc

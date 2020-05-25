@@ -10,7 +10,8 @@
 {-# LANGUAGE LambdaCase #-}
 module Test.IOTasks.CodeGeneration.Optimization where
 
-import Control.Monad (foldM)
+import Control.Applicative ((<|>))
+import Control.Monad (foldM, guard)
 
 import Data.Maybe (fromMaybe, fromJust, isJust)
 import Data.List (nub,find)
@@ -20,8 +21,6 @@ import Data.Environment
 
 import Test.IOTasks.CodeGeneration.IR
 import Test.IOTasks.CodeGeneration.FreshVar
-
-import Debug.Trace
 
 data Rewrite m = Rewrite
   { rewrite :: IRProgram -> Maybe (IRProgram -> m IRProgram)
@@ -41,8 +40,7 @@ globalRewrites =
 
 loopRewrites :: F -> [Rewrite FreshVarM]
 loopRewrites (f,ps,_is) =
-     [ Rewrite (const $ Just accumOpt) ("introduce accumulation parameters for " ++ name f) | i <- [0..length ps -1] ]
-  ++ [ foldRewrite f i | i <- [0..length ps -1] ]
+  accumRewrite f : [ foldRewrite f i | i <- [0..length ps -1] ]
 
 rewriteOptions :: IRProgram -> [Rewrite FreshVarM]
 rewriteOptions ir@(_,_,fs) =
@@ -70,14 +68,14 @@ optimize (i,d,f) = (i,d',f)
 
 inlineRewrite :: Applicative m => Rewrite m
 inlineRewrite = Rewrite t "inline intermediate definitions" where
-    t (_,ds,_) = do
-      _ <- inline1 ds -- try if there is at least one inline possibility
-      return $ \(is,ds,fs) -> pure (is,inlineAll ds,fs)
+    t (_,ds,_) =
+      -- try if there is at least one inline possibility
+      if any (isJust . flip inline1 ds) ds
+        then Just $ \(is,ds,fs) -> pure (is,inlineAll ds,fs)
+        else Nothing
 
 inlineAll :: [Def] -> [Def]
-inlineAll ds = case inline1 ds of
-  Just ds' -> inlineAll ds'
-  Nothing -> map (\(x,d,n,scp) -> (x,d,n,scp)) ds
+inlineAll ds = foldr (\d ds' -> fromMaybe ds'$ inline1 d ds') ds ds
 
 inline :: (Var,DefRhs) -> DefRhs -> Maybe DefRhs
 inline (x,t) (U f y v)
@@ -88,15 +86,18 @@ inline (x,t) (N f y v) = do
   return $ N f y' v
 inline _ (Const _) = Nothing
 
-inline1 :: [Def] -> Maybe [Def]
-inline1 ds =
-  case break (\(_,_,n,_) -> n == 1) ds of
-    (_,[]) -> Nothing
-    (xs,(x,t,_,_):ys) -> Just $ foldr (f (x,t)) [] (xs++ys)
+inline1 :: Def -> [Def] -> Maybe [Def]
+inline1 (x,t,1,_) ds =
+      let ds' = sequenceA [ f (x,t) d <|> Just d | d@(y,_,_,_) <- ds, y /= x ]
+          changed = any isJust $ map (f (x,t)) ds -- duplicate computation TODO: fix
+      in if changed
+        then ds' --guaranteed to be Just
+        else Nothing
   where
-    f x (y,d,n,scp) ds' = case inline x d of
-      Nothing -> (y,d,n,scp) : ds'
-      Just d' -> (y,d',n,scp) : ds'
+    f x (y,d,n,scp) = do
+      rhs <-inline x d
+      pure (y,rhs,n,scp)
+inline1 _ _ = Nothing
 
 -- further optimizations
 
@@ -181,8 +182,8 @@ foldRewrite f i = Rewrite t $ "inline 'external' accumulation for paramter " ++ 
           isBaseParam = i < length rvs
           -- check how many different functions are used on the accumulation parameters inside the function
           -- if its just one (++) than we can apply the transformation
-          notUsedOtherwise =  maybe False ((== 1) . length . (\x -> usedOnBaseInScope (baseName x) (name f) ds) . (!! i) . fst) $ lookupF f fs
-          uc = fromMaybe 0 $ lookup (rvs !! i) . usedVars $ map (\(_,x,_,_) -> x) ds
+          notUsedOtherwise =  maybe False ((== ["++"]) . nub . map printFlat . (\x -> usedOnBaseInScope (baseName x) (name f) ds) . (!! i) . fst) $ lookupF f fs
+          uc = fromMaybe 0 $ lookup (rvs !! i) $ usedVars ds
       in if length bCs == 1 && isBaseParam && notUsedOtherwise && uc == 1 && isJust (lookupF f fs)
         then Just $ foldOpt f i
         else Nothing
@@ -304,6 +305,17 @@ extractAlgebra _ _ _ = Nothing
 initialAccum :: String -> String -> Var -> AST Var
 initialAccum _ i (Initial _) = Leaf i
 initialAccum f _ p = App (Leaf f) (Leaf $ name p)
+
+knownFolds :: [(String,a)]
+knownFolds = [("sum",_), ("length",_)]
+
+accumRewrite :: Var -> Rewrite FreshVarM
+accumRewrite f = Rewrite t $ "introduce auxillary accumulation parameter(s) for " ++ name f where
+  t (_,ds,fs) = do
+    (ps,_) <- lookupF f fs
+    let usedOtherwise = any (any (`elem` map fst knownFolds)) $ map printFlat . (\x -> usedOnBaseInScope (baseName x) (name f) ds) <$> ps
+    guard usedOtherwise
+    pure accumOpt
 
 -- change usage of a variable expressable by "folding accumulation" into an additional loop parameter
 accumOpt :: IRProgram -> FreshVarM IRProgram

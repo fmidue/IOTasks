@@ -54,7 +54,8 @@ data Output = I Int | O Int deriving (Show,Eq) -- simple trace elements
       uc2 = instructionVars is2
       ds1' = updateUseCount uc2 ds1
       ds2' = updateUseCount uc1 ds2
-  in (is1 ++ is2,foldr (\(x,d,n,scp) -> addDef (x,d,Just n,scp)) ds1' ds2',fs1 ++ fs2)
+      ds' = updateUseCount (usedVars ds2') ds1' ++ updateUseCount (usedVars ds1') ds2'
+  in (is1 ++ is2,ds',fs1 ++ fs2)
 
 readIR :: Var -> IRProgram
 readIR x = ([READ x],[],[])
@@ -156,8 +157,8 @@ instance Show DefRhs where
 
 addDef :: (Var,DefRhs,Maybe Int,Varname) -> [Def] -> [Def]
 addDef (x,d,mn,scp) ds =
-  let n = fromMaybe 0 $ mn <|> lookup x (usedVars (map (\(_,d,_,_) -> d) ds))
-  in (x,d,n,scp) : updateUseCount (usedVars [d]) ds
+  let n = fromMaybe 0 $ mn <|> lookup x (usedVars ds)
+  in (x,d,n,scp) : updateUseCount (usedVars' [d]) ds
 
 updateUseCount :: [(Var,Int)] -> [Def] -> [Def]
 updateUseCount cs = foldr phi [] where
@@ -166,7 +167,7 @@ updateUseCount cs = foldr phi [] where
     Nothing -> (x,d,n,scp) : ds
 
 allVars :: [Def] -> [Var]
-allVars ds = nub $ definedVars ds ++ map fst (usedVars (map (\(_,x,_,_) -> x) ds))
+allVars ds = nub $ definedVars ds ++ map fst (usedVars ds)
 
 allVarsInScope :: Varname -> [Def] -> [Var]
 allVarsInScope scp ds = allVars $ filter (\(_,_,_,scp') -> scp == scp' ) ds
@@ -174,8 +175,11 @@ allVarsInScope scp ds = allVars $ filter (\(_,_,_,scp') -> scp == scp' ) ds
 definedVars :: [Def] -> [Var]
 definedVars = map (\(x,_,_,_) -> x)
 
-usedVars :: [DefRhs] -> [(Var,Int)]
-usedVars = map (\x -> (head x, length x)) . group . sort . concatMap go where
+usedVars :: [Def] -> [(Var,Int)]
+usedVars = usedVars' . map (\(_,d,_,_) -> d)
+
+usedVars' :: [DefRhs] -> [(Var,Int)]
+usedVars' = map (\x -> (head x, length x)) . group . sort . concatMap go where
   go :: DefRhs -> [Var]
   go (U _ y v) = [y,v]
   go (N _ y v) = v : go y
@@ -196,8 +200,8 @@ updateDef (x,newRhs) = (\(ds',vs) -> updateUseCount vs ds') . updateDef' ([],[])
   updateDef' (ds',vs) ((y,oldRhs,n,scp):ds)
     | x == y =
       let
-        newUsed = usedVars [newRhs]
-        oldUsed = usedVars [oldRhs]
+        newUsed = usedVars' [newRhs]
+        oldUsed = usedVars' [oldRhs]
         diff = usageDiff newUsed oldUsed
       in (ds'++(x,newRhs,n,scp):ds,diff)
     | otherwise = updateDef' ((y,oldRhs,n,scp):ds',vs) ds
