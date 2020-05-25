@@ -184,7 +184,7 @@ foldRewrite f i = Rewrite t $ "inline 'external' accumulation for paramter " ++ 
           isBaseParam = i < length rvs
           -- check how many different functions are used on the accumulation parameters inside the function
           -- if its just one (++) than we can apply the transformation
-          notUsedOtherwise =  maybe False ((== ["++"]) . nub . map printFlat . (\x -> usedOnBaseInScope (baseName x) (name f) ds) . (!! i) . fst) $ lookupF f fs
+          notUsedOtherwise =  maybe False ((== ["++"]). nub . map printFlat . (\x -> usedOnBaseInScope (baseName x) (name f) ds) . (!! i) . fst) $ lookupF f fs
           uc = fromMaybe 0 $ lookup (rvs !! i) $ usedVars ds
       in if length bCs == 1 && isBaseParam && notUsedOtherwise && uc == 1 && isJust (lookupF f fs)
         then Just $ foldOpt f i

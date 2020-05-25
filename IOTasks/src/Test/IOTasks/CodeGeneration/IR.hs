@@ -146,8 +146,8 @@ printDefTree :: DefRhs -> String
 printDefTree = pPrintTree . toAST
 
 toAST :: DefRhs -> AST Var
-toAST (U f y v) = f (Leaf $ name y) (Leaf $ name v)
-toAST (N f y v) = f (toAST y) (Leaf $ name v)
+toAST (U f y v) = f (Var y) (Var v)
+toAST (N f y v) = f (toAST y) (Var v)
 toAST (Const t) = t
 
 instance Show DefRhs where
