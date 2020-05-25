@@ -296,20 +296,21 @@ leavingVars = concatMap f where
 -- incomplete implementation. Currently not sure how to write this in a general way.
 -- especially the starting value is not correct in a general setting.
 extractAlgebra :: AST Var -> Var -> Var -> Maybe (AST Var -> AST Var -> AST Var, AST Var)
-extractAlgebra (App (Leaf f) (Var x)) rv p | x == rv =
-  case f of
-    -- folds to Int
-    "sum" -> Just (\b a -> App (PostApp b (Leaf "+")) a, initialAccum f "0" p)
-    "length" -> Just (\b _ -> App (PostApp b (Leaf "+")) (Leaf "1"), initialAccum f "0" p)
-    _ -> Nothing
+extractAlgebra (App (Leaf f) (Var x)) rv p
+  | x == rv = do
+    (g,z) <- lookup f knownFolds
+    pure (g,z p)
 extractAlgebra _ _ _ = Nothing
 
 initialAccum :: String -> String -> Var -> AST Var
 initialAccum _ i (Initial _) = Leaf i
 initialAccum f _ p = App (Leaf f) (Leaf $ name p)
 
-knownFolds :: [(String,a)]
-knownFolds = [("sum",_), ("length",_)]
+knownFolds :: [(String,(AST Var -> AST Var -> AST Var, Var -> AST Var))]
+knownFolds =
+  [ ("sum",(\b a -> App (PostApp b (Leaf "+")) a, initialAccum "sum" "0"))
+  , ("length",(\b _ -> App (PostApp b (Leaf "+")) (Leaf "1"), initialAccum "length" "0"))
+  ]
 
 accumRewrite :: Var -> Rewrite FreshVarM
 accumRewrite f = Rewrite t $ "introduce auxillary accumulation parameter(s) for " ++ name f where
