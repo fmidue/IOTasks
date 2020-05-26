@@ -43,7 +43,7 @@ data DefRhs where
   -- nested updates
   N :: (AST Var -> AST Var -> AST Var) -> DefRhs -> Var -> DefRhs
   Const :: AST Var -> DefRhs
-type F = (Var, [Var], [Instruction])
+type F = (Var, ([Var],[Var]), [Instruction]) -- the two sets of are the 'original' parameters and the parameters introduced by transformations
 type Input = Int
 data Output = I Int | O Int deriving (Show,Eq) -- simple trace elements
 
@@ -76,7 +76,7 @@ ifIR :: Var -> IRProgram -> IRProgram -> IRProgram
 ifIR c (is1,ds1,fs1) (is2,ds2,fs2) = ([IF c is1 is2],ds1 ++ ds2,fs1 ++ fs2)
 
 defLoopIR :: Var -> [Var] -> IRProgram -> IRProgram
-defLoopIR f xs (b,ds,fs) = ([],ds,(f,xs,b):fs)
+defLoopIR f xs (b,ds,fs) = ([],ds,(f,(xs,[]),b):fs)
 
 enterLoopIR :: Var -> [Var] -> [Var] -> IRProgram
 enterLoopIR f ps rvs = ([BINDCALL f ps rvs],[],[])
@@ -133,7 +133,7 @@ printDefRhs (N f y v) = PP.text $ printFlat $ f (toAST y) (Leaf $ name v)
 printDefRhs (Const t) = PP.text $ printFlat t
 
 printF :: F -> Doc
-printF (f,xs,b) = PP.hang (PP.text (name f) PP.<+> tupelize xs PP.<+> PP.text ":=") 2 $
+printF (f,(xs,ys),b) = PP.hang (PP.text (name f) PP.<+> tupelize (xs++ys) PP.<+> PP.text ":=") 2 $
   PP.vcat (map printInstruction b)
 
 tupelize :: [Var] -> Doc
@@ -217,7 +217,7 @@ usageDiff ((x,n):xs) ((y,m):ys)
   | x > y = (y,negate m) : usageDiff ((x,n):xs) ys
   | otherwise = (x,n) : usageDiff xs ((y,m):ys)
 
-lookupF :: Var -> [F] -> Maybe ([Var],[Instruction])
+lookupF :: Var -> [F] -> Maybe (([Var],[Var]),[Instruction])
 lookupF = lookup2
 
 updateF :: Var -> (F -> F) -> [F] -> [F]

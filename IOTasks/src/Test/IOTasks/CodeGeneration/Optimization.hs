@@ -101,34 +101,49 @@ inline1 (x,t,1,_) ds =
       pure (y,rhs,n,scp)
 inline1 _ _ = Nothing
 
--- further optimizations
+
+printRewrite :: F -> Int -> Rewrite f
+printRewrite (f,_,_) i = Rewrite t "" where
+  t (is,ds,fs) =
+    let
+      bCs = bindCalls f is
+      -- ASSUMPTION: BINDCALL as generated from specifications have the same number of parameters and return variables
+      -- this rules out application of this transformation on newly introduced accumulators
+      isBaseParam = i < length @[] _rvs
+    in _
+
+-- every variable that is printed
+printVars :: [Instruction] -> [Var]
+printVars = concatMap $ \case
+  PRINT x -> [x]
+  _ -> []
 
 -- NOTE: there is a naming issue here if we do this for a loop with more then one
 -- retrun point (or a program that uses the name t', which should not happen, because of IndexedVar)
-inlinePrint :: IRProgram -> IRProgram
-inlinePrint ([],ds,fs) = ([],ds,fs)
-inlinePrint p@(BINDCALL f ps [rv] : PRINT t : is,ds,fs)
-  | rv == t =
-    let
-      (_,b) = fromJust $ lookupF f fs
-      (b',ds',fs') = transformProgram tr (b,ds,fs)
-      tr ds fs = (idFold ds fs){ fYield = trYield ds fs }
-      trYield ds fs [rv'] = ([PRINT rv'], ds ,fs)
-      trYield ds fs rvs = ([YIELD rvs], ds, fs)
-    in (BINDCALL f ps [] : is,ds',updateF f (\(f,p,_) -> (f,p,b')) fs')
-  | otherwise =
-    case lookupDef t ds of
-      Just (Const tRhs,n,_) | n <= 1 && vars tRhs == [rv] ->
-        let
-          r y = mapV (\x -> if x == rv then y else x) tRhs
-          (_,b) = fromJust $ lookupF f fs
-          (b',ds',fs') = transformProgram tr (b,ds,fs)
-          tr ds fs = (idFold ds fs){ fYield = trYield ds fs }
-          trYield ds fs [rv'] = ([PRINT (inc t 100)], (inc t 100,Const (r rv'),1,_) : ds ,fs)
-          trYield ds fs rvs = ([YIELD rvs], ds, fs)
-        in (BINDCALL f ps [] : is,ds',updateF f (\(f,p,_) -> (f,p,b')) fs')
-      _ -> p
-inlinePrint (i:is,ds,fs) = let (is',ds',fs') = inlinePrint (is,ds,fs) in (i:is',ds',fs')
+-- inlinePrint :: IRProgram -> IRProgram
+-- inlinePrint ([],ds,fs) = ([],ds,fs)
+-- inlinePrint p@(BINDCALL f ps [rv] : PRINT t : is,ds,fs)
+--   | rv == t =
+--     let
+--       (_,b) = fromJust $ lookupF f fs
+--       (b',ds',fs') = transformProgram tr (b,ds,fs)
+--       tr ds fs = (idFold ds fs){ fYield = trYield ds fs }
+--       trYield ds fs [rv'] = ([PRINT rv'], ds ,fs)
+--       trYield ds fs rvs = ([YIELD rvs], ds, fs)
+--     in (BINDCALL f ps [] : is,ds',updateF f (\(f,p,_) -> (f,p,b')) fs')
+--   | otherwise =
+--     case lookupDef t ds of
+--       Just (Const tRhs,n,_) | n <= 1 && vars tRhs == [rv] ->
+--         let
+--           r y = mapV (\x -> if x == rv then y else x) tRhs
+--           (_,b) = fromJust $ lookupF f fs
+--           (b',ds',fs') = transformProgram tr (b,ds,fs)
+--           tr ds fs = (idFold ds fs){ fYield = trYield ds fs }
+--           trYield ds fs [rv'] = ([PRINT (inc t 100)], (inc t 100,Const (r rv'),1,_) : ds ,fs)
+--           trYield ds fs rvs = ([YIELD rvs], ds, fs)
+--         in (BINDCALL f ps [] : is,ds',updateF f (\(f,p,_) -> (f,p,b')) fs')
+--       _ -> p
+-- inlinePrint (i:is,ds,fs) = let (is',ds',fs') = inlinePrint (is,ds,fs) in (i:is',ds',fs')
 
 data InstFold a = InstFold
   { fRead :: Var -> a
@@ -177,19 +192,20 @@ foldRewrite f i = Rewrite t $ "inline 'external' accumulation for paramter " ++ 
   where
     t (is,ds,fs) =
       -- this condition is quite conservative right now to avoid complexity
-      let bCs = bindCalls is
+      let bCs = bindCalls f is
           [(_,rvs)] = bCs
-          -- ASSUMPTION: BINDCALL as generated from specifications have the same number of parameters and return variables
-          -- this rules out application of this transformation on newly introduced accumulators
-          isBaseParam = i < length rvs
+          Just ((xs,_),_) = lookupF f fs
+          isBaseParam = i < length xs
           -- check how many different functions are used on the accumulation parameters inside the function
           -- if its just one (++) than we can apply the transformation
-          notUsedOtherwise =  maybe False ((== ["++"]). nub . map printFlat . (\x -> usedOnBaseInScope (baseName x) (name f) ds) . (!! i) . fst) $ lookupF f fs
+          notUsedOtherwise =  maybe False ((== ["++"]). nub . map printFlat . (\x -> usedOnBaseInScope (baseName x) (name f) ds) . (!! i) . fst . fst) $ lookupF f fs
           uc = fromMaybe 0 $ lookup (rvs !! i) $ usedVars ds
       in if length bCs == 1 && isBaseParam && notUsedOtherwise && uc == 1 && isJust (lookupF f fs)
         then Just $ foldOpt f i
         else Nothing
-    bindCalls = concatMap @[] (\case BINDCALL g ps rvs -> [(ps,rvs) | f == g]; _ -> [])
+
+bindCalls :: Var -> [Instruction] -> [([Var],[Var])]
+bindCalls f = concatMap @[] (\case BINDCALL g ps rvs -> [(ps,rvs) | f == g]; _ -> [])
 
 -- TODO: generalize to all parameters
 -- "inlining" fold optimization
@@ -231,8 +247,8 @@ data ChangeMode = Add Varname | Replace
 toFoldAccum :: (AST Var -> AST Var -> AST Var) -> Var -> Int -> [F] -> [Def] -> FreshVarM [Def]
 toFoldAccum g f i fs ds =
   let
-    (ps,b) = fromJust $ lookupF f fs
-    xs = filterJust (inputDependency ps ds) (==(ps !! i)) $ leavingVars b
+    ((as,bs),b) = fromJust $ lookupF f fs
+    xs = filterJust (inputDependency (as++bs) ds) (==((as++bs) !! i)) $ leavingVars b
   in foldM (\ds' x -> maybe ds' fst <$> changeUpdate Replace x g ds') ds xs
 
 filterJust :: (a -> Maybe b) -> (b -> Bool) -> [a] -> [a]
@@ -315,8 +331,8 @@ knownFolds =
 accumRewrite :: Var -> Rewrite FreshVarM
 accumRewrite f = Rewrite t $ "introduce auxillary accumulation parameter(s) for " ++ name f where
   t (_,ds,fs) = do
-    (ps,_) <- lookupF f fs
-    let usedOtherwise = any (any (`elem` map fst knownFolds)) $ map printFlat . (\x -> usedOnBaseInScope (baseName x) (name f) ds) <$> ps
+    ((as,bs),_) <- lookupF f fs
+    let usedOtherwise = any (any (`elem` map fst knownFolds)) $ map printFlat . (\x -> usedOnBaseInScope (baseName x) (name f) ds) <$> (as++bs)
     guard usedOtherwise
     pure accumOpt
 
@@ -337,7 +353,7 @@ addArguments f p = foldr (\case
   x -> \(is,ds) -> (x:is,ds)) ([],[])
 
 introAccums :: [Instruction] -> [Def] -> F -> FreshVarM ([Instruction],[Def],F)
-introAccums gis ds (f,ps,fis) = do
+introAccums gis ds (f,(as,bs),fis) = do
   (gis',ds',(ps',fis')) <- foldM (\(gis',ds',(ps',fis')) p -> do
       (ds',ivs,ys,fis') <- introSingleAccum ds' f p fis'
       let (is,ds'') = addArguments f ivs gis'
@@ -380,7 +396,7 @@ addNewParameter new f = map $ \case
   NOP -> NOP
 
 addParameter :: Var -> Var -> [F] -> [F]
-addParameter f p = updateF f $ \(f,ps,b) -> (f,ps ++ [p],b)
+addParameter f p = updateF f $ \(f,(xs,ys),b) -> (f,(xs,ys ++ [p]),b)
 
 usedOnBaseInScope :: Varname -> Varname -> [Def] -> [AST Var]
 usedOnBaseInScope x scp ds = flip usedOn ds =<< filter ((== x) . baseName) (allVarsInScope scp ds)

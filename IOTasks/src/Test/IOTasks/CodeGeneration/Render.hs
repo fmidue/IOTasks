@@ -52,15 +52,15 @@ renderInstruction r@Render{..} ds fs i =
       <*> (PP.vcat <$> traverse (renderInstruction r ds fs) e)
     TAILCALL f ps ->
       case lookupF f fs of
-        Just (pts,_) -> renderTailCall <$> renderVars r ds ps <*> pure f <*> pure pts
+        Just ((xs,ys),_) -> renderTailCall <$> renderVars r ds ps <*> pure f <*> pure (xs++ys)
         Nothing -> error $ "can't find definition for " ++ name f
     BINDCALL f ps rvs ->
       case lookupF f fs of
-        Just (pts,is) -> do
+        Just ((xs,ys),is) -> do
           body <- PP.vcat <$> mapM (renderInstruction r ds fs) is
           renderBindCall
             <$> renderVars r ds ps
-            <*> pure (renderLoop f pts body, pts)
+            <*> pure (renderLoop f (xs++ys) body, (xs++ys))
             <*> pure f
             <*> pure rvs
         Nothing -> error $ "can't find definition for " ++ name f
