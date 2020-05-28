@@ -3,13 +3,13 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE LambdaCase #-}
 module Test.IOTasks.CodeGeneration.Optimization where
 
+import Control.Arrow (second)
 import Control.Applicative ((<|>))
 import Control.Monad (foldM, guard)
 
@@ -39,8 +39,10 @@ globalRewrites =
   [ inlineRewrite ]
 
 loopRewrites :: F -> [Rewrite FreshVarM]
-loopRewrites (f,ps,_is) =
-  accumRewrite f : [ foldRewrite f i | i <- [0..length ps -1] ]
+loopRewrites f@(fVar,(as,_),_) =
+     accumRewrite fVar
+  :  [ foldRewrite f i | i <- [0..length as -1] ]
+  ++ [ printRewrite f i | i <- [0..length as -1] ]
 
 rewriteOptions :: IRProgram -> [Rewrite FreshVarM]
 rewriteOptions ir@(_,_,fs) =
@@ -102,15 +104,20 @@ inline1 (x,t,1,_) ds =
 inline1 _ _ = Nothing
 
 
-printRewrite :: F -> Int -> Rewrite f
-printRewrite (f,_,_) i = Rewrite t "" where
+printRewrite :: Applicative f => F -> Int -> Rewrite f
+printRewrite (fVar,(as,_),_) i = Rewrite t $ "move print inside " ++ show fVar where
   t (is,ds,fs) =
     let
-      bCs = bindCalls f is
-      -- ASSUMPTION: BINDCALL as generated from specifications have the same number of parameters and return variables
-      -- this rules out application of this transformation on newly introduced accumulators
-      isBaseParam = i < length @[] _rvs
-    in _
+      bCs = bindCalls fVar is
+      boundVars = map ((!! i) . snd) bCs
+      printed = printVars is
+      allPrinted = all (`elem` printed) boundVars
+      printedBound = filter (`elem` boundVars) printed
+      allPrintedOnce = allPrinted && printedBound == nub printedBound
+      isBaseParam = i < length as
+    in if isBaseParam && allPrintedOnce
+      then Just $ pure . inlinePrint fVar i printedBound
+      else Nothing
 
 -- every variable that is printed
 printVars :: [Instruction] -> [Var]
@@ -118,84 +125,44 @@ printVars = concatMap $ \case
   PRINT x -> [x]
   _ -> []
 
--- NOTE: there is a naming issue here if we do this for a loop with more then one
--- retrun point (or a program that uses the name t', which should not happen, because of IndexedVar)
--- inlinePrint :: IRProgram -> IRProgram
--- inlinePrint ([],ds,fs) = ([],ds,fs)
--- inlinePrint p@(BINDCALL f ps [rv] : PRINT t : is,ds,fs)
---   | rv == t =
---     let
---       (_,b) = fromJust $ lookupF f fs
---       (b',ds',fs') = transformProgram tr (b,ds,fs)
---       tr ds fs = (idFold ds fs){ fYield = trYield ds fs }
---       trYield ds fs [rv'] = ([PRINT rv'], ds ,fs)
---       trYield ds fs rvs = ([YIELD rvs], ds, fs)
---     in (BINDCALL f ps [] : is,ds',updateF f (\(f,p,_) -> (f,p,b')) fs')
---   | otherwise =
---     case lookupDef t ds of
---       Just (Const tRhs,n,_) | n <= 1 && vars tRhs == [rv] ->
---         let
---           r y = mapV (\x -> if x == rv then y else x) tRhs
---           (_,b) = fromJust $ lookupF f fs
---           (b',ds',fs') = transformProgram tr (b,ds,fs)
---           tr ds fs = (idFold ds fs){ fYield = trYield ds fs }
---           trYield ds fs [rv'] = ([PRINT (inc t 100)], (inc t 100,Const (r rv'),1,_) : ds ,fs)
---           trYield ds fs rvs = ([YIELD rvs], ds, fs)
---         in (BINDCALL f ps [] : is,ds',updateF f (\(f,p,_) -> (f,p,b')) fs')
---       _ -> p
--- inlinePrint (i:is,ds,fs) = let (is',ds',fs') = inlinePrint (is,ds,fs) in (i:is',ds',fs')
-
-data InstFold a = InstFold
-  { fRead :: Var -> a
-  , fPrint :: Var -> a
-  , fIf :: Var -> a -> a -> a
-  , fTailCall :: Var -> [Var] -> a
-  , fBindCall :: Var -> [Var] -> [Var] -> a
-  , fYield :: [Var] -> a
-  , fNop :: a
-  }
-
-idFold :: [Def] -> [F] -> InstFold IRProgram
-idFold ds fs =
+inlinePrint :: Var -> Int -> [Var] -> IRProgram -> IRProgram
+inlinePrint f i xs (is,ds,fs) =
   let
-    fIf c (t,_,_) (e,ds',fs') = ([IF c t e], ds', fs')
-    fRead x = ([READ x], ds, fs)
-    fPrint x = ([PRINT x], ds, fs)
-    fTailCall x y = ([TAILCALL x y], ds, fs)
-    fBindCall x y z = ([BINDCALL x y z], ds, fs)
-    fYield x = ([YIELD x], ds, fs)
-    fNop = ([NOP], ds, fs)
-  in InstFold{..}
+    is' = removeBinding $ removePrint is
+    fs' = updateF f u fs
+  in (is',ds,fs')
+  where
+    removePrint = concatMap $ \case
+      IF c t e -> [IF c (removePrint t) (removePrint e)]
+      PRINT x -> [ PRINT x | x `notElem` xs ]
+      x -> [x]
+    removeBinding = concatMap $ \case
+      IF c t e -> [IF c (removeBinding t) (removeBinding e)]
+      BINDCALL g ps rvs
+        | g == f -> [BINDCALL f ps (dropIndex i rvs)]
+        | otherwise -> [BINDCALL g ps rvs]
+      x -> [x]
+    u (fVar,(as,bs),is) = (fVar,(as,bs),addPrintYield is)
+    addPrintYield = concatMap $ \case
+      IF c t e -> [IF c (addPrintYield t) (addPrintYield e)]
+      YIELD rvs ->
+        let rvs' = dropIndex i rvs
+        in PRINT (rvs !! i) : [ YIELD rvs' | not $ null rvs' ]
+      x -> [x]
 
-transformProgram :: ([Def] -> [F] -> InstFold IRProgram) -> IRProgram -> IRProgram
-transformProgram _ ([],ds,fs) = ([],ds,fs)
-transformProgram f (i:is,ds,fs) =
-  let
-    InstFold{..} = f ds fs
-    (is',ds',fs') = case i of
-      READ x -> fRead x
-      PRINT x -> fPrint x
-      IF c t e ->
-        let
-          (t',ds',fs') = transformProgram f (t,ds,fs)
-          (e',ds'',fs'') = transformProgram f (e,ds',fs')
-        in fIf c (t',ds'',fs'') (e',ds'',fs'')
-      TAILCALL f ps -> fTailCall f ps
-      BINDCALL f ps rvs -> fBindCall f ps rvs
-      YIELD ps -> fYield ps
-      NOP -> fNop
-    (is'',ds'',fs'') = transformProgram f (is,ds',fs')
-  in (is' ++ is'', ds'', fs'')
+dropIndex :: Int -> [a] -> [a]
+dropIndex i xs
+  | 0 <= i && i < length xs = uncurry (++) . second tail $ splitAt i xs
+  | otherwise = error "dropIndex: index out of bounds"
 
-foldRewrite :: Var -> Int ->  Rewrite FreshVarM
-foldRewrite f i = Rewrite t $ "inline 'external' accumulation for paramter " ++ show i ++ " of " ++ name f
+foldRewrite :: F -> Int ->  Rewrite FreshVarM
+foldRewrite (f,(as,_),_) i = Rewrite t $ "inline 'external' accumulation for paramter " ++ show i ++ " of " ++ name f
   where
     t (is,ds,fs) =
       -- this condition is quite conservative right now to avoid complexity
       let bCs = bindCalls f is
           [(_,rvs)] = bCs
-          Just ((xs,_),_) = lookupF f fs
-          isBaseParam = i < length xs
+          isBaseParam = i < length as
           -- check how many different functions are used on the accumulation parameters inside the function
           -- if its just one (++) than we can apply the transformation
           notUsedOtherwise =  maybe False ((== ["++"]). nub . map printFlat . (\x -> usedOnBaseInScope (baseName x) (name f) ds) . (!! i) . fst . fst) $ lookupF f fs
