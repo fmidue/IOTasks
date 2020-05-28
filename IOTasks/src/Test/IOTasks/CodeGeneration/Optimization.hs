@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
@@ -9,8 +10,7 @@
 {-# LANGUAGE LambdaCase #-}
 module Test.IOTasks.CodeGeneration.Optimization where
 
-import Control.Arrow (second)
-import Control.Applicative ((<|>))
+import Control.Applicative ((<|>), Alternative)
 import Control.Monad (foldM, guard)
 
 import Data.Maybe (fromMaybe, fromJust, isJust)
@@ -22,6 +22,7 @@ import Data.Environment
 import Test.IOTasks.CodeGeneration.IR
 import Test.IOTasks.CodeGeneration.FreshVar
 
+-- general infrastructure
 data Rewrite m = Rewrite
   { rewrite :: IRProgram -> Maybe (IRProgram -> m IRProgram)
   , desc :: String
@@ -73,31 +74,34 @@ inlineRewrite = Rewrite t "inline intermediate definitions" where
         then Just $ \(is,ds,fs) -> pure (is,inlineAll ds,fs)
         else Nothing
 
+-- actual rewrites
 inlineAll :: [Def] -> [Def]
 inlineAll ds = foldr (\d ds' -> fromMaybe ds'$ inline1 d ds') ds ds
 
 inline :: (Var,DefRhs) -> DefRhs -> Maybe DefRhs
-inline (x,t) (U f y v)
-  | x == y = Just $ N f t v
-  | otherwise = Nothing
+inline (x,t) (U f y v) = do
+  guard (x == y)
+  pure $ N f t v
 inline (x,t) (N f y v) = do
   y' <- inline (x,t) y
-  return $ N f y' v
+  pure $ N f y' v
 inline _ (Const _) = Nothing
 
 inline1 :: Def -> [Def] -> Maybe [Def]
-inline1 (x,t,1,_) ds =
-      let ds' = sequenceA [ f (x,t) d <|> Just d | d@(y,_,_,_) <- ds, y /= x ]
-          changed = any isJust $ map (f (x,t)) ds -- duplicate computation TODO: fix
-      in if changed
-        then ds' --guaranteed to be Just
-        else Nothing
+inline1 (x,t,1,_) ds = do
+  ds' <- applyUpdate (update (x,t)) $ filter (\(y,_,_,_) -> y /= x) ds
+  guard $ any snd ds' -- check for change
+  pure $ map fst ds'
   where
-    f x (y,d,n,scp) = do
+    update x (y,d,n,scp) = do
       rhs <-inline x d
       pure (y,rhs,n,scp)
 inline1 _ _ = Nothing
 
+-- apply an update function to each element choosing the new value if it
+-- "succeedes" else keeping the old value. Indicates which elements were updated.
+applyUpdate :: Alternative f => (a -> f a) -> [a] -> f [(a,Bool)]
+applyUpdate update = traverse (\old -> ((,True) <$> update old) <|> pure (old,False))
 
 printRewrite :: Applicative f => F -> Int -> Rewrite f
 printRewrite (fVar,(as,_),_) i = Rewrite t $ "move print inside " ++ show fVar where
@@ -147,7 +151,8 @@ inlinePrint f i xs (is,ds,fs) =
 
 dropIndex :: Int -> [a] -> [a]
 dropIndex i xs
-  | 0 <= i && i < length xs = uncurry (++) . second tail $ splitAt i xs
+  -- | 0 <= i && i < length xs = uncurry (++) . second tail $ splitAt i xs
+  | 0 <= i && i < length xs = (\(xs,_,ys) -> xs ++ ys) $ peekAt i xs
   | otherwise = error "dropIndex: index out of bounds"
 
 foldRewrite :: F -> Int ->  Rewrite FreshVarM
@@ -169,12 +174,11 @@ foldRewrite (f,(as,_),_) i = Rewrite t $ "inline 'external' accumulation for par
 bindCalls :: Var -> [Instruction] -> [([Var],[Var])]
 bindCalls f = concatMap @[] (\case BINDCALL g ps rvs -> [(ps,rvs) | f == g]; _ -> [])
 
--- TODO: generalize to all parameters
 -- "inlining" fold optimization
 foldOpt :: Var -> Int -> IRProgram -> FreshVarM IRProgram
 foldOpt _ _ ([],ds,fs) = return ([],ds,fs)
 -- again, this pattern is conservative to reduce complexity
-foldOpt f n (BINDCALL g (elemAt n -> (ps1,p,ps2)) rvs : PRINT t : is,ds,fs)
+foldOpt f n (BINDCALL g (peekAt n -> (ps1,p,ps2)) rvs : PRINT t : is,ds,fs)
   | f == g =
   case lookupDef t ds of
     Just (rhs,1,_) ->
@@ -196,12 +200,12 @@ foldOpt f n (i:is,ds,fs) = do
   (is',ds',fs') <- foldOpt f n (is,ds,fs)
   return (i:is',ds',fs')
 
-elemAt :: Int -> [a] -> ([a],a,[a])
-elemAt n xs
-  | length xs > n =
-    let (as,b:bs) = splitAt n xs
+peekAt :: Int -> [a] -> ([a],a,[a])
+peekAt i xs
+  | 0 <= i && i < length xs =
+    let (as,b:bs) = splitAt i xs
     in (as,b,bs)
-  | otherwise = error "elemAt: index to large"
+  | otherwise = error "peekAt: index out of bounds"
 
 data ChangeMode = Add Varname | Replace
 
@@ -274,10 +278,10 @@ leavingVars = concatMap f where
 -- incomplete implementation. Currently not sure how to write this in a general way.
 -- especially the starting value is not correct in a general setting.
 extractAlgebra :: AST Var -> Var -> Var -> Maybe (AST Var -> AST Var -> AST Var, AST Var)
-extractAlgebra (App (Leaf f) (Var x)) rv p
-  | x == rv = do
-    (g,z) <- lookup f knownFolds
-    pure (g,z p)
+extractAlgebra (App (Leaf f) (Var x)) rv p = do
+  guard (x == rv)
+  (g,z) <- lookup f knownFolds
+  pure (g,z p)
 extractAlgebra _ _ _ = Nothing
 
 initialAccum :: String -> String -> Var -> AST Var
@@ -345,10 +349,7 @@ addNewParameter new f = map $ \case
   READ x -> READ x
   PRINT x -> PRINT x
   IF c t e -> IF c (addNewParameter new f t) (addNewParameter new f e)
-  TAILCALL g ps ->
-    if f == g
-      then TAILCALL f (ps ++ [new])
-      else TAILCALL g ps
+  TAILCALL g ps -> TAILCALL g (ps ++ [new | f == g ])
   BINDCALL g ps rvs -> BINDCALL g ps rvs
   YIELD x -> YIELD x
   NOP -> NOP
