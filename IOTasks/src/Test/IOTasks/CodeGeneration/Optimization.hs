@@ -65,11 +65,6 @@ rewriteRepl p env = do
       let (Just p',env') = runFreshVarM  (applyRewrite (opts !! (read @Int inp - 1)) p) env
       in rewriteRepl p' env'
 
--- optimizing IRProgram
-optimize :: IRProgram -> IRProgram
-optimize (i,d,f) = (i,d',f)
-  where d' = inlineAll d
-
 inlineRewrite :: Applicative m => Rewrite m
 inlineRewrite = Rewrite t "inline intermediate definitions" where
     t (_,ds,_) =
@@ -106,7 +101,7 @@ inline1 _ _ = Nothing
 
 printRewrite :: Applicative f => F -> Int -> Rewrite f
 printRewrite (fVar,(as,_),_) i = Rewrite t $ "move print inside " ++ show fVar where
-  t (is,ds,fs) =
+  t (is,_,_) =
     let
       bCs = bindCalls fVar is
       boundVars = map ((!! i) . snd) bCs
@@ -357,9 +352,6 @@ addNewParameter new f = map $ \case
   BINDCALL g ps rvs -> BINDCALL g ps rvs
   YIELD x -> YIELD x
   NOP -> NOP
-
-addParameter :: Var -> Var -> [F] -> [F]
-addParameter f p = updateF f $ \(f,(xs,ys),b) -> (f,(xs,ys ++ [p]),b)
 
 usedOnBaseInScope :: Varname -> Varname -> [Def] -> [AST Var]
 usedOnBaseInScope x scp ds = flip usedOn ds =<< filter ((== x) . baseName) (allVarsInScope scp ds)
