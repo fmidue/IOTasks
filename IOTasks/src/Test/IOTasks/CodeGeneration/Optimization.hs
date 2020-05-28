@@ -151,7 +151,6 @@ inlinePrint f i xs (is,ds,fs) =
 
 dropIndex :: Int -> [a] -> [a]
 dropIndex i xs
-  -- | 0 <= i && i < length xs = uncurry (++) . second tail $ splitAt i xs
   | 0 <= i && i < length xs = (\(xs,_,ys) -> xs ++ ys) $ peekAt i xs
   | otherwise = error "dropIndex: index out of bounds"
 
