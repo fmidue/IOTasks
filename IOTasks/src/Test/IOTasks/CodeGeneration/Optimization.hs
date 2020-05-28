@@ -354,17 +354,17 @@ addArguments f p = foldr (\case
 
 introAccums :: [Instruction] -> [Def] -> F -> FreshVarM ([Instruction],[Def],F)
 introAccums gis ds (f,(as,bs),fis) = do
-  (gis',ds',(ps',fis')) <- foldM (\(gis',ds',(ps',fis')) p -> do
+  (gis',ds',(bs',fis')) <- foldM (\(gis',ds',(bs',fis')) p -> do
       (ds',ivs,ys,fis') <- introSingleAccum ds' f p fis'
       let (is,ds'') = addArguments f ivs gis'
-      return (is, ds' ++ ds'',(ps' ++ ys ,fis'))
-    ) (gis,ds,(ps,fis)) ps
-  return (gis',ds',(f,ps',fis'))
+      return (is, ds' ++ ds'',(bs' ++ ys ,fis'))
+    ) (gis,ds,(bs,fis)) as
+  return (gis',ds',(f,(as,bs'),fis'))
 
 introSingleAccum :: [Def] -> Var -> Var -> [Instruction] -> FreshVarM ([Def],[Maybe (Var -> Def)],[Var],[Instruction])
 introSingleAccum ds fVar p is =
     foldM (\(ds',xs,ys,is') f ->
-      case foldParameters f of
+      case lookup f knownFolds of
         Just (g,v) -> do
           x1 <- freshName "acc"
           let [os] = nub $ filter (\x -> baseName x == baseName p && x /= p) $ leavingVars is
@@ -376,10 +376,6 @@ introSingleAccum ds fVar p is =
               Nothing -> return (ds',xs++[Nothing],ys,is')
         Nothing -> return (ds',xs++[Nothing],ys,is')
     ) (ds,[],[],is) (map printFlat $ usedOn p ds)
-
-foldParameters :: String -> Maybe (AST Var -> AST Var -> AST Var, Var -> AST Var)
-foldParameters "length" = Just (\y _ -> App (PostApp y (Leaf "+")) (Leaf "1"), initialAccum "length" "0")
-foldParameters _ = Nothing
 
 -- first parameter are the basenames of the new accumulation parameter and the old one it is derived from
 addNewParameter :: Var -> Var -> [Instruction] -> [Instruction]
