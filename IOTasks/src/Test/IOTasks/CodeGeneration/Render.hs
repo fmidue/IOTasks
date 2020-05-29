@@ -22,7 +22,7 @@ data Render = Render
   , renderBindCall :: ([Doc], Doc) -> (Doc, [Var]) -> Var -> [Var] -> Doc -- (params,ctx), (body, pts), name, rvs
   , renderYield :: ([Doc],Doc) -> Doc -- (params,ctx)
   , renderNop :: Doc
-  , renderLoop :: Var -> [Var] -> Doc -> Doc
+  , renderLoop :: Var -> [Var] -> (Doc,Maybe (Doc,Doc)) -> Doc -- f ps (body,Maybe (modBody,exitCond))
   , renderAssignment :: Var -> DefRhs -> Doc
 
   }
@@ -57,10 +57,22 @@ renderInstruction r@Render{..} ds fs i =
     BINDCALL f ps rvs ->
       case lookupF f fs of
         Just ((xs,ys),is) -> do
+          condInfo <-
+            -- try to detect the loop condition
+            case is of
+              [IF c t [YIELD _]] -> do
+                (cond,_) <- renderVar r ds c
+                body <- PP.vcat <$> mapM (renderInstruction r ds fs) t
+                return $ Just (body,cond)
+              [IF c [YIELD _] e] -> do
+                (cond,_) <- renderVar r ds c
+                body <- PP.vcat <$> mapM (renderInstruction r ds fs) e
+                return $ Just (body,PP.text "!" <> cond)
+              _ -> return Nothing
           body <- PP.vcat <$> mapM (renderInstruction r ds fs) is
           renderBindCall
             <$> renderVars r ds ps
-            <*> pure (renderLoop f (xs++ys) body, (xs++ys))
+            <*> pure (renderLoop f (xs++ys) (body,condInfo), xs++ys)
             <*> pure f
             <*> pure rvs
         Nothing -> error $ "can't find definition for " ++ name f
@@ -118,7 +130,7 @@ haskellRender =
       PP.$$ (if null rvs then id else (tupelize rvs PP.<+> PP.text "<-" PP.<+>)) (PP.text (name f) PP.<+> PP.hsep params)
     renderYield (params,ctx) = ctx PP.$$ PP.text "return" PP.<+> PP.hsep params
     renderNop = mempty
-    renderLoop f ps = PP.hang (PP.text $ "let " ++ name f ++ " " ++ unwords (map name ps) ++ " =") 6
+    renderLoop f ps (body,_) = PP.hang (PP.text $ "let " ++ name f ++ " " ++ unwords (map name ps) ++ " =") 6 body
     renderAssignment x rhs = PP.text ("let " ++ name x ++ " =") PP.<+> printDefRhs rhs
   in Render{..}
 
@@ -144,7 +156,10 @@ pseudoRender =
         PP.$$ loopDef
     renderYield (params,ctx) = PP.text "break;"
     renderNop = mempty
-    renderLoop f ps body =
+    renderLoop f ps (_,Just (body,cond)) =
+      PP.hang (PP.text "while" PP.<+> cond PP.<+> PP.text " {") 2 body
+        PP.$$ PP.text "}"
+    renderLoop f ps (body,_) =
       PP.hang (PP.text "while True {") 2 body
         PP.$$ PP.text "}"
     renderAssignment x rhs = PP.text (name x ++ " :=") PP.<+> printDefRhs rhs
