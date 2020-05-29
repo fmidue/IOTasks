@@ -18,7 +18,7 @@ data Render = Render
   , renderRead :: Var -> Doc
   , renderPrint :: (Doc, Doc) -> Doc -- (argTerm,ctx)
   , renderIf :: (Doc ,Doc) -> Doc -> Doc -> Doc -- (cond,ctx), then, else
-  , renderTailCall :: ([Doc], Doc) -> Var -> [Var] -> Doc -- (params,ctx), name, pts
+  , renderTailCall :: ([Doc], Doc) -> Var -> [Var] -> Doc -- (params,ctx), name, pts -- pts are the names of the parameters at the loop entry
   , renderBindCall :: ([Doc], Doc) -> (Doc, [Var]) -> Var -> [Var] -> Doc -- (params,ctx), (body, pts), name, rvs
   , renderYield :: ([Doc],Doc) -> Doc -- (params,ctx)
   , renderNop :: Doc
@@ -86,7 +86,7 @@ renderVars r ds (v:vs) = do
   (xs,ctxs) <- renderVars r ds vs
   return (x:xs, ctx PP.$$ ctxs)
 
--- returns the a Doc for the actual variable and one wiht the neccessary definitions
+-- returns the a Doc for the actual variable and one with the neccessary definitions
 renderVar :: Render -> [Def] -> Var -> ScopeM (Doc, Doc)
 renderVar r ds x = do
   ctx <- renderContext r ds (neededVars ds x)
@@ -107,7 +107,7 @@ renderContext Render{..} ds xs = do
   let notDef = foldr (\x ys -> if x `notElem` scope then maybe ys (\v -> (x,(\(a,_,_) -> a) v):ys) $ lookupDef x ds else ys) [] xs
   return $ PP.hcat $ map (uncurry renderAssignment) notDef
 
--- printing to Haskell
+-- rendering to Haskell
 haskellRender :: Render
 haskellRender =
   let
@@ -134,33 +134,42 @@ haskellRender =
     renderAssignment x rhs = PP.text ("let " ++ name x ++ " =") PP.<+> printDefRhs rhs
   in Render{..}
 
--- printing to imperative pseudo-code
+-- rendering to imperative pseudo-code
 pseudoCode :: IRProgram -> Doc
 pseudoCode = renderCode pseudoRender
 
+-- this will produce rather unidiomatic code, due to the variable indexing
+-- TODO: WHen is it safe to just drop the indices?
 pseudoRender :: Render
 pseudoRender =
   let
     renderProg = id
     renderRead x = PP.text $ name x ++ " := input();"
-    renderPrint (argTerm,ctx) = PP.text "print" <> PP.parens argTerm <> PP.text ";"
+    renderPrint (argTerm,ctx) = ctx PP.$$ PP.text "print" <> PP.parens argTerm <> PP.text ";"
     renderIf (cond,ctx) thenBranch elseBranch =
-      (PP.text "if" PP.<+> cond PP.<+> PP.text "{")
-        PP.$$ PP.nest 2 thenBranch
-        PP.$$ PP.text "} else {"
-        PP.$$ PP.nest 2 elseBranch
-        PP.$$ PP.text "}"
-    renderTailCall ([ps],ctx) f [pt] = PP.text (name pt ++ " := ") <> ps <> PP.text ";"
-    renderBindCall ([ps],ctx) (loopDef,[ps']) f rvs =
-      PP.text (name ps' ++ " :=") PP.<+> ps
-        PP.$$ loopDef
-    renderYield (params,ctx) = PP.text "break;"
+      PP.vcat
+        [ ctx
+        , PP.text "if" PP.<+> cond PP.<+> PP.text "{"
+        , PP.nest 2 thenBranch
+        , PP.text "} else {"
+        , PP.nest 2 elseBranch
+        , PP.text "}"
+        ]
+    renderTailCall (ps,ctx) _ pts = PP.vcat $ ctx : zipWith (\p pt -> PP.text (name pt ++ " := ") <> p <> PP.text ";") ps pts
+    renderBindCall (ps,ctx) (loopDef,ps') _ rvs =
+      PP.vcat
+        [ ctx
+        , PP.vcat (zipWith (\p p' -> PP.text (name p' ++ " :=") PP.<+> p)  ps ps')
+        , loopDef
+        , PP.vcat (zipWith (\p' rv -> PP.text (name rv ++ " :=") PP.<+> PP.text (name p')) ps' rvs)
+        ]
+    renderYield (_,ctx) = ctx PP.$$ PP.text "break;"
     renderNop = mempty
-    renderLoop f ps (_,Just (body,cond)) =
+    renderLoop _ _ (_,Just (body,cond)) =
       PP.hang (PP.text "while" PP.<+> cond PP.<+> PP.text " {") 2 body
-        PP.$$ PP.text "}"
-    renderLoop f ps (body,_) =
+      PP.$$ PP.text "}"
+    renderLoop _ _ (body,_) =
       PP.hang (PP.text "while True {") 2 body
-        PP.$$ PP.text "}"
+      PP.$$ PP.text "}"
     renderAssignment x rhs = PP.text (name x ++ " :=") PP.<+> printDefRhs rhs
   in Render{..}
