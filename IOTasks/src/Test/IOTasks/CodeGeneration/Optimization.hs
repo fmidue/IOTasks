@@ -49,7 +49,7 @@ rewriteOptions :: IRProgram -> [Rewrite FreshVarM]
 rewriteOptions ir@(_,_,fs) =
   filter (`isApplicable` ir) $ globalRewrites ++ concatMap loopRewrites fs
 
-rewriteRepl :: IRProgram -> [(Varname, Int)] -> IO IRProgram
+rewriteRepl :: IRProgram -> VarInfo -> IO IRProgram
 rewriteRepl p env = do
   putStrLn "Current program:"
   print $ printIRProgram p
@@ -240,8 +240,8 @@ changeUpdate m x g ds = case break (\(z,_,_,_) -> x == z) ds of
     case m of
       Replace -> return $ Just (d1' ++ (x,replaceUpdate g rhs,n,scp) : d2',x)
       Add base -> do
-        accC <- currentName base
-        accF <- freshName base
+        accC <- currentName () base
+        accF <- freshName () base
         return $ Just (d1' ++ [(x,rhs,n,scp),(accF,replaceUpdate g (changeBaseVar accC rhs),n,scp)] ++ d2',accF)
   _ -> return Nothing
 
@@ -331,12 +331,12 @@ introSingleAccum ds fVar p is =
     foldM (\(ds',xs,ys,is') f ->
       case lookup f knownFolds of
         Just (g,v) -> do
-          x1 <- freshName "acc"
+          x1 <- freshName () "acc"
           let [os] = nub $ filter (\x -> baseName x == baseName p && x /= p) $ leavingVars is
           changeUpdate (Add "acc") os g ds'
             >>= \case
               Just (ds',xNew) -> do
-                xp <- freshName "acc"
+                xp <- freshName () "acc"
                 return (changeUsage f p x1 ds',xs++[Just $ \x -> (xp,Const (v x),0,"main")],ys++[x1],addNewParameter xNew fVar is')
               Nothing -> return (ds',xs++[Nothing],ys,is')
         Nothing -> return (ds',xs++[Nothing],ys,is')

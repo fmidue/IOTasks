@@ -1,4 +1,5 @@
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE LambdaCase #-}
 module Test.IOTasks.CodeGeneration.FreshVar where
 
 import Test.IOTasks.CodeGeneration.Analysis (Varname)
@@ -40,11 +41,13 @@ inc (Plain _) _ = error "can not increase index of plain variable"
 
 -- stores next fresh index and a stack of most recent indecies for the current/surounding scopes
 -- invariant: stack is never empty
-newtype FreshVarM a = FreshVarM { runFreshVarM :: [(Varname, Int)] -> (a,[(Varname, Int)]) }
-  deriving (Functor, Applicative, Monad, MonadState [(Varname, Int)]) via (StateT [(Varname, Int)] Identity)
+newtype FreshVarM a = FreshVarM { runFreshVarM :: VarInfo -> (a,VarInfo) }
+  deriving (Functor, Applicative, Monad, MonadState VarInfo) via (StateT VarInfo Identity)
 
-initState :: [(Varname,Int)]
-initState = []
+data VarInfo = VarInfo { fresh :: [(Varname,Int)], current :: [(Varname,Int)], parentScope :: Maybe VarInfo }
+
+initState :: VarInfo
+initState = VarInfo [] [] Nothing
 
 updateContext :: Eq k => (k, Int) -> [(k,Int)] -> [(k,Int)]
 updateContext (k,v) [] = [(k,v)]
@@ -54,15 +57,30 @@ updateContext (k,v) ((k',v') : xs)
 
 -- generating a fresh name under the assumption that user defined variables dont end in numberic sequences
 -- TODO: not a very good assumption
-freshName :: Varname -> FreshVarM IndexedVar
-freshName v = do
-  i <- gets $ (+1) . fromMaybe 0 . lookup v
-  modify $ updateContext (v, i)
+freshName :: () -> Varname -> FreshVarM IndexedVar
+freshName _ v = do
+  i <- gets $ fromMaybe 1 . lookup v . fresh
+  modify $ \(VarInfo fr cu p) -> VarInfo (updateContext (v,i+1) fr) (updateContext (v,i) cu) p
   return $ Indexed v i
 
-currentName :: Varname -> FreshVarM IndexedVar
-currentName v = do
-  i <- gets $ fromMaybe 0 . lookup v
+currentName :: () -> Varname -> FreshVarM IndexedVar
+currentName _ v = do
+  i <- gets $ fromMaybe 0 . lookup v . current
   case i of
     0 -> return $ Initial v
     _ -> return $ Indexed v i
+
+enterScope :: FreshVarM ()
+enterScope = modify $ \info -> info { parentScope  = Just info }
+
+leaveScope :: FreshVarM ()
+leaveScope = modify $ \case
+  VarInfo fr _ (Just p) -> p { fresh = fr }
+  VarInfo{} -> error "leaveScope: no parent scope"
+
+scoped :: FreshVarM a -> FreshVarM a
+scoped m = do
+  enterScope
+  a <- m
+  leaveScope
+  return a
