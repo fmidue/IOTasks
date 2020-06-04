@@ -5,21 +5,19 @@
 -- module Test.IOTasks.SpecGen (specGen, loopBodyGen) where
 module Test.IOTasks.SpecGen where
 
-import Data.Environment (Environment, Varname)
+import Data.Environment (Varname)
 import Test.IOTasks.ValueSet (ValueSet)
 import Test.IOTasks.Specification
 import Test.IOTasks.Language (exit, ints,nats, getCurrent, getAll, var, StringEmbedding)
+import Test.IOTasks (SpecTerm)
 
 import Data.Term (PVarTerm)
 import Data.Term.Liftable (Liftable)
 import qualified Data.Term.Liftable.Prelude as T
-import Data.Term.ITerm (ITerm)
 
 import Test.QuickCheck
 
 import Type.Reflection (Typeable)
-
-type SpecTerm = ITerm Environment Varname
 
 -- limited versions of old generators for testing
 -- TODO: improve for better coverage

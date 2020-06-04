@@ -15,8 +15,6 @@ import qualified Data.Term.Liftable.Prelude as T
 -- Specification and corresponding implementation of
 -- a simple hangman game.
 
-type SpecTerm = ITerm Environment Varname
-
 -- possible elements to build the secret from
 hangmanDomain :: [Int]
 hangmanDomain = [0..9]

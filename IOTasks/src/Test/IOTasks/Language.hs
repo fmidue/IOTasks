@@ -19,6 +19,7 @@ module Test.IOTasks.Language
   , ints
   , nats
   , StringEmbedding
+  , SpecTerm
   ) where
 
 import Data.Dynamic (Typeable)
@@ -26,12 +27,13 @@ import Data.Dynamic (Typeable)
 import Test.IOTasks.Utils
 import Test.IOTasks.Specification
 import Data.Term
-import Data.Environment (Varname)
+import Data.Environment (Varname, Environment)
 import Test.IOTasks.ValueSet
 import Test.IOTasks.Pattern
 
 import Test.QuickCheck (Gen, Arbitrary, elements)
 
+type SpecTerm = ITerm Environment Varname
 
 readInput :: Varname -> ValueSet -> Specification t
 readInput x vs = Spec [ReadInput x vs]

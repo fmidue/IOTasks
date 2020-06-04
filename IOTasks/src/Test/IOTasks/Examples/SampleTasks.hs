@@ -5,7 +5,7 @@ module Test.IOTasks.Examples.SampleTasks where
 
 import Prelude hiding (putStrLn, getLine, readLn, print, putStr)
 
-import Test.IOTasks
+import Test.IOTasks hiding (SpecTerm)
 
 import Data.Term.Typed.AST (AST)
 import Data.Term.Liftable (litT)

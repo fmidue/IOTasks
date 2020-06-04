@@ -22,6 +22,7 @@ module Test.IOTasks (
   ints,
   nats,
   StringEmbedding,
+  SpecTerm,
   -- * Combinators
   readTillFixedLength,
   readUntil,

@@ -56,9 +56,8 @@ library:
   - Test.IOTasks.SpecGen
   - Test.IOTasks.Examples.SampleTasks
   - Test.IOTasks.Examples.Hangman
-  # - Test.IOTasks.CodeGeneration.IR
-  # - Test.IOTasks.CodeGeneration.Analysis
-  # - Test.IOTasks.CodeGeneration.Optimization
+  - Test.IOTasks.CodeGeneration
+  - Test.IOTasks.TaskGeneration.Task
 
 tests:
   IOTasks-test:
