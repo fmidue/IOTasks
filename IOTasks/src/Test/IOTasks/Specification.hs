@@ -29,8 +29,8 @@ import Data.MonoTraversable.Unprefixed (foldr)
 
 import Type.Reflection (Typeable)
 
-import Text.PrettyPrint.Annotated.HughesPJClass (Pretty)
-import qualified Text.PrettyPrint.Annotated.HughesPJClass as PP
+import Text.PrettyPrint.HughesPJClass (Pretty)
+import qualified Text.PrettyPrint.HughesPJClass as PP
 
 newtype Specification t = Spec [Action (Specification t) t]
   deriving (Semigroup, Monoid, MonoFoldable) via [Action (Specification t) t]
@@ -52,14 +52,19 @@ instance (Pretty r, SynTerm t (AST Varname)) => Show (Action r t) where
   show = PP.render . PP.pPrint
 
 instance SynTerm t (AST Varname) => Pretty (Specification t) where
-  pPrint (Spec []) = PP.text "0" PP.$$ PP.text " "
-  pPrint (Spec as) = PP.vcat (PP.pPrint <$> as) PP.$$ PP.text " "
+  pPrint (Spec []) = PP.text "0"
+  pPrint (Spec as) = PP.vcat (PP.pPrint <$> as)
 
 instance (Pretty r, SynTerm t (AST Varname)) => Pretty (Action r t) where
-  pPrint (ReadInput x _) = PP.text "ReadInput" PP.<+> PP.text (show x) PP.<+> PP.text "_"
-  pPrint (WriteOutput b ps ts) = PP.hsep [PP.text "WriteOutput", PP.text (show b), PP.text (show ps), PP.text (show (printFlat' . viewTerm @_ @(AST Varname) <$> ts))]
-  pPrint (Branch c s1 s2) = PP.hang (PP.text "Branch" PP.<+> PP.parens (PP.text $ printFlat' $ viewTerm @_ @(AST Varname) c)) 2 (PP.parens (PP.pPrint s1) PP.$+$ PP.parens (PP.pPrint s2))
-  pPrint (TillE s) = PP.hang (PP.text "TillE") 2 (PP.parens (PP.pPrint s))
+  pPrint (ReadInput x _) = PP.text "[ |>" PP.<+> PP.text (show x) PP.<+> PP.text "]"
+  pPrint (WriteOutput b ps ts) =
+    let terms = PP.hcat . PP.punctuate PP.comma $ map (`pPrintTermPattern` ts) ([mempty | b] ++ ps)
+    in PP.hcat [PP.text "[", PP.braces terms, PP.text "|> ]"]
+  pPrint (Branch c s1 s2) =
+    PP.hang (PP.text "if" PP.<+> PP.text (printFlat' $ viewTerm @_ @(AST Varname) c)) 2
+            (PP.text "then" PP.<+> PP.parens (PP.pPrint s2)
+      PP.$+$ PP.text "else" PP.<+> PP.parens (PP.pPrint s1))
+  pPrint (TillE s) = PP.parens (PP.pPrint s PP.$$ PP.text " ") <> PP.text "->E"
   pPrint E = PP.text "E"
 
 -- move into Combinators ?

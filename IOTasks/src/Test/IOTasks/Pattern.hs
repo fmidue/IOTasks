@@ -18,10 +18,12 @@ module Test.IOTasks.Pattern
   , fillHoles
   , emptyPattern
   , isContainedIn
+  , pPrintTermPattern
   ) where
 
 import Data.Environment
-import Data.Term (SemTerm(..))
+import Data.Term (SemTerm(..),SynTerm(..))
+import Data.Term.AST
 import Test.IOTasks.Utils
 
 import Data.Coerce
@@ -33,7 +35,7 @@ import Test.QuickCheck
 import Text.Parsec
 import Text.Parsec.Char (endOfLine)
 import Text.Parsec.String
-import Text.PrettyPrint.HughesPJClass (Pretty)
+import Text.PrettyPrint.HughesPJClass (Pretty,Doc)
 import qualified Text.PrettyPrint.HughesPJClass as PP
 
 -- ----------------------------- --
@@ -128,6 +130,13 @@ instance Pretty (SimplePattern l) where
   pPrint Linebreak = PP.text "\\n"
   pPrint NoBreak = PP.text "~"
   pPrint Backslash = PP.text "\\\\"
+
+pPrintTermPattern :: SynTerm t (AST String) => TermPattern -> [t a] -> Doc
+pPrintTermPattern (TermPattern []) _ = PP.text "epsilon"
+pPrintTermPattern (TermPattern ps) ts = mconcat . flip map ps $ \case
+  Hole i | i < length ts -> semBrackets (PP.text . printFlat' $ viewTerm @_ @(AST Varname) $ ts !! i)
+  p -> PP.pPrint p
+  where semBrackets d = PP.text "[|" <> d <> PP.text "|]"
 
 newlineToWhitespace :: String -> String
 newlineToWhitespace = map (\c -> if c == '\n' then ' ' else c)
