@@ -45,11 +45,11 @@ type Program = IOrep ()
 forUnknownSpec :: Gen (Specification SpecTerm) -> (Specification SpecTerm -> TaskBody s) -> Task s
 forUnknownSpec = Task
 
-imperativeSolution :: Specification SpecTerm -> Description
-imperativeSolution = pseudoCode . programIR
+imperativeProgram :: Specification SpecTerm -> Description
+imperativeProgram = pseudoCode . programIR
 
-haskellSolution :: Specification SpecTerm -> Description
-haskellSolution = haskellCode . programIR
+haskellProgram :: Specification SpecTerm -> Description
+haskellProgram = haskellCode . programIR
 
 behavior :: Specification SpecTerm -> Require Program
 behavior = flip fulfills
@@ -64,8 +64,7 @@ solveWith = TaskBody
 task :: Task (Trace String)
 task = forUnknownSpec simpleSpec $ \s ->
   (PP.text "Give an example interaction for the following Haskell program:"
-  PP.$$ haskellSolution s
-  PP.$$ PP.pPrint s)
+    PP.$$ haskellProgram s)
   `solveWith` sampleTrace s
 
 readTrace :: IO (Trace String)
