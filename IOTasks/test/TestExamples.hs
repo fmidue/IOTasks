@@ -107,9 +107,9 @@ testExamples = describe "Testing Test.IOTasks.Examples.Examples:" $ do
   --       in not (null is) ==> fulfillsNotFor @(IOrep ()) (init is) (buildComputation s) s))
 
   prop "tillExit s === tillExit (s <> tillExit s <> exit) " $
-    forAll loopBodyGen $ \s -> testEquiv
-      (tillExit s)
-      (tillExit (s <> tillExit s <> exit))
+    forAll loopBodyGen $ \(s,i) -> testEquiv
+      (i <> tillExit s)
+      (i <> tillExit (s <> tillExit s <> exit))
 
   prop "s1 <> (s2 <> s3) === (s1 <> s2) <> s3" $
     forAll ((,,) <$> specGen <*> specGen <*> specGen) $

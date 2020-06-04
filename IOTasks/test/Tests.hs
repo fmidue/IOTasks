@@ -9,6 +9,8 @@ import Test.IOTasks.Examples.Hangman
 import Test.Hspec (hspec, describe)
 import Test.Hspec.QuickCheck (prop)
 
+import Debug.Trace
+
 main :: IO ()
 main = hspec $ do
   testExamples
