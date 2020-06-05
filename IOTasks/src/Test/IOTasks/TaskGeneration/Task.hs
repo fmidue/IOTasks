@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Test.IOTasks.TaskGeneration.Task where
 
 import Data.Char (isSpace)
@@ -5,15 +6,16 @@ import Data.Char (isSpace)
 import Test.QuickCheck
 
 import qualified Text.PrettyPrint.HughesPJ as PP
-import qualified Text.PrettyPrint.HughesPJClass as PP
 
 import Text.Parsec
 import Text.Parsec.String (Parser)
 
+import Data.Term.Class
+import Data.Term.AST
+
 import Test.IOTasks hiding (putStrLn, getLine)
 import Test.IOTasks.Trace
 import Test.IOTasks.SpecGen
-
 import Test.IOTasks.CodeGeneration
 
 -- Internal API --
@@ -21,7 +23,7 @@ import Test.IOTasks.CodeGeneration
 -- tasks over solution type s
 data Task s = Task
   { generator :: Gen (Specification SpecTerm) -- generator for the underlying specification
-  , body :: Specification SpecTerm -> TaskBody s -- the actual task, depending on the generated specifciation
+  , body :: Specification SpecTerm -> Gen (TaskBody s) -- the actual task generator, depending on the generated specifciation
   }
 
 data TaskBody s = TaskBody
@@ -34,22 +36,25 @@ type Require s = s -> Property
 
 taskRunnerIO :: IO a -> Task a -> IO ()
 taskRunnerIO getAnswer t = do
-  spec <- generate $ generator t
-  let TaskBody desc req = body t spec
+  TaskBody desc req <- generate $ do
+    spec <- generator t
+    body t spec
   putStrLn $ PP.render desc
   quickCheck . req =<< getAnswer
 
 -- external API --
 type Program = IOrep ()
 
-forUnknownSpec :: Gen (Specification SpecTerm) -> (Specification SpecTerm -> TaskBody s) -> Task s
+forUnknownSpec :: Gen (Specification SpecTerm) -> (Specification SpecTerm -> Gen (TaskBody s)) -> Task s
 forUnknownSpec = Task
 
 imperativeProgram :: Specification SpecTerm -> Description
 imperativeProgram = pseudoCode . programIR
 
-haskellProgram :: Specification SpecTerm -> Description
-haskellProgram = haskellCode . programIR
+haskellProgram :: (SynTerm t (AST Varname), VarListTerm t Varname) => Specification t -> Gen Description
+haskellProgram p =
+  let ps = fst $ runFreshVarM (programVariants =<< programIR' p) emptyVarInfo
+  in haskellCode <$> elements ps
 
 behavior :: Specification SpecTerm -> Require Program
 behavior = flip fulfills
@@ -62,10 +67,12 @@ solveWith = TaskBody
 
 -- example task
 task :: Task (Trace String)
-task = forUnknownSpec simpleSpec $ \s ->
-  (PP.text "Give an example interaction for the following Haskell program:"
-    PP.$$ haskellProgram s)
-  `solveWith` sampleTrace s
+task = forUnknownSpec simpleSpec $ \s -> do
+  prog <- haskellProgram s
+  return $
+    ( PP.text "Give an example interaction for the following Haskell program:"
+      PP.$$ prog
+    ) `solveWith` sampleTrace s
 
 readTrace :: IO (Trace String)
 readTrace = do

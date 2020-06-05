@@ -34,6 +34,16 @@ applyRewrite r x = traverse ($ x) (rewrite r x)
 isApplicable :: Rewrite m -> IRProgram -> Bool
 isApplicable r x = isJust $ rewrite r x
 
+-- all possible rewrite 'paths' for a given program
+programVariants :: IRProgram -> FreshVarM [IRProgram]
+programVariants p = do
+  let steps = rewriteOptions p
+  r <- fromJust <$$> traverse (`applyRewrite` p) steps
+  pure $ p : r
+
+(<$$>) :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
+(<$$>) = fmap . fmap
+
 -- interactive rewriting
 globalRewrites :: [Rewrite FreshVarM]
 globalRewrites =
