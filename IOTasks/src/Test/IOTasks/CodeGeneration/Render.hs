@@ -36,6 +36,10 @@ evalScopeM m = fst . runScopeM m
 haskellCode :: IRProgram -> Doc
 haskellCode = renderCode haskellRender
 
+haskellWithReadWriteHoles :: IRProgram -> Doc
+haskellWithReadWriteHoles = renderCode haskellRender{ renderRead = hole, renderPrint = hole}
+  where hole _ = PP.text "???" 
+
 renderCode :: Render -> IRProgram -> Doc
 renderCode r@Render{..} (is,ds,fs) =
     renderProg $ PP.vcat $ evalScopeM (mapM (renderInstruction r ds fs) is) []

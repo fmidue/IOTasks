@@ -51,10 +51,10 @@ forUnknownSpec = Task
 imperativeProgram :: Specification SpecTerm -> Description
 imperativeProgram = pseudoCode . programIR
 
-haskellProgram :: (SynTerm t (AST Varname), VarListTerm t Varname) => Specification t -> Gen Description
-haskellProgram p =
+specProgram :: (SynTerm t (AST Varname), VarListTerm t Varname) => Specification t -> Gen IRProgram
+specProgram p =
   let ps = fst $ runFreshVarM (programVariants =<< programIR' p) emptyVarInfo
-  in haskellCode <$> elements ps
+  in elements ps
 
 behavior :: Specification SpecTerm -> Require Program
 behavior = flip fulfills
@@ -62,17 +62,31 @@ behavior = flip fulfills
 sampleTrace :: Specification SpecTerm -> Require (Trace String)
 sampleTrace s t = property $ accept s t
 
+compilingProgram :: Require String
+compilingProgram _ = property True -- TODO: implement
+
 solveWith :: Description -> Require s -> TaskBody s
 solveWith = TaskBody
 
 -- example task
-task :: Task (Trace String)
-task = forUnknownSpec simpleSpec $ \s -> do
-  prog <- haskellProgram s
+task1 :: Task (Trace String)
+task1 = forUnknownSpec simpleSpec $ \s -> do
+  prog <- haskellCode <$> specProgram s
   return $
     ( PP.text "Give an example interaction for the following Haskell program:"
       PP.$$ prog
     ) `solveWith` sampleTrace s
+
+type Code = String
+
+task2 :: Task Code
+task2 = forUnknownSpec simpleSpec $ \s -> do
+  prog <- haskellWithReadWriteHoles <$> specProgram s
+  return $
+    ( PP.text "Complete the following template into a syntactically correct program"
+      PP.$$ PP.text "(replace the ??? with calls to readLn and print)"
+      PP.$$ prog
+    ) `solveWith` compilingProgram
 
 readTrace :: IO (Trace String)
 readTrace = do

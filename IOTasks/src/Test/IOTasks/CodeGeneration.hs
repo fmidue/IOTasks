@@ -3,6 +3,7 @@ module Test.IOTasks.CodeGeneration (
   programIR,
   programIR',
   haskellCode,
+  haskellWithReadWriteHoles,
   pseudoCode,
   programVariants,
   FreshVarM,
