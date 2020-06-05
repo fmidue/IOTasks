@@ -10,6 +10,7 @@
 {-# LANGUAGE LambdaCase #-}
 module Test.IOTasks.CodeGeneration.Optimization where
 
+import Control.Arrow (first,(***))
 import Control.Applicative ((<|>), Alternative)
 import Control.Monad (foldM, guard)
 
@@ -319,24 +320,31 @@ accumOpt (is,ds,fs) =
     return (is'',ds'',fs'++[f'])
     ) (is,ds,[]) fs
 
-addArguments :: Var -> [Maybe (Var -> Def)] -> [Instruction] -> ([Instruction],[Def])
-addArguments f p = foldr (\case
-  BINDCALL g ps rvs ->
-    let vds = concat $ zipWith (\g x -> maybe [] pure (g <*> pure x)) p ps
-        newVs = map (\(x,_,_,_) -> x) vds
-    in \(is,ds) -> (BINDCALL g (if f == g then ps ++ newVs else ps) rvs : is, vds ++ ds)
-  x -> \(is,ds) -> (x:is,ds)) ([],[])
+addArguments :: Var -> Int -> [Var -> Def] -> [Instruction] -> ([Instruction], [Def])
+addArguments f i new =
+  foldr (\case
+    BINDCALL g ps rvs ->
+      let newParamDefs = concat [ map ($ p) new | f == g, (p,j) <- zip ps [0..], i == j ]
+          newParamVars = map (\(x,_,_,_) -> x) newParamDefs
+      in (BINDCALL g (ps ++ newParamVars) rvs :) *** (++ newParamDefs)
+    x -> first (x :)
+  ) ([],[])
 
 introAccums :: [Instruction] -> [Def] -> F -> FreshVarM ([Instruction],[Def],F)
 introAccums gis ds (f,(as,bs),fis) = do
-  (gis',ds',(bs',fis')) <- foldM (\(gis',ds',(bs',fis')) p -> do
+  (gis',ds',(bs',fis')) <- foldM (\(gis',ds',(bs',fis')) (p,i) -> do
       (ds',ivs,ys,fis') <- introSingleAccum ds' f p fis'
-      let (is,ds'') = addArguments f ivs gis'
+      let (is, ds'') = addArguments f i ivs gis'
       return (is, ds' ++ ds'',(bs' ++ ys ,fis'))
-    ) (gis,ds,(bs,fis)) as
+    ) (gis,ds,(bs,fis)) (zip as [0..])
   return (gis',ds',(f,(as,bs'),fis'))
 
-introSingleAccum :: [Def] -> Var -> Var -> [Instruction] -> FreshVarM ([Def],[Maybe (Var -> Def)],[Var],[Instruction])
+-- returns
+-- (updated definitions
+-- , initialValues for new variables (depending on their 'origin' varaiable)
+-- , new variables
+-- , updated instructions)
+introSingleAccum :: [Def] -> Var -> Var -> [Instruction] -> FreshVarM ([Def],[Var -> Def],[Var],[Instruction])
 introSingleAccum ds fVar p is =
     foldM (\(ds',xs,ys,is') f ->
       case lookup f knownFolds of
@@ -347,9 +355,12 @@ introSingleAccum ds fVar p is =
             >>= \case
               Just (ds',xNew) -> do
                 xp <- freshName () "acc"
-                return (changeUsage f p x1 ds',xs++[Just $ \x -> (xp,Const (v x),0,"main")],ys++[x1],addNewParameter xNew fVar is')
-              Nothing -> return (ds',xs++[Nothing],ys,is')
-        Nothing -> return (ds',xs++[Nothing],ys,is')
+                return (changeUsage f p x1 ds'
+                       ,xs++[\x -> (xp,Const (v x),0,"main")]
+                       ,ys++[x1]
+                       ,addNewParameter xNew fVar is')
+              Nothing -> return (ds',xs,ys,is')
+        Nothing -> return (ds',xs,ys,is')
     ) (ds,[],[],is) (map printFlat $ usedOn p ds)
 
 -- first parameter are the basenames of the new accumulation parameter and the old one it is derived from
