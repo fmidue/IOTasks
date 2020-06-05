@@ -15,7 +15,7 @@ import Data.Term.AST
 import qualified Data.Map as Map
 
 programIR :: (VarListTerm t Varname, SynTerm t (AST Varname)) => Specification t -> IRProgram
-programIR s = fst $ runFreshVarM (programIR' s) initState
+programIR s = fst $ runFreshVarM (programIR' s) emptyVarInfo
 
 programIR' :: (VarListTerm t Varname, SynTerm t (AST Varname)) => Specification t -> FreshVarM IRProgram
 programIR' s = foldr1 (<:>) <$> mapM (translate "main" (rootUsageFacts x)) x

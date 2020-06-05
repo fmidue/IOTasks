@@ -46,8 +46,8 @@ newtype FreshVarM a = FreshVarM { runFreshVarM :: VarInfo -> (a,VarInfo) }
 
 data VarInfo = VarInfo { fresh :: [(Varname,Int)], current :: [(Varname,Int)], parentScope :: Maybe VarInfo }
 
-initState :: VarInfo
-initState = VarInfo [] [] Nothing
+emptyVarInfo :: VarInfo
+emptyVarInfo = VarInfo [] [] Nothing
 
 updateContext :: Eq k => (k, Int) -> [(k,Int)] -> [(k,Int)]
 updateContext (k,v) [] = [(k,v)]
