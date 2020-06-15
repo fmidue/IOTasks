@@ -44,7 +44,7 @@ runProgram is
   -- acc: accumulates writes
   go :: Maybe String -> [String] -> IOrep () -> OrdinaryTrace
   go Nothing (x:xs) (GetLine f) = ProgRead x $ go Nothing xs (f x)
-  go (Just acc) (x:xs) (GetLine f) = ProgWrite (reverse acc) $ go Nothing xs (f x)
+  go (Just acc) (x:xs) (GetLine f) = ProgWrite (reverse acc) $ ProgRead x $ go Nothing xs (f x)
 
   go Nothing [] (GetLine _) = ProgRead "<unkonwn input>" undefined
   go (Just acc) [] (GetLine _) = ProgWrite (reverse acc) $ ProgRead "<unkonwn input>" undefined
