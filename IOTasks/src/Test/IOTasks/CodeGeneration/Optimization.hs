@@ -23,6 +23,8 @@ import Data.Environment
 import Test.IOTasks.CodeGeneration.IR
 import Test.IOTasks.CodeGeneration.FreshVar
 
+import Debug.Trace
+
 -- general infrastructure
 data Rewrite m = Rewrite
   { rewrite :: IRProgram -> Maybe (IRProgram -> m IRProgram)
@@ -36,10 +38,12 @@ isApplicable :: Rewrite m -> IRProgram -> Bool
 isApplicable r x = isJust $ rewrite r x
 
 -- all possible rewrite 'paths' for a given program
+-- TODO: check does this share fresh variables between paths?
 programVariants :: IRProgram -> FreshVarM [IRProgram]
 programVariants p = do
   let steps = rewriteOptions p
-  r <- fromJust <$$> traverse (`applyRewrite` p) steps
+  rs <- fromJust <$$> traverse (`applyRewrite` p) steps
+  r <- concat <$> mapM programVariants rs
   pure $ p : r
 
 (<$$>) :: (Functor f, Functor g) => (a -> b) -> f (g a) -> f (g b)
