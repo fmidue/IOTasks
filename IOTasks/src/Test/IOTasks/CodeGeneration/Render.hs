@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -22,7 +23,7 @@ data Render = Render
   , renderBindCall :: ([Doc], Doc) -> (Doc, [Var]) -> Var -> [Var] -> Doc -- (params,ctx), (body, pts), name, rvs
   , renderYield :: ([Doc],Doc) -> Doc -- (params,ctx)
   , renderNop :: Doc
-  , renderLoop :: Var -> [Var] -> (Doc,Maybe (Doc,Doc)) -> Doc -- f ps (body,Maybe (modBody,exitCond))
+  , renderLoop :: Var -> [Var] -> (Doc,Maybe (Doc,Doc,Doc)) -> Doc -- f ps (body,Maybe (modBody,suffix,exitCond))
   , renderAssignment :: Var -> DefRhs -> Doc
 
   }
@@ -38,7 +39,7 @@ haskellCode = renderCode haskellRender
 
 haskellWithReadWriteHoles :: IRProgram -> Doc
 haskellWithReadWriteHoles = renderCode haskellRender{ renderRead = hole, renderPrint = hole}
-  where hole _ = PP.text "???" 
+  where hole _ = PP.text "???"
 
 renderCode :: Render -> IRProgram -> Doc
 renderCode r@Render{..} (is,ds,fs) =
@@ -64,14 +65,16 @@ renderInstruction r@Render{..} ds fs i =
           condInfo <-
             -- try to detect the loop condition
             case is of
-              [IF c t [YIELD _]] -> do
+              [IF c t@(hasExposedYield -> False) e@(hasExposedYield -> True)] -> do
                 (cond,_) <- renderVar r ds c
                 body <- PP.vcat <$> mapM (renderInstruction r ds fs) t
-                return $ Just (body,cond)
-              [IF c [YIELD _] e] -> do
+                suff <- PP.vcat <$> mapM (renderInstruction r ds fs) (dropYield e)
+                return $ Just (body,suff,cond)
+              [IF c t@(hasExposedYield -> True) e@(hasExposedYield -> False)] -> do
                 (cond,_) <- renderVar r ds c
                 body <- PP.vcat <$> mapM (renderInstruction r ds fs) e
-                return $ Just (body,PP.text "!" <> cond)
+                suff <- PP.vcat <$> mapM (renderInstruction r ds fs) (dropYield t)
+                return $ Just (body,suff,PP.text "!" <> cond)
               _ -> return Nothing
           body <- PP.vcat <$> mapM (renderInstruction r ds fs) is
           renderBindCall
@@ -82,6 +85,19 @@ renderInstruction r@Render{..} ds fs i =
         Nothing -> error $ "can't find definition for " ++ name f
     YIELD rvs -> renderYield <$> renderVars r ds rvs
     NOP -> return renderNop
+
+-- (conservatively) look for unconditionally reachable YIELD
+hasExposedYield :: [Instruction] -> Bool
+hasExposedYield [] = False
+hasExposedYield (YIELD{} : _) = True
+hasExposedYield (IF{} : _) = False
+hasExposedYield (_:xs) = hasExposedYield xs
+
+dropYield :: [Instruction] -> [Instruction]
+dropYield = concatMap f where
+  f YIELD{} = []
+  f (IF c t e) = [IF c (dropYield t) (dropYield e)]
+  f x = [x]
 
 renderVars :: Render -> [Def] -> [Var] -> ScopeM ([Doc], Doc)
 renderVars _ _ [] = return ([],mempty)
@@ -132,6 +148,7 @@ haskellRender =
       PP.$$ ctx
       -- actual call
       PP.$$ (if null rvs then id else (tupelize rvs PP.<+> PP.text "<-" PP.<+>)) (PP.text (name f) PP.<+> PP.hsep params)
+    renderYield ([],_) = PP.empty
     renderYield (params,ctx) = ctx PP.$$ PP.text "return" PP.<+> PP.hsep params
     renderNop = mempty
     renderLoop f ps (body,_) = PP.hang (PP.text $ "let " ++ name f ++ " " ++ unwords (map name ps) ++ " =") 6 body
@@ -169,9 +186,10 @@ pseudoRender =
         ]
     renderYield (_,ctx) = ctx PP.$$ PP.text "break;"
     renderNop = mempty
-    renderLoop _ _ (_,Just (body,cond)) =
+    renderLoop _ _ (_,Just (body,suff,cond)) =
       PP.hang (PP.text "while" PP.<+> cond PP.<+> PP.text " {") 2 body
       PP.$$ PP.text "}"
+      PP.$$ suff
     renderLoop _ _ (body,_) =
       PP.hang (PP.text "while True {") 2 body
       PP.$$ PP.text "}"

@@ -161,7 +161,7 @@ inlinePrint f i xs (is,ds,fs) =
       IF c t e -> [IF c (addPrintYield t) (addPrintYield e)]
       YIELD rvs ->
         let rvs' = dropIndex i rvs
-        in PRINT (rvs !! i) : [ YIELD rvs' | not $ null rvs' ]
+        in [ PRINT (rvs !! i),  YIELD rvs' ]
       x -> [x]
 
 dropIndex :: Int -> [a] -> [a]
