@@ -23,10 +23,10 @@ import Test.IOTasks.CodeGeneration
 -- tasks over solution type s
 data Task s = Task
   { generator :: Gen (Specification SpecTerm) -- generator for the underlying specification
-  , body :: Specification SpecTerm -> Gen (TaskBody s) -- the actual task generator, depending on the generated specifciation
+  , body :: Specification SpecTerm -> Gen (TaskInstance s) -- the actual task generator, depending on the generated specifciation
   }
 
-data TaskBody s = TaskBody
+data TaskInstance s = TaskInstance
   { question :: Description -- a (verbal) description of the task
   , requires :: Require s -- the decider for a correct solution
   }
@@ -36,16 +36,25 @@ type Require s = s -> Property
 
 taskRunnerIO :: IO a -> Task a -> IO ()
 taskRunnerIO getAnswer t = do
-  TaskBody desc req <- generate $ do
-    spec <- generator t
-    body t spec
+  TaskInstance desc req <- generateTaskInstance t
   putStrLn $ PP.render desc
   quickCheck . req =<< getAnswer
+
+showTaskInstance :: Task a -> IO ()
+showTaskInstance t = do
+  i <- generateTaskInstance t
+  putStrLn . PP.render $ question i
+
+generateTaskInstance :: Task a -> IO (TaskInstance a)
+generateTaskInstance t =
+  generate $ do
+    spec <- generator t
+    body t spec
 
 -- external API --
 type Program = IOrep ()
 
-forUnknownSpec :: Gen (Specification SpecTerm) -> (Specification SpecTerm -> Gen (TaskBody s)) -> Task s
+forUnknownSpec :: Gen (Specification SpecTerm) -> (Specification SpecTerm -> Gen (TaskInstance s)) -> Task s
 forUnknownSpec = Task
 
 imperativeProgram :: Specification SpecTerm -> Description
@@ -63,12 +72,20 @@ sampleTrace :: Specification SpecTerm -> Require (Trace String)
 sampleTrace s t = property $ accept s t
 
 compilingProgram :: Require String
-compilingProgram _ = property True -- TODO: implement
+compilingProgram _ = property True -- TODO: implement, or let submission platform check this.
 
-solveWith :: Description -> Require s -> TaskBody s
-solveWith = TaskBody
+solveWith :: Description -> Require s -> TaskInstance s
+solveWith = TaskInstance
 
 -- example task
+task :: Task Program
+task = forUnknownSpec simpleSpec $ \s -> do
+  prog <- pseudoCode <$> specProgram s
+  return $
+    ( PP.text "Re-implement the following program in Haskell:"
+      PP.$$ prog
+    ) `solveWith` behavior s
+
 task1 :: Task (Trace String)
 task1 = forUnknownSpec simpleSpec $ \s -> do
   prog <- haskellCode <$> specProgram s
