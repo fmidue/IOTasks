@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE FlexibleContexts #-}
 module Test.IOTasks.TaskGeneration.Task where
 
@@ -6,17 +7,20 @@ import Data.Char (isSpace)
 import Test.QuickCheck
 
 import qualified Text.PrettyPrint.HughesPJ as PP
+import qualified Text.PrettyPrint.HughesPJClass as PP
 
 import Text.Parsec
 import Text.Parsec.String (Parser)
 
 import Data.Term.Class
 import Data.Term.AST
+import qualified Data.Term.Liftable.Prelude as T
 
 import Test.IOTasks hiding (putStrLn, getLine)
 import Test.IOTasks.Trace
 import Test.IOTasks.SpecGen
 import Test.IOTasks.CodeGeneration
+import Test.IOTasks.TraceSet
 
 -- Internal API --
 
@@ -77,9 +81,27 @@ compilingProgram _ = property True -- TODO: implement, or let submission platfor
 solveWith :: Description -> Require s -> TaskInstance s
 solveWith = TaskInstance
 
+exampleTraces :: Specification SpecTerm -> Gen [Trace String]
+exampleTraces s = do
+  ts <- vectorOf 5 $ traceGen s `suchThat` (\t -> length (inputsN t) <= 3)
+  return $ map (\t -> runProgram (inputsN t) $ buildComputation s) ts
+
+producingTraces :: [Trace String] -> Require Program
+producingTraces ts p = property $ all (\t -> runProgram (inputs t) p == t) ts
+
 -- example task
+fixedGen :: Gen (Specification SpecTerm)
+fixedGen = return $
+  readInput "n" (intValues [0..10]) <>
+  tillExit (
+    branch ( T.length (getAll @Int "xs") T.== getCurrent "n")
+     ( readInput "xs" (intValues [-10..10]) )
+     exit
+  ) <>
+  writeOutput [var 0] [T.sum $ getAll @Int "xs"]
+
 task :: Task Program
-task = forUnknownSpec simpleSpec $ \s -> do
+task = forUnknownSpec fixedGen $ \s -> do
   prog <- pseudoCode <$> specProgram s
   return $
     ( PP.text "Re-implement the following program in Haskell:"
@@ -104,6 +126,30 @@ task2 = forUnknownSpec simpleSpec $ \s -> do
       PP.$$ PP.text "(replace the ??? with calls to readLn and print)"
       PP.$$ prog
     ) `solveWith` compilingProgram
+
+task3 :: Task Program
+task3 = forUnknownSpec fixedGen $ \s -> do
+  ts <- exampleTraces s
+  return $
+    ( PP.text "Write a program capable of these interactions:"
+      PP.$$ PP.vcat (map PP.pPrint ts)
+    ) `solveWith` producingTraces ts
+
+task3' :: Task Program
+task3' = forUnknownSpec fixedGen $ \s -> do
+  ts <- exampleTraces s
+  return $
+    ( PP.text "Complete the given skeleton into a program capable of these interactions:"
+      PP.$$ PP.vcat (map PP.pPrint ts)
+      PP.$$ PP.vcat
+        [ PP.text ""
+        , PP.text "main :: IO ()"
+        , PP.text "main = do"
+        , PP.text "  n <- ???"
+        , PP.text "  xs <- replicateM ??? ???"
+        , PP.text "  print ???"
+        ]
+    ) `solveWith` producingTraces ts -- adherence to the skeleton is unchecked
 
 readTrace :: IO (Trace String)
 readTrace = do

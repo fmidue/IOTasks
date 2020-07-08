@@ -15,6 +15,7 @@ module Test.IOTasks.Trace (
   isCoveredBy,
   printGenNTraceInfo,
   inputsN,
+  inputs,
   MatchResult(..),
   ppResult,
   ppTrace,
@@ -189,3 +190,8 @@ inputsN (ProgReadN v t) = v : inputsN t
 inputsN (ProgWriteReadN _ v t) = v : inputsN t
 inputsN (ProgWriteStopN _) = []
 inputsN StopN = []
+
+inputs :: Trace a  -> [String]
+inputs (ProgRead v t) = v : inputs t
+inputs (ProgWrite _ t) = inputs t
+inputs Stop = []
