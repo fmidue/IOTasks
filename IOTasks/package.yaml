@@ -38,6 +38,7 @@ dependencies:
 - fgl
 - transparent-terms
 - dynamic-environment
+- contravariant
 
 library:
   source-dirs: src

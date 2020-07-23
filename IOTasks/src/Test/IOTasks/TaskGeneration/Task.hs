@@ -1,167 +1,79 @@
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TupleSections #-}
 module Test.IOTasks.TaskGeneration.Task where
-
-import Data.Char (isSpace)
 
 import Test.QuickCheck
 
+import Data.Functor.Contravariant
+import Data.Functor.Contravariant.Divisible
+
 import qualified Text.PrettyPrint.HughesPJ as PP
-import qualified Text.PrettyPrint.HughesPJClass as PP
 
-import Text.Parsec
-import Text.Parsec.String (Parser)
+instance Contravariant Require where
+  contramap f (Require r) = Require (r . f)
 
-import Data.Term.Class
-import Data.Term.AST
-import qualified Data.Term.Liftable.Prelude as T
+instance Divisible Require where
+  divide f r s = Require $
+    \x -> let (y,z) = f x in check r y .&&. check s z
+  conquer = Require $ const (property True)
 
-import Test.IOTasks hiding (putStrLn, getLine)
-import Test.IOTasks.Trace
-import Test.IOTasks.SpecGen
-import Test.IOTasks.CodeGeneration
-import Test.IOTasks.TraceSet
+instance Contravariant TaskInstance where
+  contramap f (TaskInstance d r) = TaskInstance d (contramap f r)
 
--- Internal API --
-
--- tasks over solution type s
-data Task s = Task
-  { generator :: Gen (Specification SpecTerm) -- generator for the underlying specification
-  , body :: Specification SpecTerm -> Gen (TaskInstance s) -- the actual task generator, depending on the generated specifciation
-  }
-
-data TaskInstance s = TaskInstance
-  { question :: Description -- a (verbal) description of the task
-  , requires :: Require s -- the decider for a correct solution
-  }
+instance Contravariant (TaskTemplate s) where
+  contramap f (TaskTemplate g fb) = TaskTemplate g (fmap (contramap f) . fb)
 
 type Description = PP.Doc
-type Require s = s -> Property
 
-taskRunnerIO :: IO a -> Task a -> IO ()
-taskRunnerIO getAnswer t = do
-  TaskInstance desc req <- generateTaskInstance t
-  putStrLn $ PP.render desc
-  quickCheck . req =<< getAnswer
+data TaskInstance s = TaskInstance
+    { question :: Description
+    , requires :: Require s
+    }
 
-showTaskInstance :: Task a -> IO ()
+newtype Require s = Require { check :: s -> Property}
+
+exactAnswer :: (Eq a, Show a) => a -> Require a
+exactAnswer x = Require $ \s -> s === x
+
+data TaskTemplate p s = TaskTemplate
+  { parameter :: Gen p
+  , inst :: p -> Gen (TaskInstance s)
+  }
+
+runTaskIO :: TaskTemplate p s -> IO s -> IO ()
+runTaskIO task getAnswer = do
+  TaskInstance q req <- generateTaskInstance task
+  putStrLn $ PP.render q
+  s <- getAnswer
+  quickCheck $ check req s
+
+showTaskInstance :: TaskTemplate p s -> IO ()
 showTaskInstance t = do
   i <- generateTaskInstance t
   putStrLn . PP.render $ question i
 
-generateTaskInstance :: Task a -> IO (TaskInstance a)
-generateTaskInstance t =
+generateTaskInstance :: TaskTemplate p s -> IO (TaskInstance s)
+generateTaskInstance task =
   generate $ do
-    spec <- generator t
-    body t spec
+    p <- parameter task
+    inst task p
 
--- external API --
-type Program = IOrep ()
+forFixed :: p -> (p -> Gen (TaskInstance s)) -> TaskTemplate p s
+forFixed p = TaskTemplate (pure p)
 
-forUnknownSpec :: Gen (Specification SpecTerm) -> (Specification SpecTerm -> Gen (TaskInstance s)) -> Task s
-forUnknownSpec = Task
-
-imperativeProgram :: Specification SpecTerm -> Description
-imperativeProgram = pseudoCode . programIR
-
-specProgram :: (SynTerm t (AST Varname), VarListTerm t Varname) => Specification t -> Gen IRProgram
-specProgram p =
-  let ps = fst $ runFreshVarM (programVariants =<< programIR' p) emptyVarInfo
-  in elements ps
-
-behavior :: Specification SpecTerm -> Require Program
-behavior = flip fulfills
-
-sampleTrace :: Specification SpecTerm -> Require (Trace String)
-sampleTrace s t = property $ accept s t
-
-compilingProgram :: Require String
-compilingProgram _ = property True -- TODO: implement, or let submission platform check this.
+forUnknown :: Gen p -> (p -> Gen (TaskInstance s)) -> TaskTemplate p s
+forUnknown = TaskTemplate
 
 solveWith :: Description -> Require s -> TaskInstance s
 solveWith = TaskInstance
 
-exampleTraces :: Specification SpecTerm -> Gen [Trace String]
-exampleTraces s = do
-  ts <- vectorOf 5 $ traceGen s `suchThat` (\t -> length (inputsN t) <= 3)
-  return $ map (\t -> runProgram (inputsN t) $ buildComputation s) ts
+(/\) :: Require a -> Require b -> Require (a,b)
+(/\) = divided
 
-producingTraces :: [Trace String] -> Require Program
-producingTraces ts p = property $ all (\t -> runProgram (inputs t) p == t) ts
-
--- example task
-fixedGen :: Gen (Specification SpecTerm)
-fixedGen = return $
-  readInput "n" (intValues [0..10]) <>
-  tillExit (
-    branch ( T.length (getAll @Int "xs") T.== getCurrent "n")
-     ( readInput "xs" (intValues [-10..10]) )
-     exit
-  ) <>
-  writeOutput [var 0] [T.sum $ getAll @Int "xs"]
-
-task :: Task Program
-task = forUnknownSpec fixedGen $ \s -> do
-  prog <- pseudoCode <$> specProgram s
-  return $
-    ( PP.text "Re-implement the following program in Haskell:"
-      PP.$$ prog
-    ) `solveWith` behavior s
-
-task1 :: Task (Trace String)
-task1 = forUnknownSpec simpleSpec $ \s -> do
-  prog <- haskellCode <$> specProgram s
-  return $
-    ( PP.text "Give an example interaction for the following Haskell program:"
-      PP.$$ prog
-    ) `solveWith` sampleTrace s
-
-type Code = String
-
-task2 :: Task Code
-task2 = forUnknownSpec simpleSpec $ \s -> do
-  prog <- haskellWithReadWriteHoles <$> specProgram s
-  return $
-    ( PP.text "Complete the following template into a syntactically correct program"
-      PP.$$ PP.text "(replace the ??? with calls to readLn and print)"
-      PP.$$ prog
-    ) `solveWith` compilingProgram
-
-task3 :: Task Program
-task3 = forUnknownSpec fixedGen $ \s -> do
-  ts <- exampleTraces s
-  return $
-    ( PP.text "Write a program capable of these interactions:"
-      PP.$$ PP.vcat (map PP.pPrint ts)
-    ) `solveWith` producingTraces ts
-
-task3' :: Task Program
-task3' = forUnknownSpec fixedGen $ \s -> do
-  ts <- exampleTraces s
-  return $
-    ( PP.text "Complete the given skeleton into a program capable of these interactions:"
-      PP.$$ PP.vcat (map PP.pPrint ts)
-      PP.$$ PP.vcat
-        [ PP.text ""
-        , PP.text "main :: IO ()"
-        , PP.text "main = do"
-        , PP.text "  n <- ???"
-        , PP.text "  xs <- replicateM ??? ???"
-        , PP.text "  print ???"
-        ]
-    ) `solveWith` producingTraces ts -- adherence to the skeleton is unchecked
-
-readTrace :: IO (Trace String)
-readTrace = do
-  inp <- getLine
-  let tr = parse traceParser "<string>" inp
-  either (error . show) return tr
-
-traceParser :: Parser (Trace String)
-traceParser = chainr (parseStep '?' ProgRead <|> parseStep '!' ProgWrite ) ((<>) <$ satisfy isSpace) Stop
-  where
-    parseStep :: Char -> (String -> Trace String -> Trace String) -> Parser (Trace String)
-    parseStep mark cnstr = do
-      _ <- char mark
-      i <- many alphaNum
-      pure $ cnstr i Stop
+multipleChoice :: Show a => Int -> [a] -> [a] -> Gen (Description, [Int])
+multipleChoice n rs ws = do
+  let  rs' = map (,True) rs
+       ws' = map (,False) ws
+  cs <- take n <$> shuffle (rs' ++ ws')
+  let  desc = PP.vcat $ zipWith (\i x -> PP.text $ show i ++ ") " ++ show x) [1..] (map fst cs)
+       is = [ i | (i,(_,correct)) <- zip [1..] cs, correct ]
+  return (desc,is)
