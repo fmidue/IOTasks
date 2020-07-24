@@ -1,7 +1,6 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE ExplicitForAll #-}
 {-# LANGUAGE QuantifiedConstraints #-}
-{- HLINT ignore -}
 module Data.Term.Class where
 
 import Type.Reflection
