@@ -2,5 +2,5 @@
 
 Examples for writing specifications can be found under [IOTasks/src/Test/IOTasks/Examples](IOTasks/src/Test/IOTasks/Examples).
 
-For task-template examples see [IOTasks/src/Test/IOTasks/TaskGeneration/Examples](IOTasks/src/Test/IOTasks/TaskGeneration/Examples).
+For task-template examples see [IOTasks/src/Test/IOTasks/TaskGeneration/Examples](IOTasks/src/Test/IOTasks/TaskGeneration/Examples.hs).
 You can generate tasks from templates by cloning the repository and using ```showTaskInstance <example-name>``` after invoking ```stack ghci```.
