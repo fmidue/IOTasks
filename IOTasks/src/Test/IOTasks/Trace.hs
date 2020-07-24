@@ -100,6 +100,7 @@ ppResult (OutputMismatch msg) = PP.hang (PP.text "OutputMismatch:") 4 msg
 ppResult (AlignmentMismatch msg) = PP.hang (PP.text "AlignmentMismatch:") 4 msg
 ppResult (TerminationMismatch msg) = PP.hang (PP.text "TerminationMismatch:") 4 msg
 
+{- HLINT ignore isCoveredBy-}
 isCoveredBy :: OrdinaryTrace -> GeneralizedTrace -> MatchResult
 isCoveredBy u v = isCoveredBy' (normalize u) v
   where
@@ -170,7 +171,7 @@ ppNTraceHead = ppTraceHead (printSet . fromMergeSet)
 
 printGenNTraceInfo :: GeneralizedTrace -> Doc
 printGenNTraceInfo t = inputSequence PP.$+$ generalizedRun
-  where inputSequence = PP.hang (PP.text "Input sequence:") 4 $ PP.hsep $ (PP.text . ('?' :)) <$> inputsN t
+  where inputSequence = PP.hang (PP.text "Input sequence:") 4 $ PP.hsep $ PP.text . ('?' :) <$> inputsN t
         generalizedRun = PP.hang (PP.text "Expected run (generalized):") 4 $ ppNTrace t
 
 -- ommit occurences of !{}

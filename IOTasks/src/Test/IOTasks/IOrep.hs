@@ -61,6 +61,7 @@ class Monad m => MonadTeletype m where
   putChar :: Char -> m ()
   getLine :: m String
 
+  {- HLINT ignore puStr -}
   putStr :: String -> m ()
   putStr = mapM_ putChar
 

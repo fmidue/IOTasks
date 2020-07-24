@@ -30,7 +30,7 @@ newtype Semantics m a = Semantics { runSemantics :: Environment Varname -> m (Ei
   deriving (Functor, Applicative, Monad, MonadTeletype, MonadState (Environment Varname), MonadError Exit, MonadGen)
     via ExceptT Exit (StateT (Environment Varname) m)
 
-evalSemantics :: Monad m => Semantics m a -> (Environment Varname) -> m (Either Exit a)
+evalSemantics :: Monad m => Semantics m a -> Environment Varname -> m (Either Exit a)
 evalSemantics m c = fst <$> runSemantics m c
 
 instance Monad m => Semigroup (Semantics m ()) where

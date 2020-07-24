@@ -4,7 +4,6 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE StandaloneDeriving #-}
 module Test.IOTasks.CodeGeneration.Analysis
   -- (
   -- printProgram,
@@ -97,7 +96,7 @@ annotateSpec t@Transfer{..} (normalizeSpec -> Spec as) = go as where
   go (WriteOutput o ps ts : s') =
     let r = go s'
     in AnnAction (tWrite ts (safeHeadFact r))  (WriteOutput o ps ts) : r
-  go (Branch c s1 s2 : []) =
+  go [Branch c s1 s2] =
     let q1 = annotateSpec t s1
         q2 = annotateSpec t s2
     in [AnnAction
