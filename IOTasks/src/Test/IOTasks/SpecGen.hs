@@ -1,17 +1,23 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes #-}
 -- module Test.IOTasks.SpecGen (specGen, loopBodyGen) where
 module Test.IOTasks.SpecGen where
+
+import Debug.Trace
+
+import Data.Functor.Identity
 
 import Data.Environment (Varname)
 import Test.IOTasks.ValueSet (ValueSet)
 import Test.IOTasks.Specification
 import Test.IOTasks.Language (exit, ints,nats, getCurrent, getAll, var, StringEmbedding)
-import Test.IOTasks (SpecTerm)
+import Test.IOTasks (SpecTerm, branch)
 
-import Data.Term (PVarTerm)
+import Data.Term (PVarTerm,VarListTerm)
 import Data.Term.Liftable (Liftable, litT)
 import qualified Data.Term.Liftable.Prelude as T
 
@@ -38,6 +44,22 @@ simpleSpec = do
   p <- outputOneof (intTerm ["xs","y"] ["n"])
   return $ i <> l <> p
 
+-- generator for pairs of very simple (no loops) similar specifications
+-- TODO: fix terms often containing []
+simpleSimilar :: (VarListTerm t Varname, Liftable t, PVarTerm t Varname) => Gen (Specification t, Specification t)
+simpleSimilar = do
+  (l1,vs) <- linearSpec lists xs
+  (l2,_) <- linearSpec lists xs
+  (l3,_) <- linearSpec lists xs
+  (c1,c2) <- differentConditions (fst <$> lists) vs
+  return
+    ( l1 <> branch c1 l2 l3
+    , l1 <> branch c2 l2 l3
+    )
+  where
+    lists = [("x",ints),("y",ints)]
+    xs = [("n", nats), ("m", ints)]
+
 -- basic generators
 input :: [(Varname,ValueSet)] -> Gen (Specification t)
 input xs = do
@@ -46,7 +68,7 @@ input xs = do
 
 someInputs :: [(Varname,ValueSet)] -> Int -> Gen (Specification t)
 someInputs xs nMax = do
-  n <- choose (0,nMax)
+  n <- choose (1,nMax)
   is <- vectorOf n $ input xs
   return $ mconcat is
 
@@ -73,6 +95,16 @@ outputSome' b ts = do
   return $ Spec [WriteOutput b [var 0] ts']
 
 -- generators with more complex invariants
+
+-- branch free sequence of inputs and outputs
+linearSpec :: (VarListTerm t Varname, PVarTerm t Varname, Liftable t) => [(Varname,ValueSet)] -> [(Varname,ValueSet)] -> Gen (Specification t, [Varname])
+linearSpec lists xs = sized $ \n -> do
+  is <- someInputs (lists ++ xs) (n `div` 2)
+  let vs = traceShowId $ specVars is
+  os <- resize (n `div` 2) $ listOf1 $ outputOneof (intTerm vs vs)
+  let spec = is <> mconcat os
+  return (spec,specVars spec)
+
 data Condition t = Condition { condTerm :: t Bool, progressInfo :: (Varname,ValueSet) }
 
 -- generates a numeric condition of the form
@@ -128,17 +160,30 @@ intTerm lists xs =
       return $ f (getCurrent x) (getCurrent y)
 
 condition :: (PVarTerm t Varname, Liftable t) => [Varname] -> [Varname] -> Gen (t Bool)
-condition lists xs = oneof [unary, binary]
+condition lists xs = runIdentity <$> condition' (fmap Identity . elements) lists xs
+
+newtype P a = P { unP :: (a,a) } deriving Functor
+
+differentConditions :: (PVarTerm t Varname, Liftable t) => [Varname] -> [Varname] -> Gen (t Bool, t Bool)
+differentConditions lists xs = unP <$> condition' (fmap P . choosePair) lists xs
+
+condition' :: (PVarTerm t Varname, Liftable t, Functor f) => (forall a. [a] -> Gen (f a)) -> [Varname] -> [Varname] -> Gen (f (t Bool))
+condition' select lists xs = oneof [unary, binary]
   where
     unary = do
       x <- elements lists
-      f <- elements [T.null, T.not . T.null]
-      return $ f $ getAll @Int x
+      ff <- select [T.null, T.not . T.null]
+      return $ (\f -> f $ getAll @Int x) <$> ff
     binary = do
-      op <- elements [(T.==),(T.>),(T.<)]
+      fop <- select [(T.==),(T.>),(T.<)]
       t1 <- intTerm lists xs
       t2 <- intTerm lists xs
-      return $ t1 `op` t2
+      return $ (\op -> t1 `op` t2) <$> fop
+
+-- choose two different values from a list
+choosePair :: [a] -> Gen (a,a)
+choosePair xs = elements [ (a,b) | (a,i) <- options, (b,j) <- options, i /= j ]
+  where options = zip xs ([1..] :: [Int])
 
 -- currently not used
 -- splits (non-negative) n into k (non-negative) values s.t. sum [n_1,..,n_k] == n

@@ -3,8 +3,7 @@ module Test.IOTasks.TaskGeneration.Examples where
 
 import Data.Function (on)
 import Data.Functor.Contravariant
-import Data.List (isInfixOf)
-import Data.List (sortBy)
+import Data.List (isInfixOf,sortBy)
 
 import qualified Text.PrettyPrint.HughesPJ as PP
 import qualified Text.PrettyPrint.HughesPJClass as PP
@@ -74,11 +73,11 @@ exampleTraces s n = do
   return $ map (\t -> runProgram (inputsN t) $ buildComputation s) ts'
 
 randomSpecification :: Gen Specification
-randomSpecification = simpleSpec
+randomSpecification = oneof [simpleSpec, return example, return example']
 
--- TODO: replace mock-up generator
+-- TODO: use more meaningfull generator
 similarSpecifications :: Gen (Specification,Specification)
-similarSpecifications = return (example,example')
+similarSpecifications = oneof [resize 3 simpleSimilar] -- return (example,example')]
 
 trace1 :: TaskTemplate Specification Trace
 trace1 = forUnknown randomSpecification $ \s -> do
@@ -189,7 +188,7 @@ prog5 = forUnknown randomSpecification $ \s -> do
 
 desc1 :: TaskTemplate (Specification,Specification) Bool
 desc1 = forUnknown similarSpecifications $ \(spec1,spec2) -> do
-  sameBehavior <- elements [True,False]
+  sameBehavior <- elements $ False : [ True | hasDifferentPrograms spec1 ] -- TODO: better handle this
   (p1,p2) <-
     if sameBehavior
       then differentPrograms spec1 spec1
@@ -200,6 +199,10 @@ desc1 = forUnknown similarSpecifications $ \(spec1,spec2) -> do
       PP.$$ PP.text "---"
       PP.$$ p2
     ) `solveWith` exactAnswer sameBehavior
+
+hasDifferentPrograms :: Specification -> Bool
+hasDifferentPrograms s = length variants > 1
+  where variants = fst $ runFreshVarM (programVariants =<< programIR' s) emptyVarInfo
 
 differentPrograms  :: Specification -> Specification
                    -> Gen (Description,Description)
