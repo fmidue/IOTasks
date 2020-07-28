@@ -4,6 +4,7 @@ module Test.IOTasks.TaskGeneration.Examples where
 import Data.Function (on)
 import Data.Functor.Contravariant
 import Data.List (isInfixOf)
+import Data.List (sortBy)
 
 import qualified Text.PrettyPrint.HughesPJ as PP
 import qualified Text.PrettyPrint.HughesPJClass as PP
@@ -22,6 +23,7 @@ import qualified Data.Term.Liftable.Prelude as T (sum, length, (==))
 
 import Test.IOTasks.TaskGeneration.Task
 import Test.IOTasks.CodeGeneration
+import Test.IOTasks.SpecGen
 
 type Specification = IOT.Specification SpecTerm
 type Trace = Trace.Trace String
@@ -56,6 +58,7 @@ sampleTrace s = Require $ \t -> property $ accept s t
 haskellProgram :: Specification -> Gen Description
 haskellProgram s = haskellCode <$> specProgram s
 
+-- Currently produces not Python code but rather some imperative pseudo-code
 pythonProgram :: Specification -> Gen Description
 pythonProgram s = pseudoCode <$> specProgram s
 
@@ -66,13 +69,14 @@ specProgram p =
 
 exampleTraces :: Specification -> Int -> Gen [Trace]
 exampleTraces s n = do
-  ts <- vectorOf n $ traceGen s `suchThat` (\t -> length (inputsN t) <= 3)
-  return $ map (\t -> runProgram (inputsN t) $ buildComputation s) ts
+  ts <- vectorOf (n*3) $ traceGen s
+  let ts' = take n $ sortBy (compare `on` length . inputsN) ts --prefer shorter traces
+  return $ map (\t -> runProgram (inputsN t) $ buildComputation s) ts'
 
--- TODO: replace mock-up generators
 randomSpecification :: Gen Specification
-randomSpecification = return example
+randomSpecification = simpleSpec
 
+-- TODO: replace mock-up generator
 similarSpecifications :: Gen (Specification,Specification)
 similarSpecifications = return (example,example')
 
