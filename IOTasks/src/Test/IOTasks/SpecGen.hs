@@ -124,7 +124,7 @@ loop xs loopCondition = do
   Condition c (xp,vs) <- loopCondition
   let progress = ReadInput xp vs
   s1 <- someInputs xs 2
-  s1' <- insert progress mempty
+  s1' <- insert progress s1
   s <- oneof
     [ return $ Branch c s1' exit
     , return $ Branch (T.not c) exit s1'
