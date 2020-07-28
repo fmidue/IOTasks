@@ -7,6 +7,7 @@ import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
 
 import qualified Text.PrettyPrint.HughesPJ as PP
+import Text.PrettyPrint.HughesPJClass (Pretty(pPrint))
 
 instance Contravariant Require where
   contramap f (Require r) = Require (r . f)
@@ -75,5 +76,14 @@ multipleChoice n rs ws = do
        ws' = map (,False) ws
   cs <- take n <$> shuffle (rs' ++ ws')
   let  desc = PP.vcat $ zipWith (\i x -> PP.text $ show i ++ ") " ++ show x) [1..] (map fst cs)
+       is = [ i | (i,(_,correct)) <- zip [1..] cs, correct ]
+  return (desc,is)
+
+multipleChoicePP :: Pretty a => Int -> [a] -> [a] -> Gen (Description, [Int])
+multipleChoicePP n rs ws = do
+  let  rs' = map (,True) rs
+       ws' = map (,False) ws
+  cs <- take n <$> shuffle (rs' ++ ws')
+  let  desc = PP.vcat $ zipWith (\i x -> PP.text (show i ++ ") ") <> pPrint x) [1..] (map fst cs)
        is = [ i | (i,(_,correct)) <- zip [1..] cs, correct ]
   return (desc,is)

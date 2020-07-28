@@ -216,7 +216,7 @@ desc2 = forUnknown similarSpecifications $ \(spec1,spec2) -> do
   p <- haskellProgram spec1
   ts1 <- exampleTraces spec1 5
   ts2 <- exampleTraces spec2 5
-  (choices, solution) <- multipleChoice 7 ts1 ts2
+  (choices, solution) <- multipleChoicePP 7 ts1 ts2
   return $
     (PP.text "Which of the given trace can the program below produce?"
      PP.$$ p
