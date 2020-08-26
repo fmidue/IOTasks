@@ -8,7 +8,7 @@ import Prelude hiding (putStrLn, getLine, readLn, print, putStr)
 import Test.IOTasks hiding (SpecTerm)
 
 import Data.Term.Typed.AST (AST)
-import Data.Term.Liftable (litT)
+import Data.Term.Liftable (litT, liftT)
 import qualified Data.Term.Liftable.Prelude as T
 
 import Control.Monad (replicateM,replicateM_)
@@ -163,3 +163,26 @@ printNSpec (QC.Positive n) x = repeatSpec n $ writeFixedOutput [text (show x) <>
 
 printN :: Int -> Int -> IOrep ()
 printN n x = replicateM_ n $ print x
+
+-- Example 6:
+-- 'local state' programs
+printSequenceSpec :: Specification SpecTerm
+printSequenceSpec =
+  readInput "x" (values [1 :: Int .. 9])
+  -- this way of lifting, obviously, hides the definition of output
+  <> writeOutput [var 0] [liftT (unlines . output,"output") $ getCurrent @Int "x"]
+  where
+    output :: Int -> [String]
+    output 1 = ["1"]
+    output x = show x : if even x then output (x `div` 2) else output (x + 1)
+
+printSequence :: IOrep ()
+printSequence = do
+  v <- readLn
+  let loop 1 = print 1
+      loop x = do
+        print x
+        if even x
+          then loop (x `div` 2)
+          else loop (x + 1)
+  loop v
