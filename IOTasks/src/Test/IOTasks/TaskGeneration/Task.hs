@@ -1,4 +1,5 @@
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ExistentialQuantification #-}
 module Test.IOTasks.TaskGeneration.Task where
 
 import Test.QuickCheck
@@ -20,7 +21,7 @@ instance Divisible Require where
 instance Contravariant TaskInstance where
   contramap f (TaskInstance d r) = TaskInstance d (contramap f r)
 
-instance Contravariant (TaskTemplate s) where
+instance Contravariant TaskTemplate where
   contramap f (TaskTemplate g fb) = TaskTemplate g (fmap (contramap f) . fb)
 
 type Description = PP.Doc
@@ -35,33 +36,33 @@ newtype Require s = Require { check :: s -> Property}
 exactAnswer :: (Eq a, Show a) => a -> Require a
 exactAnswer x = Require $ \s -> s === x
 
-data TaskTemplate p s = TaskTemplate
+data TaskTemplate s = forall p. TaskTemplate
   { parameter :: Gen p
   , inst :: p -> Gen (TaskInstance s)
   }
 
-runTaskIO :: TaskTemplate p s -> IO s -> IO ()
+runTaskIO :: TaskTemplate s -> IO s -> IO ()
 runTaskIO task getAnswer = do
   TaskInstance q req <- generateTaskInstance task
   putStrLn $ PP.render q
   s <- getAnswer
   quickCheck $ check req s
 
-showTaskInstance :: TaskTemplate p s -> IO ()
+showTaskInstance :: TaskTemplate s -> IO ()
 showTaskInstance t = do
   i <- generateTaskInstance t
   putStrLn . PP.render $ question i
 
-generateTaskInstance :: TaskTemplate p s -> IO (TaskInstance s)
-generateTaskInstance task =
+generateTaskInstance :: TaskTemplate s -> IO (TaskInstance s)
+generateTaskInstance (TaskTemplate param inst) =
   generate $ do
-    p <- parameter task
-    inst task p
+    p <- param
+    inst p
 
-forFixed :: p -> (p -> Gen (TaskInstance s)) -> TaskTemplate p s
+forFixed :: p -> (p -> Gen (TaskInstance s)) -> TaskTemplate s
 forFixed p = TaskTemplate (pure p)
 
-forUnknown :: Gen p -> (p -> Gen (TaskInstance s)) -> TaskTemplate p s
+forUnknown :: Gen p -> (p -> Gen (TaskInstance s)) -> TaskTemplate s
 forUnknown = TaskTemplate
 
 solveWith :: Description -> Require s -> TaskInstance s

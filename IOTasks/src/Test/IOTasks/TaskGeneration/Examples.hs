@@ -77,9 +77,10 @@ randomSpecification = oneof [simpleSpec, return example, return example']
 
 -- TODO: use more meaningfull generator
 similarSpecifications :: Gen (Specification,Specification)
-similarSpecifications = oneof [resize 3 simpleSimilar] -- return (example,example')]
+-- similarSpecifications = oneof [resize 3 simpleSimilar]
+similarSpecifications = return (example,example')
 
-trace1 :: TaskTemplate Specification Trace
+trace1 :: TaskTemplate Trace
 trace1 = forUnknown randomSpecification $ \s -> do
   prog <- haskellProgram s
   ~[t] <- exampleTraces s 1
@@ -91,7 +92,7 @@ trace1 = forUnknown randomSpecification $ \s -> do
 
 type Input = String
 
-trace2 :: TaskTemplate (Specification,Specification) [Input]
+trace2 :: TaskTemplate [Input]
 trace2 = forUnknown similarSpecifications $ \(spec1,spec2) -> do
   p1 <- haskellProgram spec1
   p2 <- haskellProgram spec2
@@ -107,7 +108,7 @@ triggeringDifference :: Specification -> Specification -> Require [Input]
 triggeringDifference s1 s2 = Require $ \is ->
   ((=/=) `on` (runProgram is . buildComputation)) s1 s2
 
-prog1 :: TaskTemplate Specification Program
+prog1 :: TaskTemplate Program
 prog1 = forUnknown randomSpecification $ \s -> do
   ts <- exampleTraces s 5
   return $
@@ -120,7 +121,7 @@ producingTraces :: [Trace] -> Require Program
 producingTraces ts = Require $ \p ->
   property $ all (\t -> runProgram (inputs t) p == t) ts
 
-prog2 :: TaskTemplate Specification Program
+prog2 :: TaskTemplate Program
 prog2 = forFixed example $ \s -> do
   ts <- exampleTraces s 5
   return $
@@ -141,7 +142,7 @@ haskellWithHoles s = haskellWithReadWriteHoles <$> specProgram s
 
 type Code = String
 
-prog3 :: TaskTemplate Specification Code
+prog3 :: TaskTemplate Code
 prog3 = forUnknown randomSpecification $ \s -> do
   prog <- haskellWithHoles s
   return $
@@ -154,7 +155,7 @@ prog3 = forUnknown randomSpecification $ \s -> do
 compilingProgram :: Require Code
 compilingProgram = Require $ const $ property True
 
-prog4 :: TaskTemplate Specification (Program, Code)
+prog4 :: TaskTemplate (Program, Code)
 prog4 = forFixed example $ \spec -> do
   p <- haskellFoldProgram spec
   return $
@@ -173,12 +174,12 @@ haskellFoldProgram s = do
   return $ haskellCode p
 
 -- sketch for simplification of prog4 via contramap
-prog4' :: TaskTemplate Specification Code
+prog4' :: TaskTemplate Code
 prog4' =  parseCode >$< prog4 where
   parseCode :: Code -> (Program, Code)
   parseCode = undefined
 
-prog5 :: TaskTemplate Specification Program
+prog5 :: TaskTemplate Program
 prog5 = forUnknown randomSpecification $ \s -> do
   prog <- pythonProgram s
   return $
@@ -186,7 +187,7 @@ prog5 = forUnknown randomSpecification $ \s -> do
       PP.$$ prog
     ) `solveWith` behavior s
 
-desc1 :: TaskTemplate (Specification,Specification) Bool
+desc1 :: TaskTemplate Bool
 desc1 = forUnknown similarSpecifications $ \(spec1,spec2) -> do
   sameBehavior <- elements $ False : [ True | hasDifferentPrograms spec1 ] -- TODO: better handle this
   (p1,p2) <-
@@ -211,12 +212,12 @@ differentPrograms s1 s2 = do
   p2 <- haskellProgram s2 `suchThat` (/= p1)
   return (p1,p2)
 
-desc2 :: TaskTemplate (Specification,Specification) [Int]
+desc2 :: TaskTemplate [Int]
 desc2 = forUnknown similarSpecifications $ \(spec1,spec2) -> do
   p <- haskellProgram spec1
-  ts1 <- exampleTraces spec1 5
-  ts2 <- exampleTraces spec2 5
-  (choices, solution) <- multipleChoicePP 7 ts1 ts2
+  ts1 <- exampleTraces spec1 2
+  ts2 <- exampleTraces spec2 2
+  (choices, solution) <- multipleChoicePP 3 ts1 ts2
   return $
     (PP.text "Which of the given trace can the program below produce?"
      PP.$$ p
