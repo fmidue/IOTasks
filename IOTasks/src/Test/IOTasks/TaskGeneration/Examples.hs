@@ -66,11 +66,14 @@ specProgram p =
   let ps = fst $ runFreshVarM (programVariants =<< programIR' p) emptyVarInfo
   in elements ps
 
-exampleTraces :: Specification -> Int -> Gen [Trace]
-exampleTraces s n = do
+exampleTraces :: Int -> Specification ->  Gen [Trace]
+exampleTraces n s = do
   ts <- vectorOf (n*3) $ traceGen s
   let ts' = take n $ sortBy (compare `on` length . inputsN) ts --prefer shorter traces
   return $ map (\t -> runProgram (inputsN t) $ buildComputation s) ts'
+
+exampleTrace :: Specification -> Gen Trace
+exampleTrace = fmap head . exampleTraces 1
 
 randomSpecification :: Gen Specification
 randomSpecification = oneof [simpleSpec, return example, return example']
@@ -80,88 +83,96 @@ similarSpecifications :: Gen (Specification,Specification)
 -- similarSpecifications = oneof [resize 3 simpleSimilar]
 similarSpecifications = return (example,example')
 
-trace1 :: TaskTemplate Trace
-trace1 = forUnknown randomSpecification $ \s -> do
-  prog <- haskellProgram s
-  ~[t] <- exampleTraces s 1
-  let is = inputs t
-  return $
-    ( PP.text ("Give the interaction trace of the following program for input(s) " ++ show is ++ "!")
-      PP.$$ prog
-    ) `solveWith` exactAnswer t
+trace1 :: TaskDesign Trace
+trace1 = for ((exampleTrace &&&& haskellProgram) `from` randomSpecification) giveInteractionTrace
+
+giveInteractionTrace :: (Trace, Description) -> TaskInstance Trace
+giveInteractionTrace (t,prog) =
+  ( PP.text ("Give the interaction trace of the following program for input(s) " ++ show (inputs t) ++ "!")
+    PP.$$ prog
+  ) `solveWith` exactAnswer t
 
 type Input = String
 
-trace2 :: TaskTemplate [Input]
-trace2 = forUnknown similarSpecifications $ \(spec1,spec2) -> do
-  p1 <- haskellProgram spec1
-  p2 <- haskellProgram spec2
-  return $
-    (PP.text "Give a sequence of input values for which the two programs below behave differently!"
-     PP.$$ p1
-     PP.$$ PP.text "---"
-     PP.$$ p2
-    ) `solveWith` triggeringDifference spec1 spec2
+trace2 :: TaskDesign [Input]
+trace2 = for ((specification ^&&& haskellProgram) `fromBoth` similarSpecifications) findDiffSequence
 
+specification :: Specification -> Specification
+specification = id
+
+specificationAnd :: Monad m => (Specification -> m a) -> Specification -> m (Specification,a)
+specificationAnd = (id ^&&&)
+
+findDiffSequence :: ((Specification, Description), (Specification, Description)) -> TaskInstance [Input]
+findDiffSequence ((s1,d1), (s2,d2)) =
+  (PP.text "Give a sequence of input values for which the two programs below behave differently!"
+     PP.$$ d1
+     PP.$$ PP.text "---"
+     PP.$$ d2
+  ) `solveWith` triggeringDifference s1 s2
 
 triggeringDifference :: Specification -> Specification -> Require [Input]
 triggeringDifference s1 s2 = Require $ \is ->
   ((=/=) `on` (runProgram is . buildComputation)) s1 s2
 
-prog1 :: TaskTemplate Program
-prog1 = forUnknown randomSpecification $ \s -> do
-  ts <- exampleTraces s 5
-  return $
-    ( PP.text "Write a program capable of these interactions:"
-      PP.$$ PP.text "(? represent inputs, ! represent outputs)"
-      PP.$$ PP.vcat (map PP.pPrint ts)
-    ) `solveWith` producingTraces ts
+prog1 :: TaskDesign Program
+prog1 = for (exampleTraces 5 `from` randomSpecification) writeProgramForTraces
+
+writeProgramForTraces :: [Trace] -> TaskInstance Program
+writeProgramForTraces ts =
+  ( PP.text "Write a program capable of these interactions:"
+    PP.$$ PP.text "(? represent inputs, ! represent outputs)"
+    PP.$$ PP.vcat (map PP.pPrint ts)
+  ) `solveWith` producingTraces ts
 
 producingTraces :: [Trace] -> Require Program
 producingTraces ts = Require $ \p ->
   property $ all (\t -> runProgram (inputs t) p == t) ts
 
-prog2 :: TaskTemplate Program
-prog2 = forFixed example $ \s -> do
-  ts <- exampleTraces s 5
-  return $
-    ( PP.text "Complete the given skeleton into a program capable of these interactions:"
-      PP.$$ PP.vcat (map PP.pPrint ts)
-      PP.$$ PP.text (unlines
-        ["---"
-        ,"main :: IO ()"
-        ,"main = do"
-        ,"  n <- readLn"
-        ,"  let loop s m = undefined"
-        ,"  loop 0 0"
-        ])
-    ) `solveWith` producingTraces ts
+prog2 :: TaskDesign Program
+prog2 = for (exampleTraces 5 `from` fixed example) completeToMatchInteractions
+
+completeToMatchInteractions :: [Trace] -> TaskInstance Program
+completeToMatchInteractions ts =
+  ( PP.text "Complete the given skeleton into a program capable of these interactions:"
+    PP.$$ PP.vcat (map PP.pPrint ts)
+    PP.$$ PP.text (unlines
+      ["---"
+      ,"main :: IO ()"
+      ,"main = do"
+      ,"  n <- readLn"
+      ,"  let loop s m = undefined"
+      ,"  loop 0 0"
+      ])
+  ) `solveWith` producingTraces ts
 
 haskellWithHoles :: Specification -> Gen Description
 haskellWithHoles s = haskellWithReadWriteHoles <$> specProgram s
 
 type Code = String
 
-prog3 :: TaskTemplate Code
-prog3 = forUnknown randomSpecification $ \s -> do
-  prog <- haskellWithHoles s
-  return $
-    ( PP.text "Complete the following template into a syntactically correct program"
-      PP.$$ PP.text "(replace the ??? with calls to readLn and print)"
-      PP.$$ prog
-    ) `solveWith` compilingProgram
+prog3 :: TaskDesign Code
+prog3 = for (haskellWithHoles `from` randomSpecification) completeTemplate
+
+completeTemplate :: Description -> TaskInstance Code
+completeTemplate prog =
+  ( PP.text "Complete the following template into a syntactically correct program"
+    PP.$$ PP.text "(replace the ??? with calls to readLn and print)"
+    PP.$$ prog
+  ) `solveWith` compilingProgram
 
 -- TODO: implement, or let submission platform check this.
 compilingProgram :: Require Code
 compilingProgram = Require $ const $ property True
 
-prog4 :: TaskTemplate (Program, Code)
-prog4 = forFixed example $ \spec -> do
-  p <- haskellFoldProgram spec
-  return $
-    ( PP.text "Re-write the given program s.t. it does not contain any accumulation list."
-      PP.$$ p
-    ) `solveWith` (behavior spec /\ noLists)
+prog4 :: TaskDesign (Program, Code)
+prog4 = for (specificationAnd haskellFoldProgram `from` fixed example) rewriteToNoLists
+
+rewriteToNoLists :: (Specification, Description) -> TaskInstance (Program, Code)
+rewriteToNoLists (spec, prog) =
+  ( PP.text "Re-write the given program s.t. it does not contain any accumulation list."
+    PP.$$ prog
+  ) `solveWith` (behavior spec /\ noLists)
 
 noLists :: Require Code
 noLists = Require $ \code -> property $ not $ "++" `isInfixOf` code
@@ -174,32 +185,41 @@ haskellFoldProgram s = do
   return $ haskellCode p
 
 -- sketch for simplification of prog4 via contramap
-prog4' :: TaskTemplate Code
+prog4' :: TaskDesign Code
 prog4' =  parseCode >$< prog4 where
   parseCode :: Code -> (Program, Code)
   parseCode = undefined
 
-prog5 :: TaskTemplate Program
-prog5 = forUnknown randomSpecification $ \s -> do
-  prog <- pythonProgram s
-  return $
-    ( PP.text "Re-implement the following Python program in Haskell:"
-      PP.$$ prog
-    ) `solveWith` behavior s
+prog5 :: TaskDesign Program
+prog5 = for (specificationAnd pythonProgram `from` randomSpecification) implementAsHaskell
 
-desc1 :: TaskTemplate Bool
-desc1 = forUnknown similarSpecifications $ \(spec1,spec2) -> do
-  sameBehavior <- elements $ False : [ True | hasDifferentPrograms spec1 ] -- TODO: better handle this
+implementAsHaskell :: (Specification, Description) -> TaskInstance Program
+implementAsHaskell (s,prog) =
+  ( PP.text "Re-implement the following Python program in Haskell:"
+    PP.$$ prog
+  ) `solveWith` behavior s
+
+data BinDesc = Yes | No deriving (Eq, Ord, Enum, Show)
+
+desc1 :: TaskDesign BinDesc
+desc1 = for (equivalenceProblem `from` similarSpecifications) determineEquivalence
+
+equivalenceProblem :: (Specification, Specification) -> Gen (BinDesc, Description, Description)
+equivalenceProblem (spec1,spec2) = do
+  sameBehavior <- elements $ No : [ Yes | hasDifferentPrograms spec1 ] -- TODO: better handle this
   (p1,p2) <-
-    if sameBehavior
+    if sameBehavior == Yes
       then differentPrograms spec1 spec1
       else differentPrograms spec1 spec2
-  return $
-    ( PP.text "Do the following two programs have the same behavior?"
-      PP.$$ p1
-      PP.$$ PP.text "---"
-      PP.$$ p2
-    ) `solveWith` exactAnswer sameBehavior
+  pure (sameBehavior,p1,p2)
+
+determineEquivalence :: (BinDesc, Description, Description) -> TaskInstance BinDesc
+determineEquivalence (haveSameBehavior,p1,p2) =
+  ( PP.text "Do the following two programs have the same behavior?"
+    PP.$$ p1
+    PP.$$ PP.text "---"
+    PP.$$ p2
+  ) `solveWith` exactAnswer haveSameBehavior
 
 hasDifferentPrograms :: Specification -> Bool
 hasDifferentPrograms s = length variants > 1
@@ -212,14 +232,18 @@ differentPrograms s1 s2 = do
   p2 <- haskellProgram s2 `suchThat` (/= p1)
   return (p1,p2)
 
-desc2 :: TaskTemplate [Int]
-desc2 = forUnknown similarSpecifications $ \(spec1,spec2) -> do
-  p <- haskellProgram spec1
-  ts1 <- exampleTraces spec1 2
-  ts2 <- exampleTraces spec2 2
-  (choices, solution) <- multipleChoicePP 3 ts1 ts2
-  return $
-    (PP.text "Which of the given trace can the program below produce?"
-     PP.$$ p
-     PP.$$ choices
-    ) `solveWith` exactAnswer solution
+desc2 :: TaskDesign [Int]
+desc2 = for ((haskellProgram . fst &&&& generateChoices) `from` similarSpecifications) giveProducedTraces
+
+generateChoices :: (Specification, Specification) -> Gen (Description, [Int])
+generateChoices (spec1,spec2) = do
+  ts1 <- exampleTraces 5 spec1
+  ts2 <- exampleTraces 5 spec2
+  multipleChoicePP 7 ts1 ts2
+
+giveProducedTraces :: (Description, (Description, [Int])) -> TaskInstance [Int]
+giveProducedTraces (p,(choices,solution)) =
+  (PP.text "Which of the given trace can the program below produce?"
+   PP.$$ p
+   PP.$$ choices
+  ) `solveWith` exactAnswer solution

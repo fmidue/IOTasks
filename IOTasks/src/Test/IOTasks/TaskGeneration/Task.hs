@@ -1,8 +1,11 @@
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ExistentialQuantification #-}
 module Test.IOTasks.TaskGeneration.Task where
 
 import Test.QuickCheck
+
+import Control.Arrow
 
 import Data.Functor.Contravariant
 import Data.Functor.Contravariant.Divisible
@@ -21,8 +24,8 @@ instance Divisible Require where
 instance Contravariant TaskInstance where
   contramap f (TaskInstance d r) = TaskInstance d (contramap f r)
 
-instance Contravariant TaskTemplate where
-  contramap f (TaskTemplate g fb) = TaskTemplate g (fmap (contramap f) . fb)
+instance Contravariant TaskDesign where
+  contramap f (TaskDesign g fb) = TaskDesign g (contramap f . fb)
 
 type Description = PP.Doc
 
@@ -36,40 +39,68 @@ newtype Require s = Require { check :: s -> Property}
 exactAnswer :: (Eq a, Show a) => a -> Require a
 exactAnswer x = Require $ \s -> s === x
 
-data TaskTemplate s = forall p. TaskTemplate
+data TaskDesign s = forall p. TaskDesign
   { parameter :: Gen p
-  , inst :: p -> Gen (TaskInstance s)
+  , instantiate :: p -> TaskInstance s
   }
 
-runTaskIO :: TaskTemplate s -> IO s -> IO ()
+runTaskIO :: TaskDesign s -> IO s -> IO ()
 runTaskIO task getAnswer = do
   TaskInstance q req <- generateTaskInstance task
   putStrLn $ PP.render q
   s <- getAnswer
   quickCheck $ check req s
 
-showTaskInstance :: TaskTemplate s -> IO ()
+showTaskInstance :: TaskDesign s -> IO ()
 showTaskInstance t = do
   i <- generateTaskInstance t
   putStrLn . PP.render $ question i
 
-generateTaskInstance :: TaskTemplate s -> IO (TaskInstance s)
-generateTaskInstance (TaskTemplate param inst) =
-  generate $ do
-    p <- param
-    inst p
+generateTaskInstance :: TaskDesign s -> IO (TaskInstance s)
+generateTaskInstance (TaskDesign gen inst) =
+  generate $ inst <$> gen
 
-forFixed :: p -> (p -> Gen (TaskInstance s)) -> TaskTemplate s
-forFixed p = TaskTemplate (pure p)
+fixed :: p -> Gen p
+fixed = pure
 
-forUnknown :: Gen p -> (p -> Gen (TaskInstance s)) -> TaskTemplate s
-forUnknown = TaskTemplate
+for :: Gen p -> (p -> TaskInstance s) -> TaskDesign s
+for = TaskDesign
 
 solveWith :: Description -> Require s -> TaskInstance s
 solveWith = TaskInstance
 
 (/\) :: Require a -> Require b -> Require (a,b)
 (/\) = divided
+
+infixr 3 &&&&
+(&&&&) :: Monad m => (a -> m c) -> (a -> m c') -> a -> m (c, c')
+f &&&& g = runKleisli $ Kleisli f &&& Kleisli g
+
+infixr 3 &&&^
+(&&&^) :: Monad m => (a -> m c) -> (a -> c') -> a -> m (c, c')
+f &&&^ g = f &&&& (pure . g)
+
+infixr 3 ^&&&
+(^&&&) :: Monad m => (a -> c) -> (a -> m c') -> a -> m (c, c')
+f ^&&& g =  (pure . f) &&&& g
+
+from :: (a -> Gen b) -> Gen a -> Gen b
+from = (=<<)
+
+infixr 3 ****
+(****) :: Monad m => (b -> m c) -> (b' -> m c') -> (b, b') -> m (c, c')
+f **** g = runKleisli $ Kleisli f *** Kleisli g
+
+infixr 3 ***^
+(***^) :: Monad m => (b -> m c) -> (a -> c') -> (b, a) -> m (c, c')
+f ***^ g = f **** (pure . g)
+
+infixr 3 ^***
+(^***) :: Monad m => (a -> c) -> (b' -> m c') -> (a, b') -> m (c, c')
+f ^*** g = pure . f **** g
+
+fromBoth :: (a -> Gen b) -> Gen (a,a) -> Gen (b,b)
+fromBoth f g = (f **** f) =<< g
 
 multipleChoice :: Show a => Int -> [a] -> [a] -> Gen (Description, [Int])
 multipleChoice n rs ws = do
