@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ExistentialQuantification #-}
 module Test.IOTasks.TaskGeneration.Task where
@@ -13,42 +15,82 @@ import qualified Text.PrettyPrint.HughesPJ as PP
 import Text.PrettyPrint.HughesPJClass (Pretty(pPrint))
 
 instance Contravariant Require where
-  contramap f (Require r) = Require (r . f)
+  -- contramap f (Require r) = Require (r . f)
 
 instance Divisible Require where
-  divide f r s = Require $
-    \x -> let (y,z) = f x in check r y .&&. check s z
-  conquer = Require $ const (property True)
-
-instance Contravariant TaskInstance where
-  contramap f (TaskInstance d r) = TaskInstance d (contramap f r)
-
-instance Contravariant TaskDesign where
-  contramap f (TaskDesign g fb) = TaskDesign g (contramap f . fb)
+  -- divide f r s = Require $
+  --   \x -> let (y,z) = f x in (&&) <$> check r y <*> check s z
+  -- conquer = Require . const $ pure True
 
 type Description = PP.Doc
 
 data TaskInstance s = TaskInstance
     { question :: Description
+    , given :: Maybe s
     , requires :: Require s
     }
 
-newtype Require s = Require { check :: s -> Property}
+data Require s where
+  RequireProp :: (s -> Property) -> Require s
+  RequirePure :: (s -> Bool) -> Require s
+  AndR :: Require s -> Require s -> Require s
+  RequireAfterIO :: Require s' -> (s -> IO (Maybe s')) ->  Require s
+
+check :: Require s -> s -> IO Bool
+check (RequireProp p) s = fmap isSuccess . quickCheckResult $ p s
+check (RequirePure p) s = pure $ p s
+check (AndR r t) s = (&&) <$> check r s <*> check t s
+check (RequireAfterIO p f) s = f s >>= maybe (pure False) (check p)
+
+checkPure :: Require s -> Maybe (s -> Bool)
+checkPure (RequireProp _) = Nothing
+checkPure (RequireAfterIO _ _) = Nothing
+checkPure (RequirePure p) = Just p
+checkPure (AndR r t) = (\p q s -> p s && q s) <$> checkPure r <*> checkPure t
+
+(/\) :: Require s -> Require s -> Require s
+AndR r s /\ t = r /\ (s /\ t)
+RequirePure p /\ RequireProp q = requireProp q /\ requirePure p
+RequireProp p /\ RequireProp q = requireProp $ \s -> p s .&&. q s
+p@(RequireProp _) /\ (AndR q@(RequireProp _) r) = (p /\ q) /\ r
+r /\ s = AndR r s
+
+requireProp :: (s -> Property) -> Require s
+requireProp = RequireProp
+
+requirePure :: (s -> Bool) -> Require s
+requirePure = RequirePure
+
+after :: Require s' -> (s -> IO (Maybe s')) -> Require s
+after = RequireAfterIO
+
+class Matches s where
+  -- should define a partial order on s
+  matches :: s -> s -> Bool
+
+mustMatch :: Matches s => s -> Require s
+mustMatch = requirePure . matches
 
 exactAnswer :: (Eq a, Show a) => a -> Require a
-exactAnswer x = Require $ \s -> s === x
+exactAnswer x = requireProp $ \s -> s === x
 
 data TaskDesign s = forall p. TaskDesign
   { parameter :: Gen p
   , instantiate :: p -> TaskInstance s
   }
 
-runTaskIO :: TaskDesign s -> IO s -> IO ()
+runTaskIO :: Show s => TaskDesign s -> IO s -> IO ()
 runTaskIO task getAnswer = do
-  TaskInstance q req <- generateTaskInstance task
+  TaskInstance q g req <- generateTaskInstance task
   putStrLn $ PP.render q
+  case g of
+    Just s -> putStrLn $ unlines ["","solution template:",show s]
+    Nothing -> pure ()
   s <- getAnswer
-  quickCheck $ check req s
+  isCorrect <- check req s
+  if isCorrect
+    then putStrLn "Correct solution"
+    else putStrLn "Incorrect solution"
 
 showTaskInstance :: TaskDesign s -> IO ()
 showTaskInstance t = do
@@ -65,11 +107,8 @@ fixed = pure
 for :: Gen p -> (p -> TaskInstance s) -> TaskDesign s
 for = TaskDesign
 
-solveWith :: Description -> Require s -> TaskInstance s
-solveWith = TaskInstance
-
-(/\) :: Require a -> Require b -> Require (a,b)
-(/\) = divided
+-- solveWith :: Description -> Require s -> TaskInstance s
+-- solveWith = TaskInstance
 
 infixr 3 &&&&
 (&&&&) :: Monad m => (a -> m c) -> (a -> m c') -> a -> m (c, c')

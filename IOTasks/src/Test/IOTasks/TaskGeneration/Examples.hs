@@ -2,7 +2,6 @@
 module Test.IOTasks.TaskGeneration.Examples where
 
 import Data.Function (on)
-import Data.Functor.Contravariant
 import Data.List (isInfixOf,sortBy)
 
 import qualified Text.PrettyPrint.HughesPJ as PP
@@ -46,13 +45,29 @@ example' =
   ) <>
   writeOutput [var 0] [T.sum $ getAll @Int "x"]
 
-type Program = IOrep ()
+type HaskellProgram = IOrep ()
+newtype HaskellCode = HaskellCode { code :: Description }
 
-behavior :: Specification -> Require Program
-behavior s = Require (`fulfills` s)
+fromSourceString :: String -> HaskellCode
+fromSourceString = HaskellCode . PP.text
+
+instance Show HaskellCode where
+  show (HaskellCode code) = PP.render code
+
+containsFunction :: String -> HaskellCode -> Bool
+containsFunction f (HaskellCode code) = f `isInfixOf` PP.render code
+
+instance Matches HaskellCode where
+  matches = _
+
+mustSatisfy :: Specification -> Require HaskellProgram
+mustSatisfy s = requireProp (`fulfills` s)
+
+compile :: HaskellCode -> IO (Maybe HaskellProgram)
+compile = _
 
 sampleTrace :: Specification -> Require Trace
-sampleTrace s = Require $ \t -> property $ accept s t
+sampleTrace = requirePure . accept
 
 haskellProgram :: Specification -> Gen Description
 haskellProgram s = haskellCode <$> specProgram s
@@ -93,6 +108,7 @@ giveInteractionTrace (t,prog) =
     = PP.text ("Give the interaction trace of the following program for input(s) " ++ show (inputs t) ++ "!")
     PP.$$ prog
 
+  , given = Nothing
   , requires
     = exactAnswer t
   }
@@ -117,18 +133,19 @@ findDiffSequence ((s1,d1), (s2,d2)) =
     PP.$$ PP.text "---"
     PP.$$ d2
 
+  , given = Nothing
   , requires
     = triggeringDifference s1 s2
   }
 
 triggeringDifference :: Specification -> Specification -> Require [Input]
-triggeringDifference s1 s2 = Require $ \is ->
+triggeringDifference s1 s2 = requireProp $ \is ->
   ((=/=) `on` (runProgram is . buildComputation)) s1 s2
 
-prog1 :: TaskDesign Program
+prog1 :: TaskDesign HaskellProgram
 prog1 = for (exampleTraces 5 `from` randomSpecification) writeProgramForTraces
 
-writeProgramForTraces :: [Trace] -> TaskInstance Program
+writeProgramForTraces :: [Trace] -> TaskInstance HaskellProgram
 writeProgramForTraces ts =
   TaskInstance
   { question
@@ -136,76 +153,76 @@ writeProgramForTraces ts =
     PP.$$ PP.text "(? represent inputs, ! represent outputs)"
     PP.$$ PP.vcat (map PP.pPrint ts)
 
+  , given = Nothing
   , requires
     = producingTraces ts
   }
 
-producingTraces :: [Trace] -> Require Program
-producingTraces ts = Require $ \p ->
-  property $ all (\t -> runProgram (inputs t) p == t) ts
+producingTraces :: [Trace] -> Require HaskellProgram
+producingTraces ts = requirePure $ \p ->
+  all (\t -> runProgram (inputs t) p == t) ts
 
-prog2 :: TaskDesign Program
+prog2 :: TaskDesign HaskellCode
 prog2 = for (exampleTraces 5 `from` fixed example) completeToMatchInteractions
 
-completeToMatchInteractions :: [Trace] -> TaskInstance Program
+completeToMatchInteractions :: [Trace] -> TaskInstance HaskellCode
 completeToMatchInteractions ts =
   TaskInstance
   { question
     = PP.text "Complete the given skeleton into a program capable of these interactions:"
     PP.$$ PP.vcat (map PP.pPrint ts)
-    PP.$$ PP.text (unlines
-      ["---"
-      ,"main :: IO ()"
-      ,"main = do"
-      ,"  n <- readLn"
-      ,"  let loop s m = undefined"
-      ,"  loop 0 0"
-      ])
+
+  , given = Just $ fromSourceString $ unlines
+    ["main :: IO ()"
+    ,"main = do"
+    ,"  n <- readLn"
+    ,"  let loop s m = undefined"
+    ,"  loop 0 0"
+    ]
 
   , requires
-    = producingTraces ts
+    = producingTraces ts `after` compile
   }
 
-haskellWithHoles :: Specification -> Gen Description
-haskellWithHoles s = haskellWithReadWriteHoles <$> specProgram s
+haskellWithHoles :: Specification -> Gen HaskellCode
+haskellWithHoles s = HaskellCode . haskellWithReadWriteHoles <$> specProgram s
 
-type Code = String
-
-prog3 :: TaskDesign Code
+prog3 :: TaskDesign HaskellCode
 prog3 = for (haskellWithHoles `from` randomSpecification) completeTemplate
 
-completeTemplate :: Description -> TaskInstance Code
+completeTemplate :: HaskellCode -> TaskInstance HaskellCode
 completeTemplate prog =
   TaskInstance
   { question
     = PP.text "Complete the following template into a syntactically correct program"
     PP.$$ PP.text "(replace the ??? with calls to readLn and print)"
-    PP.$$ prog
+  , given = Just prog
 
   , requires
     = compilingProgram
   }
 
 -- TODO: implement, or let submission platform check this.
-compilingProgram :: Require Code
-compilingProgram = Require $ const $ property True
+compilingProgram :: Require HaskellCode
+compilingProgram = requirePure (const True) `after` compile
 
-prog4 :: TaskDesign (Program, Code)
+prog4 :: TaskDesign HaskellCode
 prog4 = for (specificationAnd haskellFoldProgram `from` fixed example) rewriteToNoLists
 
-rewriteToNoLists :: (Specification, Description) -> TaskInstance (Program, Code)
+rewriteToNoLists :: (Specification, Description) -> TaskInstance HaskellCode
 rewriteToNoLists (spec, prog) =
   TaskInstance
   { question
     = PP.text "Re-write the given program s.t. it does not contain any accumulation list."
     PP.$$ prog
+  , given = Nothing
 
   , requires
-    = behavior spec /\ noLists
+    = (mustSatisfy spec `after` compile) /\ noLists
   }
 
-noLists :: Require Code
-noLists = Require $ \code -> property $ not $ "++" `isInfixOf` code
+noLists :: Require HaskellCode
+noLists = requirePure $ \code -> not $ containsFunction "++" code
 
 -- TODO: replace brute force generate and test
 haskellFoldProgram :: Specification -> Gen Description
@@ -214,24 +231,19 @@ haskellFoldProgram s = do
     `suchThat` (("++" `isInfixOf`) . PP.render . haskellCode)
   return $ haskellCode p
 
--- sketch for simplification of prog4 via contramap
-prog4' :: TaskDesign Code
-prog4' =  parseCode >$< prog4 where
-  parseCode :: Code -> (Program, Code)
-  parseCode = undefined
-
-prog5 :: TaskDesign Program
+prog5 :: TaskDesign HaskellProgram
 prog5 = for (specificationAnd pythonProgram `from` randomSpecification) implementAsHaskell
 
-implementAsHaskell :: (Specification, Description) -> TaskInstance Program
+implementAsHaskell :: (Specification, Description) -> TaskInstance HaskellProgram
 implementAsHaskell (s,prog) =
   TaskInstance
   { question
     = PP.text "Re-implement the following Python program in Haskell:"
     PP.$$ prog
+  , given = Nothing
 
   , requires
-    = behavior s
+    = mustSatisfy s
   }
 
 data BinDesc = Yes | No deriving (Eq, Ord, Enum, Show)
@@ -256,6 +268,7 @@ determineEquivalence (haveSameBehavior,p1,p2) =
     PP.$$ p1
     PP.$$ PP.text "---"
     PP.$$ p2
+  , given = Nothing
 
   , requires
     = exactAnswer haveSameBehavior
@@ -288,6 +301,7 @@ giveProducedTraces (p,(choices,solution)) =
     = PP.text "Which of the given trace can the program below produce?"
     PP.$$ p
     PP.$$ choices
+  , given = Nothing
 
   , requires
     = exactAnswer solution
