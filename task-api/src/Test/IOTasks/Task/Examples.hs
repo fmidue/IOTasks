@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeApplications #-}
-module Test.IOTasks.TaskGeneration.Examples where
+module Test.IOTasks.Task.Examples where
 
 import Data.Function (on)
 import Data.List (isInfixOf,sortBy)
@@ -19,7 +19,7 @@ import qualified Test.IOTasks.Trace as Trace (Trace)
 import Data.Term.Liftable (litT)
 import qualified Data.Term.Liftable.Prelude as T (sum, length, (==))
 
-import Test.IOTasks.TaskGeneration.Task
+import Test.IOTasks.Task
 import Test.IOTasks.CodeGeneration
 import Test.IOTasks.SpecGen
 

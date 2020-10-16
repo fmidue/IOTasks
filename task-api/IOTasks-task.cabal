@@ -1,0 +1,43 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.33.0.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: b8c5b9f64a28a6d9819466258519ce7e22587d0615108b0fb79024cffbbb785f
+
+name:           IOTasks-task
+version:        0.0.1.0
+description:    Please see the README on GitHub at <https://github.com/owestphal/IOTasks#readme>
+category:       Testing
+homepage:       https://github.com/owestphal/IOTasks#readme
+bug-reports:    https://github.com/owestphal/IOTasks/issues
+author:         Oliver Westphal
+maintainer:     oliver.westphal@uni-due.de
+copyright:      2020 Oliver Westphal
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+
+source-repository head
+  type: git
+  location: https://github.com/owestphal/IOTasks
+
+library
+  exposed-modules:
+      Test.IOTasks.Task
+      Test.IOTasks.Task.IO
+      Test.IOTasks.Task.Examples
+  other-modules:
+      Paths_IOTasks_task
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -fdefer-typed-holes
+  build-depends:
+      IOTasks
+    , QuickCheck
+    , base >=4.7 && <5
+    , contravariant
+    , pretty
+    , transparent-terms
+  default-language: Haskell2010

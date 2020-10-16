@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 07f472ee47207f0ba4268600c201af7e48ae89db9aab2ffbc2a692fd7a0a4c1f
+-- hash: 4b41c9d620b0a46600f21208d9f5f2e90054317d03db37c09f6c3fc9c024f307
 
 name:           IOTasks
 version:        0.1.0.0
@@ -38,7 +38,6 @@ library
       Test.IOTasks.Examples.SampleTasks
       Test.IOTasks.Examples.Hangman
       Test.IOTasks.CodeGeneration
-      Test.IOTasks.TaskGeneration.Task
   other-modules:
       Test.IOTasks.CodeGeneration.Analysis
       Test.IOTasks.CodeGeneration.FreshVar
@@ -52,7 +51,6 @@ library
       Test.IOTasks.Python
       Test.IOTasks.Semantics
       Test.IOTasks.Specification
-      Test.IOTasks.TaskGeneration.Examples
       Test.IOTasks.Utils
       Test.IOTasks.ValueSet
       Paths_IOTasks
@@ -63,7 +61,6 @@ library
       QuickCheck
     , base >=4.7 && <5
     , containers
-    , contravariant
     , dynamic-environment
     , extra
     , fgl
@@ -97,7 +94,6 @@ test-suite IOTasks-test
     , QuickCheck
     , base >=4.7 && <5
     , containers
-    , contravariant
     , deepseq
     , dynamic-environment
     , extra

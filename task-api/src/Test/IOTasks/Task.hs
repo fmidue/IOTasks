@@ -2,7 +2,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ExistentialQuantification #-}
-module Test.IOTasks.TaskGeneration.Task where
+module Test.IOTasks.Task where
 
 import Test.QuickCheck
 

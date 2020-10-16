@@ -38,7 +38,6 @@ dependencies:
 - fgl
 - transparent-terms
 - dynamic-environment
-- contravariant
 
 library:
   source-dirs: src
@@ -58,7 +57,6 @@ library:
   - Test.IOTasks.Examples.SampleTasks
   - Test.IOTasks.Examples.Hangman
   - Test.IOTasks.CodeGeneration
-  - Test.IOTasks.TaskGeneration.Task
 
 tests:
   IOTasks-test:
