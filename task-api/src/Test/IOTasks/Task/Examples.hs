@@ -1,30 +1,20 @@
 {-# LANGUAGE TypeApplications #-}
 module Test.IOTasks.Task.Examples where
 
-import Data.Function (on)
-import Data.List (isInfixOf,sortBy)
-
 import qualified Text.PrettyPrint.HughesPJ as PP
 import qualified Text.PrettyPrint.HughesPJClass as PP
 
 import Test.QuickCheck
 
 import Test.IOTasks hiding (Specification)
-import qualified Test.IOTasks as IOT
 
-import Test.IOTasks.Trace (inputs, inputsN)
-import Test.IOTasks.TraceSet (traceGen)
-import qualified Test.IOTasks.Trace as Trace (Trace)
+import Test.IOTasks.Trace (inputs)
 
 import Data.Term.Liftable (litT)
 import qualified Data.Term.Liftable.Prelude as T (sum, length, (==))
 
 import Test.IOTasks.Task
-import Test.IOTasks.CodeGeneration
-import Test.IOTasks.SpecGen
-
-type Specification = IOT.Specification SpecTerm
-type Trace = Trace.Trace String
+import Test.IOTasks.Task.IO
 
 example :: Specification
 example =
@@ -45,59 +35,6 @@ example' =
   ) <>
   writeOutput [var 0] [T.sum $ getAll @Int "x"]
 
-type HaskellProgram = IOrep ()
-newtype HaskellCode = HaskellCode { code :: Description }
-
-fromSourceString :: String -> HaskellCode
-fromSourceString = HaskellCode . PP.text
-
-instance Show HaskellCode where
-  show (HaskellCode code) = PP.render code
-
-containsFunction :: String -> HaskellCode -> Bool
-containsFunction f (HaskellCode code) = f `isInfixOf` PP.render code
-
-instance Matches HaskellCode where
-  matches = _
-
-mustSatisfy :: Specification -> Require HaskellProgram
-mustSatisfy s = requireProp (`fulfills` s)
-
-compile :: HaskellCode -> IO (Maybe HaskellProgram)
-compile = _
-
-sampleTrace :: Specification -> Require Trace
-sampleTrace = requirePure . accept
-
-haskellProgram :: Specification -> Gen Description
-haskellProgram s = haskellCode <$> specProgram s
-
--- Currently produces not Python code but rather some imperative pseudo-code
-pythonProgram :: Specification -> Gen Description
-pythonProgram s = pseudoCode <$> specProgram s
-
-specProgram :: Specification -> Gen IRProgram
-specProgram p =
-  let ps = fst $ runFreshVarM (programVariants =<< programIR' p) emptyVarInfo
-  in elements ps
-
-exampleTraces :: Int -> Specification ->  Gen [Trace]
-exampleTraces n s = do
-  ts <- vectorOf (n*3) $ traceGen s
-  let ts' = take n $ sortBy (compare `on` length . inputsN) ts --prefer shorter traces
-  return $ map (\t -> runProgram (inputsN t) $ buildComputation s) ts'
-
-exampleTrace :: Specification -> Gen Trace
-exampleTrace = fmap head . exampleTraces 1
-
-randomSpecification :: Gen Specification
-randomSpecification = oneof [simpleSpec, return example, return example']
-
--- TODO: use more meaningfull generator
-similarSpecifications :: Gen (Specification,Specification)
--- similarSpecifications = oneof [resize 3 simpleSimilar]
-similarSpecifications = return (example,example')
-
 trace1 :: TaskDesign Trace
 trace1 = for ((exampleTrace &&&& haskellProgram) `from` randomSpecification) giveInteractionTrace
 
@@ -113,16 +50,8 @@ giveInteractionTrace (t,prog) =
     = exactAnswer t
   }
 
-type Input = String
-
 trace2 :: TaskDesign [Input]
 trace2 = for ((specification ^&&& haskellProgram) `fromBoth` similarSpecifications) findDiffSequence
-
-specification :: Specification -> Specification
-specification = id
-
-specificationAnd :: Monad m => (Specification -> m a) -> Specification -> m (Specification,a)
-specificationAnd = (id ^&&&)
 
 findDiffSequence :: ((Specification, Description), (Specification, Description)) -> TaskInstance [Input]
 findDiffSequence ((s1,d1), (s2,d2)) =
@@ -137,10 +66,6 @@ findDiffSequence ((s1,d1), (s2,d2)) =
   , requires
     = triggeringDifference s1 s2
   }
-
-triggeringDifference :: Specification -> Specification -> Require [Input]
-triggeringDifference s1 s2 = requireProp $ \is ->
-  ((=/=) `on` (runProgram is . buildComputation)) s1 s2
 
 prog1 :: TaskDesign HaskellProgram
 prog1 = for (exampleTraces 5 `from` randomSpecification) writeProgramForTraces
@@ -184,9 +109,6 @@ completeToMatchInteractions ts =
     = producingTraces ts `after` compile
   }
 
-haskellWithHoles :: Specification -> Gen HaskellCode
-haskellWithHoles s = HaskellCode . haskellWithReadWriteHoles <$> specProgram s
-
 prog3 :: TaskDesign HaskellCode
 prog3 = for (haskellWithHoles `from` randomSpecification) completeTemplate
 
@@ -201,10 +123,6 @@ completeTemplate prog =
   , requires
     = compilingProgram
   }
-
--- TODO: implement, or let submission platform check this.
-compilingProgram :: Require HaskellCode
-compilingProgram = requirePure (const True) `after` compile
 
 prog4 :: TaskDesign HaskellCode
 prog4 = for (specificationAnd haskellFoldProgram `from` fixed example) rewriteToNoLists
@@ -221,15 +139,6 @@ rewriteToNoLists (spec, prog) =
     = (mustSatisfy spec `after` compile) /\ noLists
   }
 
-noLists :: Require HaskellCode
-noLists = requirePure $ \code -> not $ containsFunction "++" code
-
--- TODO: replace brute force generate and test
-haskellFoldProgram :: Specification -> Gen Description
-haskellFoldProgram s = do
-  p <- specProgram s
-    `suchThat` (("++" `isInfixOf`) . PP.render . haskellCode)
-  return $ haskellCode p
 
 prog5 :: TaskDesign HaskellProgram
 prog5 = for (specificationAnd pythonProgram `from` randomSpecification) implementAsHaskell
@@ -246,19 +155,8 @@ implementAsHaskell (s,prog) =
     = mustSatisfy s
   }
 
-data BinDesc = Yes | No deriving (Eq, Ord, Enum, Show)
-
 desc1 :: TaskDesign BinDesc
 desc1 = for (equivalenceProblem `from` similarSpecifications) determineEquivalence
-
-equivalenceProblem :: (Specification, Specification) -> Gen (BinDesc, Description, Description)
-equivalenceProblem (spec1,spec2) = do
-  sameBehavior <- elements $ No : [ Yes | hasDifferentPrograms spec1 ] -- TODO: better handle this
-  (p1,p2) <-
-    if sameBehavior == Yes
-      then differentPrograms spec1 spec1
-      else differentPrograms spec1 spec2
-  pure (sameBehavior,p1,p2)
 
 determineEquivalence :: (BinDesc, Description, Description) -> TaskInstance BinDesc
 determineEquivalence (haveSameBehavior,p1,p2) =
@@ -274,16 +172,6 @@ determineEquivalence (haveSameBehavior,p1,p2) =
     = exactAnswer haveSameBehavior
   }
 
-hasDifferentPrograms :: Specification -> Bool
-hasDifferentPrograms s = length variants > 1
-  where variants = fst $ runFreshVarM (programVariants =<< programIR' s) emptyVarInfo
-
-differentPrograms  :: Specification -> Specification
-                   -> Gen (Description,Description)
-differentPrograms s1 s2 = do
-  p1 <- haskellProgram s1
-  p2 <- haskellProgram s2 `suchThat` (/= p1)
-  return (p1,p2)
 
 desc2 :: TaskDesign [Int]
 desc2 = for ((haskellProgram . fst &&&& generateChoices) `from` similarSpecifications) giveProducedTraces
