@@ -22,6 +22,9 @@ dependencies:
 - QuickCheck
 - contravariant
 - pretty
+- ghc == 8.6.5
+- ghc-boot-th
+- ghc-paths
 
 library:
   source-dirs: src

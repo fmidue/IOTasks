@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b8c5b9f64a28a6d9819466258519ce7e22587d0615108b0fb79024cffbbb785f
+-- hash: 93d08c5701996265e72b4dc74819a4b1a0d4f5dc513a29dcaf3f3d1ca11378ce
 
 name:           IOTasks-task
 version:        0.0.1.0
@@ -38,6 +38,9 @@ library
     , QuickCheck
     , base >=4.7 && <5
     , contravariant
+    , ghc ==8.6.5
+    , ghc-boot-th
+    , ghc-paths
     , pretty
     , transparent-terms
   default-language: Haskell2010

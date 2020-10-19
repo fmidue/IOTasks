@@ -1,3 +1,4 @@
+{-# LANGUAGE PartialTypeSignatures #-}
 module Test.IOTasks.Task.IO where
 
 import Data.Function (on)
@@ -17,6 +18,14 @@ import qualified Test.IOTasks.Trace as Trace (Trace)
 import Test.IOTasks.Task
 import Test.IOTasks.CodeGeneration
 import Test.IOTasks.SpecGen
+
+import GHC
+import DynFlags
+import RdrName
+import OccName
+import GHC.Paths (libdir)
+import Unsafe.Coerce
+import Control.Exception
 
 type Specification = IOT.Specification SpecTerm
 type Trace = Trace.Trace String
@@ -41,8 +50,13 @@ instance Matches HaskellCode where
 mustSatisfy :: Specification -> Require HaskellProgram
 mustSatisfy s = requireProp (`fulfills` s)
 
+-- simple proof of concept compilation of HaskellCode
+-- ASSUMPTION:
+--   Program code contains a list of toplevel declarations,
+--   including a declaration for main. in case of successful
+--   compilation the value of this main decalration is returned.
 compile :: HaskellCode -> IO (Maybe HaskellProgram)
-compile = _
+compile = compile' "main" . PP.render . code
 
 sampleTrace :: Specification -> Require Trace
 sampleTrace = requirePure . accept
@@ -125,3 +139,40 @@ haskellFoldProgram s = do
   p <- specProgram s
     `suchThat` (("++" `isInfixOf`) . PP.render . haskellCode)
   return $ haskellCode p
+
+-----
+compile' :: String -> String -> IO (Maybe HaskellProgram)
+compile' exprName exprSource =
+  defaultErrorHandler defaultFatalMessager defaultFlushOut $
+    runGhc (Just libdir) $ do
+      dflags <- getSessionDynFlags
+      _ <- setSessionDynFlags $ dflags
+        { hscTarget = HscInterpreted
+        , ghcLink   = LinkInMemory
+        }
+      setContext
+        [ IIDecl (simpleImportDecl (mkModuleName "Prelude")) { ideclHiding =
+            Just (True,L noSrcSpan
+              [ hidingName "putStrLn"
+              , hidingName "putStr"
+              , hidingName "print"
+              , hidingName "getLine"
+              , hidingName "readLn"
+              ])}
+        , IIDecl $ simpleImportDecl (mkModuleName "Test.IOTasks.IOrep")
+        ]
+      hValue <- flip gcatch (\SomeException{} -> pure Nothing) $
+        fmap Just $ compileExpr $ unlines $
+          "let" :
+          map (' ':) (lines exprSource)
+          ++ ["in " ++ exprName]
+      return $ unsafeCoerce <$> hValue
+
+hidingName :: String -> LIE _
+hidingName name =
+  L noSrcSpan
+    (IEVar noExt
+      (L noSrcSpan
+        (IEName
+          (L noSrcSpan (mkRdrUnqual (mkVarOcc name)))
+    ) ) )
