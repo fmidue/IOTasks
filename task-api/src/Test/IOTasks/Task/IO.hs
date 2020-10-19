@@ -1,4 +1,3 @@
-{-# LANGUAGE PartialTypeSignatures #-}
 module Test.IOTasks.Task.IO where
 
 import Data.Function (on)
@@ -168,7 +167,7 @@ compile' exprName exprSource =
           ++ ["in " ++ exprName]
       return $ unsafeCoerce <$> hValue
 
-hidingName :: String -> LIE _
+hidingName :: String -> LIE GhcPs
 hidingName name =
   L noSrcSpan
     (IEVar noExt

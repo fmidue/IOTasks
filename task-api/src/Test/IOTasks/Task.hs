@@ -147,7 +147,7 @@ multipleChoice n rs ws = do
   let  rs' = map (,True) rs
        ws' = map (,False) ws
   cs <- take n <$> shuffle (rs' ++ ws')
-  let  desc = PP.vcat $ zipWith (\i x -> PP.text $ show i ++ ") " ++ show x) [1..] (map fst cs)
+  let  desc = PP.vcat $ zipWith (\i x -> PP.text $ show i ++ ") " ++ show x) [(1 :: Int)..] (map fst cs)
        is = [ i | (i,(_,correct)) <- zip [1..] cs, correct ]
   return (desc,is)
 
@@ -156,6 +156,6 @@ multipleChoicePP n rs ws = do
   let  rs' = map (,True) rs
        ws' = map (,False) ws
   cs <- take n <$> shuffle (rs' ++ ws')
-  let  desc = PP.vcat $ zipWith (\i x -> PP.text (show i ++ ") ") <> pPrint x) [1..] (map fst cs)
+  let  desc = PP.vcat $ zipWith (\i x -> PP.text (show i ++ ") ") <> pPrint x) [(1 :: Int)..] (map fst cs)
        is = [ i | (i,(_,correct)) <- zip [1..] cs, correct ]
   return (desc,is)
