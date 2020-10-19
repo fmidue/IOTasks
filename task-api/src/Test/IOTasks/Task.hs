@@ -15,12 +15,14 @@ import qualified Text.PrettyPrint.HughesPJ as PP
 import Text.PrettyPrint.HughesPJClass (Pretty(pPrint))
 
 instance Contravariant Require where
-  -- contramap f (Require r) = Require (r . f)
+  contramap f (RequireProp r) = RequireProp (r . f)
+  contramap f (RequirePure r) = RequirePure (r . f)
+  contramap f (AndR r s) = AndR (contramap f r) (contramap f s)
+  contramap f (RequireAfterIO r k) = RequireAfterIO r (k . f)
 
 instance Divisible Require where
-  -- divide f r s = Require $
-  --   \x -> let (y,z) = f x in (&&) <$> check r y <*> check s z
-  -- conquer = Require . const $ pure True
+  divide f r s = AndR (contramap (fst . f) r) (contramap (snd . f) s)
+  conquer = RequirePure . const $ True
 
 type Description = PP.Doc
 
