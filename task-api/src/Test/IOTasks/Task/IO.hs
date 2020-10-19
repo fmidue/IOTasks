@@ -45,7 +45,7 @@ containsFunction :: String -> HaskellCode -> Bool
 containsFunction f = (f `isInfixOf`) . PP.render . code
 
 instance Matches HaskellCode where
-  matches = _
+  matches _ _ = True -- placeholder implementation/checked for us by autotool
 
 mustSatisfy :: Specification -> Require HaskellProgram
 mustSatisfy s = requireProp (`fulfills` s)
