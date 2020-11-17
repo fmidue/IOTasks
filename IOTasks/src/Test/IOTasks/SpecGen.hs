@@ -7,8 +7,6 @@
 -- module Test.IOTasks.SpecGen (specGen, loopBodyGen) where
 module Test.IOTasks.SpecGen where
 
-import Debug.Trace
-
 import Data.Functor.Identity
 
 import Data.Environment (Varname)
@@ -100,7 +98,7 @@ outputSome' b ts = do
 linearSpec :: (VarListTerm t Varname, PVarTerm t Varname, Liftable t) => [(Varname,ValueSet)] -> [(Varname,ValueSet)] -> Gen (Specification t, [Varname])
 linearSpec lists xs = sized $ \n -> do
   is <- someInputs (lists ++ xs) (n `div` 2)
-  let vs = traceShowId $ specVars is
+  let vs = specVars is
   os <- resize (n `div` 2) $ listOf1 $ outputOneof (intTerm vs vs)
   let spec = is <> mconcat os
   return (spec,specVars spec)
