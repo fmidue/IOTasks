@@ -4,8 +4,8 @@ module Test.IOTasks.IOrep (
   IOrep(..),
   runProgram,
   MonadTeletype(..), print, readLn,
-  IO.BufferMode(..),
-  IO.Handle, IO.stdout,
+  IO.BufferMode(NoBuffering),
+  IO.stdout,
   Exit(..),
 ) where
 
@@ -37,7 +37,8 @@ instance MonadTeletype IOrep where
   putChar c = PutChar c $ Return ()
   getLine = GetLine Return
 
-  hSetBuffering _ _ = pure ()
+  hSetBuffering _ IO.NoBuffering = pure ()
+  hSetBuffering _ m = error $ "hSetBuffering unsupported buffering mode: " ++ show m
 
 -- returns Nothing if the number of inputs provided was not sufficient to complete the program run
 runProgram :: [String] -> IOrep () -> OrdinaryTrace
@@ -64,7 +65,7 @@ class Monad m => MonadTeletype m where
   putChar :: Char -> m ()
   getLine :: m String
 
-  {- HLINT ignore puStr -}
+  {- HLINT ignore putStr -}
   putStr :: String -> m ()
   putStr = mapM_ putChar
 
