@@ -1,10 +1,11 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE DeriveFunctor #-}
 module Test.IOTasks.IOrep (
   IOrep(..),
   runProgram,
   MonadTeletype(..), print, readLn,
+  IO.BufferMode(..),
+  IO.Handle, IO.stdout,
   Exit(..),
 ) where
 
@@ -35,6 +36,8 @@ instance Monad IOrep where
 instance MonadTeletype IOrep where
   putChar c = PutChar c $ Return ()
   getLine = GetLine Return
+
+  hSetBuffering _ _ = pure ()
 
 -- returns Nothing if the number of inputs provided was not sufficient to complete the program run
 runProgram :: [String] -> IOrep () -> OrdinaryTrace
@@ -68,6 +71,8 @@ class Monad m => MonadTeletype m where
   putStrLn :: String -> m ()
   putStrLn s = putStr s >> putChar '\n'
 
+  hSetBuffering :: IO.Handle -> IO.BufferMode -> m ()
+
 print :: (Show a, MonadTeletype m) => a -> m ()
 print = putStrLn . show
 
@@ -77,15 +82,19 @@ readLn = read <$> getLine
 data Exit = Exit
 
 instance MonadTeletype m => MonadTeletype (ExceptT Exit m) where
-  putStrLn = lift . putStrLn
+  putChar = lift . putChar
   getLine = lift getLine
+  hSetBuffering h = lift . hSetBuffering h
+
 
 instance MonadTeletype m => MonadTeletype (StateT s m) where
-  putStrLn = lift . putStrLn
+  putChar = lift . putChar
   getLine = lift getLine
+  hSetBuffering h = lift . hSetBuffering h
 
 instance MonadTeletype IO where
   putChar = IO.putChar
   putStr = IO.putStr
   putStrLn = IO.putStrLn
   getLine = IO.getLine
+  hSetBuffering = IO.hSetBuffering
