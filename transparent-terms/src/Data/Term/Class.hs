@@ -1,6 +1,5 @@
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE ExplicitForAll #-}
 {-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module Data.Term.Class where
 
 import Type.Reflection

@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.31.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: b485739a1b98639981dba2b1fef8e9463e88f72cae18fbf9f0823db849d78815
+-- hash: 68f3c8a986ab05fc3bc10f5b421c63244655a8ba74df0e6d4ff64d8c377a280d
 
 name:           transparent-terms
 version:        0.0.1.0
@@ -29,6 +29,7 @@ library
       Data.Term.Class
       Data.Term.ITerm
       Data.Term.ATerm
+      Data.Term.PTerm
       Data.Term.Liftable
       Data.Term.Liftable.Prelude
       Data.Term.AST

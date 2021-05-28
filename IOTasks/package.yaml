@@ -39,6 +39,8 @@ dependencies:
 - transparent-terms
 - dynamic-environment
 - contravariant
+- vector
+- holmes
 
 library:
   source-dirs: src
@@ -56,6 +58,7 @@ library:
   - Test.IOTasks.Trace
   - Test.IOTasks.SpecGen
   - Test.IOTasks.Examples.SampleTasks
+  - Test.IOTasks.Examples.PTermExamples
   - Test.IOTasks.Examples.Hangman
   - Test.IOTasks.CodeGeneration
   - Test.IOTasks.TaskGeneration.Task

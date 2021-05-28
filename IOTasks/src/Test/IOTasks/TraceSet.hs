@@ -8,6 +8,7 @@
 module Test.IOTasks.TraceSet (
   traceGen,
   sampleNTrace,
+  traceForSequence,
 ) where
 
 import Prelude hiding (putStrLn, getLine, GT)
@@ -106,8 +107,8 @@ chooseTrace' f = go 0 where
   go _ (Return t) = pure t
   go i (Bind (ValueChoice ty cont)) = f i ty >>= (go (i+1) . cont)
 
-genTraceForSequence :: (SemTerm t (Environment Varname), VarListTerm t Varname) => [Value] -> Specification t -> Maybe GeneralizedTrace
-genTraceForSequence is (Spec as) = chooseTrace' maybeChoose $ traceSet as kTI (freshEnvironment $ specVars (Spec as))
+traceForSequence :: (SemTerm t (Environment Varname), VarListTerm t Varname) => [Value] -> Specification t -> Maybe GeneralizedTrace
+traceForSequence is (Spec as) = chooseTrace' maybeChoose $ traceSet as kTI (freshEnvironment $ specVars (Spec as))
   where
     maybeChoose i ty =
       let v = (is !! i)

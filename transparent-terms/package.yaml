@@ -31,6 +31,7 @@ library:
   - Data.Term.Class
   - Data.Term.ITerm
   - Data.Term.ATerm
+  - Data.Term.PTerm
   - Data.Term.Liftable
   - Data.Term.Liftable.Prelude
   - Data.Term.AST
