@@ -34,6 +34,7 @@ module Test.IOTasks (
   MonadTeletype(..), print, readLn,
   -- * IOProperty
   IOTestable(..),
+  CleverIOTestable(..),
   accept,
   matchesTrace,
   MatchResult(..),
