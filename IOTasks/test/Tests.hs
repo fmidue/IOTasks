@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeApplications #-}
 import TestExamples
+import TestPTermExamples
 import RegressionTests
 
 import Test.IOTasks (fulfills)
@@ -14,6 +15,7 @@ import Debug.Trace
 main :: IO ()
 main = hspec $ do
   testExamples
+  testPTermExamples
   describe "Testing hangman" $
     prop "game runs on a random 'words'" $
       \xs -> let word = filter (`elem` hangmanDomain) xs

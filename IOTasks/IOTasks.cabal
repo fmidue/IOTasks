@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5590fc261fb38459492f0b45b1c5bfa560ee2003f41dfcb5d188a34d72442700
+-- hash: ae6567d262d3cc391955e0d1923b074dc710eae3d0732934a7909f4ee05c8721
 
 name:           IOTasks
 version:        0.1.0.0
@@ -93,6 +93,7 @@ test-suite IOTasks-test
   other-modules:
       RegressionTests
       TestExamples
+      TestPTermExamples
       Paths_IOTasks
   hs-source-dirs:
       test
