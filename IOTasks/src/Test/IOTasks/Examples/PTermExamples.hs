@@ -3,6 +3,8 @@
 {-# LANGUAGE DataKinds #-}
 module Test.IOTasks.Examples.PTermExamples where
 
+import Prelude hiding (print,putStrLn,putStr,readLn)
+
 import Test.IOTasks hiding (SpecTerm)
 
 import Data.Term.PTerm
@@ -63,3 +65,39 @@ ex3P =
     readInput "x" ints <>
     when (Lit 0 :== getCurrent @Int "x")
       (writeOutput [anything <> var 0 <> anything] [Sum $ getAll @Int "x"] <> exit)
+
+-- Example 4
+sum2Spec :: Specification SpecTerm
+sum2Spec =
+  tillExit (
+    optionalTextOutput <>
+    readInput "x" ints <>
+    branch (getCurrent @Int "x" :== Lit 0)
+    (optionalTextOutput <>
+     readInput "y" ints <>
+     writeOutput [anything <> var 0 <> anything] [getCurrent @Int "x" :+ getCurrent @Int "y"])
+    exit
+  ) <>
+  writeOutput [anything <> var 0 <> anything] [Length $ getAll @Int "y"]
+
+optionalTextOutput :: Specification t
+optionalTextOutput = optional (writeFixedOutput [anything])
+
+sum2 :: IOrep ()
+sum2 = loop 0
+  where
+    loop :: Integer -> IOrep ()
+    loop n = do
+      putStr "First number or 0 to exit: "
+      x <- readLn
+      if x == 0
+        then do
+          putStrLn "Exiting program"
+          putStr "The number of additions performed was: "
+          print n
+        else do
+          putStr "Second number: "
+          y <- readLn
+          putStr ("The sum of " ++ show x ++ " and " ++ show y ++ " is ")
+          print (x + y)
+          loop (n + 1)

@@ -33,6 +33,9 @@ testPTermExamples = describe "Testing Test.IOTasks.Examples.PTermExamples:" $ do
   -- Example 3
   testPairSuccess (solution3,"solution3") (ex3P,"ex3P")
 
+  -- Example 4
+  testPairSuccess (sum2,"sum2") (sum2Spec,"sum2Spec")
+
   -- Generation of programs
   prop "program generated from ex1P matches ex1P" $
     buildIOrepComputation ex1P `fulfills` ex1P
