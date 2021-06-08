@@ -27,7 +27,7 @@ data PTerm v a where
   Reverse :: PTerm v [a] -> PTerm v [a]
   Sum :: Num a => PTerm v [a] -> PTerm v a
   Filter :: Num a => (a -> Bool) -> PTerm v [a] -> PTerm v [a]
-  Lit :: a -> PTerm v a
+  Lit :: Show a => a -> PTerm v a
   GetCurrent :: Typeable a => v -> PTerm v a
   GetAll :: Typeable a => v -> PTerm v [a]
 
@@ -58,7 +58,21 @@ instance UsageTerm (PTerm v) v where
   varUsage = error "UsageTerm (PTerm v) v: not implemented"
 
 instance SynTerm (PTerm v) (AST v) where
-  viewTerm = error "SynTerm (PTerm v) (AST v): not implemented"
+   viewTerm (x :== y) = infixApp (viewTerm x) "==" (viewTerm y)
+   viewTerm (x :> y) = infixApp (viewTerm x) ">" (viewTerm y)
+   viewTerm (x :+ y) = infixApp (viewTerm x) "+" (viewTerm y)
+   viewTerm (Mod x y) = infixApp (viewTerm x) "`mod`" (viewTerm y)
+   viewTerm (x :&& y) = infixApp (viewTerm x) "&&" (viewTerm y)
+   viewTerm (Not x) = Leaf "not" `app` viewTerm x
+   viewTerm (Length x) = Leaf "length" `app` viewTerm x
+   viewTerm (Init x) = Leaf "init" `app` viewTerm x
+   viewTerm (Last x) = Leaf "last" `app` viewTerm x
+   viewTerm (Reverse x) = Leaf "reverse" `app` viewTerm x
+   viewTerm (Sum x) = Leaf "sum" `app` viewTerm x
+   viewTerm (Filter _ xs) = Leaf "filter ???" `app` viewTerm xs
+   viewTerm (Lit x) = Leaf $ show x
+   viewTerm (GetCurrent x) = Var x
+   viewTerm (GetAll x) = VarA x
 
 instance SynTermTyped (PTerm v) (Typed.AST v) where
   viewTermTyped = error "SynTermTyped (PTerm v) (Typed.AST v): not implemented"

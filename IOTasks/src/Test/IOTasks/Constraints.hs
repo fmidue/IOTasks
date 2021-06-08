@@ -17,12 +17,7 @@ import Test.IOTasks.ValueSet
 
 import Type.Reflection
 import Data.List
-import Data.Maybe
 import Data.Holmes
-import Data.Char (isDigit)
-import qualified Data.Vector as Vec
-import Data.Vector ((!))
-
 
 data ConstraintTree
   = Assert Constraint ConstraintTree
@@ -30,7 +25,7 @@ data ConstraintTree
   | Leaf
 
 data Constraint where
-  TypeConstaint :: Varname -> SomeTypeRep -> Constraint
+  TypeConstaint :: (Varname,Int) -> SomeTypeRep -> Constraint
   PredicateConstraint :: PTerm Varname Bool -> Env -> Constraint
 
 instance Eq Constraint where
@@ -55,9 +50,8 @@ type Env = Varname -> VarCounter
 
 constraintTree' :: [Action (Specification (PTerm Varname)) (PTerm Varname)] -> (Step -> Env -> ConstraintTree) -> Env -> ConstraintTree
 constraintTree' (ReadInput x vs : s') k e =
-  let v = x ++ show (e x)
-      e' u = if u == x then e u + 1 else e u
-  in Assert (TypeConstaint v $ typeOfValueSet vs) $ constraintTree' s' k e'
+  let e' u = if u == x then e u + 1 else e u
+  in Assert (TypeConstaint (x,e x) $ typeOfValueSet vs) $ constraintTree' s' k e'
 constraintTree' (WriteOutput{} : s') k e = constraintTree' s' k e
 constraintTree' (TillE (Spec s) : s') k e =
   let k' Continue = constraintTree' s  k'
@@ -92,8 +86,14 @@ depth = length . filter (\case { PredicateConstraint{} -> True; _ -> False })
 pathsWithMaxDepth :: Int -> ConstraintTree -> [Path]
 pathsWithMaxDepth d = takeWhile ((<= d). depth) . paths
 
+pathBaseVars :: Path -> [Varname]
+pathBaseVars = nub . concatMap extractVar
+  where
+    extractVar (TypeConstaint (v,_) _) = [v]
+    extractVar (PredicateConstraint c _) = termVars c
+
 printConstraint :: Constraint -> String
-printConstraint (TypeConstaint x ty) = x ++ " : " ++ show ty
+printConstraint (TypeConstaint (x,i) ty) = x ++ show i ++ " : " ++ show ty
 printConstraint (PredicateConstraint c e) = viewTerm' c e
 
 fillInVariables :: AST Varname -> Env -> AST Void
@@ -129,28 +129,18 @@ printBranch (R:xs) (Split _  t2) = "SplitR " ++ printBranch xs t2
 -- holmes constraint
 newtype HolmesConstraint = HolmesConstraint (forall m. MonadCell m => [Prop m (Defined Int)] -> Prop m (Defined Bool))
 
-holmesConstraint :: Path -> (Int,[a] -> [a],HolmesConstraint)
-holmesConstraint path = (nVars, arrangeVars, constr)
+holmesConstraint :: Path -> (Int,HolmesConstraint)
+holmesConstraint path = (nVars, constr)
   where
-    constr = HolmesConstraint $ \vs -> and' [ let f = constrH c (ixVE e) in f vs | ~(PredicateConstraint c e) <- predConstr]
-    ixVE e x = take (e x -1) $ ixV x
-    ixV x = fromMaybe [] $ lookup x ix
-    (tyConstr,predConstr) = partition (\case {TypeConstaint{} -> True; _ -> False}) path
     nVars = length tyConstr
-    maxIx :: Varname -> Int
-    maxIx x = maximum [ e x -1 | ~(PredicateConstraint _ e) <- predConstr]
-    allVars = nub $ concat [ termVars c | ~(PredicateConstraint c _) <- predConstr]
-    ixF :: [Varname] -> Int -> [(Varname,[Int])]
-    ixF [] _ = []
-    ixF (x:xs) i = let mX = maxIx x in (x,[i..i + mX]) : ixF xs (i + mX)
-    ix =  ixF allVars 0
-    -- rearanging the variables to match the input sequence
-    arrangeVars xs =
-      let
-        old = Vec.fromList xs
-        pos = Vec.fromList $ [ ixV x !! (read n - 1) | (TypeConstaint xN _) <- tyConstr, let (x,n) = splitVarName xN ]
-      in Vec.toList $ Vec.generate nVars (\i -> old ! (pos ! i))
-    splitVarName = break isDigit
+    constr = HolmesConstraint $ \vs -> and' [ let f = constrH c (ixE e) in f vs | ~(PredicateConstraint c e) <- predConstr]
+    (tyConstr,predConstr) = partition (\case {TypeConstaint{} -> True; _ -> False}) path
+    allVars = (\(TypeConstaint (v,_) _) -> v) <$> tyConstr
+    -- maps Varnames to the indices at which the respective constraint variables occur
+    ix x = [ i | (y,i) <- allVars `zip` [0..], x == y]
+    -- same as ix but respects the environment of a constraint, i.e., the fact that not all inputs for a varaible are "known" for a constraint
+    ixE e x = take (e x -1) $ ix x
+    -- all variable names that are read into on the path (with multiples and in order of reading)
 
 constrH :: Eq a => MonadCell m => PTerm Varname a -> (Varname -> [Int]) -> [Prop m (Defined Int)] -> Prop m (Defined a)
 constrH (x :== y) ix vs = constrH x ix vs .== constrH y ix vs
@@ -159,7 +149,7 @@ constrH (x :+ y) ix vs = constrH x ix vs .+ constrH y ix vs
 constrH (Mod x y) ix vs = constrH x ix vs .%. constrH y ix vs
 constrH (x :&& y) ix vs = constrH x ix vs .&& constrH y ix vs
 constrH (Not x) ix vs = not' $ constrH x ix vs
-constrH (Length x) ix vs = length .$ constrH x ix vs
+constrH (Length x) ix _ = lift $ lengthT x ix
 constrH (Init x) ix vs = init .$ constrH x ix vs
 constrH (Last x) ix vs = last .$ constrH x ix vs
 constrH (Reverse x) ix vs = reverse .$ constrH x ix vs
@@ -174,3 +164,11 @@ constrH (GetCurrent x :: PTerm Varname a) ix vs =
   case eqTypeRep (typeRep @a) (typeRep @Int) of
     Just HRefl -> vs !! last (ix x)
     Nothing -> error "implement non-Int types!"
+
+lengthT :: PTerm Varname [a] -> (Varname -> [Int]) -> Int
+lengthT (Init x) ix = lengthT x ix -1
+lengthT (Reverse x) ix = lengthT x ix
+lengthT (Filter _ _) _ = error "length of filter unsupported"
+lengthT (Lit x) _ = length x
+lengthT (GetAll x :: PTerm Varname [a]) ix = length $ ix x
+lengthT _ _ = error "unsupported lengthT"

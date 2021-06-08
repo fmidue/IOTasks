@@ -23,6 +23,7 @@ forAllCleverInputs s prop =
     (genTestCase (constraintTree s))
     shrinkTestCase
     (\tc -> ioProperty $ do
+      -- input <- fromMaybe (error $ show tc) <$> solveTestCase Holmes tc -- discard the test case if path is UNSAT
       input <- fromMaybe discard <$> solveTestCase Holmes tc -- discard the test case if path is UNSAT
       pure $ counterexample (show input) $ prop input)
       -- pure $ classify True (show $ head input) $ counterexample (show input) $ prop input)
@@ -66,8 +67,8 @@ solveHolmes p b = do
 
 runHolmes :: Path -> Bound -> IO (Maybe [Defined Int])
 runHolmes p b = do
-  res <- variables `satisfying` constraints
-  pure $ fmap f res -- rearange the variables to match the input sequence
+  variables `satisfying` constraints
+  -- pure $ fmap f res -- rearange the variables to match the input sequence
   where
-    (n,f,HolmesConstraint constraints) = holmesConstraint p
+    (n,HolmesConstraint constraints) = holmesConstraint p
     variables = Holmes.shuffle $ n `from` [-b..b]
