@@ -50,8 +50,8 @@ runProgram is
   go Nothing (x:xs) (GetLine f) = ProgRead x $ go Nothing xs (f x)
   go (Just acc) (x:xs) (GetLine f) = ProgWrite (reverse acc) $ ProgRead x $ go Nothing xs (f x)
 
-  go Nothing [] (GetLine _) = ProgRead "<unkonwn input>" undefined
-  go (Just acc) [] (GetLine _) = ProgWrite (reverse acc) $ ProgRead "<unkonwn input>" undefined
+  go Nothing [] (GetLine _) = ProgRead "<unknown input>" undefined
+  go (Just acc) [] (GetLine _) = ProgWrite (reverse acc) $ ProgRead "<unknown input>" undefined
 
   go Nothing xs (PutChar '\n' p) = ProgWrite "\n" $ go Nothing xs p
   go Nothing xs (PutChar v p) = go (Just [v]) xs p
