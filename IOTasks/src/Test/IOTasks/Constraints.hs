@@ -146,6 +146,7 @@ constrH :: Eq a => MonadCell m => PTerm Varname a -> (Varname -> [Int]) -> [Prop
 constrH (x :== y) ix vs = constrH x ix vs .== constrH y ix vs
 constrH (x :> y) ix vs = constrH x ix vs .> constrH y ix vs
 constrH (x :+ y) ix vs = constrH x ix vs .+ constrH y ix vs
+constrH (x :* y) ix vs = constrH x ix vs .* constrH y ix vs
 constrH (Mod x y) ix vs = constrH x ix vs .%. constrH y ix vs
 constrH (x :&& y) ix vs = constrH x ix vs .&& constrH y ix vs
 constrH (Not x) ix vs = not' $ constrH x ix vs
@@ -154,6 +155,7 @@ constrH (Init x) ix vs = init .$ constrH x ix vs
 constrH (Last x) ix vs = last .$ constrH x ix vs
 constrH (Reverse x) ix vs = reverse .$ constrH x ix vs
 constrH (Sum x) ix vs = sum .$ constrH x ix vs
+constrH (Product x) ix vs = product .$ constrH x ix vs
 constrH (Filter f xs) ix vs = filter f .$ constrH xs ix vs
 constrH (Lit x) _ _ = lift x
 constrH (GetAll x :: PTerm Varname a) ix vs =
