@@ -25,6 +25,7 @@ instance {-# OVERLAPPING #-} StringEmbedding String where
 
 instance StringEmbedding Bool
 instance StringEmbedding Int
+instance StringEmbedding Integer
 
 instance StringEmbedding a => StringEmbedding [a] where
   pack = show . map pack

@@ -19,8 +19,7 @@ module Test.IOTasks (
   values,
   stringValues,
   mkValueSet,
-  ints,
-  nats,
+  ints, nats, integers,
   StringEmbedding,
   SpecTerm,
   -- * Combinators

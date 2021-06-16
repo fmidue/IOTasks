@@ -16,8 +16,7 @@ module Test.IOTasks.Language
   , values
   , stringValues
   , mkValueSet
-  , ints
-  , nats
+  , ints, nats, integers
   , StringEmbedding
   , SpecTerm
   ) where
@@ -74,6 +73,11 @@ stringValues = valueSet
 ints :: ValueSet
 ints = valueSet' (const True) gen where
   gen :: Gen Int
+  gen = elements [-10..10]
+
+integers :: ValueSet
+integers = valueSet' (const True) gen where
+  gen :: Gen Integer
   gen = elements [-10..10]
 
 nats :: ValueSet
