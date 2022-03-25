@@ -1,0 +1,62 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.34.4.
+--
+-- see: https://github.com/sol/hpack
+
+name:           mini-IOTasks
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/githubuser/mini-IOTasks#readme>
+homepage:       https://github.com/githubuser/mini-IOTasks#readme
+bug-reports:    https://github.com/githubuser/mini-IOTasks/issues
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2021 Author name here
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/githubuser/mini-IOTasks
+
+library
+  exposed-modules:
+      Constraints
+      Example
+      IOrep
+      Specification
+      Term
+      Trace
+      ValueSet
+      Z3
+  other-modules:
+      Paths_mini_IOTasks
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -fdefer-typed-holes
+  build-depends:
+      QuickCheck
+    , base >=4.7 && <5
+    , containers
+    , z3
+  default-language: Haskell2010
+
+test-suite mini-IOTasks-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_mini_IOTasks
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -fdefer-typed-holes -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      QuickCheck
+    , base >=4.7 && <5
+    , containers
+    , mini-IOTasks
+    , z3
+  default-language: Haskell2010
