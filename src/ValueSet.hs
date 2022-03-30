@@ -25,3 +25,13 @@ valueOf vs sz = elements $ range vs [-sz..sz] where
   range (LessThen n) r = filter (<n) r
   range (Eq n) r = filter (==n) r
   range Every r = r
+
+printValueSet :: ValueSet -> String
+printValueSet vs = concat ["{ v : Int | ", printValueSet' vs ,"}"] where
+  printValueSet' (Union vs1 vs2) = concat ["(",printValueSet' vs1,") \\/ (", printValueSet' vs2,")"]
+  printValueSet' (Intersection vs1 vs2) = concat ["(",printValueSet' vs1,") /\\ (", printValueSet' vs2,")"]
+  printValueSet' (Complement vs') = "v not in " ++ printValueSet vs'
+  printValueSet' (GreaterThan n) = "v > " ++ show n
+  printValueSet' (LessThen n) = "v < " ++ show n
+  printValueSet' (Eq n) = "v == " ++ show n
+  printValueSet' Every = "true"

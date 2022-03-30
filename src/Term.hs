@@ -12,7 +12,7 @@ data Term a where
   (:==:) :: Term Int -> Term Int -> Term Bool
   (:>:) :: Term Int -> Term Int -> Term Bool
   Not :: Term Bool -> Term Bool
-  Lenght :: Term [Int] -> Term Int
+  Length :: Term [Int] -> Term Int
   Current :: Varname -> Term Int
   All :: Varname -> Term [Int]
 
@@ -23,7 +23,7 @@ eval (x :*: y) e = eval x e * eval y e
 eval (x :==: y) e = eval x e == eval y e
 eval (x :>: y) e = eval x e > eval y e
 eval (Not b) e = not $ eval b e
-eval (Lenght xs) e = length $ eval xs e
+eval (Length xs) e = length $ eval xs e
 eval (Current x) e = fromMaybe (error $ "empty list for" ++ x) $ safeHead $ eval (All x) e
 eval (All x) e = fromMaybe (error $ "no value for " ++ x) $ lookup x e
 

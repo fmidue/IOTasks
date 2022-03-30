@@ -9,6 +9,7 @@ data Specification where
   WriteOutput :: Term Int -> Specification -> Specification
   Branch :: Term Bool -> Specification -> Specification -> Specification -> Specification
   Nop :: Specification
+  Until :: Term Bool -> Specification -> Specification -> Specification
 
 instance Semigroup Specification where
   s <> Nop = s
@@ -16,6 +17,7 @@ instance Semigroup Specification where
   (ReadInput x vs s) <> s' = ReadInput x vs $ s <> s'
   (WriteOutput t s) <> s' = WriteOutput t $ s <> s'
   (Branch c l r s) <> s' = Branch c l r $ s <> s'
+  (Until cond body s) <> s' = Until cond body $ s <> s'
 
 instance Monoid Specification where
   mempty = Nop
