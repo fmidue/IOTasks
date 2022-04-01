@@ -27,6 +27,21 @@ instance Semigroup Specification where
 instance Monoid Specification where
   mempty = Nop
 
+readInput :: Varname -> ValueSet -> Specification
+readInput x vs = ReadInput x vs nop
+
+writeOutput :: Term Integer -> Specification
+writeOutput t = WriteOutput t nop
+
+branch :: Term Bool -> Specification -> Specification -> Specification
+branch c t e = Branch c t e nop
+
+nop :: Specification
+nop = Nop
+
+until :: Term Bool -> Specification -> Specification
+until c bdy = Until c bdy nop
+
 vars :: Specification -> [Varname]
 vars = nub . go where
   go (ReadInput x _ s') = x : go s'

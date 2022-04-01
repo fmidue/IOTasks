@@ -1,5 +1,7 @@
 module Example where
-import Prelude hiding (putChar,putStr,putStrLn,print,getChar,getLine,readLn)
+import Prelude hiding
+  (putChar,putStr,putStrLn,print,getChar,getLine,readLn
+  ,until)
 
 
 import Specification
@@ -11,28 +13,28 @@ import ValueSet
 
 example :: Specification
 example =
-  ReadInput "x" ints $
-  ReadInput "y" nats $
-  Branch (Current "x" :>: Current "y")
-    (WriteOutput (Current "x" :+: Current "y") Nop)
-    (WriteOutput (Current "x" :*: Current "y") Nop)
-  Nop
+  readInput "x" ints <>
+  readInput "y" nats <>
+  branch (Current "x" :>: Current "y")
+    (writeOutput (Current "x" :+: Current "y") )
+    (writeOutput (Current "x" :*: Current "y") )
+
 
 example2 :: Specification
 example2 =
-  ReadInput "n" nats $
-  Until (Length (All "x") :==: Current "n")
-    (ReadInput "x" ints Nop) $
-  WriteOutput (Sum $ All "x")
-  Nop
+  readInput "n" nats <>
+  until (Length (All "x") :==: Current "n")
+    (readInput "x" ints ) <>
+  writeOutput (Sum $ All "x")
+
 
 example3 :: Specification
 example3 =
-  ReadInput "n" nats $
-  Until (Sum (All "x") :>: Current "n")
-    (ReadInput "x" ints Nop) $
-  WriteOutput (Length $ All "x")
-  Nop
+  readInput "n" nats <>
+  until (Sum (All "x") :>: Current "n")
+    (readInput "x" ints) <>
+  writeOutput (Length $ All "x")
+
 
 ints, nats :: ValueSet
 ints = Every
