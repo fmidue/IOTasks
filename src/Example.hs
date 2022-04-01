@@ -26,6 +26,14 @@ example2 =
   WriteOutput (Sum $ All "x")
   Nop
 
+example3 :: Specification
+example3 =
+  ReadInput "n" nats $
+  Until (Sum (All "x") :>: Current "n")
+    (ReadInput "x" ints Nop) $
+  WriteOutput (Length $ All "x")
+  Nop
+
 ints, nats :: ValueSet
 ints = Every
 nats = Eq 0 `Union` GreaterThan 0
@@ -49,3 +57,14 @@ prog2 = do
       i <- getLine
       loop (m-1) (x+i)
   loop n 0
+
+prog3 :: IOrep ()
+prog3 = do
+  n <- getLine
+  let
+    loop s m
+      | s > n  = putChar m
+      | otherwise = do
+        x <- getLine
+        loop (s+x) (m+1)
+  loop 0 0

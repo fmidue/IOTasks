@@ -42,7 +42,7 @@ getLine = GetLine pure
 
 
 runProgram :: [Integer] -> IOrep () -> Trace
-runProgram [] (GetLine _) = error "out of inputs"
+runProgram [] (GetLine _) = OutOfInputs
 runProgram (i:is) (GetLine f) = ProgRead i $ runProgram is (f i)
 runProgram is (PutChar n p') = ProgWrite n $ runProgram is p'
 runProgram _ (Return ()) = Terminate
