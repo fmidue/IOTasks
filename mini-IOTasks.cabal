@@ -30,6 +30,7 @@ library
       IOrep
       Specification
       Term
+      Testing
       Trace
       ValueSet
       Z3

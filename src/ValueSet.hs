@@ -8,16 +8,25 @@ data ValueSet
   = Union ValueSet ValueSet
   | Intersection ValueSet ValueSet
   | Complement ValueSet
-  | GreaterThan Int
-  | LessThen Int
-  | Eq Int
+  | GreaterThan Integer
+  | LessThen Integer
+  | Eq Integer
   | Every
 
-type Size = Int
+type Size = Integer
 
-valueOf :: ValueSet -> Size -> Gen Int
+containsValue :: ValueSet -> Integer -> Bool
+containsValue (Union vs1 vs2) n = vs1 `containsValue` n || vs2 `containsValue` n
+containsValue (Intersection vs1 vs2) n = vs1 `containsValue` n && vs2 `containsValue` n
+containsValue (Complement vs) n = not (vs `containsValue` n)
+containsValue (GreaterThan i) n = n > i
+containsValue (LessThen i) n = n < i
+containsValue (Eq i) n = i == n
+containsValue Every _ = True
+
+valueOf :: ValueSet -> Size -> Gen Integer
 valueOf vs sz = elements $ range vs [-sz..sz] where
-  range :: ValueSet -> [Int] -> [Int]
+  range :: ValueSet -> [Integer] -> [Integer]
   range (Union x y) r = range x r `union` range y r
   range (Intersection x y) r = range x r `intersect` range y r
   range (Complement x) r = filter (`notElem` range x r) [-sz .. sz]

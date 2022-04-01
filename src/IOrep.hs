@@ -1,12 +1,14 @@
 {-# LANGUAGE DeriveFunctor #-}
 module IOrep where
+import Prelude hiding (putChar,putStr,putStrLn,print,getChar,getLine,readLn)
+
 import Control.Monad (ap, (>=>))
 
 import Trace
 
 data IOrep a
-  = GetLine (Int -> IOrep a)
-  | PutChar Int (IOrep a)
+  = GetLine (Integer -> IOrep a)
+  | PutChar Integer (IOrep a)
   | Return a
   deriving Functor
 
@@ -20,7 +22,26 @@ instance Monad IOrep where
   (PutChar s ma) >>= g = PutChar s (ma >>= g)
   return = pure
 
-runProgram :: [Int] -> IOrep () -> Trace
+putChar :: Integer -> IOrep ()
+putChar c = PutChar c $ pure ()
+
+-- putStr :: [Integer] -> IOrep ()
+-- putStr = mapM_ putChar
+
+-- putStrLn :: [Integer] -> IOrep ()
+-- putStrLn = putChar  . putStr
+-- print :: Show a => a -> IOrep ()
+--
+-- getChar :: IOrep Integer
+-- getChar = _
+
+getLine :: IOrep Integer
+getLine = GetLine pure
+
+-- readLn :: Read a => a -> IOrep a
+
+
+runProgram :: [Integer] -> IOrep () -> Trace
 runProgram [] (GetLine _) = error "out of inputs"
 runProgram (i:is) (GetLine f) = ProgRead i $ runProgram is (f i)
 runProgram is (PutChar n p') = ProgWrite n $ runProgram is p'

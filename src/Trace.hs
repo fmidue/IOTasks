@@ -1,7 +1,7 @@
 module Trace where
 
 data Trace
-  = ProgRead Int Trace
-  | ProgWrite Int Trace
+  = ProgRead Integer Trace
+  | ProgWrite Integer Trace
   | Terminate
-  deriving Show
+  deriving (Eq,Show)

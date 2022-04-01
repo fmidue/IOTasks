@@ -8,7 +8,7 @@ import ValueSet
 
 import Z3.Monad
 
-import Test.QuickCheck (chooseInt, generate, vectorOf)
+import Test.QuickCheck (chooseInteger, generate, vectorOf)
 import Control.Monad (forM, forM_)
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe (catMaybes, fromMaybe)
@@ -16,10 +16,10 @@ import Term
 import Data.Map (Map)
 import qualified Data.Map as Map
 
-findPathInput :: Path -> Int -> IO (Maybe [Integer])
+findPathInput :: Path -> Integer -> IO (Maybe [Integer])
 findPathInput p bound = evalZ3 $ pathScript p bound
 
-pathScript :: Path -> Int -> Z3 (Maybe [Integer])
+pathScript :: Path -> Integer -> Z3 (Maybe [Integer])
 pathScript path bound = do
   let (tyConstr,predConstr) = partitionPath path
   vars <- forM tyConstr $
@@ -31,10 +31,10 @@ pathScript path bound = do
   forM_ predConstr $
     \(ConditionConstraint t e) ->
       optimizeAssert =<< z3Predicate t e vars
-  vs <- liftIO $ generate $ vectorOf (length vars) $ chooseInt (-bound,bound)
+  vs <- liftIO $ generate $ vectorOf (length vars) $ chooseInteger (-bound,bound)
   def <- mkStringSymbol "default"
   forM_ (zip (zip vs vars) [1..]) $ \((v,(_,x)),_w) -> do
-    eq <- mkEq x =<< mkInteger (fromIntegral v)
+    eq <- mkEq x =<< mkInteger v
     optimizeAssertSoft eq "1" def -- soft assert with weight 1 and id "default"
   result <- optimizeCheck []
   case result of
@@ -54,6 +54,7 @@ z3Predicate (x :==: y) e vars = binRec e vars mkEq x y
 z3Predicate (x :>: y) e vars = binRec e vars mkGt x y
 z3Predicate (Not x) e vars = mkNot =<< z3Predicate x e vars
 z3Predicate (Length (All x)) e _ = mkIntNum $ fromMaybe 0 $ Map.lookup x e
+z3Predicate (Sum (All x)) e vars = let n = fromMaybe 0 $ Map.lookup x e in mkAdd [ xi | ((name,i),xi) <- vars, name == x, i <= n ]
 z3Predicate (Current x) e vars = pure $ fromMaybe (error $ "unknown variable " ++ x++ show e ++ show vars) $ Map.lookup x e >>= (\i -> lookup (x,i) vars)
 z3Predicate (All _x) _e _vars = error "generic list"
 
