@@ -43,7 +43,7 @@ pathScript path bound = do
       Just . catMaybes <$> mapM (evalInt model . snd) vars
     _ -> do
       str <- optimizeToString
-      liftIO $ print str
+      -- liftIO $ print str
       pure Nothing
 
 z3Predicate :: Term a -> Map Varname Int -> [((Varname, Int), AST)] -> Z3 AST

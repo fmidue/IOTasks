@@ -15,12 +15,22 @@ data TestConfig = TestConfig { depth :: Int, sizeBound :: Integer, testsPerPath 
 defaultConfig :: TestConfig
 defaultConfig = TestConfig 25 100 5
 
-fulfills :: TestConfig -> IOrep () -> Specification -> IO Bool
+fulfills :: TestConfig -> IOrep () -> Specification -> IO Outcome
 fulfills TestConfig{..} prog spec  = do
   let ps = paths depth $ constraintTree spec
   nestedIs <- forM ps $ \p -> do
     ms <- replicateM testsPerPath $ findPathInput p sizeBound
     pure $ catMaybes ms
   let is = nub $ concat nestedIs
-  putStrLn $ "generated " ++ show (length is) ++ " unique inputs covering " ++ show (length $ filter (not.null) nestedIs) ++ " paths."  
-  pure $ all (\i -> runProgram i prog == runSpecification i spec) is
+  putStrLn $ "generated " ++ show (length is) ++ " unique inputs covering " ++ show (length $ filter (not.null) nestedIs) ++ " paths."
+  pure $ runTests prog spec is
+
+type Inputs = [Integer]
+
+data Outcome = Success | Failure Inputs deriving Show
+
+runTests :: IOrep () -> Specification -> [Inputs] -> Outcome
+runTests _ _ [] = Success
+runTests prog spec (i:is)
+  | runProgram i prog == runSpecification i spec = runTests prog spec is
+  | otherwise = Failure i
