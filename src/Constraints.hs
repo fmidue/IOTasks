@@ -66,5 +66,6 @@ printIndexedTerm (tx :==: ty) m = concat ["(",printIndexedTerm tx m, ") == (", p
 printIndexedTerm (tx :>: ty) m = concat ["(",printIndexedTerm tx m, ") > (", printIndexedTerm ty m,")"]
 printIndexedTerm (Not t) m = concat ["not (", printIndexedTerm t m, ")"]
 printIndexedTerm (Length t) m = concat ["length (", printIndexedTerm t m, ")"]
+printIndexedTerm (Sum t) m = concat ["sum (", printIndexedTerm t m, ")"]
 printIndexedTerm (Current x) m = concat [x,"_",show $ ix x m]
 printIndexedTerm (All x) _ = x++"_A"
