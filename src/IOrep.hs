@@ -2,6 +2,8 @@
 module IOrep where
 import Prelude hiding (putChar,putStr,putStrLn,print,getChar,getLine,readLn)
 
+import Data.Set (singleton)
+
 import Control.Monad (ap, (>=>))
 
 import Trace
@@ -44,5 +46,5 @@ getLine = GetLine pure
 runProgram :: [Integer] -> IOrep () -> Trace
 runProgram [] (GetLine _) = OutOfInputs
 runProgram (i:is) (GetLine f) = ProgRead i $ runProgram is (f i)
-runProgram is (PutChar n p') = ProgWrite n $ runProgram is p'
+runProgram is (PutChar n p') = ProgWrite Mandatory (singleton n) $ runProgram is p'
 runProgram _ (Return ()) = Terminate

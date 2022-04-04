@@ -42,7 +42,7 @@ pathScript path bound = do
       model <- optimizeGetModel
       Just . catMaybes <$> mapM (evalInt model . snd) vars
     _ -> do
-      str <- optimizeToString
+      _str <- optimizeToString
       -- liftIO $ print str
       pure Nothing
 

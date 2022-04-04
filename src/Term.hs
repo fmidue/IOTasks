@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE StandaloneDeriving #-}
 module Term where
 import Data.Maybe (fromMaybe)
 
@@ -16,6 +17,10 @@ data Term a where
   Sum :: Term [Integer] -> Term Integer
   Current :: Varname -> Term Integer
   All :: Varname -> Term [Integer]
+
+deriving instance Eq (Term a)
+deriving instance Ord (Term a)
+deriving instance Show (Term a)
 
 eval :: Term a -> [(Varname,[Integer])] -> a
 eval (x :+: y) e = eval x e + eval y e

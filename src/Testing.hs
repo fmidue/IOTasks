@@ -4,6 +4,7 @@ module Testing where
 import IOrep
 import Specification
 import Constraints
+import Trace
 import Z3
 
 import Control.Monad (forM, replicateM)
@@ -27,10 +28,18 @@ fulfills TestConfig{..} prog spec  = do
 
 type Inputs = [Integer]
 
-data Outcome = Success | Failure Inputs deriving Show
+data Outcome = Success | Failure Inputs Trace Trace
+
+instance Show Outcome where
+  show Success = "Success"
+  show (Failure is s t) = unlines ["Failure","  "++show is, "  "++show s,"  "++show t]
 
 runTests :: IOrep () -> Specification -> [Inputs] -> Outcome
 runTests _ _ [] = Success
-runTests prog spec (i:is)
-  | runProgram i prog == runSpecification i spec = runTests prog spec is
-  | otherwise = Failure i
+runTests prog spec (i:is) =
+  let
+    specTrace = runSpecification i spec
+    progTrace = runProgram i prog
+  in if specTrace `covers` progTrace
+    then runTests prog spec is
+    else Failure i specTrace progTrace

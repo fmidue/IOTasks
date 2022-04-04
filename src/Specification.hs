@@ -6,12 +6,14 @@ import ValueSet
 import Term
 import Trace
 
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.List (nub)
 import qualified Data.Map as Map
 
 data Specification where
   ReadInput :: Varname -> ValueSet -> Specification -> Specification
-  WriteOutput :: Term Integer -> Specification -> Specification
+  WriteOutput :: OptFlag -> Set (Term Integer) -> Specification -> Specification
   Branch :: Term Bool -> Specification -> Specification -> Specification -> Specification
   Nop :: Specification
   Until :: Term Bool -> Specification -> Specification -> Specification
@@ -20,7 +22,7 @@ instance Semigroup Specification where
   s <> Nop = s
   Nop <> s = s
   (ReadInput x vs s) <> s' = ReadInput x vs $ s <> s'
-  (WriteOutput t s) <> s' = WriteOutput t $ s <> s'
+  (WriteOutput o t s) <> s' = WriteOutput o t $ s <> s'
   (Branch c l r s) <> s' = Branch c l r $ s <> s'
   (Until cond body s) <> s' = Until cond body $ s <> s'
 
@@ -30,8 +32,11 @@ instance Monoid Specification where
 readInput :: Varname -> ValueSet -> Specification
 readInput x vs = ReadInput x vs nop
 
-writeOutput :: Term Integer -> Specification
-writeOutput t = WriteOutput t nop
+writeOutput :: [Term Integer] -> Specification
+writeOutput ts = WriteOutput Mandatory (Set.fromList ts) nop
+
+writeOptionalOutput :: [Term Integer] -> Specification
+writeOptionalOutput ts = WriteOutput Optional (Set.fromList ts) nop
 
 branch :: Term Bool -> Specification -> Specification -> Specification
 branch c t e = Branch c t e nop
@@ -45,7 +50,7 @@ until c bdy = Until c bdy nop
 vars :: Specification -> [Varname]
 vars = nub . go where
   go (ReadInput x _ s') = x : go s'
-  go (WriteOutput _ s') = go s'
+  go (WriteOutput _ _ s') = go s'
   go (Branch _ l r s') = go l ++ go r ++ go s'
   go Nop = []
   go (Until _ bdy s') = go bdy ++ go s'
@@ -57,7 +62,7 @@ runSpecification inputs spec = runSpecification' (Map.fromList ((,[]) <$> vars s
   runSpecification' e (i:is) (ReadInput x vs s')
     | vs `containsValue` i = ProgRead i $ runSpecification' (Map.update (\xs -> Just $ i:xs) x e) is s'
     | otherwise = error "invalid value"
-  runSpecification' e is (WriteOutput t s') = ProgWrite (eval t $ Map.toList e) $ runSpecification' e is s'
+  runSpecification' e is (WriteOutput o ts s') = ProgWrite o (Set.map (`eval` Map.toList e) ts) $ runSpecification' e is s'
   runSpecification' e is (Branch c l r s')
     | eval c $ Map.toList e = runSpecification' e is $ l <> s'
     | otherwise = runSpecification' e is $ r <> s'

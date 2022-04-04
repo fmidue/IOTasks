@@ -16,25 +16,22 @@ example =
   readInput "x" ints <>
   readInput "y" nats <>
   branch (Current "x" :>: Current "y")
-    (writeOutput (Current "x" :+: Current "y") )
-    (writeOutput (Current "x" :*: Current "y") )
-
+    (writeOutput [Current "x" :+: Current "y", Current "x" :-: Current "y"] )
+    (writeOutput [Current "x" :*: Current "y"] )
 
 example2 :: Specification
 example2 =
   readInput "n" nats <>
   until (Length (All "x") :==: Current "n")
-    (readInput "x" ints ) <>
-  writeOutput (Sum $ All "x")
-
+    (writeOptionalOutput [Current "n" :-: Length (All "x")] <> readInput "x" ints ) <>
+  writeOutput [Sum $ All "x"]
 
 example3 :: Specification
 example3 =
   readInput "n" nats <>
   until (Sum (All "x") :>: Current "n")
     (readInput "x" ints) <>
-  writeOutput (Length $ All "x")
-
+  writeOutput [Length $ All "x"]
 
 ints, nats :: ValueSet
 ints = Every
@@ -56,6 +53,7 @@ prog2 = do
   let
     loop 0 x = putChar x
     loop m x = do
+      -- putChar m
       i <- getLine
       loop (m-1) (x+i)
   loop n 0
