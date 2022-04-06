@@ -52,9 +52,15 @@ z3Predicate (x :-: y) e vars = binRec e vars (\a b -> mkSub [a,b]) x y
 z3Predicate (x :*: y) e vars = binRec e vars (\a b -> mkMul [a,b]) x y
 z3Predicate (x :==: y) e vars = binRec e vars mkEq x y
 z3Predicate (x :>: y) e vars = binRec e vars mkGt x y
+z3Predicate (x :>=: y) e vars = binRec e vars mkGe x y
+z3Predicate (x :<: y) e vars = binRec e vars mkLt x y
+z3Predicate (x :<=: y) e vars = binRec e vars mkLe x y
 z3Predicate (Not x) e vars = mkNot =<< z3Predicate x e vars
+z3Predicate (x :&&: y) e vars = binRec e vars (\a b -> mkAnd [a,b]) x y
+z3Predicate (x :||: y) e vars = binRec e vars (\a b -> mkOr [a,b]) x y
 z3Predicate (Length (All x)) e _ = mkIntNum $ fromMaybe 0 $ Map.lookup x e
 z3Predicate (Sum (All x)) e vars = let n = fromMaybe 0 $ Map.lookup x e in mkAdd [ xi | ((name,i),xi) <- vars, name == x, i <= n ]
+z3Predicate (Product (All x)) e vars = let n = fromMaybe 0 $ Map.lookup x e in mkMul [ xi | ((name,i),xi) <- vars, name == x, i <= n ]
 z3Predicate (Current x) e vars = pure $ fromMaybe (error $ "unknown variable " ++ x++ show e ++ show vars) $ Map.lookup x e >>= (\i -> lookup (x,i) vars)
 z3Predicate (All _x) _e _vars = error "generic list"
 
