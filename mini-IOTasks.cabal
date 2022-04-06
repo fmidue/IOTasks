@@ -31,6 +31,7 @@ library
       Specification
       Term
       Testing
+      Testing.Random
       Trace
       ValueSet
       Z3

@@ -52,3 +52,15 @@ showTraceHead (ProgWrite Optional ts _) = "(!"++show (toList ts)++")"
 showTraceHead (ProgWrite Mandatory ts _) = "!"++show (toList ts)
 showTraceHead Terminate = "stop"
 showTraceHead OutOfInputs = "?<unknown input>"
+
+isTerminating :: Trace -> Bool
+isTerminating (ProgRead _ t) = isTerminating t
+isTerminating (ProgWrite _ _ t) = isTerminating t
+isTerminating Terminate = True
+isTerminating OutOfInputs = False
+
+inputSequence :: Trace -> [Integer]
+inputSequence (ProgRead x t) = x:inputSequence t
+inputSequence (ProgWrite _ _ t) = inputSequence t
+inputSequence Terminate = []
+inputSequence OutOfInputs = []

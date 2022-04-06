@@ -58,7 +58,7 @@ vars = nub . go where
 runSpecification :: [Integer] -> Specification -> Trace
 runSpecification inputs spec = runSpecification' (Map.fromList ((,[]) <$> vars spec)) inputs spec where
   runSpecification' :: Map.Map Varname [Integer] -> [Integer] -> Specification -> Trace
-  runSpecification' _ [] ReadInput{} = error "not enough inputs"
+  runSpecification' _ [] ReadInput{} = OutOfInputs
   runSpecification' e (i:is) (ReadInput x vs s')
     | vs `containsValue` i = ProgRead i $ runSpecification' (Map.update (\xs -> Just $ i:xs) x e) is s'
     | otherwise = error "invalid value"
