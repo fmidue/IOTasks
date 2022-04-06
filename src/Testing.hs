@@ -28,11 +28,11 @@ fulfills TestConfig{..} prog spec  = do
 
 type Inputs = [Integer]
 
-data Outcome = Success | Failure Inputs Trace Trace
+data Outcome = Success | Failure Inputs MatchResult
 
 instance Show Outcome where
   show Success = "Success"
-  show (Failure is s t) = unlines ["Failure","  "++show is, "  "++show s,"  "++show t]
+  show (Failure is r) = unlines ["Failure","  "++show is, "  "++show r]
 
 runTests :: IOrep () -> Specification -> [Inputs] -> Outcome
 runTests _ _ [] = Success
@@ -40,6 +40,6 @@ runTests prog spec (i:is) =
   let
     specTrace = runSpecification i spec
     progTrace = runProgram i prog
-  in if specTrace `covers` progTrace
-    then runTests prog spec is
-    else Failure i specTrace progTrace
+  in case specTrace `covers` progTrace of
+    MatchSuccessfull -> runTests prog spec is
+    failure -> Failure i failure
