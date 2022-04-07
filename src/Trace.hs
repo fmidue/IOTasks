@@ -5,8 +5,8 @@ import Data.Set
 data OptFlag = Optional | Mandatory deriving (Eq, Ord, Show)
 
 data Trace
-  = ProgRead Integer Trace
-  | ProgWrite OptFlag (Set Integer) Trace
+  = ProgRead Char Trace
+  | ProgWrite OptFlag (Set String) Trace
   | Terminate
   | OutOfInputs
   deriving (Eq, Show)
@@ -59,8 +59,11 @@ isTerminating (ProgWrite _ _ t) = isTerminating t
 isTerminating Terminate = True
 isTerminating OutOfInputs = False
 
-inputSequence :: Trace -> [Integer]
-inputSequence (ProgRead x t) = x:inputSequence t
-inputSequence (ProgWrite _ _ t) = inputSequence t
-inputSequence Terminate = []
-inputSequence OutOfInputs = []
+inputSequence :: Trace -> [String]
+inputSequence = go "" where
+  go cs (ProgRead '\n' t) = reverse cs : go "" t
+  go cs (ProgRead c t) = go (c:cs) t
+  go cs (ProgWrite _ _ t) = reverse cs : go "" t
+  -- technically this might add an additional linebreak on the last line that might not be there in the Trace
+  go cs Terminate = [reverse cs]
+  go cs OutOfInputs = [reverse cs]

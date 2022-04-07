@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Testing where
 
-import IOrep
+import IOrep (IOrep, Line, runProgram)
 import Specification
 import Constraints
 import Trace
@@ -22,11 +22,11 @@ fulfills TestConfig{..} prog spec  = do
   nestedIs <- forM ps $ \p -> do
     ms <- replicateM testsPerPath $ findPathInput p sizeBound
     pure $ catMaybes ms
-  let is = nub $ concat nestedIs
+  let is = map (map show) $ nub $ concat nestedIs
   putStrLn $ "generated " ++ show (length is) ++ " unique inputs covering " ++ show (length $ filter (not.null) nestedIs) ++ " paths."
   pure $ runTests prog spec is
 
-type Inputs = [Integer]
+type Inputs = [Line]
 
 data Outcome = Success | Failure Inputs MatchResult
 

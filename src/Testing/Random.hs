@@ -4,8 +4,8 @@ module Testing.Random where
 
 import Testing hiding (fulfills, TestConfig)
 
-import Data.Map as Map
-import Data.Set as Set
+import Data.Map as Map hiding (foldr)
+import Data.Set as Set hiding (foldr)
 
 import IOrep
 import Specification
@@ -40,11 +40,11 @@ genTrace spec depth bound = genTrace' (Map.fromList ((,[]) <$> vars spec)) depth
     | otherwise = do
       i <- valueOf vs bound
       t' <- genTrace' (Map.update (\xs -> Just $ i:xs) x e) (d-1) s'
-      pure $ ProgRead i t'
+      pure $ foldr ProgRead t' (show i)
   genTrace' e d (WriteOutput o ts s') =
     do
       t' <- genTrace' e d s'
-      pure $ ProgWrite o (Set.map (`eval` Map.toList e) ts) t'
+      pure $ ProgWrite o (Set.map (show . (`eval` Map.toList e)) ts) t'
   genTrace' e d (Branch c l r s')
     | eval c $ Map.toList e = genTrace' e d $ l <> s'
     | otherwise = genTrace' e d $ r <> s'

@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 module Example where
 import Prelude hiding
   (putChar,putStr,putStrLn,print,getChar,getLine,readLn
@@ -41,30 +42,30 @@ nats = Eq 0 `Union` GreaterThan 0
 
 prog1 :: IOrep ()
 prog1 = do
-  x <- getLine
-  y <- getLine
+  x <- readLn @Integer
+  y <- readLn
   if x > y
-    then putChar $ x + y
-    else putChar $ x * y
+    then print $ x + y
+    else print $ x * y
 
 prog2 :: IOrep ()
 prog2 = do
-  n <- getLine
+  n <- readLn @Integer
   let
-    loop 0 x = putChar x
+    loop 0 x = print @Integer x
     loop m x = do
       -- putChar m
-      i <- getLine
+      i <- readLn
       loop (m-1) (x+i)
   loop n 0
 
 prog3 :: IOrep ()
 prog3 = do
-  n <- getLine
+  n <- readLn @Integer
   let
     loop s m
-      | s > n  = putChar m
+      | s > n  = print @Integer m
       | otherwise = do
-        x <- getLine
+        x <- readLn
         loop (s+x) (m+1)
   loop 0 0

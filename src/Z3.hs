@@ -33,7 +33,7 @@ pathScript path bound = do
       optimizeAssert =<< z3Predicate t e vars
   vs <- liftIO $ generate $ vectorOf (length vars) $ chooseInteger (-bound,bound)
   def <- mkStringSymbol "default"
-  forM_ (zip (zip vs vars) [1..]) $ \((v,(_,x)),_w) -> do
+  forM_ (zip (zip vs vars) [(1 :: Integer)..]) $ \((v,(_,x)),_w) -> do
     eq <- mkEq x =<< mkInteger v
     optimizeAssertSoft eq "1" def -- soft assert with weight 1 and id "default"
   result <- optimizeCheck []

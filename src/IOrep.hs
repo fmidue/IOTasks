@@ -9,8 +9,8 @@ import Control.Monad (ap, (>=>))
 import Trace
 
 data IOrep a
-  = GetLine (Integer -> IOrep a)
-  | PutChar Integer (IOrep a)
+  = GetChar (Char -> IOrep a)
+  | PutString String (IOrep a)
   | Return a
   deriving Functor
 
@@ -20,31 +20,44 @@ instance Applicative IOrep where
 
 instance Monad IOrep where
   (Return a) >>= g = g a
-  (GetLine f) >>= g = GetLine (f >=> g)
-  (PutChar s ma) >>= g = PutChar s (ma >>= g)
+  (GetChar f) >>= g = GetChar (f >=> g)
+  (PutString s ma) >>= g = putString s (ma >>= g)
   return = pure
 
-putChar :: Integer -> IOrep ()
-putChar c = PutChar c $ pure ()
+putString :: String -> IOrep a -> IOrep a
+putString s (PutString s' m) = PutString (s++s') m
+putString s m = PutString s m
 
--- putStr :: [Integer] -> IOrep ()
--- putStr = mapM_ putChar
+putChar :: Char -> IOrep ()
+putChar c = PutString [c] $ pure ()
 
--- putStrLn :: [Integer] -> IOrep ()
--- putStrLn = putChar  . putStr
--- print :: Show a => a -> IOrep ()
---
--- getChar :: IOrep Integer
--- getChar = _
+putStr :: String -> IOrep ()
+putStr s = PutString s $ pure ()
 
-getLine :: IOrep Integer
-getLine = GetLine pure
+putStrLn :: String -> IOrep ()
+putStrLn s = putStr $ s++"\n"
 
--- readLn :: Read a => a -> IOrep a
+print :: Show a => a -> IOrep ()
+print = putStrLn . show
 
+getChar :: IOrep Char
+getChar = GetChar pure
 
-runProgram :: [Integer] -> IOrep () -> Trace
-runProgram [] (GetLine _) = OutOfInputs
-runProgram (i:is) (GetLine f) = ProgRead i $ runProgram is (f i)
-runProgram is (PutChar n p') = ProgWrite Mandatory (singleton n) $ runProgram is p'
+getLine :: IOrep String
+getLine = do
+  c <- getChar
+  case c of
+    '\n' -> pure [c]
+    _ -> (c:) <$> getLine
+
+readLn :: Read a => IOrep a
+readLn = read <$> getLine
+
+type Line = String
+
+runProgram :: [Line] -> IOrep () -> Trace
+runProgram [] (GetChar _) = OutOfInputs
+runProgram ("":is) (GetChar f) = ProgRead '\n' $ runProgram is (f '\n')
+runProgram ((c:cs):is) (GetChar f) = ProgRead c $ runProgram (cs:is) (f c)
+runProgram is (PutString n p') = ProgWrite Mandatory (singleton n) $ runProgram is p'
 runProgram _ (Return ()) = Terminate

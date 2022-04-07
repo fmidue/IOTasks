@@ -55,14 +55,14 @@ vars = nub . go where
   go Nop = []
   go (Until _ bdy s') = go bdy ++ go s'
 
-runSpecification :: [Integer] -> Specification -> Trace
+runSpecification :: [String] -> Specification -> Trace
 runSpecification inputs spec = runSpecification' (Map.fromList ((,[]) <$> vars spec)) inputs spec where
-  runSpecification' :: Map.Map Varname [Integer] -> [Integer] -> Specification -> Trace
+  runSpecification' :: Map.Map Varname [Integer] -> [String] -> Specification -> Trace
   runSpecification' _ [] ReadInput{} = OutOfInputs
   runSpecification' e (i:is) (ReadInput x vs s')
-    | vs `containsValue` i = ProgRead i $ runSpecification' (Map.update (\xs -> Just $ i:xs) x e) is s'
+    | vs `containsValue` read i = foldr ProgRead (ProgRead '\n' $ runSpecification' (Map.update (\xs -> Just $ read i:xs) x e) is s') i
     | otherwise = error "invalid value"
-  runSpecification' e is (WriteOutput o ts s') = ProgWrite o (Set.map (`eval` Map.toList e) ts) $ runSpecification' e is s'
+  runSpecification' e is (WriteOutput o ts s') = ProgWrite o (Set.map ((++"\n"). show . (`eval` Map.toList e)) ts) $ runSpecification' e is s'
   runSpecification' e is (Branch c l r s')
     | eval c $ Map.toList e = runSpecification' e is $ l <> s'
     | otherwise = runSpecification' e is $ r <> s'
