@@ -11,6 +11,7 @@ import IOrep (IOrep, runProgram)
 import Specification
 import Trace
 import Term
+import OutputPattern
 
 import Test.QuickCheck (Gen, vectorOf, generate, frequency)
 import ValueSet
@@ -48,7 +49,7 @@ genTrace spec depth bound maxNeg = genTrace' (Map.fromList ((,[]) <$> vars spec)
   genTrace' e d n (WriteOutput o ts s') =
     do
       t' <- genTrace' e d n s'
-      pure $ ProgWrite o (Set.map (show . (`eval` Map.toList e)) ts) t'
+      pure $ ProgWrite o (Set.map (evalPattern $ Map.toList e) ts) t'
   genTrace' e d n (Branch c l r s')
     | eval c $ Map.toList e = genTrace' e d n $ l <> s'
     | otherwise = genTrace' e d n $ r <> s'

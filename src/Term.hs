@@ -2,7 +2,10 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE StandaloneDeriving #-}
 module Term where
+
 import Data.Maybe (fromMaybe)
+import Data.Map (Map)
+import qualified Data.Map as Map (lookup)
 
 type Varname = String
 
@@ -51,3 +54,22 @@ eval (IntLit n) _ = n
 safeHead :: [a] -> Maybe a
 safeHead [] = Nothing
 safeHead (x:_) = Just x
+
+printIndexedTerm :: Term a -> Map Varname Int -> String
+printIndexedTerm (tx :+: ty) m = concat ["(",printIndexedTerm tx m, ") + (", printIndexedTerm ty m,")"]
+printIndexedTerm (tx :-: ty) m = concat ["(",printIndexedTerm tx m, ") - (", printIndexedTerm ty m,")"]
+printIndexedTerm (tx :*: ty) m = concat ["(",printIndexedTerm tx m, ") * (", printIndexedTerm ty m,")"]
+printIndexedTerm (tx :==: ty) m = concat ["(",printIndexedTerm tx m, ") == (", printIndexedTerm ty m,")"]
+printIndexedTerm (tx :>: ty) m = concat ["(",printIndexedTerm tx m, ") > (", printIndexedTerm ty m,")"]
+printIndexedTerm (tx :>=: ty) m = concat ["(",printIndexedTerm tx m, ") >= (", printIndexedTerm ty m,")"]
+printIndexedTerm (tx :<: ty) m = concat ["(",printIndexedTerm tx m, ") < (", printIndexedTerm ty m,")"]
+printIndexedTerm (tx :<=: ty) m = concat ["(",printIndexedTerm tx m, ") <= (", printIndexedTerm ty m,")"]
+printIndexedTerm (Not t) m = concat ["not (", printIndexedTerm t m, ")"]
+printIndexedTerm (tx :&&: ty) m = concat ["(",printIndexedTerm tx m, ") && (", printIndexedTerm ty m,")"]
+printIndexedTerm (tx :||: ty) m = concat ["(",printIndexedTerm tx m, ") || (", printIndexedTerm ty m,")"]
+printIndexedTerm (Length t) m = concat ["length (", printIndexedTerm t m, ")"]
+printIndexedTerm (Sum t) m = concat ["sum (", printIndexedTerm t m, ")"]
+printIndexedTerm (Product t) m = concat ["product (", printIndexedTerm t m, ")"]
+printIndexedTerm (Current x) m = concat [x,"_",show $ fromMaybe 0 $ Map.lookup x m]
+printIndexedTerm (All x) _ = x++"_A"
+printIndexedTerm (IntLit x) _ = show x

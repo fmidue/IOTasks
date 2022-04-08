@@ -24,6 +24,8 @@ dependencies:
 - QuickCheck
 - containers
 - z3
+- parsec
+- unify
 
 ghc-options:
 - -Wall

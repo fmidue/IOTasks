@@ -1,10 +1,12 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE DataKinds #-}
 module Specification where
 
 import ValueSet
 import Term
 import Trace
+import OutputPattern
 
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -13,7 +15,7 @@ import qualified Data.Map as Map
 
 data Specification where
   ReadInput :: Varname -> ValueSet -> InputMode -> Specification -> Specification
-  WriteOutput :: OptFlag -> Set (Term Integer) -> Specification -> Specification
+  WriteOutput :: OptFlag -> Set (OutputPattern 'SpecificationP) -> Specification -> Specification
   Branch :: Term Bool -> Specification -> Specification -> Specification -> Specification
   Nop :: Specification
   Until :: Term Bool -> Specification -> Specification -> Specification
@@ -34,10 +36,10 @@ instance Monoid Specification where
 readInput :: Varname -> ValueSet -> InputMode -> Specification
 readInput x vs m = ReadInput x vs m nop
 
-writeOutput :: [Term Integer] -> Specification
+writeOutput :: [OutputPattern 'SpecificationP] -> Specification
 writeOutput ts = WriteOutput Mandatory (Set.fromList ts) nop
 
-writeOptionalOutput :: [Term Integer] -> Specification
+writeOptionalOutput :: [OutputPattern 'SpecificationP] -> Specification
 writeOptionalOutput ts = WriteOutput Optional (Set.fromList ts) nop
 
 branch :: Term Bool -> Specification -> Specification -> Specification
@@ -66,7 +68,7 @@ runSpecification inputs spec = runSpecification' (Map.fromList ((,[]) <$> vars s
     | otherwise = case mode of
         AssumeValid -> error "invalid value"
         UntilValid -> foldr ProgRead (ProgRead '\n' $ runSpecification' e is s) i
-  runSpecification' e is (WriteOutput o ts s') = ProgWrite o (Set.map ((++"\n"). show . (`eval` Map.toList e)) ts) $ runSpecification' e is s'
+  runSpecification' e is (WriteOutput o ts s') = ProgWrite o (Set.map ((<> Text "\n") . evalPattern (Map.toList e)) ts) $ runSpecification' e is s'
   runSpecification' e is (Branch c l r s')
     | eval c $ Map.toList e = runSpecification' e is $ l <> s'
     | otherwise = runSpecification' e is $ r <> s'

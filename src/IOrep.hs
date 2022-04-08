@@ -7,6 +7,7 @@ import Data.Set (singleton)
 import Control.Monad (ap, (>=>))
 
 import Trace
+import OutputPattern
 
 data IOrep a
   = GetChar (Char -> IOrep a)
@@ -59,5 +60,5 @@ runProgram :: [Line] -> IOrep () -> Trace
 runProgram [] (GetChar _) = OutOfInputs
 runProgram ("":is) (GetChar f) = ProgRead '\n' $ runProgram is (f '\n')
 runProgram ((c:cs):is) (GetChar f) = ProgRead c $ runProgram (cs:is) (f c)
-runProgram is (PutString n p') = ProgWrite Mandatory (singleton n) $ runProgram is p'
+runProgram is (PutString n p') = ProgWrite Mandatory (singleton $ Text n) $ runProgram is p'
 runProgram _ (Return ()) = Terminate

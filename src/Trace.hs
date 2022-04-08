@@ -1,13 +1,16 @@
+{-# LANGUAGE DataKinds #-}
 module Trace where
 
-import Data.Set (Set, toList, isSubsetOf)
+import OutputPattern
+
+import Data.Set (Set, toList)
 import Data.List (intercalate)
 
 data OptFlag = Optional | Mandatory deriving (Eq, Ord, Show)
 
 data Trace
   = ProgRead Char Trace
-  | ProgWrite OptFlag (Set String) Trace
+  | ProgWrite OptFlag (Set (OutputPattern 'TraceP)) Trace
   | Terminate
   | OutOfInputs
   deriving (Eq, Show)
@@ -31,7 +34,7 @@ covers s@(ProgRead i t1) t@(ProgRead j t2)
   | otherwise = InputMismatch $ reportMismatch s t
 
 covers s@(ProgWrite Mandatory is t1) t@(ProgWrite Mandatory js t2)
-  | js `isSubsetOf` is = t1 `covers` t2
+  | all (\j -> any (>: j) is) js = t1 `covers` t2
   | otherwise = OutputMismatch $ reportMismatch s t
 
 covers (ProgWrite Optional is t1) t = ProgWrite Mandatory is t1 `covers` t <> t1 `covers` t
@@ -50,8 +53,8 @@ reportMismatch s t = unwords ["Expected:",showTraceHead s,"Got:",showTraceHead t
 showTraceHead :: Trace -> String
 showTraceHead (ProgRead x (ProgRead c t)) | c /= '\n' = "?"++ x : tail (showTraceHead (ProgRead c t))
 showTraceHead (ProgRead x _) = "?"++[x]
-showTraceHead (ProgWrite Optional ts _) = "(!["++ intercalate "," (toList ts) ++ "])"
-showTraceHead (ProgWrite Mandatory ts _) = "!["++ intercalate "," (toList ts) ++ "]"
+showTraceHead (ProgWrite Optional ts _) = "(!["++ intercalate "," (printPattern <$> toList ts) ++ "])"
+showTraceHead (ProgWrite Mandatory ts _) = "!["++ intercalate "," (printPattern <$> toList ts) ++ "]"
 showTraceHead Terminate = "stop"
 showTraceHead OutOfInputs = "?<unknown input>"
 

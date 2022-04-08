@@ -67,22 +67,3 @@ printPath = intercalate ";" . map printConstraint
 printConstraint :: Constraint -> String
 printConstraint (InputConstraint (x,i) vs) = concat [x,"_",show i," : ",printValueSet vs]
 printConstraint (ConditionConstraint t m) = printIndexedTerm t m
-
-printIndexedTerm :: Term a -> Map Varname Int -> String
-printIndexedTerm (tx :+: ty) m = concat ["(",printIndexedTerm tx m, ") + (", printIndexedTerm ty m,")"]
-printIndexedTerm (tx :-: ty) m = concat ["(",printIndexedTerm tx m, ") - (", printIndexedTerm ty m,")"]
-printIndexedTerm (tx :*: ty) m = concat ["(",printIndexedTerm tx m, ") * (", printIndexedTerm ty m,")"]
-printIndexedTerm (tx :==: ty) m = concat ["(",printIndexedTerm tx m, ") == (", printIndexedTerm ty m,")"]
-printIndexedTerm (tx :>: ty) m = concat ["(",printIndexedTerm tx m, ") > (", printIndexedTerm ty m,")"]
-printIndexedTerm (tx :>=: ty) m = concat ["(",printIndexedTerm tx m, ") >= (", printIndexedTerm ty m,")"]
-printIndexedTerm (tx :<: ty) m = concat ["(",printIndexedTerm tx m, ") < (", printIndexedTerm ty m,")"]
-printIndexedTerm (tx :<=: ty) m = concat ["(",printIndexedTerm tx m, ") <= (", printIndexedTerm ty m,")"]
-printIndexedTerm (Not t) m = concat ["not (", printIndexedTerm t m, ")"]
-printIndexedTerm (tx :&&: ty) m = concat ["(",printIndexedTerm tx m, ") && (", printIndexedTerm ty m,")"]
-printIndexedTerm (tx :||: ty) m = concat ["(",printIndexedTerm tx m, ") || (", printIndexedTerm ty m,")"]
-printIndexedTerm (Length t) m = concat ["length (", printIndexedTerm t m, ")"]
-printIndexedTerm (Sum t) m = concat ["sum (", printIndexedTerm t m, ")"]
-printIndexedTerm (Product t) m = concat ["product (", printIndexedTerm t m, ")"]
-printIndexedTerm (Current x) m = concat [x,"_",show $ ix x m]
-printIndexedTerm (All x) _ = x++"_A"
-printIndexedTerm (IntLit x) _ = show x

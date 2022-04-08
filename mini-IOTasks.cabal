@@ -28,6 +28,7 @@ library
       Constraints
       Example
       IOrep
+      OutputPattern
       Specification
       Term
       Testing
@@ -44,6 +45,8 @@ library
       QuickCheck
     , base >=4.7 && <5
     , containers
+    , parsec
+    , unify
     , z3
   default-language: Haskell2010
 
@@ -61,5 +64,7 @@ test-suite mini-IOTasks-test
     , containers
     , hspec
     , mini-IOTasks
+    , parsec
+    , unify
     , z3
   default-language: Haskell2010

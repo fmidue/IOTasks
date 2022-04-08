@@ -9,6 +9,7 @@ import Specification
 import IOrep
 import Term
 import ValueSet
+import OutputPattern
 
 --example specifications
 
@@ -17,22 +18,22 @@ example1 =
   readInput "x" ints AssumeValid <>
   readInput "y" nats AssumeValid <>
   branch (Current "x" :>: Current "y")
-    (writeOutput [Current "x" :+: Current "y", Current "x" :-: Current "y"] )
-    (writeOutput [Current "x" :*: Current "y"] )
+    (writeOutput [Wildcard <> Value (Current "x" :+: Current "y") <> Wildcard , Value (Current "x" :-: Current "y") <> Wildcard] )
+    (writeOutput [Wildcard <> Text "Result: " <> Value (Current "x" :*: Current "y")] )
 
 example2 :: Specification
 example2 =
   readInput "n" nats UntilValid <>
   until (Length (All "x") :==: Current "n")
-    (writeOptionalOutput [Current "n" :-: Length (All "x")] <> readInput "x" ints AssumeValid) <>
-  writeOutput [Sum $ All "x"]
+    (writeOptionalOutput [Value $ Current "n" :-: Length (All "x")] <> readInput "x" ints AssumeValid) <>
+  writeOutput [Value $ Sum $ All "x"]
 
 example3 :: Specification
 example3 =
   readInput "n" nats AssumeValid <>
   until (Sum (All "x") :>: Current "n")
     (readInput "x" ints AssumeValid) <>
-  writeOutput [Length $ All "x"]
+  writeOutput [Value $ Length $ All "x"]
 
 -- atempt at 'breaking' the solver
 example4 :: Specification
@@ -53,7 +54,7 @@ prog1 = do
   y <- readLn
   if x > y
     then print $ x + y
-    else print $ x * y
+    else putStr "Result: " >> print (x * y)
 
 prog2 :: IOrep ()
 prog2 = do
