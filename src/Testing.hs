@@ -29,6 +29,7 @@ fulfills TestConfig{..} prog spec  = do
 type Inputs = [Line]
 
 data Outcome = Success | Failure Inputs MatchResult
+  deriving Eq 
 
 instance Show Outcome where
   show Success = "Success"

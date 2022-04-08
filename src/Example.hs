@@ -12,8 +12,8 @@ import ValueSet
 
 --example specifications
 
-example :: Specification
-example =
+example1 :: Specification
+example1 =
   readInput "x" ints <>
   readInput "y" nats <>
   branch (Current "x" :>: Current "y")
