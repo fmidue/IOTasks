@@ -40,7 +40,7 @@ genTrace spec depth bound = genTrace' (Map.fromList ((,[]) <$> vars spec)) depth
     | otherwise = do
       i <- valueOf vs bound
       t' <- genTrace' (Map.update (\xs -> Just $ i:xs) x e) (d-1) s'
-      pure $ foldr ProgRead t' (show i)
+      pure $ foldr ProgRead t' (show i ++ "\n")
   genTrace' e d (WriteOutput o ts s') =
     do
       t' <- genTrace' e d s'

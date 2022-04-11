@@ -63,7 +63,10 @@ inputSequence :: Trace -> [String]
 inputSequence = go "" where
   go cs (ProgRead '\n' t) = reverse cs : go "" t
   go cs (ProgRead c t) = go (c:cs) t
+  go "" (ProgWrite _ _ t) = go "" t
   go cs (ProgWrite _ _ t) = reverse cs : go "" t
   -- technically this might add an additional linebreak on the last line that might not be there in the Trace
+  go "" Terminate = []
   go cs Terminate = [reverse cs]
+  go "" OutOfInputs = []
   go cs OutOfInputs = [reverse cs]
