@@ -24,7 +24,7 @@ main = hspec $ do
         fulfills defaultConfig prog2 example3 `shouldNotReturn` Success
 
     describe "prog3" $ do
-      it "fulfills example2 specification" $
+      it "fulfills example3 specification" $
         fulfills defaultConfig prog3 example3 `shouldReturn` Success
       it "does not fulfill example1 specification" $
         fulfills defaultConfig prog3 example1 `shouldNotReturn` Success
@@ -49,7 +49,7 @@ main = hspec $ do
         Random.fulfills Random.defaultConfig prog2 example3 `shouldNotReturn` Success
 
     describe "prog3" $ do
-      it "fulfills example2 specification" $
+      it "fulfills example3 specification" $
         Random.fulfills Random.defaultConfig prog3 example3 `shouldReturn` Success
       it "does not fulfill example1 specification" $
         Random.fulfills Random.defaultConfig prog3 example1 `shouldNotReturn` Success
