@@ -11,16 +11,22 @@ import Z3.Monad
 import Test.QuickCheck (chooseInteger, generate, vectorOf)
 import Control.Monad (forM, forM_)
 import Control.Monad.IO.Class (liftIO)
-import Data.Maybe (catMaybes, fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe, isJust)
 import Term
 import Data.Map (Map)
 import qualified Data.Map as Map
 
 findPathInput :: Path -> Integer -> IO (Maybe [Integer])
-findPathInput p bound = evalZ3 $ pathScript p bound
+findPathInput p bound = evalZ3 $ pathScript p $ WithSoft bound
 
-pathScript :: Path -> Integer -> Z3 (Maybe [Integer])
-pathScript path bound = do
+isSatPath :: Path -> IO Bool
+isSatPath p = do
+  isJust <$> evalZ3 (pathScript p WithoutSoft)
+
+data ScriptMode = WithSoft Integer | WithoutSoft
+
+pathScript :: Path -> ScriptMode -> Z3 (Maybe [Integer])
+pathScript path mode = do
   let (tyConstr,predConstr) = partitionPath path
   vars <- forM tyConstr $
     \(InputConstraint (x,i) vs) -> do
@@ -31,11 +37,14 @@ pathScript path bound = do
   forM_ predConstr $
     \(ConditionConstraint t e) ->
       optimizeAssert =<< z3Predicate t e vars
-  vs <- liftIO $ generate $ vectorOf (length vars) $ chooseInteger (-bound,bound)
-  def <- mkStringSymbol "default"
-  forM_ (zip (zip vs vars) [(1 :: Integer)..]) $ \((v,(_,x)),_w) -> do
-    eq <- mkEq x =<< mkInteger v
-    optimizeAssertSoft eq "1" def -- soft assert with weight 1 and id "default"
+  case mode of
+    WithSoft bound -> do
+      vs <- liftIO $ generate $ vectorOf (length vars) $ chooseInteger (-bound,bound)
+      def <- mkStringSymbol "default"
+      forM_ (zip (zip vs vars) [(1 :: Integer)..]) $ \((v,(_,x)),_w) -> do
+        eq <- mkEq x =<< mkInteger v
+        optimizeAssertSoft eq "1" def -- soft assert with weight 1 and id "default"
+    WithoutSoft -> pure ()
   result <- optimizeCheck []
   case result of
     Sat -> do

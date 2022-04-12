@@ -7,7 +7,7 @@ import Constraints
 import Trace
 import Z3
 
-import Control.Monad (forM, replicateM)
+import Control.Monad (forM, replicateM, filterM)
 import Data.Maybe
 import Data.List (nub)
 
@@ -19,17 +19,18 @@ defaultConfig = TestConfig 25 100 5
 fulfills :: TestConfig -> IOrep () -> Specification -> IO Outcome
 fulfills TestConfig{..} prog spec  = do
   let ps = paths depth $ constraintTree spec
-  nestedIs <- forM ps $ \p -> do
+  satPaths <- filterM isSatPath ps
+  nestedIs <- forM satPaths $ \p -> do
     ms <- replicateM testsPerPath $ findPathInput p sizeBound
     pure $ catMaybes ms
   let is = map (map show) $ nub $ concat nestedIs
-  putStrLn $ "generated " ++ show (length is) ++ " unique inputs covering " ++ show (length $ filter (not.null) nestedIs) ++ " paths."
+  putStrLn $ unwords ["generated", show (length is),"unique inputs covering", show (length satPaths),"satisfiable paths ("++ show (length ps),"paths with max. depth",show depth,"in total)"]
   pure $ runTests prog spec is
 
 type Inputs = [Line]
 
 data Outcome = Success | Failure Inputs MatchResult
-  deriving Eq 
+  deriving Eq
 
 instance Show Outcome where
   show Success = "Success"
