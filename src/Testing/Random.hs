@@ -7,7 +7,7 @@ import Testing hiding (fulfills, TestConfig)
 import Data.Map as Map hiding (foldr)
 import Data.Set as Set hiding (foldr)
 
-import IOrep
+import IOrep (IOrep)
 import Specification
 import Trace
 import Term
@@ -23,7 +23,9 @@ defaultConfig = TestConfig 25 100 100
 fulfills :: TestConfig -> IOrep () -> Specification -> IO Outcome
 fulfills TestConfig{..} prog spec  = do
   is <- generate $ vectorOf testCases $ genInput spec depth sizeBound
-  pure $ runTests prog spec is
+  let (outcome, n) = runTests prog spec is
+  putStrLn $ unwords ["passed", show n,"tests"] 
+  pure outcome
 
 genInput :: Specification -> Int -> Integer -> Gen Inputs
 genInput s depth bound = do

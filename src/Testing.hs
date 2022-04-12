@@ -25,7 +25,7 @@ fulfills TestConfig{..} prog spec  = do
     pure $ catMaybes ms
   let is = map (map show) $ nub $ concat nestedIs
   putStrLn $ unwords ["generated", show (length is),"unique inputs covering", show (length satPaths),"satisfiable paths ("++ show (length ps),"paths with max. depth",show depth,"in total)"]
-  pure $ runTests prog spec is
+  pure . fst $ runTests prog spec is
 
 type Inputs = [Line]
 
@@ -36,12 +36,13 @@ instance Show Outcome where
   show Success = "Success"
   show (Failure is r) = unlines ["Failure","  "++show is, "  "++show r]
 
-runTests :: IOrep () -> Specification -> [Inputs] -> Outcome
-runTests _ _ [] = Success
-runTests prog spec (i:is) =
-  let
-    specTrace = runSpecification i spec
-    progTrace = runProgram i prog
-  in case specTrace `covers` progTrace of
-    MatchSuccessfull -> runTests prog spec is
-    failure -> Failure i failure
+runTests :: IOrep () -> Specification -> [Inputs] -> (Outcome,Int)
+runTests = go 0 where
+  go n _ _ [] = (Success,n)
+  go n prog spec (i:is) =
+    let
+      specTrace = runSpecification i spec
+      progTrace = runProgram i prog
+    in case specTrace `covers` progTrace of
+      MatchSuccessfull -> go (n+1) prog spec is
+      failure -> (Failure i failure,n)
