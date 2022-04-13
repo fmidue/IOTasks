@@ -7,7 +7,7 @@ import Testing hiding (fulfills, TestConfig)
 import Data.Map as Map hiding (foldr)
 import Data.Set as Set hiding (foldr)
 
-import IOrep (IOrep)
+import IOrep (IOrep, runProgram)
 import Specification
 import Trace
 import Term
@@ -24,7 +24,7 @@ fulfills :: TestConfig -> IOrep () -> Specification -> IO Outcome
 fulfills TestConfig{..} prog spec  = do
   is <- generate $ vectorOf testCases $ genInput spec depth sizeBound
   let (outcome, n) = runTests prog spec is
-  putStrLn $ unwords ["passed", show n,"tests"] 
+  putStrLn $ unwords ["passed", show n,"tests"]
   pure outcome
 
 genInput :: Specification -> Int -> Integer -> Gen Inputs
@@ -54,3 +54,14 @@ genTrace spec depth bound = genTrace' (Map.fromList ((,[]) <$> vars spec)) depth
   genTrace' e d s@(Until c bdy s')
     | eval c $ Map.toList e = genTrace' e d s'
     | otherwise = genTrace' e d $ bdy <> s
+
+runTests :: IOrep () -> Specification -> [Inputs] -> (Outcome,Int)
+runTests = go 0 where
+  go n _ _ [] = (Success,n)
+  go n prog spec (i:is) =
+    let
+      specTrace = runSpecification i spec
+      progTrace = runProgram i prog
+    in case specTrace `covers` progTrace of
+      MatchSuccessfull -> go (n+1) prog spec is
+      failure -> (Failure i failure,n)
