@@ -34,6 +34,13 @@ example3 =
     (readInput "x" ints) <>
   writeOutput [Length $ All "x"]
 
+-- atempt at 'breaking' the solver
+example4 :: Specification
+example4 =
+  readInput "x" nats <>
+  until (Current "x" :==: Product (All "y"))
+    (readInput "y" nats)
+
 ints, nats :: ValueSet
 ints = Every
 nats = Eq 0 `Union` GreaterThan 0
