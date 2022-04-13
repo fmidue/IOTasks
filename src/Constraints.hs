@@ -75,3 +75,4 @@ printIndexedTerm (Sum t) m = concat ["sum (", printIndexedTerm t m, ")"]
 printIndexedTerm (Product t) m = concat ["product (", printIndexedTerm t m, ")"]
 printIndexedTerm (Current x) m = concat [x,"_",show $ ix x m]
 printIndexedTerm (All x) _ = x++"_A"
+printIndexedTerm (IntLit x) _ = show x
