@@ -16,8 +16,8 @@ data TestConfig = TestConfig { depth :: Int, sizeBound :: Integer, testsPerPath 
 defaultConfig :: TestConfig
 defaultConfig = TestConfig 25 100 5
 
-fulfills :: TestConfig -> IOrep () -> Specification -> IO Outcome
-fulfills TestConfig{..} prog spec  = do
+fulfillsOld :: TestConfig -> IOrep () -> Specification -> IO Outcome
+fulfillsOld TestConfig{..} prog spec  = do
   let ps = paths depth $ constraintTree spec
   satPaths <- filterM isSatPath ps
   nestedIs <- forM satPaths $ \p -> do
@@ -26,6 +26,37 @@ fulfills TestConfig{..} prog spec  = do
   let is = map (map show) $ nub $ concat nestedIs
   putStrLn $ unwords ["generated", show (length is),"unique inputs covering", show (length satPaths),"satisfiable paths ("++ show (length ps),"paths with max. depth",show depth,"in total)"]
   pure . fst $ runTests prog spec is
+
+fulfills :: TestConfig -> IOrep () -> Specification -> IO Outcome
+fulfills TestConfig{..} prog spec = do
+  let ps = paths depth $ constraintTree spec
+  (out,satPaths,nInputs) <- testPaths ps (0,0)
+  putStrLn $ unwords
+    ["generated", show nInputs,"inputs covering", show satPaths,"satisfiable paths ("++ show (length ps),"paths with max. depth",show depth,"in total)"]
+  pure out
+
+  where
+    testPaths :: [Path] -> (Int,Int) -> IO (Outcome,Int,Int)
+    testPaths [] (m,n) = pure (Success,m,n)
+    testPaths (p:ps) (m,n) = do
+      sat <- isSatPath p
+      if sat
+        then do
+          (out,k) <- testPath p 0
+          case out of
+            Success -> testPaths ps (m+1,n+k)
+            failure -> pure (failure,m+1,n+k)
+        else testPaths ps (m,n)
+    testPath :: Path -> Int -> IO (Outcome,Int)
+    testPath _ n | n >= testsPerPath = pure (Success,n)
+    testPath p n = do
+      nextInput <- map show . fromJust <$> findPathInput p sizeBound -- check usage of fromJust
+      let
+        specTrace = runSpecification nextInput spec
+        progTrace = runProgram nextInput prog
+      case specTrace `covers` progTrace of
+        MatchSuccessfull -> testPath p (n+1)
+        failure -> pure (Failure nextInput failure,n+1)
 
 type Inputs = [Line]
 
