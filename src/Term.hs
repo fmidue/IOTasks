@@ -23,6 +23,7 @@ data Term a where
   Product :: Term [Integer] -> Term Integer
   Current :: Varname -> Term Integer
   All :: Varname -> Term [Integer]
+  IntLit :: Integer -> Term Integer
 
 deriving instance Eq (Term a)
 deriving instance Ord (Term a)
@@ -45,6 +46,7 @@ eval (Sum xs) e = fromIntegral . sum $ eval xs e
 eval (Product xs) e = fromIntegral . product $ eval xs e
 eval (Current x) e = fromMaybe (error $ "empty list for " ++ x) $ safeHead $ eval (All x) e
 eval (All x) e = fromMaybe (error $ "no value for " ++ x) $ lookup x e
+eval (IntLit n) _ = n
 
 safeHead :: [a] -> Maybe a
 safeHead [] = Nothing
