@@ -17,11 +17,12 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 
 findPathInput :: Path -> Integer -> IO (Maybe [Integer])
-findPathInput p bound = evalZ3 $ pathScript p $ WithSoft bound
+findPathInput p bound = do
+  evalZ3With Nothing (stdOpts +? opt "timeout" "1000") $ pathScript p $ WithSoft bound
 
 isSatPath :: Path -> IO Bool
 isSatPath p = do
-  isJust <$> evalZ3 (pathScript p WithoutSoft)
+  isJust <$> evalZ3With Nothing (stdOpts +? opt "timeout" "1000") (pathScript p WithoutSoft)
 
 data ScriptMode = WithSoft Integer | WithoutSoft
 
@@ -45,6 +46,8 @@ pathScript path mode = do
         eq <- mkEq x =<< mkInteger v
         optimizeAssertSoft eq "1" def -- soft assert with weight 1 and id "default"
     WithoutSoft -> pure ()
+  -- str <- optimizeToString
+  -- liftIO $ print str
   result <- optimizeCheck []
   case result of
     Sat -> do
@@ -72,6 +75,7 @@ z3Predicate (Sum (All x)) e vars = let n = fromMaybe 0 $ Map.lookup x e in mkAdd
 z3Predicate (Product (All x)) e vars = let n = fromMaybe 0 $ Map.lookup x e in mkMul [ xi | ((name,i),xi) <- vars, name == x, i <= n ]
 z3Predicate (Current x) e vars = pure $ fromMaybe (error $ "unknown variable " ++ x++ show e ++ show vars) $ Map.lookup x e >>= (\i -> lookup (x,i) vars)
 z3Predicate (All _x) _e _vars = error "generic list"
+z3Predicate (IntLit n) _ _ = mkIntNum n
 
 -- helper for binary recursive case
 binRec :: Map Varname Int -> [((Varname,Int),AST)] -> (AST -> AST -> Z3 AST) -> Term a -> Term a -> Z3 AST
