@@ -76,3 +76,14 @@ prog3 = do
         x <- readLn
         loop (s+x) (m+1)
   loop 0 0
+
+prog4 :: IOrep ()
+prog4 = do
+  x <- readLn @Integer
+  let
+    loop p
+      | p == x = pure ()
+      | otherwise = do
+        y <- readLn
+        loop (p*y)
+  loop 1
