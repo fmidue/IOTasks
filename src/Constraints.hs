@@ -22,9 +22,18 @@ data ConstraintTree
 
 constraintTree :: Specification -> ConstraintTree
 constraintTree = constraintTree' Map.empty where
-  constraintTree' e (ReadInput x vs s) =
-    let e' = inc x e
-    in Assert (InputConstraint(x, ix x e') vs) $ constraintTree' e' s
+
+  constraintTree' e s@(ReadInput x vs mode s') =
+    let
+      e' = inc x e
+      modeContext = case mode of
+        AssumeValid -> id
+        UntilValid -> Choice
+          (Assert (InputConstraint(x, ix x e') (complement vs)) $ constraintTree' e' s)
+
+    in
+      modeContext $ Assert (InputConstraint(x, ix x e') vs) $ constraintTree' e' s'
+
   constraintTree' e (WriteOutput _ _ s) = constraintTree' e s
   constraintTree' e (Branch c l r s) =
     Choice (Assert (ConditionConstraint c e) $ constraintTree' e (l <> s)) (Assert (ConditionConstraint (Not c) e) $ constraintTree' e (r <> s))

@@ -14,32 +14,32 @@ import ValueSet
 
 example1 :: Specification
 example1 =
-  readInput "x" ints <>
-  readInput "y" nats <>
+  readInput "x" ints AssumeValid <>
+  readInput "y" nats AssumeValid <>
   branch (Current "x" :>: Current "y")
     (writeOutput [Current "x" :+: Current "y", Current "x" :-: Current "y"] )
     (writeOutput [Current "x" :*: Current "y"] )
 
 example2 :: Specification
 example2 =
-  readInput "n" nats <>
+  readInput "n" nats UntilValid <>
   until (Length (All "x") :==: Current "n")
-    (writeOptionalOutput [Current "n" :-: Length (All "x")] <> readInput "x" ints ) <>
+    (writeOptionalOutput [Current "n" :-: Length (All "x")] <> readInput "x" ints AssumeValid) <>
   writeOutput [Sum $ All "x"]
 
 example3 :: Specification
 example3 =
-  readInput "n" nats <>
+  readInput "n" nats AssumeValid <>
   until (Sum (All "x") :>: Current "n")
-    (readInput "x" ints) <>
+    (readInput "x" ints AssumeValid) <>
   writeOutput [Length $ All "x"]
 
 -- atempt at 'breaking' the solver
 example4 :: Specification
 example4 =
-  readInput "x" nats <>
+  readInput "x" nats AssumeValid <>
   until (Current "x" :==: Product (All "y"))
-    (readInput "y" nats)
+    (readInput "y" nats AssumeValid)
 
 ints, nats :: ValueSet
 ints = Every
@@ -58,13 +58,16 @@ prog1 = do
 prog2 :: IOrep ()
 prog2 = do
   n <- readLn @Integer
-  let
-    loop 0 x = print @Integer x
-    loop m x = do
-      -- putChar m
-      i <- readLn
-      loop (m-1) (x+i)
-  loop n 0
+  if n < 0
+    then prog2
+    else
+      let
+        loop 0 x = print @Integer x
+        loop m x = do
+          -- putChar m
+          i <- readLn
+          loop (m-1) (x+i)
+      in loop n 0
 
 prog3 :: IOrep ()
 prog3 = do

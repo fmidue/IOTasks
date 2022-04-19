@@ -12,7 +12,7 @@ import Specification
 import Trace
 import Term
 
-import Test.QuickCheck (Gen, vectorOf, generate)
+import Test.QuickCheck (Gen, vectorOf, generate, frequency)
 import ValueSet
 
 data TestConfig = TestConfig { depth :: Int, sizeBound :: Integer, testCases :: Int }
@@ -37,12 +37,14 @@ genInput s depth bound = do
 genTrace :: Specification -> Int -> Integer -> Gen Trace
 genTrace spec depth bound = genTrace' (Map.fromList ((,[]) <$> vars spec)) depth spec where
   genTrace' :: Map.Map Varname [Integer] -> Int -> Specification -> Gen Trace
-  genTrace' e d (ReadInput x vs s')
+  genTrace' e d s@(ReadInput x vs mode s')
     | d <= 0 = pure OutOfInputs
     | otherwise = do
-      i <- valueOf vs bound
-      t' <- genTrace' (Map.update (\xs -> Just $ i:xs) x e) (d-1) s'
+      (set,nextSpec) <- frequency $ (5,pure (vs,s')) : [(1,pure (complement vs,s)) | mode == UntilValid]
+      i <- valueOf set bound
+      t' <- genTrace' (Map.update (\xs -> Just $ i:xs) x e) (d-1) nextSpec
       pure $ foldr ProgRead t' (show i ++ "\n")
+
   genTrace' e d (WriteOutput o ts s') =
     do
       t' <- genTrace' e d s'
