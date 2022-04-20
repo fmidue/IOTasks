@@ -8,7 +8,8 @@ import Constraints
 import Trace
 import Z3
 
-import Control.Monad (when)
+import Control.Monad (when, forM, replicateM)
+import Data.Maybe (catMaybes)
 
 data TestConfig = TestConfig { depth :: Int, sizeBound :: Integer, testsPerPath :: Int, maxNegativeInputs :: Int }
 
@@ -65,3 +66,19 @@ data PathOutcome = PathSuccess | PathTimeout | PathFailure Inputs MatchResult
 instance Show Outcome where
   show Success = "Success"
   show (Failure is r) = unlines ["Failure","  "++show is, "  "++show r]
+
+-- static test suite generation
+fulfillsOn :: [Inputs] -> IOrep () -> Specification -> Outcome
+fulfillsOn [] _ _ = Success
+fulfillsOn (i:is) prog spec =
+  let
+    specTrace = runSpecification i spec
+    progTrace = runProgram i prog
+  in case specTrace `covers` progTrace of
+    MatchSuccessfull -> fulfillsOn is prog spec
+    failure -> Failure i failure
+
+generateStaticTestSuite :: TestConfig -> Specification -> IO [Inputs]
+generateStaticTestSuite TestConfig{..} spec =
+  let ps = paths depth $ constraintTree maxNegativeInputs spec
+  in map (map show) . concat <$> forM ps (\p -> catMaybes <$> replicateM testsPerPath (findPathInput p sizeBound))

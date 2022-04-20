@@ -31,6 +31,15 @@ main = hspec $ do
       it "does not fulfill example2 specification" $
         fulfills defaultConfig prog3 example2 `shouldNotReturn` Success
 
+    context "static test generation" $ do
+      describe "prog2" $ do
+        it "fulfills tests generated from example2 specification" $
+          ((\is -> fulfillsOn is prog2 example2) <$> generateStaticTestSuite defaultConfig example2) `shouldReturn` Success
+        it "does not fulfill tests generated from example1 specification" $
+          ((\is -> fulfillsOn is prog2 example1) <$> generateStaticTestSuite defaultConfig example1) `shouldNotReturn` Success
+        it "does not fulfill tests generated from example3 specification" $
+          ((\is -> fulfillsOn is prog2 example3) <$> generateStaticTestSuite defaultConfig example3) `shouldNotReturn` Success
+
   context "random testing" $ do
     describe "prog1" $ do
       it "fulfills example1 specification" $
