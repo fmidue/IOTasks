@@ -10,14 +10,14 @@ import Z3
 
 import Control.Monad (when)
 
-data TestConfig = TestConfig { depth :: Int, sizeBound :: Integer, testsPerPath :: Int }
+data TestConfig = TestConfig { depth :: Int, sizeBound :: Integer, testsPerPath :: Int, maxNegativeInputs :: Int }
 
 defaultConfig :: TestConfig
-defaultConfig = TestConfig 25 100 5
+defaultConfig = TestConfig 25 100 5 5
 
 fulfills :: TestConfig -> IOrep () -> Specification -> IO Outcome
 fulfills TestConfig{..} prog spec = do
-  let ps = paths depth $ constraintTree spec
+  let ps = paths depth $ constraintTree maxNegativeInputs spec
   (out,satPaths,nInputs,timeouts) <- testPaths ps (0,0,0)
   putStrLn $ unwords
     ["generated", show nInputs,"inputs covering", show satPaths,"satisfiable paths ("++ show (length ps),"paths with max. depth",show depth,"in total)"]
