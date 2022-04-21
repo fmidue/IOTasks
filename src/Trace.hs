@@ -1,7 +1,7 @@
 module Trace where
 
 import Data.Set (Set, toList, isSubsetOf)
-import Data.List (intersperse, intercalate)
+import Data.List (intercalate)
 
 data OptFlag = Optional | Mandatory deriving (Eq, Ord, Show)
 

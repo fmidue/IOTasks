@@ -8,7 +8,7 @@ import ValueSet
 
 import Z3.Monad
 
-import Test.QuickCheck (chooseInteger, generate, vectorOf)
+import Test.QuickCheck (generate)
 import Control.Monad (forM, forM_)
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe (catMaybes, fromMaybe, isJust)
