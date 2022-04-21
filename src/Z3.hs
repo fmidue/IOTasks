@@ -34,16 +34,16 @@ pathScript path mode = do
       var <- mkFreshIntVar $ x ++ show i
       constraint <- z3ValueSetConstraint vs var
       optimizeAssert constraint
-      pure ((x,i),var)
+      pure (((x,i),var),vs)
   forM_ predConstr $
     \(ConditionConstraint t e) ->
-      optimizeAssert =<< z3Predicate t e vars
+      optimizeAssert =<< z3Predicate t e (map fst vars)
   case mode of
     WithSoft bound -> do
-      vs <- liftIO $ generate $ vectorOf (length vars) $ chooseInteger (-bound,bound)
+      vs <- liftIO $ forM vars $ \((_,ast),vs) -> do {v <- generate $ valueOf vs bound; pure (ast,v)}
       def <- mkStringSymbol "default"
-      forM_ (zip (zip vs vars) [(1 :: Integer)..]) $ \((v,(_,x)),_w) -> do
-        eq <- mkEq x =<< mkInteger v
+      forM_ vs $ \(ast,v) -> do
+        eq <- mkEq ast =<< mkInteger v
         optimizeAssertSoft eq "1" def -- soft assert with weight 1 and id "default"
     WithoutSoft -> pure ()
   -- str <- optimizeToString
@@ -52,7 +52,7 @@ pathScript path mode = do
   case result of
     Sat -> do
       model <- optimizeGetModel
-      Just . catMaybes <$> mapM (evalInt model . snd) vars
+      Just . catMaybes <$> mapM ((evalInt model . snd) . fst) vars
     _ -> do
       _str <- optimizeToString
       -- liftIO $ print str
