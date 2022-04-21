@@ -1,6 +1,7 @@
 module Trace where
 
-import Data.Set
+import Data.Set (Set, toList, isSubsetOf)
+import Data.List (intersperse, intercalate)
 
 data OptFlag = Optional | Mandatory deriving (Eq, Ord, Show)
 
@@ -47,9 +48,10 @@ reportMismatch :: Trace -> Trace -> String
 reportMismatch s t = unwords ["Expected:",showTraceHead s,"Got:",showTraceHead t]
 
 showTraceHead :: Trace -> String
-showTraceHead (ProgRead x _) = "?"++show x
-showTraceHead (ProgWrite Optional ts _) = "(!"++show (toList ts)++")"
-showTraceHead (ProgWrite Mandatory ts _) = "!"++show (toList ts)
+showTraceHead (ProgRead x (ProgRead c t)) | c /= '\n' = "?"++ x : tail (showTraceHead (ProgRead c t))
+showTraceHead (ProgRead x _) = "?"++[x]
+showTraceHead (ProgWrite Optional ts _) = "(!["++ intercalate "," (toList ts) ++ "])"
+showTraceHead (ProgWrite Mandatory ts _) = "!["++ intercalate "," (toList ts) ++ "]"
 showTraceHead Terminate = "stop"
 showTraceHead OutOfInputs = "?<unknown input>"
 
