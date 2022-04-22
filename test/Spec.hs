@@ -1,8 +1,14 @@
+{-# LANGUAGE DataKinds #-}
 import Test.Hspec
+
+import OutputPattern
 
 import Testing
 import qualified Testing.Random as Random
 import Example
+import Test.Hspec.QuickCheck
+import Test.QuickCheck hiding (Success)
+import Control.Applicative (liftA2)
 
 main :: IO ()
 main = hspec $ do
@@ -64,3 +70,29 @@ main = hspec $ do
         Random.fulfills Random.defaultConfig prog3 example1 `shouldNotReturn` Success
       it "does not fulfill example2 specification" $
         Random.fulfills Random.defaultConfig prog3 example2 `shouldNotReturn` Success
+
+  fcontext "string pattern matching" $ do
+    prop "wildcard >: _ == True" $
+      forAll genPattern $ \p -> Wildcard >: p
+    prop "reflexivity of >:" $
+      forAll genPattern $ \p -> p >: p
+    prop "transitivity of >:" $ -- not ideal
+      forAll ((,,) <$> genPattern <*> genPattern <*> genPattern) $ \(x,y,z) -> not (x >: z) ==> (not (x >: y) || not (y >: z))
+
+    prop "adding a wildcard results in a more general trace" $
+      forAll (liftA2 (,) genPattern genPattern) $
+        \(p,q) -> (p <> Wildcard <> q) >: (p <> q)
+
+    prop "replacing a wildcard with a pattern yields a less general pattern" $
+      forAll ((,,) <$> genPattern <*> genPattern <*> genPattern) $
+        \(p,q,x) -> counterexample (unlines [show $ p <> Wildcard <> q, show $ p <> x <> q]) $
+          (p <> Wildcard <> q) >: (p <> x <> q)
+
+genPattern :: Gen (OutputPattern 'TraceP)
+genPattern = sized $ \size ->
+  frequency $
+    [ (1,pure Wildcard)
+    , (1,Text <$> listOf1 arbitraryPrintableChar)
+    ] ++
+    [ (4,liftA2 (<>) (resize 1 genPattern) (resize (size - 1) genPattern)) | size > 1
+    ]

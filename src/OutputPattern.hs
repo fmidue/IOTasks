@@ -24,6 +24,8 @@ deriving instance Ord (OutputPattern t)
 deriving instance Show (OutputPattern t)
 
 instance Semigroup (OutputPattern t) where
+  Wildcard <> Wildcard = Wildcard
+  Wildcard <> Sequence Wildcard y = Sequence Wildcard y
   Text "" <> y = y
   x <> Text "" = x
   Text s <> Text t = Text $ s ++ t
