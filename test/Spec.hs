@@ -76,10 +76,12 @@ main = hspec $ do
       forAll genPattern $ \p -> Wildcard >: p
     prop "reflexivity of >:" $
       forAll genPattern $ \p -> p >: p
-    prop "transitivity of >:" $ -- not ideal
-      forAll ((,,) <$> genPattern <*> genPattern <*> genPattern) $ \(x,y,z) -> not (x >: z) ==> (not (x >: y) || not (y >: z))
+    prop "transitivity of >:" $ --improve?
+      forAll ((,,) <$> genPattern <*> genPattern <*> genPattern) $ \(x,y,z) -> not (not (x >: z) && (x >: y) && (y >: z))
+    prop "antisymmetry of >:" $
+      forAll ((,) <$> genPattern <*> genPattern) $ \(x,y) -> (x==y) || not (x >: y && y >: x)
 
-    prop "adding a wildcard results in a more general trace" $
+    prop "adding a wildcard results in a more general pattern" $
       forAll (liftA2 (,) genPattern genPattern) $
         \(p,q) -> (p <> Wildcard <> q) >: (p <> q)
 
@@ -92,7 +94,7 @@ genPattern :: Gen (OutputPattern 'TraceP)
 genPattern = sized $ \size ->
   frequency $
     [ (1,pure Wildcard)
-    , (1,Text <$> listOf1 arbitraryPrintableChar)
+    , (1,Text <$> listOf1 (arbitraryPrintableChar `suchThat` (/= '_')))
     ] ++
     [ (4,liftA2 (<>) (resize 1 genPattern) (resize (size - 1) genPattern)) | size > 1
     ]
