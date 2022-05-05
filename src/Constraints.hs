@@ -21,25 +21,27 @@ data ConstraintTree
   | Empty
 
 constraintTree :: Int -> Specification -> ConstraintTree
-constraintTree negMax = constraintTree' 0 Map.empty where
+constraintTree negMax =
+  sem
+    (\(n,e) x vs mode ->
+      let
+        e' = inc x e
+      in case mode of
+          AssumeValid -> (\(s',_) -> Assert (InputConstraint(x, ix x e') vs) s',((n,e'),undefined))
+          UntilValid
+            | n < negMax -> (\(s',s) ->
+              Choice
+                (Assert (InputConstraint(x, ix x e') (complement vs)) s)
+                (Assert (InputConstraint(x, ix x e') vs) s')
+              ,((n,e'),(n+1,e'))
+              )
+            | otherwise -> (\(s',_) -> Assert (InputConstraint(x, ix x e') vs) s',((n,e'),undefined))
+    )
+    (\_ _ _ t -> t)
+    (\(_,e) c l r -> Choice (Assert (ConditionConstraint c e) l) (Assert (ConditionConstraint (Not c) e) r))
+    Empty
+    (0,Map.empty)
 
-  constraintTree' n e s@(ReadInput x vs mode s') =
-    let
-      e' = inc x e
-      modeContext = case mode of
-        AssumeValid -> id
-        UntilValid
-          | n < negMax -> Choice
-            (Assert (InputConstraint(x, ix x e') (complement vs)) $ constraintTree' (n+1) e' s)
-          | otherwise -> id
-    in
-      modeContext $ Assert (InputConstraint(x, ix x e') vs) $ constraintTree' n e' s'
-
-  constraintTree' n e (WriteOutput _ _ s) = constraintTree' n e s
-  constraintTree' n e (Branch c l r s) =
-    Choice (Assert (ConditionConstraint c e) $ constraintTree' n e (l <> s)) (Assert (ConditionConstraint (Not c) e) $ constraintTree' n e (r <> s))
-  constraintTree' _ _ Nop = Empty
-  constraintTree' n e loop@(Until c body s) = Choice (Assert (ConditionConstraint c e) $ constraintTree' n e s) (Assert (ConditionConstraint (Not c) e) $ constraintTree' n e $ body <> loop)
 
 ix :: Varname -> Map Varname Int -> Int
 ix x m = fromMaybe 0 $ Map.lookup x m

@@ -1,6 +1,9 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Specification where
 
 import ValueSet
@@ -12,13 +15,15 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.List (nub)
 import qualified Data.Map as Map
+import Data.Functor.Identity (runIdentity,Identity(..))
 
 data Specification where
   ReadInput :: Varname -> ValueSet -> InputMode -> Specification -> Specification
   WriteOutput :: OptFlag -> Set (OutputPattern 'SpecificationP) -> Specification -> Specification
   Branch :: Term Bool -> Specification -> Specification -> Specification -> Specification
   Nop :: Specification
-  Until :: Term Bool -> Specification -> Specification -> Specification
+  TillE :: Specification -> Specification -> Specification
+  E :: Specification
 
 data InputMode = AssumeValid | UntilValid deriving (Eq,Show)
 
@@ -28,7 +33,8 @@ instance Semigroup Specification where
   (ReadInput x vs m s) <> s' = ReadInput x vs m $ s <> s'
   (WriteOutput o t s) <> s' = WriteOutput o t $ s <> s'
   (Branch c l r s) <> s' = Branch c l r $ s <> s'
-  (Until cond body s) <> s' = Until cond body $ s <> s'
+  TillE bdy s <> s' = TillE bdy $ s <> s'
+  E <> _ = E
 
 instance Monoid Specification where
   mempty = Nop
@@ -49,7 +55,7 @@ nop :: Specification
 nop = Nop
 
 until :: Term Bool -> Specification -> Specification
-until c bdy = Until c bdy nop
+until c bdy = TillE (branch c E bdy) nop
 
 vars :: Specification -> [Varname]
 vars = nub . go where
@@ -57,22 +63,59 @@ vars = nub . go where
   go (WriteOutput _ _ s') = go s'
   go (Branch _ l r s') = go l ++ go r ++ go s'
   go Nop = []
-  go (Until _ bdy s') = go bdy ++ go s'
+  go (TillE bdy s') = go bdy ++ go s'
+  go E = []
 
 runSpecification :: [String] -> Specification -> Trace
-runSpecification inputs spec = runSpecification' (Map.fromList ((,[]) <$> vars spec)) inputs spec where
-  runSpecification' :: Map.Map Varname [Integer] -> [String] -> Specification -> Trace
-  runSpecification' _ [] ReadInput{} = OutOfInputs
-  runSpecification' e (i:is) s@(ReadInput x vs mode s')
-    | vs `containsValue` read i = foldr ProgRead (ProgRead '\n' $ runSpecification' (Map.update (\xs -> Just $ read i:xs) x e) is s') i
-    | otherwise = case mode of
-        AssumeValid -> error "invalid value"
-        UntilValid -> foldr ProgRead (ProgRead '\n' $ runSpecification' e is s) i
-  runSpecification' e is (WriteOutput o ts s') = ProgWrite o (Set.map ((<> Text "\n") . evalPattern (Map.toList e)) ts) $ runSpecification' e is s'
-  runSpecification' e is (Branch c l r s')
-    | eval c $ Map.toList e = runSpecification' e is $ l <> s'
-    | otherwise = runSpecification' e is $ r <> s'
-  runSpecification' _ _ Nop = Terminate
-  runSpecification' e is s@(Until c bdy s')
-    | eval c $ Map.toList e = runSpecification' e is s'
-    | otherwise = runSpecification' e is $ bdy <> s
+runSpecification inputs spec =
+  sem
+    (\(e,ins) x vs mode ->
+      case ins of
+        [] -> (const OutOfInputs ,undefined)
+        (i:is)
+          | vs `containsValue` read i -> (\(t',_) -> foldr ProgRead (ProgRead '\n' t') i,((Map.update (\xs -> Just $ read i:xs) x e,is),undefined))
+          | otherwise -> case mode of
+              AssumeValid -> error "invalid value"
+              UntilValid -> (\(_,t') -> foldr ProgRead (ProgRead '\n' t') i,(undefined,(e,is)))
+    )
+    (\(e,_) o ts t' -> ProgWrite o (Set.map ((<> Text "\n") . evalPattern (Map.toList e)) ts) t')
+    (\(e,_) c l r -> if eval c $ Map.toList e then l else r)
+    Terminate
+    (Map.fromList ((,[]) <$> vars spec),inputs)
+    spec
+
+sem :: forall st a.
+  (st -> Varname -> ValueSet -> InputMode -> ((a,a) -> a,(st,st))) ->
+  (st -> OptFlag -> Set (OutputPattern 'SpecificationP) -> a -> a) ->
+  (st -> Term Bool -> a -> a -> a) ->
+  a ->
+  st -> Specification -> a
+sem f g h c st s = runIdentity $ semM (Identity <. f) (\a b c -> Identity . g a b c . runIdentity) (\a b c d -> Identity $ h a b (runIdentity c) (runIdentity d)) (pure c) st s
+  where f <. g = \a b c d -> f $ g a b c d
+
+semM :: forall m st a. Monad m =>
+  (st -> Varname -> ValueSet -> InputMode -> m ((a,a) -> a,(st,st))) ->
+  (st -> OptFlag -> Set (OutputPattern 'SpecificationP) -> m a -> m a) ->
+  (st -> Term Bool -> m a -> m a -> m a) ->
+  m a ->
+  st -> Specification -> m a
+semM f g h c s_I spec = sem' s_I spec k_I where
+  sem' :: st -> Specification -> (T ->  st -> m a) -> m a
+  sem' st s@(ReadInput x vs mode s') k =
+    do
+      (r,(st',st'')) <- f st x vs mode
+      r <$> ((,) <$> sem' st' s' k <*> sem' st'' s k)
+  sem' st (WriteOutput o ts s') k = g st o ts $ sem' st s' k
+  sem' st (Branch c l r s') k = h st c (sem' st (l <> s') k) (sem' st (r <> s') k)
+  sem' st (TillE s s') k = sem' st s k'
+    where
+      k' End st = sem' st s k'
+      k' Exit st = sem' st s' k
+  sem' st Nop k = k End st
+  sem' st E k = k Exit st
+
+  k_I :: T ->  st -> m a
+  k_I End _ = c
+  k_I Exit _ = error "ill-formed specification: exit marker at top-level"
+
+data T = End | Exit

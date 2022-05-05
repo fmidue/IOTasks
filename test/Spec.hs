@@ -71,7 +71,7 @@ main = hspec $ do
       it "does not fulfill example2 specification" $
         Random.fulfills Random.defaultConfig prog3 example2 `shouldNotReturn` Success
 
-  fcontext "string pattern matching" $ do
+  xcontext "string pattern matching" $ do
     prop "wildcard >: _ == True" $
       forAll genPattern $ \p -> Wildcard >: p
     prop "reflexivity of >:" $

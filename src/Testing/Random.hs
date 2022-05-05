@@ -36,27 +36,21 @@ genInput s depth bound maxNeg = do
     else genInput s depth bound maxNeg -- repeat sampling until a terminating trace is found
 
 genTrace :: Specification -> Int -> Integer -> Int -> Gen Trace
-genTrace spec depth bound maxNeg = genTrace' (Map.fromList ((,[]) <$> vars spec)) depth 0 spec where
-  genTrace' :: Map.Map Varname [Integer] -> Int -> Int -> Specification -> Gen Trace
-  genTrace' e d n s@(ReadInput x vs mode s')
-    | d <= 0 = pure OutOfInputs
-    | otherwise = do
-      (set,nextSpec,n') <- frequency $ (5,pure (vs,s',n)) : [(1,pure (complement vs,s,n+1)) | mode == UntilValid && n < maxNeg]
-      i <- valueOf set bound
-      t' <- genTrace' (Map.update (\xs -> Just $ i:xs) x e) (d-1) n' nextSpec
-      pure $ foldr ProgRead t' (show i ++ "\n")
-
-  genTrace' e d n (WriteOutput o ts s') =
-    do
-      t' <- genTrace' e d n s'
-      pure $ ProgWrite o (Set.map (evalPattern $ Map.toList e) ts) t'
-  genTrace' e d n (Branch c l r s')
-    | eval c $ Map.toList e = genTrace' e d n $ l <> s'
-    | otherwise = genTrace' e d n $ r <> s'
-  genTrace' _ _ _ Nop = pure Terminate
-  genTrace' e d n s@(Until c bdy s')
-    | eval c $ Map.toList e = genTrace' e d n s'
-    | otherwise = genTrace' e d n $ bdy <> s
+genTrace spec depth bound maxNeg =
+  semM
+    (\(e,d,n) x vs mode ->
+      if d <= (0 :: Int) then pure (const OutOfInputs,(undefined,undefined))
+      else do
+        (set,chooseT,n') <- frequency $ (5,pure (vs,fst,n)) : [(1,pure (complement vs,snd,n+1)) | mode == UntilValid && n < maxNeg]
+        i <- valueOf set bound
+        let st' = (Map.update (\xs -> Just $ i:xs) x e,d-1,n')
+        pure (\t' -> foldr ProgRead (chooseT t') (show i ++ "\n") ,(st',st'))
+    )
+    (\(e,_,_) o ts t' -> ProgWrite o (Set.map (evalPattern $ Map.toList e) ts) <$> t')
+    (\(e,_,_) c l r -> if eval c $ Map.toList e then l else r)
+    (pure Terminate)
+    (Map.fromList ((,[]) <$> vars spec),depth,0)
+    spec
 
 runTests :: IOrep () -> Specification -> [Inputs] -> (Outcome,Int)
 runTests = go 0 where
