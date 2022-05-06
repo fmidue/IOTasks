@@ -11,25 +11,50 @@ import Z3
 import Control.Monad (when, forM, replicateM)
 import Data.Maybe (catMaybes)
 
-data TestConfig = TestConfig { depth :: Int, sizeBound :: Integer, testsPerPath :: Int, maxNegativeInputs :: Int }
+taskCheck :: IOrep () -> Specification -> IO Outcome
+taskCheck = taskCheckWith stdArgs
 
-defaultConfig :: TestConfig
-defaultConfig = TestConfig 25 100 5 5
+data Args
+  = Args
+  { maxPathDepth :: Int -- maximum number of inputs to consider
+  , valueSize :: Integer -- size of randomly generated input candidates (the solver might find bigger solutions)
+  , solverTimeout :: Int -- solver timeout in miliseconds
+  , maxTimeouts :: Int -- maximum number of solver timeouts before giving up
+  , maxSuccessPerPath :: Int -- number of tests generated per path
+  , maxNegative :: Int -- maximum number of negative inputs per path
+  , verbose :: Bool -- print extra information
+  }
 
-fulfills :: TestConfig -> IOrep () -> Specification -> IO Outcome
-fulfills TestConfig{..} prog spec = do
-  let ps = paths depth $ constraintTree maxNegativeInputs spec
+stdArgs :: Args
+stdArgs = Args
+  { maxPathDepth = 25
+  , valueSize = 100
+  , solverTimeout = 1000
+  , maxTimeouts = 3
+  , maxSuccessPerPath = 5
+  , maxNegative = 5
+  , verbose = True
+  }
+
+taskCheckWith :: Args -> IOrep () -> Specification -> IO Outcome
+taskCheckWith Args{..} prog spec = do
+  let ps = paths maxPathDepth $ constraintTree maxNegative spec
   (out,satPaths,nInputs,timeouts) <- testPaths ps (0,0,0)
-  putStrLn $ unwords
-    ["generated", show nInputs,"inputs covering", show satPaths,"satisfiable paths ("++ show (length ps),"paths with max. depth",show depth,"in total)"]
-  when (timeouts > 0) $ putStrLn $ unwords ["---",show timeouts, "paths timed out"]
+  --
+  when verbose $ do
+    putStrLn $ unwords
+      ["generated", show nInputs,"inputs covering", show satPaths,"satisfiable paths ("++ show (length ps),"paths with max. depth",show maxPathDepth,"in total)"]
+    when (timeouts > 0) $
+      putStrLn $ unwords ["---",show timeouts, "paths timed out"]
+  --
   pure out
 
   where
     testPaths :: [Path] -> (Int,Int,Int) -> IO (Outcome,Int,Int,Int)
     testPaths [] (m,n,t) = pure (Success,m,n,t)
+    testPaths _ (m,n,t) | t > maxTimeouts = pure (GaveUp,m,n,t)
     testPaths (p:ps) (m,n,t) = do
-      sat <- isSatPath p
+      sat <- isSatPath solverTimeout p
       if sat -- does not account for timeouts yet
         then do
           (out,k) <- testPath p 0 n
@@ -41,13 +66,13 @@ fulfills TestConfig{..} prog spec = do
               | otherwise -> testPaths ps (m,n,t+1)
         else testPaths ps (m,n,t)
     testPath :: Path -> Int -> Int -> IO (PathOutcome,Int)
-    testPath _ n _ | n >= testsPerPath = pure (PathSuccess,n)
+    testPath _ n _ | n >= maxSuccessPerPath = pure (PathSuccess,n)
     testPath p n nOtherTests = do
-      mNextInput <- fmap @Maybe (map show) <$> findPathInput p sizeBound
+      mNextInput <- fmap @Maybe (map show) <$> findPathInput solverTimeout p valueSize
       case mNextInput of
         Nothing -> pure (PathTimeout,n) -- should (only?) be the case if solving times out
         Just nextInput  -> do
-          putStr $ concat ["(",show (n+nOtherTests)," tests)\r"]
+          when verbose $ putStr $ concat ["(",show (n+nOtherTests)," tests)\r"]
           let
             specTrace = runSpecification nextInput spec
             progTrace = runProgram nextInput prog
@@ -57,7 +82,7 @@ fulfills TestConfig{..} prog spec = do
 
 type Inputs = [Line]
 
-data Outcome = Success | Failure Inputs MatchResult
+data Outcome = Success | Failure Inputs MatchResult | GaveUp
   deriving Eq
 
 data PathOutcome = PathSuccess | PathTimeout | PathFailure Inputs MatchResult
@@ -66,19 +91,20 @@ data PathOutcome = PathSuccess | PathTimeout | PathFailure Inputs MatchResult
 instance Show Outcome where
   show Success = "Success"
   show (Failure is r) = unlines ["Failure","  "++show is, "  "++show r]
+  show GaveUp = "GaveUp"
 
 -- static test suite generation
-fulfillsOn :: [Inputs] -> IOrep () -> Specification -> Outcome
-fulfillsOn [] _ _ = Success
-fulfillsOn (i:is) prog spec =
+taskCheckOn :: [Inputs] -> IOrep () -> Specification -> Outcome
+taskCheckOn [] _ _ = Success
+taskCheckOn (i:is) prog spec =
   let
     specTrace = runSpecification i spec
     progTrace = runProgram i prog
   in case specTrace `covers` progTrace of
-    MatchSuccessfull -> fulfillsOn is prog spec
+    MatchSuccessfull -> taskCheckOn is prog spec
     failure -> Failure i failure
 
-generateStaticTestSuite :: TestConfig -> Specification -> IO [Inputs]
-generateStaticTestSuite TestConfig{..} spec =
-  let ps = paths depth $ constraintTree maxNegativeInputs spec
-  in map (map show) . concat <$> forM ps (\p -> catMaybes <$> replicateM testsPerPath (findPathInput p sizeBound))
+generateStaticTestSuite :: Args -> Specification -> IO [Inputs]
+generateStaticTestSuite Args{..} spec =
+  let ps = paths maxPathDepth $ constraintTree maxNegative spec
+  in map (map show) . concat <$> forM ps (\p -> catMaybes <$> replicateM maxSuccessPerPath (findPathInput solverTimeout p valueSize))

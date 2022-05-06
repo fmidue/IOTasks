@@ -2,10 +2,11 @@
 {-# LANGUAGE TupleSections #-}
 module Testing.Random where
 
-import Testing hiding (fulfills, TestConfig)
+import Testing hiding (taskCheck, taskCheckWith, Args, stdArgs)
 
 import Data.Map as Map hiding (foldr)
 import Data.Set as Set hiding (foldr)
+import Control.Monad (when)
 
 import IOrep (IOrep, runProgram)
 import Specification
@@ -16,16 +17,32 @@ import OutputPattern
 import Test.QuickCheck (Gen, vectorOf, generate, frequency)
 import ValueSet
 
-data TestConfig = TestConfig { depth :: Int, sizeBound :: Integer, testCases :: Int, maxNegativeInputs :: Int }
+taskCheck :: IOrep () -> Specification -> IO Outcome
+taskCheck = taskCheckWith stdArgs
 
-defaultConfig :: TestConfig
-defaultConfig = TestConfig 25 100 100 5
+data Args
+  = Args
+  { maxPathDepth :: Int
+  , valueSize :: Integer
+  , maxSuccess :: Int
+  , maxNegative :: Int
+  , verbose :: Bool
+  }
 
-fulfills :: TestConfig -> IOrep () -> Specification -> IO Outcome
-fulfills TestConfig{..} prog spec  = do
-  is <- generate $ vectorOf testCases $ genInput spec depth sizeBound maxNegativeInputs
+stdArgs :: Args
+stdArgs = Args
+  { maxPathDepth = 25
+  , valueSize = 100
+  , maxSuccess = 10
+  , maxNegative = 5
+  , verbose = True
+  }
+
+taskCheckWith :: Args -> IOrep () -> Specification -> IO Outcome
+taskCheckWith Args{..} prog spec  = do
+  is <- generate $ vectorOf maxSuccess $ genInput spec maxPathDepth valueSize maxNegative
   let (outcome, n) = runTests prog spec is
-  putStrLn $ unwords ["passed", show n,"tests"]
+  when verbose $ putStrLn $ unwords ["passed", show n,"tests"]
   pure outcome
 
 genInput :: Specification -> Int -> Integer -> Int -> Gen Inputs

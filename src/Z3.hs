@@ -1,5 +1,4 @@
 {-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE GADTs #-}
 module Z3 where
 
@@ -16,13 +15,15 @@ import Term
 import Data.Map (Map)
 import qualified Data.Map as Map
 
-findPathInput :: Path -> Integer -> IO (Maybe [Integer])
-findPathInput p bound = do
-  evalZ3With Nothing (stdOpts +? opt "timeout" "1000") $ pathScript p $ WithSoft bound
+type Timeout = Int
 
-isSatPath :: Path -> IO Bool
-isSatPath p = do
-  isJust <$> evalZ3With Nothing (stdOpts +? opt "timeout" "1000") (pathScript p WithoutSoft)
+findPathInput :: Timeout -> Path -> Integer -> IO (Maybe [Integer])
+findPathInput t p bound = do
+  evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) $ pathScript p $ WithSoft bound
+
+isSatPath :: Timeout -> Path -> IO Bool
+isSatPath t p = do
+  isJust <$> evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) (pathScript p WithoutSoft)
 
 data ScriptMode = WithSoft Integer | WithoutSoft
 

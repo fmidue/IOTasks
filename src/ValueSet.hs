@@ -34,15 +34,19 @@ containsValue Every _ = True
 containsValue None _ = False
 
 valueOf :: ValueSet -> Size -> Gen Integer
-valueOf vs sz = elements $ range vs [-sz..sz] where
-  range :: ValueSet -> [Integer] -> [Integer]
-  range (Union x y) r = range x r `union` range y r
-  range (Intersection x y) r = range x r `intersect` range y r
-  range (GreaterThan n) r = filter (>n) r
-  range (LessThen n) r = filter (<n) r
-  range (Eq n) r = filter (==n) r
-  range Every r = r
-  range None _ = error "empty ValueSet"
+valueOf vs sz =
+  case range vs [-sz..sz] of
+    [] -> error "valueOf: no values within size bound"
+    xs -> elements xs
+  where
+    range :: ValueSet -> [Integer] -> [Integer]
+    range (Union x y) r = range x r `union` range y r
+    range (Intersection x y) r = range x r `intersect` range y r
+    range (GreaterThan n) r = filter (>n) r
+    range (LessThen n) r = filter (<n) r
+    range (Eq n) r = filter (==n) r
+    range Every r = r
+    range None _ = error "valueOf: empty ValueSet"
 
 printValueSet :: ValueSet -> String
 printValueSet vs = concat ["{ v : Int | ", printValueSet' vs ,"}"] where
