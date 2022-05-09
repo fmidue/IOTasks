@@ -26,16 +26,20 @@ constraintTree negMax =
     (\(n,e) x vs mode ->
       let
         e' = inc x e
+        p = (x,e',vs)
       in case mode of
-          AssumeValid -> (\(s',_) -> Assert (InputConstraint(x, ix x e') vs) s',((n,e'),undefined))
+          AssumeValid -> RecSub p (n,e')
           UntilValid
-            | n < negMax -> (\(s',s) ->
-              Choice
-                (Assert (InputConstraint(x, ix x e') (complement vs)) s)
-                (Assert (InputConstraint(x, ix x e') vs) s')
-              ,((n,e'),(n+1,e'))
-              )
-            | otherwise -> (\(s',_) -> Assert (InputConstraint(x, ix x e') vs) s',((n,e'),undefined))
+            | n < negMax -> RecBoth p (n,e') (n+1,e')
+            | otherwise -> RecSub p (n,e')
+    )
+    (\case
+      RecSub (x,e',vs) s' -> Assert (InputConstraint(x, ix x e') vs) s'
+      RecBoth (x,e',vs) s' s -> Choice
+        (Assert (InputConstraint(x, ix x e') (complement vs)) s)
+        (Assert (InputConstraint(x, ix x e') vs) s')
+      NoRec -> error "constraintTree: impossible"
+      RecSame{} -> error "constraintTree: impossible"
     )
     (\_ _ _ t -> t)
     (\(_,e) c l r -> Choice (Assert (ConditionConstraint c e) l) (Assert (ConditionConstraint (Not c) e) r))

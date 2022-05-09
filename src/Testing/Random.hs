@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE LambdaCase #-}
 module Testing.Random where
 
 import Testing hiding (taskCheck, taskCheckWith, Args, stdArgs)
@@ -56,12 +57,19 @@ genTrace :: Specification -> Int -> Integer -> Int -> Gen Trace
 genTrace spec depth bound maxNeg =
   semM
     (\(e,d,n) x vs mode ->
-      if d <= (0 :: Int) then pure (const OutOfInputs,(undefined,undefined))
+      (if d <= (0 :: Int) then pure NoRec
       else do
-        (set,chooseT,n') <- frequency $ (5,pure (vs,fst,n)) : [(1,pure (complement vs,snd,n+1)) | mode == UntilValid && n < maxNeg]
-        i <- valueOf set bound
-        let st' = (Map.update (\xs -> Just $ i:xs) x e,d-1,n')
-        pure (\t' -> foldr ProgRead (chooseT t') (show i ++ "\n") ,(st',st'))
+        frequency $
+            (5, valueOf vs bound >>= (\i -> pure $ RecSub i (Map.update (\xs -> Just $ i:xs) x e,d-1,n)))
+          : [(1, valueOf (complement vs) bound >>= (\i -> pure $ RecSame i (e,d-1,n+1))) | mode == UntilValid && n < maxNeg]
+    ))
+    (pure . \case
+      NoRec -> OutOfInputs
+      RecSub i t' -> do
+        foldr ProgRead t' (show i ++ "\n")
+      RecSame i t' -> do
+        foldr ProgRead t' (show i ++ "\n")
+      RecBoth{} -> error "genTrace: impossible"
     )
     (\(e,_,_) o ts t' -> ProgWrite o (Set.map (evalPattern $ Map.toList e) ts) <$> t')
     (\(e,_,_) c l r -> if eval c $ Map.toList e then l else r)
