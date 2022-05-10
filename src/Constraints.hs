@@ -64,6 +64,9 @@ paths n (Choice lt rt) = paths n lt ++ paths n rt
 paths n (Assert c@InputConstraint{} t) = (c:) <$> paths (n-1) t
 paths n (Assert c@ConditionConstraint{} t) = (c:) <$> paths n t
 
+pathDepth :: Path -> Int
+pathDepth =  length . fst . partitionPath
+
 partitionPath :: Path -> ([Constraint],[Constraint])
 partitionPath = partition (\case InputConstraint{} -> True; _ -> False)
 

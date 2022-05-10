@@ -10,6 +10,7 @@ import Z3
 
 import Control.Monad (when, forM, replicateM)
 import Data.Maybe (catMaybes)
+import Data.List (sortOn)
 
 taskCheck :: IOrep () -> Specification -> IO Outcome
 taskCheck = taskCheckWith stdArgs
@@ -38,7 +39,7 @@ stdArgs = Args
 
 taskCheckWith :: Args -> IOrep () -> Specification -> IO Outcome
 taskCheckWith Args{..} prog spec = do
-  let ps = paths maxPathDepth $ constraintTree maxNegative spec
+  let ps = sortOn pathDepth $ paths maxPathDepth $ constraintTree maxNegative spec
   (out,satPaths,nInputs,timeouts) <- testPaths ps (0,0,0)
   --
   when verbose $ do
@@ -106,5 +107,5 @@ taskCheckOn (i:is) prog spec =
 
 generateStaticTestSuite :: Args -> Specification -> IO [Inputs]
 generateStaticTestSuite Args{..} spec =
-  let ps = paths maxPathDepth $ constraintTree maxNegative spec
+  let ps = sortOn pathDepth $ paths maxPathDepth $ constraintTree maxNegative spec
   in map (map show) . concat <$> forM ps (\p -> catMaybes <$> replicateM maxSuccessPerPath (findPathInput solverTimeout p valueSize))
