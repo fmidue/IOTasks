@@ -34,7 +34,7 @@ stdArgs :: Args
 stdArgs = Args
   { maxPathDepth = 25
   , valueSize = 100
-  , maxSuccess = 10
+  , maxSuccess = 100
   , maxNegative = 5
   , verbose = True
   }
