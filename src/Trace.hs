@@ -3,7 +3,8 @@ module Trace where
 
 import OutputPattern
 
-import Data.Set (Set, toList)
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.List (intercalate)
 
 data OptFlag = Optional | Mandatory deriving (Eq, Ord, Show)
@@ -14,6 +15,23 @@ data Trace
   | Terminate
   | OutOfInputs
   deriving (Eq, Show)
+
+progRead c = ProgRead c Terminate
+progWrite o ts = ProgWrite o ts Terminate 
+
+instance Semigroup Trace where
+  ProgRead c t <> t' = ProgRead c $ t <> t'
+  ProgWrite o1 ts1 t <> ProgWrite o2 ts2 t'
+    = ProgWrite
+      (max o1 o2)
+      (Set.unions $
+        [ ts1 | o2 == Optional ] ++
+        [ ts2 | o1 == Optional ] ++
+        [Set.map (uncurry (<>)) $ Set.cartesianProduct ts1 ts2]) t
+      <> t'
+  ProgWrite o ts t <> t' = ProgWrite o ts $ t <> t'
+  Terminate <> t' = t'
+  OutOfInputs <> _ = OutOfInputs
 
 data MatchResult
   = MatchSuccessfull
@@ -53,8 +71,8 @@ reportMismatch s t = unwords ["Expected:",showTraceHead s,"Got:",showTraceHead t
 showTraceHead :: Trace -> String
 showTraceHead (ProgRead x (ProgRead c t)) | c /= '\n' = "?"++ x : tail (showTraceHead (ProgRead c t))
 showTraceHead (ProgRead x _) = "?"++[x]
-showTraceHead (ProgWrite Optional ts _) = "(!["++ intercalate "," (printPattern <$> toList ts) ++ "])"
-showTraceHead (ProgWrite Mandatory ts _) = "!["++ intercalate "," (printPattern <$> toList ts) ++ "]"
+showTraceHead (ProgWrite Optional ts _) = "(!["++ intercalate "," (printPattern <$> Set.toList ts) ++ "])"
+showTraceHead (ProgWrite Mandatory ts _) = "!["++ intercalate "," (printPattern <$> Set.toList ts) ++ "]"
 showTraceHead Terminate = "stop"
 showTraceHead OutOfInputs = "?<unknown input>"
 

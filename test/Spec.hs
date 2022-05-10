@@ -46,6 +46,23 @@ main = hspec $ do
         it "does not fulfill tests generated from example3 specification" $
           ((\is -> taskCheckOn is prog2 example3) <$> generateStaticTestSuite stdArgs example3) `shouldNotReturn` Success
 
+    context "string/newline semantics" $ do
+      describe "stringS1" $ do
+        it "is satisfied by stringP1" $
+          taskCheck stringP1 stringS1 `shouldReturn` Success
+        it "is satisfied by stringP2" $
+          taskCheck stringP2 stringS1 `shouldReturn` Success
+        it "is satisfied by stringP3" $
+          taskCheck stringP3 stringS1 `shouldReturn` Success
+
+      describe "stringS2" $ do
+        it "is satisfied by stringP1" $
+          taskCheck stringP1 stringS2 `shouldReturn` Success
+        it "is not satisfied by stringP2" $
+          taskCheck stringP2 stringS2 `shouldNotReturn` Success
+        it "is satisfied by stringP3" $
+          taskCheck stringP3 stringS2 `shouldReturn` Success
+
   context "random testing" $ do
     describe "prog1" $ do
       it "taskCheck example1 specification" $

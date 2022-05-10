@@ -83,7 +83,10 @@ runSpecification inputs spec =
       RecSame i t' -> foldr ProgRead (ProgRead '\n' t') i
       RecBoth{} -> error "runSpecification: impossible"
     )
-    (\(e,_) o ts t' -> ProgWrite o (Set.map ((<> Text "\n") . evalPattern (Map.toList e)) ts) t')
+    (\(e,_) o ts t' ->
+      let os = Set.map (evalPattern (Map.toList e)) ts
+      in progWrite o (os `Set.union` Set.map (<> Text "\n") os) <> t'
+    )
     (\(e,_) c l r -> if eval c $ Map.toList e then l else r)
     Terminate
     (Map.fromList ((,[]) <$> vars spec),inputs)

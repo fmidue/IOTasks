@@ -30,10 +30,10 @@ putString s (PutString s' m) = PutString (s++s') m
 putString s m = PutString s m
 
 putChar :: Char -> IOrep ()
-putChar c = PutString [c] $ pure ()
+putChar c = putString [c] $ pure ()
 
 putStr :: String -> IOrep ()
-putStr s = PutString s $ pure ()
+putStr s = putString s $ pure ()
 
 putStrLn :: String -> IOrep ()
 putStrLn s = putStr $ s++"\n"

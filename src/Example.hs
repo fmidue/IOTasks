@@ -91,3 +91,40 @@ prog4 = do
         y <- readLn
         loop (p*y)
   loop 1
+
+--
+stringS1 :: Specification
+stringS1 = writeOutput [Text "A"] <> writeOutput [Text "B"]
+
+stringS2 :: Specification
+stringS2 = writeOutput [Text "A" <> Text "B"]
+
+stringP1 :: IOrep ()
+stringP1 = putStrLn "AB"
+
+stringP2 :: IOrep ()
+stringP2 = putStrLn "A" >> putStrLn "B"
+
+stringP3 :: IOrep ()
+stringP3 = putStr "A" >> putStr "B"
+
+---
+
+addSpec :: Specification
+addSpec =
+  readInput "x" nats AssumeValid <>
+  readInput "y" nats AssumeValid <>
+  writeOutput [Value $ Current "x" :+: Current "y"]
+
+nonsense :: IOrep ()
+nonsense = do
+  putStrLn =<< plus <$> getLine <*> getLine
+
+plus :: String -> String -> String
+plus x y = reverse $ plus' (reverse $ filter (>= '0') x) (reverse $ filter (>= '0') y) where
+  plus' xs [] = xs
+  plus' [] ys = ys
+  plus' ('0':xs) (y:ys) = y : plus' xs ys
+  plus' [x] ('9':ys) = plus' (pred x:['1']) ('0':ys)
+  plus' (x:x':xs) ('9':ys) = plus' (pred x:succ x':xs) ('0':ys)
+  plus' (x:xs) (y:ys) = plus' (pred x:xs) (succ y:ys)
