@@ -48,7 +48,7 @@ getLine :: IOrep String
 getLine = do
   c <- getChar
   case c of
-    '\n' -> pure [c]
+    '\n' -> pure ""
     _ -> (c:) <$> getLine
 
 readLn :: Read a => IOrep a
