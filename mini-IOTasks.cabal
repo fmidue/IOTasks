@@ -28,6 +28,7 @@ library
       Constraints
       Example
       IOrep
+      MonadTeletype
       OutputPattern
       Specification
       Term

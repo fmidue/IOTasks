@@ -8,6 +8,7 @@ import Control.Monad (ap, (>=>))
 
 import Trace
 import OutputPattern
+import MonadTeletype
 
 data IOrep a
   = GetChar (Char -> IOrep a)
@@ -29,30 +30,10 @@ putString :: String -> IOrep a -> IOrep a
 putString s (PutString s' m) = PutString (s++s') m
 putString s m = PutString s m
 
-putChar :: Char -> IOrep ()
-putChar c = putString [c] $ pure ()
-
-putStr :: String -> IOrep ()
-putStr s = putString s $ pure ()
-
-putStrLn :: String -> IOrep ()
-putStrLn s = putStr $ s++"\n"
-
-print :: Show a => a -> IOrep ()
-print = putStrLn . show
-
-getChar :: IOrep Char
-getChar = GetChar pure
-
-getLine :: IOrep String
-getLine = do
-  c <- getChar
-  case c of
-    '\n' -> pure ""
-    _ -> (c:) <$> getLine
-
-readLn :: Read a => IOrep a
-readLn = read <$> getLine
+instance MonadTeletype IOrep where
+  putChar c = putString [c] $ pure ()
+  putStr s = putString s $ pure ()
+  getChar = GetChar pure
 
 type Line = String
 

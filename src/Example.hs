@@ -6,7 +6,7 @@ import Prelude hiding
 
 
 import Specification
-import IOrep
+import MonadTeletype
 import Term
 import ValueSet
 import OutputPattern
@@ -48,42 +48,42 @@ nats = Eq 0 `Union` GreaterThan 0
 
 -- example programs
 
-prog1 :: IOrep ()
+prog1 :: MonadTeletype m => m ()
 prog1 = do
-  x <- readLn @Integer
+  x <- readLn @_ @Integer
   y <- readLn
   if x > y
     then print $ x + y
     else putStr "Result: " >> print (x * y)
 
-prog2 :: IOrep ()
+prog2 :: MonadTeletype m => m ()
 prog2 = do
-  n <- readLn @Integer
+  n <- readLn @_ @Integer
   if n < 0
     then prog2
     else
       let
-        loop 0 x = print @Integer x
+        loop 0 x = print @_ @Integer x
         loop m x = do
           -- putChar m
           i <- readLn
           loop (m-1) (x+i)
       in loop n 0
 
-prog3 :: IOrep ()
+prog3 :: MonadTeletype m => m ()
 prog3 = do
-  n <- readLn @Integer
+  n <- readLn @_ @Integer
   let
     loop s m
-      | s > n  = print @Integer m
+      | s > n  = print @_ @Integer m
       | otherwise = do
         x <- readLn
         loop (s+x) (m+1)
   loop 0 0
 
-prog4 :: IOrep ()
+prog4 :: MonadTeletype m => m ()
 prog4 = do
-  x <- readLn @Integer
+  x <- readLn @_ @Integer
   let
     loop p
       | p == x = pure ()
@@ -99,13 +99,13 @@ stringS1 = writeOutput [Text "A"] <> writeOutput [Text "B"]
 stringS2 :: Specification
 stringS2 = writeOutput [Text "A" <> Text "B"]
 
-stringP1 :: IOrep ()
+stringP1 :: MonadTeletype m => m ()
 stringP1 = putStrLn "AB"
 
-stringP2 :: IOrep ()
+stringP2 :: MonadTeletype m => m ()
 stringP2 = putStrLn "A" >> putStrLn "B"
 
-stringP3 :: IOrep ()
+stringP3 :: MonadTeletype m => m ()
 stringP3 = putStr "A" >> putStr "B"
 
 ---
@@ -116,7 +116,7 @@ addSpec =
   readInput "y" nats AssumeValid <>
   writeOutput [Value $ Current "x" :+: Current "y"]
 
-nonsense :: IOrep ()
+nonsense :: MonadTeletype m => m ()
 nonsense = do
   putStrLn =<< plus <$> getLine <*> getLine
 
