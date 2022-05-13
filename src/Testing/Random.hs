@@ -71,8 +71,8 @@ genTrace spec depth bound maxNeg =
         foldr ProgRead t' (show i ++ "\n")
       RecBoth{} -> error "genTrace: impossible"
     )
-    (\(e,_,_) o ts t' -> ProgWrite o (Set.map (evalPattern $ Map.toList e) ts) <$> t')
-    (\(e,_,_) c l r -> if eval c $ Map.toList e then l else r)
+    (\(e,_,_) o ts t' -> ProgWrite o (Set.map (evalPattern e) ts) <$> t')
+    (\(e,_,_) c l r -> if eval c e then l else r)
     (pure Terminate)
     (Map.fromList ((,[]) <$> vars spec),depth,0)
     spec

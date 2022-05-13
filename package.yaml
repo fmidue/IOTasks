@@ -26,6 +26,8 @@ dependencies:
 - z3
 - parsec
 - unify
+- mtl
+- monad-loops
 
 ghc-options:
 - -Wall

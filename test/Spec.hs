@@ -6,9 +6,12 @@ import OutputPattern
 import Testing
 import qualified Testing.Random as Random
 import Example
+import Interpreter
+
 import Test.Hspec.QuickCheck
 import Test.QuickCheck hiding (Success, stdArgs)
 import Control.Applicative (liftA2)
+import Control.Monad.Loops (allM)
 
 main :: IO ()
 main = hspec $ do
@@ -45,6 +48,10 @@ main = hspec $ do
           ((\is -> taskCheckOn is prog2 example1) <$> generateStaticTestSuite stdArgs example1) `shouldNotReturn` Success
         it "does not fulfill tests generated from example3 specification" $
           ((\is -> taskCheckOn is prog2 example3) <$> generateStaticTestSuite stdArgs example3) `shouldNotReturn` Success
+
+    context "interpretation" $
+      it "all interpretations of a specification satisfy that specification" $
+        allM (\p -> (== Success) <$> taskCheck p example1) (interpret example1) `shouldReturn` True
 
     context "string/newline semantics" $ do
       describe "stringS1" $ do

@@ -27,6 +27,7 @@ library
   exposed-modules:
       Constraints
       Example
+      Interpreter
       IOrep
       MonadTeletype
       OutputPattern
@@ -46,6 +47,8 @@ library
       QuickCheck
     , base >=4.7 && <5
     , containers
+    , monad-loops
+    , mtl
     , parsec
     , unify
     , z3
@@ -65,6 +68,8 @@ test-suite mini-IOTasks-test
     , containers
     , hspec
     , mini-IOTasks
+    , monad-loops
+    , mtl
     , parsec
     , unify
     , z3

@@ -84,10 +84,10 @@ runSpecification inputs spec =
       RecBoth{} -> error "runSpecification: impossible"
     )
     (\(e,_) o ts t' ->
-      let os = Set.map (evalPattern (Map.toList e)) ts
+      let os = Set.map (evalPattern e) ts
       in progWrite o (os `Set.union` Set.map (<> Text "\n") os) <> t'
     )
-    (\(e,_) c l r -> if eval c $ Map.toList e then l else r)
+    (\(e,_) c l r -> if eval c e then l else r)
     Terminate
     (Map.fromList ((,[]) <$> vars spec),inputs)
     spec

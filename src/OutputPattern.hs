@@ -7,6 +7,7 @@ module OutputPattern where
 import Term
 
 import Data.Either (isRight)
+import Data.Map (Map)
 
 import Text.Parsec
 
@@ -34,7 +35,7 @@ instance Semigroup (OutputPattern t) where
 instance Monoid (OutputPattern t) where
   mempty = Text ""
 
-evalPattern :: [(Varname,[Integer])] -> OutputPattern t -> OutputPattern 'TraceP
+evalPattern :: Map Varname [Integer] -> OutputPattern t -> OutputPattern 'TraceP
 evalPattern _ Wildcard = Wildcard
 evalPattern _ (Text s) = Text s
 evalPattern e (Sequence x y) = evalPattern e x <> evalPattern e y

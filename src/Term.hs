@@ -32,7 +32,7 @@ deriving instance Eq (Term a)
 deriving instance Ord (Term a)
 deriving instance Show (Term a)
 
-eval :: Term a -> [(Varname,[Integer])] -> a
+eval :: Term a -> Map Varname [Integer] -> a
 eval (x :+: y) e = eval x e + eval y e
 eval (x :-: y) e = eval x e - eval y e
 eval (x :*: y) e = eval x e * eval y e
@@ -48,7 +48,7 @@ eval (Length xs) e = fromIntegral . length $ eval xs e
 eval (Sum xs) e = fromIntegral . sum $ eval xs e
 eval (Product xs) e = fromIntegral . product $ eval xs e
 eval (Current x) e = fromMaybe (error $ "empty list for " ++ x) $ safeHead $ eval (All x) e
-eval (All x) e = fromMaybe (error $ "no value for " ++ x) $ lookup x e
+eval (All x) e = fromMaybe [] $ Map.lookup x e
 eval (IntLit n) _ = n
 
 safeHead :: [a] -> Maybe a
