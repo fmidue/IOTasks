@@ -11,8 +11,9 @@ import Z3
 import Control.Monad (when, forM, replicateM)
 import Data.Maybe (catMaybes)
 import Data.List (sortOn)
+import Data.Functor (void)
 
-taskCheck :: IOrep () -> Specification -> IO Outcome
+taskCheck :: IOrep () -> Specification -> IO ()
 taskCheck = taskCheckWith stdArgs
 
 data Args
@@ -37,8 +38,14 @@ stdArgs = Args
   , verbose = True
   }
 
-taskCheckWith :: Args -> IOrep () -> Specification -> IO Outcome
-taskCheckWith Args{..} prog spec = do
+taskCheckWith :: Args -> IOrep () -> Specification -> IO ()
+taskCheckWith args p s = void $ taskCheckWithOutcome args p s
+
+taskCheckOutcome :: IOrep () -> Specification -> IO Outcome
+taskCheckOutcome = taskCheckWithOutcome stdArgs
+
+taskCheckWithOutcome :: Args -> IOrep () -> Specification -> IO Outcome
+taskCheckWithOutcome Args{..} prog spec = do
   let ps = sortOn pathDepth $ paths maxPathDepth $ constraintTree maxNegative spec
   (out,satPaths,nInputs,timeouts) <- testPaths ps (0,0,0)
   --
@@ -48,11 +55,12 @@ taskCheckWith Args{..} prog spec = do
     when (timeouts > 0) $
       putStrLn $ unwords ["---",show timeouts, "paths timed out"]
   --
+  putStrLn $ pPrintOutcome out
   pure out
 
   where
     testPaths :: [Path] -> (Int,Int,Int) -> IO (Outcome,Int,Int,Int)
-    testPaths [] (m,n,t) = pure (Success,m,n,t)
+    testPaths [] (m,n,t) = pure (Success n,m,n,t)
     testPaths _ (m,n,t) | t > maxTimeouts = pure (GaveUp,m,n,t)
     testPaths (p:ps) (m,n,t) = do
       sat <- isSatPath solverTimeout p
@@ -61,7 +69,7 @@ taskCheckWith Args{..} prog spec = do
           (out,k) <- testPath p 0 n
           case out of
             PathSuccess -> testPaths ps (m+1,n+k,t)
-            PathFailure i r -> pure (Failure i r,m+1,n+k,t)
+            PathFailure i et at r -> pure (Failure i et at r,m+1,n+k,t)
             PathTimeout
               | k > 0 -> testPaths ps (m+1,n+k,t)
               | otherwise -> testPaths ps (m,n,t+1)
@@ -79,31 +87,52 @@ taskCheckWith Args{..} prog spec = do
             progTrace = runProgram nextInput prog
           case specTrace `covers` progTrace of
             MatchSuccessfull -> testPath p (n+1) nOtherTests
-            failure -> pure (PathFailure nextInput failure,n+1)
+            failure -> pure (PathFailure nextInput specTrace progTrace failure,n+1)
 
 type Inputs = [Line]
+type ExpectedRun = Trace
+type ActualRun = Trace
 
-data Outcome = Success | Failure Inputs MatchResult | GaveUp
+data Outcome = Success Int | Failure Inputs ExpectedRun ActualRun MatchResult | GaveUp
   deriving Eq
 
-data PathOutcome = PathSuccess | PathTimeout | PathFailure Inputs MatchResult
+isSuccess :: Outcome -> Bool
+isSuccess Success{} = True
+isSuccess _ = False
+
+data PathOutcome = PathSuccess | PathTimeout | PathFailure Inputs ExpectedRun ActualRun MatchResult
   deriving Eq
 
 instance Show Outcome where
-  show Success = "Success"
-  show (Failure is r) = unlines ["Failure","  "++show is, "  "++show r]
+  show (Success n) = "Success " ++ show n
+  show (Failure is et at r) = unlines ["Failure","  "++show is, "  "++show et,"  "++show at,"  "++show r]
   show GaveUp = "GaveUp"
+
+pPrintOutcome :: Outcome -> String
+pPrintOutcome (Success n) = unwords ["+++ OK, passed",show n,"tests."]
+pPrintOutcome (Failure is et at r) = unlines
+  [ "*** Failure"
+  , "Input sequence "++ pPrintInputs is
+  , "Expected run (generalized): " ++ pPrintTrace et
+  , "Actual run: " ++ pPrintTrace at
+  , "Error:",pPrintMatchResult r
+  ]
+pPrintOutcome GaveUp = "*** Gave up!"
+
+pPrintInputs :: Inputs -> String
+pPrintInputs = unwords . map ('?':)
 
 -- static test suite generation
 taskCheckOn :: [Inputs] -> IOrep () -> Specification -> Outcome
-taskCheckOn [] _ _ = Success
-taskCheckOn (i:is) prog spec =
-  let
-    specTrace = runSpecification i spec
-    progTrace = runProgram i prog
-  in case specTrace `covers` progTrace of
-    MatchSuccessfull -> taskCheckOn is prog spec
-    failure -> Failure i failure
+taskCheckOn = go 0 where
+  go n [] _ _ = Success n
+  go n (i:is) prog spec =
+    let
+      specTrace = runSpecification i spec
+      progTrace = runProgram i prog
+    in case specTrace `covers` progTrace of
+      MatchSuccessfull -> go (n+1) is prog spec
+      failure -> Failure i specTrace progTrace failure
 
 generateStaticTestSuite :: Args -> Specification -> IO [Inputs]
 generateStaticTestSuite Args{..} spec =

@@ -9,91 +9,93 @@ import Example
 import Interpreter
 
 import Test.Hspec.QuickCheck
-import Test.QuickCheck hiding (Success, stdArgs)
+import Test.QuickCheck hiding (Success, stdArgs,isSuccess)
 import Control.Applicative (liftA2)
 import Control.Monad.Loops (allM)
+
+import Data.Functor ((<&>))
 
 main :: IO ()
 main = hspec $ do
   context "solver based testing" $ do
     describe "prog1" $ do
       it "taskCheck example1 specification" $
-        taskCheck prog1 example1 `shouldReturn` Success
+        (taskCheckOutcome prog1 example1 <&> isSuccess) `shouldReturn` True
       it "does not fulfill example2 specification" $
-        taskCheck prog1 example2 `shouldNotReturn` Success
+        (taskCheckOutcome prog1 example2 <&> not . isSuccess) `shouldReturn` True
       it "does not fulfill example3 specification" $
-        taskCheck prog1 example3 `shouldNotReturn` Success
+        (taskCheckOutcome prog1 example3 <&> not . isSuccess) `shouldReturn` True
 
     describe "prog2" $ do
       it "taskCheck example2 specification" $
-        taskCheck prog2 example2 `shouldReturn` Success
+        (taskCheckOutcome prog2 example2 <&> isSuccess) `shouldReturn` True
       it "does not fulfill example1 specification" $
-        taskCheck prog2 example1 `shouldNotReturn` Success
+        (taskCheckOutcome prog2 example1 <&> not . isSuccess) `shouldReturn` True
       it "does not fulfill example3 specification" $
-        taskCheck prog2 example3 `shouldNotReturn` Success
+        (taskCheckOutcome prog2 example3 <&> not . isSuccess) `shouldReturn` True
 
     describe "prog3" $ do
       it "taskCheck example3 specification" $
-        taskCheck prog3 example3 `shouldReturn` Success
+        (taskCheckOutcome prog3 example3 <&> isSuccess) `shouldReturn` True
       it "does not fulfill example1 specification" $
-        taskCheck prog3 example1 `shouldNotReturn` Success
+        (taskCheckOutcome prog3 example1 <&> not . isSuccess) `shouldReturn` True
       it "does not fulfill example2 specification" $
-        taskCheck prog3 example2 `shouldNotReturn` Success
+        (taskCheckOutcome prog3 example2 <&> not . isSuccess) `shouldReturn` True
 
     context "static test generation" $ do
       describe "prog2" $ do
         it "fulfills tests generated from example2 specification" $
-          ((\is -> taskCheckOn is prog2 example2) <$> generateStaticTestSuite stdArgs example2) `shouldReturn` Success
+          (((\is -> taskCheckOn is prog2 example2) <$> generateStaticTestSuite stdArgs example2) <&> isSuccess) `shouldReturn` True
         it "does not fulfill tests generated from example1 specification" $
-          ((\is -> taskCheckOn is prog2 example1) <$> generateStaticTestSuite stdArgs example1) `shouldNotReturn` Success
+          (((\is -> taskCheckOn is prog2 example1) <$> generateStaticTestSuite stdArgs example1) <&> not . isSuccess) `shouldReturn` True
         it "does not fulfill tests generated from example3 specification" $
-          ((\is -> taskCheckOn is prog2 example3) <$> generateStaticTestSuite stdArgs example3) `shouldNotReturn` Success
+          (((\is -> taskCheckOn is prog2 example3) <$> generateStaticTestSuite stdArgs example3) <&> not . isSuccess) `shouldReturn` True
 
     context "interpretation" $
       it "all interpretations of a specification satisfy that specification" $
-        allM (\p -> (== Success) <$> taskCheck p example1) (interpret example1) `shouldReturn` True
+        allM (\p -> isSuccess <$> taskCheckOutcome p example1) (interpret example1) `shouldReturn` True
 
     context "string/newline semantics" $ do
       describe "stringS1" $ do
         it "is satisfied by stringP1" $
-          taskCheck stringP1 stringS1 `shouldReturn` Success
+          (taskCheckOutcome stringP1 stringS1 <&> isSuccess) `shouldReturn` True
         it "is satisfied by stringP2" $
-          taskCheck stringP2 stringS1 `shouldReturn` Success
+          (taskCheckOutcome stringP2 stringS1 <&> isSuccess) `shouldReturn` True
         it "is satisfied by stringP3" $
-          taskCheck stringP3 stringS1 `shouldReturn` Success
+          (taskCheckOutcome stringP3 stringS1 <&> isSuccess) `shouldReturn` True
 
       describe "stringS2" $ do
         it "is satisfied by stringP1" $
-          taskCheck stringP1 stringS2 `shouldReturn` Success
+          (taskCheckOutcome stringP1 stringS2 <&> isSuccess) `shouldReturn` True
         it "is not satisfied by stringP2" $
-          taskCheck stringP2 stringS2 `shouldNotReturn` Success
+          (taskCheckOutcome stringP2 stringS2 <&> not . isSuccess) `shouldReturn` True
         it "is satisfied by stringP3" $
-          taskCheck stringP3 stringS2 `shouldReturn` Success
+          (taskCheckOutcome stringP3 stringS2 <&> isSuccess) `shouldReturn` True
 
   context "random testing" $ do
     describe "prog1" $ do
       it "taskCheck example1 specification" $
-        Random.taskCheck prog1 example1 `shouldReturn` Success
+        (Random.taskCheckOutcome prog1 example1 <&> isSuccess) `shouldReturn` True
       it "does not fulfill example2 specification" $
-        Random.taskCheck prog1 example2 `shouldNotReturn` Success
+        (Random.taskCheckOutcome prog1 example2 <&> not . isSuccess) `shouldReturn` True
       it "does not fulfill example3 specification" $
-        Random.taskCheck prog1 example3 `shouldNotReturn` Success
+        (Random.taskCheckOutcome prog1 example3 <&> not . isSuccess) `shouldReturn` True
 
     describe "prog2" $ do
       it "taskCheck example2 specification" $
-        Random.taskCheck prog2 example2 `shouldReturn` Success
+        (Random.taskCheckOutcome prog2 example2 <&> isSuccess) `shouldReturn` True
       it "does not fulfill example1 specification" $
-        Random.taskCheck prog2 example1 `shouldNotReturn` Success
+        (Random.taskCheckOutcome prog2 example1 <&> not . isSuccess) `shouldReturn` True
       it "does not fulfill example3 specification" $
-        Random.taskCheck prog2 example3 `shouldNotReturn` Success
+        (Random.taskCheckOutcome prog2 example3 <&> not . isSuccess) `shouldReturn` True
 
     describe "prog3" $ do
       it "taskCheck example3 specification" $
-        Random.taskCheck prog3 example3 `shouldReturn` Success
+        (Random.taskCheckOutcome prog3 example3 <&> isSuccess) `shouldReturn` True
       it "does not fulfill example1 specification" $
-        Random.taskCheck prog3 example1 `shouldNotReturn` Success
+        (Random.taskCheckOutcome prog3 example1 <&> not . isSuccess) `shouldReturn` True
       it "does not fulfill example2 specification" $
-        Random.taskCheck prog3 example2 `shouldNotReturn` Success
+        (Random.taskCheckOutcome prog3 example2 <&> not . isSuccess) `shouldReturn` True
 
   context "string pattern matching" $ do
     prop "wildcard >: x == True" $

@@ -6,6 +6,7 @@ import OutputPattern
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.List (intercalate)
+import Data.Function (fix)
 
 data OptFlag = Optional | Mandatory deriving (Eq, Ord, Show)
 
@@ -16,8 +17,11 @@ data Trace
   | OutOfInputs
   deriving (Eq, Show)
 
+progRead :: Char -> Trace
 progRead c = ProgRead c Terminate
-progWrite o ts = ProgWrite o ts Terminate 
+
+progWrite :: OptFlag -> Set (OutputPattern 'TraceP) -> Trace
+progWrite o ts = ProgWrite o ts Terminate
 
 instance Semigroup Trace where
   ProgRead c t <> t' = ProgRead c $ t <> t'
@@ -69,12 +73,29 @@ reportMismatch :: Trace -> Trace -> String
 reportMismatch s t = unwords ["Expected:",showTraceHead s,"Got:",showTraceHead t]
 
 showTraceHead :: Trace -> String
-showTraceHead (ProgRead x (ProgRead c t)) | c /= '\n' = "?"++ x : tail (showTraceHead (ProgRead c t))
-showTraceHead (ProgRead x _) = "?"++[x]
-showTraceHead (ProgWrite Optional ts _) = "(!["++ intercalate "," (printPattern <$> Set.toList ts) ++ "])"
-showTraceHead (ProgWrite Mandatory ts _) = "!["++ intercalate "," (printPattern <$> Set.toList ts) ++ "]"
-showTraceHead Terminate = "stop"
-showTraceHead OutOfInputs = "?<unknown input>"
+showTraceHead = showTraceHead' (const "")
+
+pPrintTrace :: Trace -> String
+pPrintTrace = fix showTraceHead'
+
+showTraceHead' :: (Trace -> String) -> Trace -> String
+showTraceHead' f (ProgRead x (ProgRead c t)) | c /= '\n' = "?"++ x : tail (showTraceHead' f (ProgRead c t))
+showTraceHead' f (ProgRead x t') = "?"++[x] ++ addSpace (f t')
+showTraceHead' f (ProgWrite Optional ts t') = "(!["++ intercalate "," (printPattern <$> Set.toList ts) ++ "])" ++ addSpace (f t')
+showTraceHead' f (ProgWrite Mandatory ts t') = "!["++ intercalate "," (printPattern <$> Set.toList ts) ++ "]" ++ addSpace (f t')
+showTraceHead' _ Terminate = "stop"
+showTraceHead' _ OutOfInputs = "?<unknown input>"
+
+addSpace :: String -> String
+addSpace "" = ""
+addSpace s = ' ':s
+
+pPrintMatchResult :: MatchResult -> String
+pPrintMatchResult MatchSuccessfull = "MatchSuccessfull"
+pPrintMatchResult (InputMismatch s) = unlines ["InputMismatch:",s]
+pPrintMatchResult (OutputMismatch s) = unlines ["OutputMismatch:",s]
+pPrintMatchResult (AlignmentMismatch s) = unlines ["AlignmentMismatch:",s]
+pPrintMatchResult (TerminationMismatch s) = unlines ["TerminationMismatch:",s]
 
 isTerminating :: Trace -> Bool
 isTerminating (ProgRead _ t) = isTerminating t

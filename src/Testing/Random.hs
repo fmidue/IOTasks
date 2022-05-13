@@ -3,10 +3,11 @@
 {-# LANGUAGE LambdaCase #-}
 module Testing.Random where
 
-import Testing hiding (taskCheck, taskCheckWith, Args, stdArgs)
+import Testing hiding (taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args, stdArgs)
 
 import Data.Map as Map hiding (foldr)
 import Data.Set as Set hiding (foldr)
+import Data.Functor (void)
 import Control.Monad (when)
 
 import IOrep (IOrep, runProgram)
@@ -18,7 +19,7 @@ import OutputPattern
 import Test.QuickCheck (Gen, vectorOf, generate, frequency)
 import ValueSet
 
-taskCheck :: IOrep () -> Specification -> IO Outcome
+taskCheck :: IOrep () -> Specification -> IO ()
 taskCheck = taskCheckWith stdArgs
 
 data Args
@@ -39,8 +40,14 @@ stdArgs = Args
   , verbose = True
   }
 
-taskCheckWith :: Args -> IOrep () -> Specification -> IO Outcome
-taskCheckWith Args{..} prog spec  = do
+taskCheckWith :: Args -> IOrep () -> Specification -> IO ()
+taskCheckWith args p s = void $ taskCheckWithOutcome args p s
+
+taskCheckOutcome :: IOrep () -> Specification -> IO Outcome
+taskCheckOutcome = taskCheckWithOutcome stdArgs
+
+taskCheckWithOutcome :: Args -> IOrep () -> Specification -> IO Outcome
+taskCheckWithOutcome Args{..} prog spec  = do
   is <- generate $ vectorOf maxSuccess $ genInput spec maxPathDepth valueSize maxNegative
   let (outcome, n) = runTests prog spec is
   when verbose $ putStrLn $ unwords ["passed", show n,"tests"]
@@ -79,11 +86,11 @@ genTrace spec depth bound maxNeg =
 
 runTests :: IOrep () -> Specification -> [Inputs] -> (Outcome,Int)
 runTests = go 0 where
-  go n _ _ [] = (Success,n)
+  go n _ _ [] = (Success n,n)
   go n prog spec (i:is) =
     let
       specTrace = runSpecification i spec
       progTrace = runProgram i prog
     in case specTrace `covers` progTrace of
       MatchSuccessfull -> go (n+1) prog spec is
-      failure -> (Failure i failure,n)
+      failure -> (Failure i specTrace progTrace failure,n)
