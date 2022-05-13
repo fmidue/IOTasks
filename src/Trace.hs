@@ -79,7 +79,8 @@ pPrintTrace :: Trace -> String
 pPrintTrace = fix showTraceHead'
 
 showTraceHead' :: (Trace -> String) -> Trace -> String
-showTraceHead' f (ProgRead x (ProgRead c t)) | c /= '\n' = "?"++ x : tail (showTraceHead' f (ProgRead c t))
+showTraceHead' f (ProgRead x (ProgRead '\n' t)) = "?"++ [x] ++ "\\n" ++ addSpace (showTraceHead' f t)
+showTraceHead' f (ProgRead x (ProgRead c t)) = "?"++ x : tail (showTraceHead' f (ProgRead c t))
 showTraceHead' f (ProgRead x t') = "?"++[x] ++ addSpace (f t')
 showTraceHead' f (ProgWrite Optional ts t') = "(!["++ intercalate "," (printPattern <$> Set.toList ts) ++ "])" ++ addSpace (f t')
 showTraceHead' f (ProgWrite Mandatory ts t') = "!["++ intercalate "," (printPattern <$> Set.toList ts) ++ "]" ++ addSpace (f t')
