@@ -25,7 +25,6 @@ dependencies:
 - containers
 - z3
 - parsec
-- unify
 - mtl
 - monad-loops
 
