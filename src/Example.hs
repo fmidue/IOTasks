@@ -23,9 +23,10 @@ example1 =
 
 example2 :: Specification
 example2 =
-  readInput "n" nats UntilValid <>
+  readInput "n" nats AssumeValid <>
   until (Length (All "x") :==: Current "n")
-    (writeOptionalOutput [Value $ Current "n" :-: Length (All "x")] <> readInput "x" ints AssumeValid) <>
+    -- (writeOptionalOutput [Value $ Current "n" :-: Length (All "x")] <> readInput "x" ints AssumeValid) <>
+    (readInput "x" ints AssumeValid) <>
   writeOutput [Value $ Sum $ All "x"]
 
 example3 :: Specification
@@ -69,6 +70,17 @@ prog2 = do
           i <- readLn
           loop (m-1) (x+i)
       in loop n 0
+
+prog2' :: MonadTeletype m => m ()
+prog2' = do
+  n <- readLn @_ @Integer
+  let
+    loop m x
+      | m >= n = print @_ @Integer x
+      | otherwise = do
+        i <- readLn
+        loop (m+1) (x+1+i)
+  loop 0 0
 
 prog3 :: MonadTeletype m => m ()
 prog3 = do

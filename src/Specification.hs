@@ -47,6 +47,9 @@ writeOutput ts = WriteOutput Mandatory (Set.fromList ts) nop
 writeOptionalOutput :: [OutputPattern 'SpecificationP] -> Specification
 writeOptionalOutput ts = WriteOutput Optional (Set.fromList ts) nop
 
+optionalTextOutput :: Specification
+optionalTextOutput = writeOptionalOutput [Wildcard]
+
 branch :: Term Bool -> Specification -> Specification -> Specification
 branch c t e = Branch c t e nop
 

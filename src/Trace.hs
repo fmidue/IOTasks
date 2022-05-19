@@ -57,7 +57,7 @@ covers s@(ProgRead i t1) t@(ProgRead j t2)
 
 covers s@(ProgWrite Mandatory is t1) t@(ProgWrite Mandatory js t2)
   | all (\j -> any (>: j) is) js = t1 `covers` t2
-  | otherwise = OutputMismatch $ reportMismatch s t
+  | otherwise = OutputMismatch $ reportOutputMismatch s t
 
 covers (ProgWrite Optional is t1) t = ProgWrite Mandatory is t1 `covers` t <> t1 `covers` t
 covers s (ProgWrite Optional is t2) = s `covers` ProgWrite Mandatory is t2 <> s `covers` t2
@@ -71,6 +71,9 @@ covers s t = AlignmentMismatch $ reportMismatch s t
 
 reportMismatch :: Trace -> Trace -> String
 reportMismatch s t = unwords ["Expected:",showTraceHead s,"Got:",showTraceHead t]
+
+reportOutputMismatch :: Trace -> Trace -> String
+reportOutputMismatch s t = unwords [showTraceHead t, "is not covered by", showTraceHead s]
 
 showTraceHead :: Trace -> String
 showTraceHead = showTraceHead' (const "")
