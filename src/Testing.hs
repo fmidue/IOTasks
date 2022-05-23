@@ -13,6 +13,8 @@ import Data.Maybe (catMaybes)
 import Data.List (sortOn)
 import Data.Functor (void)
 
+import Text.PrettyPrint hiding ((<>))
+
 taskCheck :: IOrep () -> Specification -> IO ()
 taskCheck = taskCheckWith stdArgs
 
@@ -55,7 +57,7 @@ taskCheckWithOutcome Args{..} prog spec = do
     when (timeouts > 0) $
       putStrLn $ unwords ["---",show timeouts, "paths timed out"]
   --
-  putStrLn $ pPrintOutcome out
+  print $ pPrintOutcome out
   pure out
 
   where
@@ -108,16 +110,17 @@ instance Show Outcome where
   show (Failure is et at r) = unlines ["Failure","  "++show is, "  "++show et,"  "++show at,"  "++show r]
   show GaveUp = "GaveUp"
 
-pPrintOutcome :: Outcome -> String
-pPrintOutcome (Success n) = unwords ["+++ OK, passed",show n,"tests."]
-pPrintOutcome (Failure is et at r) = unlines
-  [ "*** Failure"
-  , "Input sequence "++ pPrintInputs is
-  , "Expected run (generalized): " ++ pPrintTrace et
-  , "Actual run: " ++ pPrintTrace at
-  , "Error:",pPrintMatchResult r
+pPrintOutcome :: Outcome -> Doc
+pPrintOutcome (Success n) = text $ unwords ["+++ OK, passed",show n,"tests."]
+pPrintOutcome (Failure is et at r) = vcat
+  [ text "*** Failure"
+  , text ("Input sequence "++ pPrintInputs is)
+  , text ("Expected run (generalized): " ++ pPrintTrace et)
+  , text ("Actual run: " ++ pPrintTrace at)
+  , text "Error:"
+  , nest 2 (pPrintMatchResult r)
   ]
-pPrintOutcome GaveUp = "*** Gave up!"
+pPrintOutcome GaveUp = text "*** Gave up!"
 
 pPrintInputs :: Inputs -> String
 pPrintInputs = unwords . map ('?':)

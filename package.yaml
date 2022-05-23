@@ -28,6 +28,7 @@ dependencies:
 - mtl
 - monad-loops
 - express
+- pretty
 
 ghc-options:
 - -Wall

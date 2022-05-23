@@ -8,6 +8,8 @@ import qualified Data.Set as Set
 import Data.List (intercalate)
 import Data.Function (fix)
 
+import Text.PrettyPrint hiding ((<>))
+
 data OptFlag = Optional | Mandatory deriving (Eq, Ord, Show)
 
 data Trace
@@ -39,10 +41,10 @@ instance Semigroup Trace where
 
 data MatchResult
   = MatchSuccessfull
-  | InputMismatch String
-  | OutputMismatch String
-  | AlignmentMismatch String
-  | TerminationMismatch String
+  | InputMismatch Doc
+  | OutputMismatch Doc
+  | AlignmentMismatch Doc
+  | TerminationMismatch Doc
   deriving (Show, Eq)
 
 instance Semigroup MatchResult where
@@ -69,14 +71,19 @@ covers OutOfInputs OutOfInputs = MatchSuccessfull
 
 covers s t = AlignmentMismatch $ reportMismatch s t
 
-reportMismatch :: Trace -> Trace -> String
-reportMismatch s t = unwords ["Expected:",showTraceHead s,"Got:",showTraceHead t]
+reportMismatch :: Trace -> Trace -> Doc
+reportMismatch s t = vcat
+  [ text "Expected:"
+  , nest 2 (showTraceHead s)
+  , text "Got:"
+  , nest 2 (showTraceHead t)
+  ]
 
-reportOutputMismatch :: Trace -> Trace -> String
-reportOutputMismatch s t = unwords [showTraceHead t, "is not covered by", showTraceHead s]
+reportOutputMismatch :: Trace -> Trace -> Doc
+reportOutputMismatch s t = showTraceHead t <+> text "is not covered by" <+> showTraceHead s
 
-showTraceHead :: Trace -> String
-showTraceHead = showTraceHead' (const "")
+showTraceHead :: Trace -> Doc
+showTraceHead = text . showTraceHead' (const "")
 
 pPrintTrace :: Trace -> String
 pPrintTrace = fix showTraceHead'
@@ -94,12 +101,12 @@ addSpace :: String -> String
 addSpace "" = ""
 addSpace s = ' ':s
 
-pPrintMatchResult :: MatchResult -> String
-pPrintMatchResult MatchSuccessfull = "MatchSuccessfull"
-pPrintMatchResult (InputMismatch s) = unlines ["InputMismatch:",s]
-pPrintMatchResult (OutputMismatch s) = unlines ["OutputMismatch:",s]
-pPrintMatchResult (AlignmentMismatch s) = unlines ["AlignmentMismatch:",s]
-pPrintMatchResult (TerminationMismatch s) = unlines ["TerminationMismatch:",s]
+pPrintMatchResult :: MatchResult -> Doc
+pPrintMatchResult MatchSuccessfull = text "MatchSuccessfull"
+pPrintMatchResult (InputMismatch s) = text "InputMismatch:" $$ nest 2 s
+pPrintMatchResult (OutputMismatch s) = text "OutputMismatch:" $$ nest 2 s
+pPrintMatchResult (AlignmentMismatch s) = text "AlignmentMismatch:" $$ nest 2 s
+pPrintMatchResult (TerminationMismatch s) = text "TerminationMismatch:" $$ nest 2 s
 
 isTerminating :: Trace -> Bool
 isTerminating (ProgRead _ t) = isTerminating t
