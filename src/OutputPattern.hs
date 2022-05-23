@@ -2,9 +2,13 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeApplications #-}
 module OutputPattern where
 
-import Term
+import Prelude hiding (all)
+
+import Term (Varname)
+import OutputTerm
 
 import Data.Either (isRight)
 import Data.Map (Map)
@@ -16,7 +20,7 @@ data OutputPattern (t :: PatternType) where
   Wildcard :: OutputPattern t
   Text :: String -> OutputPattern t
   Sequence :: OutputPattern t -> OutputPattern t -> OutputPattern t
-  Value :: Term Integer -> OutputPattern 'SpecificationP
+  Value :: OutputTerm -> OutputPattern 'SpecificationP
 
 data PatternType = SpecificationP | TraceP
 
@@ -40,7 +44,7 @@ evalPattern :: Map Varname [Integer] -> OutputPattern t -> OutputPattern 'TraceP
 evalPattern _ Wildcard = Wildcard
 evalPattern _ (Text s) = Text s
 evalPattern e (Sequence x y) = evalPattern e x <> evalPattern e y
-evalPattern e (Value t) = Text . show $ eval t e
+evalPattern e (Value t) = Text . show @Integer $ eval t e
 
 printPattern :: OutputPattern 'TraceP -> String
 printPattern Wildcard = "_"

@@ -2,7 +2,7 @@
 module Example where
 import Prelude hiding
   (putChar,putStr,putStrLn,print,getChar,getLine,readLn
-  ,until)
+  ,until, all)
 
 
 import Specification
@@ -10,6 +10,7 @@ import MonadTeletype
 import Term
 import ValueSet
 import OutputPattern
+import OutputTerm
 
 --example specifications
 
@@ -18,8 +19,8 @@ example1 =
   readInput "x" ints AssumeValid <>
   readInput "y" nats AssumeValid <>
   branch (Current "x" :>: Current "y")
-    (writeOutput [Wildcard <> Value (Current "x" :+: Current "y") <> Wildcard , Value (Current "x" :-: Current "y") <> Wildcard] )
-    (writeOutput [Wildcard <> Text "Result: " <> Value (Current "x" :*: Current "y")] )
+    (writeOutput [Wildcard <> Value (current "x" +# current "y") <> Wildcard , Value (current "x" -# current "y") <> Wildcard] )
+    (writeOutput [Wildcard <> Text "Result: " <> Value (current "x" *# current "y")] )
 
 example2 :: Specification
 example2 =
@@ -27,14 +28,14 @@ example2 =
   until (Length (All "x") :==: Current "n")
     -- (writeOptionalOutput [Value $ Current "n" :-: Length (All "x")] <> readInput "x" ints AssumeValid) <>
     (readInput "x" ints AssumeValid) <>
-  writeOutput [Value $ Sum $ All "x"]
+  writeOutput [Value $ sum' $ all "x"]
 
 example3 :: Specification
 example3 =
   readInput "n" nats AssumeValid <>
   until (Sum (All "x") :>: Current "n")
     (readInput "x" ints AssumeValid) <>
-  writeOutput [Value $ Length $ All "x"]
+  writeOutput [Value $ length' $ all "x"]
 
 -- atempt at 'breaking' the solver
 example4 :: Specification
@@ -126,7 +127,7 @@ addSpec :: Specification
 addSpec =
   readInput "x" nats AssumeValid <>
   readInput "y" nats AssumeValid <>
-  writeOutput [Value $ Current "x" :+: Current "y"]
+  writeOutput [Value $ current "x" +# current "y"]
 
 nonsense :: MonadTeletype m => m ()
 nonsense = do

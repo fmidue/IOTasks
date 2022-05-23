@@ -31,6 +31,7 @@ library
       IOrep
       MonadTeletype
       OutputPattern
+      OutputTerm
       Specification
       Term
       Testing
@@ -47,6 +48,7 @@ library
       QuickCheck
     , base >=4.7 && <5
     , containers
+    , express
     , monad-loops
     , mtl
     , parsec
@@ -65,6 +67,7 @@ test-suite mini-IOTasks-test
       QuickCheck
     , base >=4.7 && <5
     , containers
+    , express
     , hspec
     , mini-IOTasks
     , monad-loops

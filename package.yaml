@@ -27,6 +27,7 @@ dependencies:
 - parsec
 - mtl
 - monad-loops
+- express
 
 ghc-options:
 - -Wall
