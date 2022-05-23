@@ -103,7 +103,7 @@ isSuccess Success{} = True
 isSuccess _ = False
 
 data PathOutcome = PathSuccess | PathTimeout | PathFailure Inputs ExpectedRun ActualRun MatchResult
-  deriving Eq
+  deriving (Eq,Show)
 
 instance Show Outcome where
   show (Success n) = "Success " ++ show n
