@@ -1,23 +1,23 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE LambdaCase #-}
-module Testing.Random where
+module IOTasks.Random.Testing where
 
-import Testing hiding (taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args, stdArgs)
+import IOTasks.Testing hiding (taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args, stdArgs)
 
 import Data.Map as Map hiding (foldr)
 import Data.Set as Set hiding (foldr)
 import Data.Functor (void)
 import Control.Monad (when)
 
-import IOrep (IOrep, runProgram)
-import Specification
-import Trace
-import Term
-import OutputPattern
+import IOTasks.IOrep (IOrep, runProgram)
+import IOTasks.Specification
+import IOTasks.Trace
+import IOTasks.Term
+import IOTasks.OutputPattern
+import IOTasks.ValueSet
 
 import Test.QuickCheck (Gen, vectorOf, generate, frequency)
-import ValueSet
 
 taskCheck :: IOrep () -> Specification -> IO ()
 taskCheck = taskCheckWith stdArgs

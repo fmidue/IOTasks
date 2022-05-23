@@ -1,12 +1,12 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
-module Testing where
+module IOTasks.Testing where
 
-import IOrep (IOrep, Line, runProgram)
-import Specification
-import Constraints
-import Trace
-import Z3
+import IOTasks.IOrep (IOrep, Line, runProgram)
+import IOTasks.Specification
+import IOTasks.Constraints
+import IOTasks.Trace
+import IOTasks.Z3
 
 import Control.Monad (when, forM, replicateM)
 import Data.Maybe (catMaybes)

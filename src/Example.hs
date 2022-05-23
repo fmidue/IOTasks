@@ -5,12 +5,7 @@ import Prelude hiding
   ,until, all)
 
 
-import Specification
-import MonadTeletype
-import Term
-import ValueSet
-import OutputPattern
-import OutputTerm
+import IOTasks
 
 --example specifications
 

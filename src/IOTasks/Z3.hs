@@ -1,9 +1,10 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE GADTs #-}
-module Z3 where
+module IOTasks.Z3 where
 
-import Constraints
-import ValueSet
+import IOTasks.Constraints
+import IOTasks.ValueSet
+import IOTasks.Term
 
 import Z3.Monad
 
@@ -11,7 +12,6 @@ import Test.QuickCheck (generate)
 import Control.Monad (forM, forM_)
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe (catMaybes, fromMaybe, isJust)
-import Term
 import Data.Map (Map)
 import qualified Data.Map as Map
 

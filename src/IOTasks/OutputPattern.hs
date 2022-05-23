@@ -3,12 +3,12 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
-module OutputPattern where
+module IOTasks.OutputPattern where
 
 import Prelude hiding (all)
 
-import Term (Varname)
-import OutputTerm
+import IOTasks.Term (Varname)
+import IOTasks.OutputTerm
 
 import Data.Either (isRight)
 import Data.Map (Map)

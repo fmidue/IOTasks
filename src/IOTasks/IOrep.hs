@@ -1,14 +1,14 @@
 {-# LANGUAGE DeriveFunctor #-}
-module IOrep where
+module IOTasks.IOrep where
 import Prelude hiding (putChar,putStr,putStrLn,print,getChar,getLine,readLn)
 
 import Data.Set (singleton)
 
 import Control.Monad (ap, (>=>))
 
-import Trace
-import OutputPattern
-import MonadTeletype
+import IOTasks.Trace
+import IOTasks.OutputPattern
+import IOTasks.MonadTeletype
 
 data IOrep a
   = GetChar (Char -> IOrep a)

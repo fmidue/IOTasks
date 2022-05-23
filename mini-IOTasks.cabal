@@ -25,20 +25,22 @@ source-repository head
 
 library
   exposed-modules:
-      Constraints
       Example
-      Interpreter
-      IOrep
-      MonadTeletype
-      OutputPattern
-      OutputTerm
-      Specification
-      Term
-      Testing
-      Testing.Random
-      Trace
-      ValueSet
-      Z3
+      IOTasks
+      IOTasks.Constraints
+      IOTasks.Interpreter
+      IOTasks.IOrep
+      IOTasks.MonadTeletype
+      IOTasks.OutputPattern
+      IOTasks.OutputTerm
+      IOTasks.Random
+      IOTasks.Random.Testing
+      IOTasks.Specification
+      IOTasks.Term
+      IOTasks.Testing
+      IOTasks.Trace
+      IOTasks.ValueSet
+      IOTasks.Z3
   other-modules:
       Paths_mini_IOTasks
   hs-source-dirs:

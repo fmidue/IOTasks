@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
-module Trace where
+module IOTasks.Trace where
 
-import OutputPattern
+import IOTasks.OutputPattern
 
 import Data.Set (Set)
 import qualified Data.Set as Set

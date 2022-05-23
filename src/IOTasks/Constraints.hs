@@ -1,10 +1,10 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE GADTs #-}
-module Constraints where
+module IOTasks.Constraints where
 
-import ValueSet
-import Term
-import Specification
+import IOTasks.ValueSet
+import IOTasks.Term
+import IOTasks.Specification
 
 import Data.List (partition,intercalate)
 import Data.Maybe (fromMaybe)

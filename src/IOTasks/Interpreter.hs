@@ -1,5 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
-module Interpreter where
+module IOTasks.Interpreter where
 
 import Prelude hiding (readLn,putStrLn)
 
@@ -9,12 +9,12 @@ import Control.Monad.Loops (iterateUntil)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import Specification
-import MonadTeletype
-import Term
-import ValueSet
-import Trace
-import OutputPattern
+import IOTasks.Specification
+import IOTasks.MonadTeletype
+import IOTasks.Term
+import IOTasks.ValueSet
+import IOTasks.Trace
+import IOTasks.OutputPattern
 
 interpret :: MonadTeletype m => Specification -> [m ()]
 interpret s = do

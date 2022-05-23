@@ -1,12 +1,11 @@
 {-# LANGUAGE DataKinds #-}
 import Test.Hspec
 
-import OutputPattern
+import IOTasks
 
-import Testing
-import qualified Testing.Random as Random
+import IOTasks.Testing
+import qualified IOTasks.Random.Testing as Random
 import Example
-import Interpreter
 
 import Test.Hspec.QuickCheck
 import Test.QuickCheck hiding (Success, stdArgs,isSuccess)

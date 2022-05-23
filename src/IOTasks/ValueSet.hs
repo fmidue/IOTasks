@@ -1,4 +1,4 @@
-module ValueSet where
+module IOTasks.ValueSet where
 
 import Data.List (intersect, union)
 

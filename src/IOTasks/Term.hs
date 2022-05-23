@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE StandaloneDeriving #-}
-module Term where
+module IOTasks.Term where
 
 import Data.Maybe (fromMaybe)
 import Data.Map (Map)

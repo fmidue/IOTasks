@@ -3,12 +3,12 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
-module Specification where
+module IOTasks.Specification where
 
-import ValueSet
-import Term
-import Trace
-import OutputPattern
+import IOTasks.ValueSet
+import IOTasks.Term
+import IOTasks.Trace
+import IOTasks.OutputPattern
 
 import Data.Set (Set)
 import qualified Data.Set as Set

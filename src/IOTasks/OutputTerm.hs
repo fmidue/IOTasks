@@ -1,4 +1,4 @@
-module OutputTerm
+module IOTasks.OutputTerm
   ( OutputTerm
   , current, all
   , eval
@@ -9,7 +9,7 @@ module OutputTerm
 
 import Prelude hiding (all)
 
-import Term (Varname)
+import IOTasks.Term (Varname)
 
 import Data.Express (Expr((:$)), var, val, value, (//-), evl)
 import Data.Map (Map,toList)
