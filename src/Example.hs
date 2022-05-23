@@ -26,8 +26,8 @@ example2 :: Specification
 example2 =
   readInput "n" nats AssumeValid <>
   until (Length (All "x") :==: Current "n")
-    -- (writeOptionalOutput [Value $ Current "n" :-: Length (All "x")] <> readInput "x" ints AssumeValid) <>
-    (readInput "x" ints AssumeValid) <>
+    ((writeOptionalOutput [Value $ current "n" -# length' (all "x")] <> readInput "x" ints AssumeValid) <>
+    readInput "x" ints AssumeValid) <>
   writeOutput [Value $ sum' $ all "x"]
 
 example3 :: Specification
