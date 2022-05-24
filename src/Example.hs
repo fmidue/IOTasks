@@ -75,7 +75,7 @@ prog2' = do
       | otherwise = do
         i <- readLn
         loop (m+1) (x+1+i)
-  loop 0 0
+  loop 1 0
 
 prog3 :: MonadTeletype m => m ()
 prog3 = do

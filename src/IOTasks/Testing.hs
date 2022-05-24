@@ -27,6 +27,7 @@ data Args
   , maxSuccessPerPath :: Int -- number of tests generated per path
   , maxNegative :: Int -- maximum number of negative inputs per path
   , verbose :: Bool -- print extra information
+  , simplifyFeedback :: Bool -- cleanup feedback for educational use
   }
 
 stdArgs :: Args
@@ -38,6 +39,7 @@ stdArgs = Args
   , maxSuccessPerPath = 5
   , maxNegative = 5
   , verbose = True
+  , simplifyFeedback = False
   }
 
 taskCheckWith :: Args -> IOrep () -> Specification -> IO ()
@@ -57,7 +59,7 @@ taskCheckWithOutcome Args{..} prog spec = do
     when (timeouts > 0) $
       putStrLn $ unwords ["---",show timeouts, "paths timed out"]
   --
-  print $ pPrintOutcome out
+  print $ (if simplifyFeedback then pPrintOutcomeSimple else pPrintOutcome) out
   pure out
 
   where
@@ -96,7 +98,7 @@ type ExpectedRun = Trace
 type ActualRun = Trace
 
 data Outcome = Success Int | Failure Inputs ExpectedRun ActualRun MatchResult | GaveUp
-  deriving Eq
+  deriving (Eq, Show)
 
 isSuccess :: Outcome -> Bool
 isSuccess Success{} = True
@@ -105,22 +107,23 @@ isSuccess _ = False
 data PathOutcome = PathSuccess | PathTimeout | PathFailure Inputs ExpectedRun ActualRun MatchResult
   deriving (Eq,Show)
 
-instance Show Outcome where
-  show (Success n) = "Success " ++ show n
-  show (Failure is et at r) = unlines ["Failure","  "++show is, "  "++show et,"  "++show at,"  "++show r]
-  show GaveUp = "GaveUp"
-
 pPrintOutcome :: Outcome -> Doc
-pPrintOutcome (Success n) = text $ unwords ["+++ OK, passed",show n,"tests."]
-pPrintOutcome (Failure is et at r) = vcat
+pPrintOutcome = pPrintOutcome' False
+
+pPrintOutcomeSimple :: Outcome -> Doc
+pPrintOutcomeSimple = pPrintOutcome' True
+
+pPrintOutcome' :: Bool -> Outcome -> Doc
+pPrintOutcome' _ (Success n) = text $ unwords ["+++ OK, passed",show n,"tests."]
+pPrintOutcome' simple (Failure is et at r) = vcat
   [ text "*** Failure"
   , text ("Input sequence "++ pPrintInputs is)
   , text ("Expected run (generalized): " ++ pPrintTrace et)
   , text ("Actual run: " ++ pPrintTrace at)
   , text "Error:"
-  , nest 2 (pPrintMatchResult r)
+  , nest 2 (if simple then pPrintMatchResultSimple r else pPrintMatchResult r)
   ]
-pPrintOutcome GaveUp = text "*** Gave up!"
+pPrintOutcome' _ GaveUp = text "*** Gave up!"
 
 pPrintInputs :: Inputs -> String
 pPrintInputs = unwords . map ('?':)

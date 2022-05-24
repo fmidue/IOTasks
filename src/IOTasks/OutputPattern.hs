@@ -51,6 +51,12 @@ printPattern Wildcard = "_"
 printPattern (Text s) = foldr showLitChar "" s
 printPattern (Sequence x y) = printPattern x ++ printPattern y
 
+printPatternSimple :: OutputPattern 'TraceP -> String
+printPatternSimple p =
+  case reverse $ printPattern p of
+  ('n':'\\':s) -> reverse s
+  s -> reverse s
+
 (>:) :: OutputPattern 'TraceP -> OutputPattern 'TraceP -> Bool
 p >: q = isRight $ parse (patternParser p) "" $ printPattern q
 

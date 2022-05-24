@@ -1,4 +1,6 @@
 {-# LANGUAGE DataKinds #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Move brackets to avoid $" #-}
 module IOTasks.Trace where
 
 import IOTasks.OutputPattern
@@ -41,10 +43,10 @@ instance Semigroup Trace where
 
 data MatchResult
   = MatchSuccessfull
-  | InputMismatch Doc
-  | OutputMismatch Doc
-  | AlignmentMismatch Doc
-  | TerminationMismatch Doc
+  | InputMismatch Trace Trace
+  | OutputMismatch Trace Trace
+  | AlignmentMismatch Trace Trace
+  | TerminationMismatch Trace Trace
   deriving (Show, Eq)
 
 instance Semigroup MatchResult where
@@ -55,58 +57,69 @@ instance Semigroup MatchResult where
 covers :: Trace -> Trace -> MatchResult
 covers s@(ProgRead i t1) t@(ProgRead j t2)
   | i == j = t1 `covers` t2
-  | otherwise = InputMismatch $ reportMismatch s t
+  | otherwise = InputMismatch s t
 
 covers s@(ProgWrite Mandatory is t1) t@(ProgWrite Mandatory js t2)
   | all (\j -> any (>: j) is) js = t1 `covers` t2
-  | otherwise = OutputMismatch $ reportOutputMismatch s t
+  | otherwise = OutputMismatch s t
 
 covers (ProgWrite Optional is t1) t = ProgWrite Mandatory is t1 `covers` t <> t1 `covers` t
 covers s (ProgWrite Optional is t2) = s `covers` ProgWrite Mandatory is t2 <> s `covers` t2
 
 covers Terminate Terminate = MatchSuccessfull
-covers s@Terminate t = TerminationMismatch $ reportMismatch s t
+covers s@Terminate t = TerminationMismatch s t
 
 covers OutOfInputs OutOfInputs = MatchSuccessfull
 
-covers s t = AlignmentMismatch $ reportMismatch s t
+covers s t = AlignmentMismatch s t
 
-reportMismatch :: Trace -> Trace -> Doc
-reportMismatch s t = vcat
+pPrintMatchResult :: MatchResult -> Doc
+pPrintMatchResult = pPrintMatchResult' False
+
+pPrintMatchResultSimple :: MatchResult -> Doc
+pPrintMatchResultSimple = pPrintMatchResult' True
+
+pPrintMatchResult' :: Bool -> MatchResult -> Doc
+pPrintMatchResult' _ MatchSuccessfull = text "MatchSuccessfull"
+pPrintMatchResult' simple (InputMismatch s t) = text "InputMismatch:" $$ nest 2 (reportMismatch simple s t)
+pPrintMatchResult' simple (OutputMismatch s t) = text "OutputMismatch:" $$ nest 2 (reportOutputMismatch simple s t)
+pPrintMatchResult' simple (AlignmentMismatch s t) = text "AlignmentMismatch:" $$ nest 2 (reportMismatch simple s t)
+pPrintMatchResult' simple (TerminationMismatch s t) = text "TerminationMismatch:" $$ nest 2 (reportMismatch simple s t)
+
+
+reportMismatch :: Bool -> Trace -> Trace -> Doc
+reportMismatch simple s t = vcat
   [ text "Expected:"
-  , nest 2 (showTraceHead s)
+  , nest 2 (showTraceHead simple s)
   , text "Got:"
-  , nest 2 (showTraceHead t)
+  , nest 2 (showTraceHead simple t)
   ]
 
-reportOutputMismatch :: Trace -> Trace -> Doc
-reportOutputMismatch s t = showTraceHead t <+> text "is not covered by" <+> showTraceHead s
+reportOutputMismatch :: Bool -> Trace -> Trace -> Doc
+reportOutputMismatch simple s t = showTraceHead simple t <+> text "is not covered by" <+> showTraceHead simple s
 
-showTraceHead :: Trace -> Doc
-showTraceHead = text . showTraceHead' (const "")
+showTraceHead :: Bool -> Trace -> Doc
+showTraceHead simple = text . showTraceHead' simple (const "")
 
 pPrintTrace :: Trace -> String
-pPrintTrace = fix showTraceHead'
+pPrintTrace = fix (showTraceHead' True)
 
-showTraceHead' :: (Trace -> String) -> Trace -> String
-showTraceHead' f (ProgRead x (ProgRead '\n' t)) = "?"++ [x] ++ "\\n" ++ addSpace (showTraceHead' f t)
-showTraceHead' f (ProgRead x (ProgRead c t)) = "?"++ x : tail (showTraceHead' f (ProgRead c t))
-showTraceHead' f (ProgRead x t') = "?"++[x] ++ addSpace (f t')
-showTraceHead' f (ProgWrite Optional ts t') = "(!["++ intercalate "," (printPattern <$> Set.toList ts) ++ "])" ++ addSpace (f t')
-showTraceHead' f (ProgWrite Mandatory ts t') = "!["++ intercalate "," (printPattern <$> Set.toList ts) ++ "]" ++ addSpace (f t')
-showTraceHead' _ Terminate = "stop"
-showTraceHead' _ OutOfInputs = "?<unknown input>"
+showTraceHead' :: Bool -> (Trace -> String) -> Trace -> String
+showTraceHead' simple f (ProgRead x (ProgRead '\n' t)) = "?"++ [x] ++ (if simple then "" else "\\n") ++ addSpace (f t)
+showTraceHead' simple f (ProgRead x (ProgRead c t)) = "?"++ x : tail (showTraceHead' simple f (ProgRead c t))
+showTraceHead' _ f (ProgRead x t') = "?"++[x] ++ addSpace (f t')
+showTraceHead' simple f (ProgWrite Optional ts t')
+  | simple = addSpace (f t') -- omit optional outputs in simplified version
+  | otherwise  = "(!["++ intercalate "," (printPattern <$> Set.toList ts) ++ "])" ++ addSpace (f t')
+showTraceHead' simple f (ProgWrite Mandatory ts t')
+  | simple = "!"++ (head $ printPatternSimple <$> Set.toList ts) ++ addSpace (f t')
+  | otherwise = "!["++ intercalate "," (printPattern <$> Set.toList ts) ++ "]" ++ addSpace (f t')
+showTraceHead' _ _ Terminate = "stop"
+showTraceHead' _ _ OutOfInputs = "?<unknown input>"
 
 addSpace :: String -> String
 addSpace "" = ""
 addSpace s = ' ':s
-
-pPrintMatchResult :: MatchResult -> Doc
-pPrintMatchResult MatchSuccessfull = text "MatchSuccessfull"
-pPrintMatchResult (InputMismatch s) = text "InputMismatch:" $$ nest 2 s
-pPrintMatchResult (OutputMismatch s) = text "OutputMismatch:" $$ nest 2 s
-pPrintMatchResult (AlignmentMismatch s) = text "AlignmentMismatch:" $$ nest 2 s
-pPrintMatchResult (TerminationMismatch s) = text "TerminationMismatch:" $$ nest 2 s
 
 isTerminating :: Trace -> Bool
 isTerminating (ProgRead _ t) = isTerminating t

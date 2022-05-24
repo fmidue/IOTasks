@@ -8,7 +8,6 @@ import IOTasks.Testing hiding (taskCheck, taskCheckWith, taskCheckOutcome, taskC
 import Data.Map as Map hiding (foldr)
 import Data.Set as Set hiding (foldr)
 import Data.Functor (void)
-import Control.Monad (when)
 
 import IOTasks.IOrep (IOrep, runProgram)
 import IOTasks.Specification
@@ -29,6 +28,7 @@ data Args
   , maxSuccess :: Int
   , maxNegative :: Int
   , verbose :: Bool
+  , simplifyFeedback :: Bool
   }
 
 stdArgs :: Args
@@ -38,6 +38,7 @@ stdArgs = Args
   , maxSuccess = 100
   , maxNegative = 5
   , verbose = True
+  , simplifyFeedback = False
   }
 
 taskCheckWith :: Args -> IOrep () -> Specification -> IO ()
@@ -49,8 +50,8 @@ taskCheckOutcome = taskCheckWithOutcome stdArgs
 taskCheckWithOutcome :: Args -> IOrep () -> Specification -> IO Outcome
 taskCheckWithOutcome Args{..} prog spec  = do
   is <- generate $ vectorOf maxSuccess $ genInput spec maxPathDepth valueSize maxNegative
-  let (outcome, n) = runTests prog spec is
-  when verbose $ putStrLn $ unwords ["passed", show n,"tests"]
+  let outcome = runTests prog spec is
+  print $ (if simplifyFeedback then pPrintOutcomeSimple else pPrintOutcome) outcome
   pure outcome
 
 genInput :: Specification -> Int -> Integer -> Int -> Gen Inputs
@@ -84,13 +85,13 @@ genTrace spec depth bound maxNeg =
     (Map.fromList ((,[]) <$> vars spec),depth,0)
     spec
 
-runTests :: IOrep () -> Specification -> [Inputs] -> (Outcome,Int)
+runTests :: IOrep () -> Specification -> [Inputs] -> Outcome
 runTests = go 0 where
-  go n _ _ [] = (Success n,n)
+  go n _ _ [] = Success n
   go n prog spec (i:is) =
     let
       specTrace = runSpecification i spec
       progTrace = runProgram i prog
     in case specTrace `covers` progTrace of
       MatchSuccessfull -> go (n+1) prog spec is
-      failure -> (Failure i specTrace progTrace failure,n)
+      failure -> Failure i specTrace progTrace failure
