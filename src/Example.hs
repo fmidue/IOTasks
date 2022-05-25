@@ -61,7 +61,7 @@ prog2 = do
       let
         loop 0 x = print @_ @Integer x
         loop m x = do
-          -- putChar m
+          print m
           i <- readLn
           loop (m-1) (x+i)
       in loop n 0

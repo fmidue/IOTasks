@@ -45,14 +45,19 @@ data MatchResult
   = MatchSuccessfull
   | InputMismatch Trace Trace
   | OutputMismatch Trace Trace
-  | AlignmentMismatch Trace Trace
-  | TerminationMismatch Trace Trace
+  | AlignmentMismatch Trace (Maybe Trace) Trace
+  | TerminationMismatch Trace (Maybe Trace) Trace
   deriving (Show, Eq)
 
 instance Semigroup MatchResult where
   MatchSuccessfull <> _ = MatchSuccessfull
   _ <> MatchSuccessfull = MatchSuccessfull
   _ <> r = r
+
+addExpect :: Trace -> MatchResult -> MatchResult
+addExpect s' (AlignmentMismatch t _ s) = AlignmentMismatch t (Just s') s
+addExpect s' (TerminationMismatch t _ s) = TerminationMismatch t (Just s') s
+addExpect _ r = r
 
 covers :: Trace -> Trace -> MatchResult
 covers s@(ProgRead i t1) t@(ProgRead j t2)
@@ -63,15 +68,15 @@ covers s@(ProgWrite Mandatory is t1) t@(ProgWrite Mandatory js t2)
   | all (\j -> any (>: j) is) js = t1 `covers` t2
   | otherwise = OutputMismatch s t
 
-covers (ProgWrite Optional is t1) t = ProgWrite Mandatory is t1 `covers` t <> t1 `covers` t
-covers s (ProgWrite Optional is t2) = s `covers` ProgWrite Mandatory is t2 <> s `covers` t2
+covers s@(ProgWrite Optional is t1) t = ProgWrite Mandatory is t1 `covers` t <> addExpect s (t1 `covers` t)
+covers s t@(ProgWrite Optional _ _) = OutputMismatch s t
 
 covers Terminate Terminate = MatchSuccessfull
-covers s@Terminate t = TerminationMismatch s t
+covers s@Terminate t = TerminationMismatch s Nothing t
 
 covers OutOfInputs OutOfInputs = MatchSuccessfull
 
-covers s t = AlignmentMismatch s t
+covers s t = AlignmentMismatch s Nothing t
 
 pPrintMatchResult :: MatchResult -> Doc
 pPrintMatchResult = pPrintMatchResult' False
@@ -81,16 +86,16 @@ pPrintMatchResultSimple = pPrintMatchResult' True
 
 pPrintMatchResult' :: Bool -> MatchResult -> Doc
 pPrintMatchResult' _ MatchSuccessfull = text "MatchSuccessfull"
-pPrintMatchResult' simple (InputMismatch s t) = text "InputMismatch:" $$ nest 2 (reportMismatch simple s t)
+pPrintMatchResult' simple (InputMismatch s t) = text "InputMismatch:" $$ nest 2 (reportMismatch simple s Nothing t)
 pPrintMatchResult' simple (OutputMismatch s t) = text "OutputMismatch:" $$ nest 2 (reportOutputMismatch simple s t)
-pPrintMatchResult' simple (AlignmentMismatch s t) = text "AlignmentMismatch:" $$ nest 2 (reportMismatch simple s t)
-pPrintMatchResult' simple (TerminationMismatch s t) = text "TerminationMismatch:" $$ nest 2 (reportMismatch simple s t)
+pPrintMatchResult' simple (AlignmentMismatch s s' t) = text "AlignmentMismatch:" $$ nest 2 (reportMismatch simple s s' t)
+pPrintMatchResult' simple (TerminationMismatch s s' t) = text "TerminationMismatch:" $$ nest 2 (reportMismatch simple s s' t)
 
 
-reportMismatch :: Bool -> Trace -> Trace -> Doc
-reportMismatch simple s t = vcat
+reportMismatch :: Bool -> Trace -> Maybe Trace -> Trace -> Doc
+reportMismatch simple s s' t = vcat
   [ text "Expected:"
-  , nest 2 (showTraceHead simple s)
+  , nest 2 (maybe mempty ((<+> text "or") . showTraceHead simple) s' <+> showTraceHead simple s)
   , text "Got:"
   , nest 2 (showTraceHead simple t)
   ]
@@ -102,18 +107,21 @@ showTraceHead :: Bool -> Trace -> Doc
 showTraceHead simple = text . showTraceHead' simple (const "")
 
 pPrintTrace :: Trace -> String
-pPrintTrace = fix (showTraceHead' True)
+pPrintTrace = fix (showTraceHead' False)
+
+pPrintTraceSimple :: Trace -> String
+pPrintTraceSimple = fix (showTraceHead' True)
 
 showTraceHead' :: Bool -> (Trace -> String) -> Trace -> String
 showTraceHead' simple f (ProgRead x (ProgRead '\n' t)) = "?"++ [x] ++ (if simple then "" else "\\n") ++ addSpace (f t)
 showTraceHead' simple f (ProgRead x (ProgRead c t)) = "?"++ x : tail (showTraceHead' simple f (ProgRead c t))
 showTraceHead' _ f (ProgRead x t') = "?"++[x] ++ addSpace (f t')
 showTraceHead' simple f (ProgWrite Optional ts t')
-  | simple = addSpace (f t') -- omit optional outputs in simplified version
-  | otherwise  = "(!["++ intercalate "," (printPattern <$> Set.toList ts) ++ "])" ++ addSpace (f t')
+  | simple = "(!"++ (head $ printPatternSimple <$> Set.toList ts) ++ ")" ++ addSpace (f t') -- omit optional outputs in simplified version
+  | otherwise  = "(!{"++ intercalate "," (printPattern <$> Set.toList ts) ++ "})" ++ addSpace (f t')
 showTraceHead' simple f (ProgWrite Mandatory ts t')
   | simple = "!"++ (head $ printPatternSimple <$> Set.toList ts) ++ addSpace (f t')
-  | otherwise = "!["++ intercalate "," (printPattern <$> Set.toList ts) ++ "]" ++ addSpace (f t')
+  | otherwise = "!{"++ intercalate "," (printPattern <$> Set.toList ts) ++ "}" ++ addSpace (f t')
 showTraceHead' _ _ Terminate = "stop"
 showTraceHead' _ _ OutOfInputs = "?<unknown input>"
 

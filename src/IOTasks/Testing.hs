@@ -115,15 +115,19 @@ pPrintOutcomeSimple = pPrintOutcome' True
 
 pPrintOutcome' :: Bool -> Outcome -> Doc
 pPrintOutcome' _ (Success n) = text $ unwords ["+++ OK, passed",show n,"tests."]
+pPrintOutcome' _ GaveUp = text "*** Gave up!"
 pPrintOutcome' simple (Failure is et at r) = vcat
   [ text "*** Failure"
   , text ("Input sequence "++ pPrintInputs is)
-  , text ("Expected run (generalized): " ++ pPrintTrace et)
-  , text ("Actual run: " ++ pPrintTrace at)
+  , text ("Expected run: " ++ printTrace et)
+  , text ("Actual run: " ++ printTrace at)
   , text "Error:"
-  , nest 2 (if simple then pPrintMatchResultSimple r else pPrintMatchResult r)
+  , nest 2 (printResult r)
   ]
-pPrintOutcome' _ GaveUp = text "*** Gave up!"
+  where
+    (printResult, printTrace)
+      | simple = (pPrintMatchResultSimple,pPrintTraceSimple)
+      | otherwise = (pPrintMatchResult,pPrintTrace)
 
 pPrintInputs :: Inputs -> String
 pPrintInputs = unwords . map ('?':)
