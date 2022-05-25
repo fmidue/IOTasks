@@ -36,7 +36,7 @@ instance Semigroup Specification where
   E <> _ = E
 
 instance Monoid Specification where
-  mempty = Nop
+  mempty = nop
 
 readInput :: Varname -> ValueSet -> InputMode -> Specification
 readInput x vs m = ReadInput x vs m nop
@@ -56,8 +56,14 @@ branch c t e = Branch c t e nop
 nop :: Specification
 nop = Nop
 
+tillExit :: Specification -> Specification
+tillExit bdy = TillE bdy nop
+
+exit :: Specification
+exit = E
+
 until :: Term Bool -> Specification -> Specification
-until c bdy = TillE (branch c E bdy) nop
+until c bdy = TillE (branch c exit bdy) nop
 
 vars :: Specification -> [Varname]
 vars = nub . go where
