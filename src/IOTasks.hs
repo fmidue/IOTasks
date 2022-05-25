@@ -9,7 +9,7 @@ module IOTasks
   , ValueSet(..)
   , OutputPattern(..), PatternType(..)
   , OutputTerm, current, all, (+#), (-#), (*#), length', sum'
-  , taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs
+  , taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs, Outcome(..)
   , generateStaticTestSuite, taskCheckOn
   , interpret
   ) where
