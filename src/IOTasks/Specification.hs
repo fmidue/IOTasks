@@ -65,6 +65,9 @@ exit = E
 until :: Term Bool -> Specification -> Specification
 until c bdy = TillE (branch c exit bdy) nop
 
+while :: Term Bool -> Specification -> Specification
+while c bdy = TillE (branch c bdy exit) nop
+
 vars :: Specification -> [Varname]
 vars = nub . go where
   go (ReadInput x _ _ s') = x : go s'
