@@ -83,8 +83,8 @@ runSpecification inputs spec =
     (\(e,ins) x vs mode ->
       case ins of
         [] -> NoRec
-        (i:is)
-          | vs `containsValue` read i -> RecSub i (Map.update (\xs -> Just $ read i:xs) x e,is)
+        ((i,n):is)
+          | vs `containsValue` read i -> RecSub i (Map.update (\xs -> Just $ (read i,n):xs) x e,is)
           | otherwise -> case mode of
               AssumeValid -> error "invalid value"
               UntilValid -> RecSame i (e,is)
@@ -101,7 +101,7 @@ runSpecification inputs spec =
     )
     (\(e,_) c l r -> if eval c e then l else r)
     Terminate
-    (Map.fromList ((,[]) <$> vars spec),inputs)
+    (Map.fromList ((,[]) <$> vars spec),inputs `zip` [1..])
     spec
 
 data RecStruct p a = NoRec | RecSub p a | RecSame p a | RecBoth p a a

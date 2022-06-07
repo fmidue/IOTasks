@@ -1,5 +1,6 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE TupleSections #-}
 module IOTasks.Z3 where
 
 import IOTasks.Constraints
@@ -14,6 +15,8 @@ import Control.Monad.IO.Class (liftIO)
 import Data.Maybe (catMaybes, fromMaybe, isJust)
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.List (intercalate)
+import Data.List.Extra (maximumOn)
 
 type Timeout = Int
 
@@ -71,10 +74,10 @@ z3Predicate (x :<=: y) e vars = binRec e vars mkLe x y
 z3Predicate (Not x) e vars = mkNot =<< z3Predicate x e vars
 z3Predicate (x :&&: y) e vars = binRec e vars (\a b -> mkAnd [a,b]) x y
 z3Predicate (x :||: y) e vars = binRec e vars (\a b -> mkOr [a,b]) x y
-z3Predicate (Length (All x)) e _ = mkIntNum $ fromMaybe 0 $ Map.lookup x e
-z3Predicate (Sum (All x)) e vars = let n = fromMaybe 0 $ Map.lookup x e in mkAdd [ xi | ((name,i),xi) <- vars, name == x, i <= n ]
-z3Predicate (Product (All x)) e vars = let n = fromMaybe 0 $ Map.lookup x e in mkMul [ xi | ((name,i),xi) <- vars, name == x, i <= n ]
-z3Predicate (Current x) e vars = pure $ fromMaybe (error $ "unknown variable " ++ x++ show e ++ show vars) $ Map.lookup x e >>= (\i -> lookup (x,i) vars)
+z3Predicate (Length (All x)) e _ = mkIntNum $ maybe 0 sum (mapM (`Map.lookup` e) (toVarList x))
+z3Predicate (Sum (All x)) e vars = let n name = fromMaybe 0 $ Map.lookup name e in mkAdd [ xi | ((name,i),xi) <- vars, name `elem` toVarList x, i <= n name ]
+z3Predicate (Product (All x)) e vars = let n name = fromMaybe 0 $ Map.lookup name e in mkMul [ xi | ((name,i),xi) <- vars, name `elem` toVarList x, i <= n name ]
+z3Predicate (Current x) e vars = pure $ fromMaybe (error $ "unknown variable(s) {" ++ intercalate "," (toVarList x) ++ "}" ++ show e ++ show vars) $ mapM (\v -> (v,) <$> Map.lookup v e) (toVarList x) >>= (\(var,i) -> lookup (var,i) vars) . maximumOn snd
 z3Predicate (All _x) _e _vars = error "generic list"
 z3Predicate (IntLit n) _ _ = mkIntNum n
 

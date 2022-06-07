@@ -1,11 +1,15 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PartialTypeSignatures #-}
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE FlexibleInstances #-}
 module IOTasks.Term where
 
 import Data.Maybe (fromMaybe)
 import Data.Map (Map)
 import qualified Data.Map as Map (lookup)
+import Data.List (sortBy, intercalate)
+import Data.Function (on)
+import Data.List.Extra (maximumOn)
 
 type Varname = String
 
@@ -24,15 +28,24 @@ data Term a where
   Length :: Term [Integer] -> Term Integer
   Sum :: Term [Integer] -> Term Integer
   Product :: Term [Integer] -> Term Integer
-  Current :: Varname -> Term Integer
-  All :: Varname -> Term [Integer]
+  Current :: VarExp a => a -> Term Integer
+  All :: VarExp a => a -> Term [Integer]
   IntLit :: Integer -> Term Integer
 
-deriving instance Eq (Term a)
-deriving instance Ord (Term a)
-deriving instance Show (Term a)
+class VarExp a where
+  toVarList :: a -> [Varname]
 
-eval :: Term a -> Map Varname [Integer] -> a
+instance VarExp Varname where
+  toVarList = pure
+
+instance VarExp [Varname] where
+  toVarList = id
+
+-- deriving instance Eq (Term a)
+-- deriving instance Ord (Term a)
+-- deriving instance Show (Term a)
+
+eval :: Term a -> Map Varname [(Integer,Int)] -> a
 eval (x :+: y) e = eval x e + eval y e
 eval (x :-: y) e = eval x e - eval y e
 eval (x :*: y) e = eval x e * eval y e
@@ -47,8 +60,8 @@ eval (x :||: y) e = eval x e || eval y e
 eval (Length xs) e = fromIntegral . length $ eval xs e
 eval (Sum xs) e = fromIntegral . sum $ eval xs e
 eval (Product xs) e = fromIntegral . product $ eval xs e
-eval (Current x) e = fromMaybe (error $ "empty list for " ++ x) $ safeHead $ eval (All x) e
-eval (All x) e = fromMaybe [] $ Map.lookup x e
+eval (Current x) e = fromMaybe (error $ "empty list for {" ++ intercalate "," (toVarList x) ++ "}") $ safeHead $ eval (All x) e
+eval (All x) e = maybe [] (map fst . sortBy (flip compare `on` snd) . concat) (mapM (`Map.lookup` e) (toVarList x))
 eval (IntLit n) _ = n
 
 safeHead :: [a] -> Maybe a
@@ -70,6 +83,6 @@ printIndexedTerm (tx :||: ty) m = concat ["(",printIndexedTerm tx m, ") || (", p
 printIndexedTerm (Length t) m = concat ["length (", printIndexedTerm t m, ")"]
 printIndexedTerm (Sum t) m = concat ["sum (", printIndexedTerm t m, ")"]
 printIndexedTerm (Product t) m = concat ["product (", printIndexedTerm t m, ")"]
-printIndexedTerm (Current x) m = concat [x,"_",show $ fromMaybe 0 $ Map.lookup x m]
-printIndexedTerm (All x) _ = x++"_A"
+printIndexedTerm (Current x) m = maybe ("{" ++ intercalate "," (toVarList x) ++ "}_C") ((\(x,i) -> x ++ "_" ++ show i) . maximumOn snd) $ mapM (\x -> (x,) <$> Map.lookup x m) (toVarList x)
+printIndexedTerm (All x) _ = "{" ++ intercalate "," (toVarList x) ++ "}_A"
 printIndexedTerm (IntLit x) _ = show x

@@ -52,7 +52,7 @@ data MatchResult
 instance Semigroup MatchResult where
   MatchSuccessfull <> _ = MatchSuccessfull
   _ <> MatchSuccessfull = MatchSuccessfull
-  _ <> r = r
+  r <> _ = r
 
 addExpect :: Trace -> MatchResult -> MatchResult
 addExpect s' (AlignmentMismatch t _ s) = AlignmentMismatch t (Just s') s
@@ -68,7 +68,7 @@ covers s@(ProgWrite Mandatory is t1) t@(ProgWrite Mandatory js t2)
   | all (\j -> any (>: j) is) js = t1 `covers` t2
   | otherwise = OutputMismatch s t
 
-covers s@(ProgWrite Optional is t1) t = ProgWrite Mandatory is t1 `covers` t <> addExpect s (t1 `covers` t)
+covers s@(ProgWrite Optional is t1) t = (ProgWrite Mandatory is t1 `covers` t) <> addExpect s (t1 `covers` t)
 covers s t@(ProgWrite Optional _ _) = OutputMismatch s t
 
 covers Terminate Terminate = MatchSuccessfull

@@ -41,6 +41,11 @@ main = hspec $ do
       it "does not fulfill example2 specification" $
         (taskCheckOutcome prog3 example2 <&> not . isSuccess) `shouldReturn` True
 
+    context "variable merging" $ do
+      describe "taskCheck prog5 example5" $
+        it "is success" $
+          (taskCheckOutcome prog5 example5 <&> isSuccess) `shouldReturn` True
+
     context "static test generation" $ do
       describe "prog2" $ do
         it "fulfills tests generated from example2 specification" $

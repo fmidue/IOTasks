@@ -21,18 +21,18 @@ interpret s = do
   collapsed <- collapseChoice s
   pure $ flip evalStateT Map.empty $
     sem
-      (\() x vs m -> RecSub (x,vs,m) ())
+      (\n x vs m -> RecSub (x,vs,m,n) n)
       (\case
-        RecSub (x,_,AssumeValid) p' -> do
+        RecSub (x,_,AssumeValid,n) p' -> do
           v <- lift readLn
-          modify (Map.alter (\case {Just xs -> Just $ v:xs; Nothing -> Just [v]}) x)
+          modify (Map.alter (\case {Just xs -> Just $ (v,n):xs; Nothing -> Just [(v,n)]}) x)
           p'
-        RecSub (x,vs,UntilValid) p' -> do
+        RecSub (x,vs,UntilValid,n) p' -> do
           v <- iterateUntil (vs `containsValue`) $ lift readLn
-          modify (Map.alter (\case {Just xs -> Just $ v:xs; Nothing -> Just [v]}) x)
+          modify (Map.alter (\case {Just xs -> Just $ (v,n):xs; Nothing -> Just [(v,n)]}) x)
           p'
         _ -> error "interpret: impossible")
-      (\() Mandatory ts p' -> do
+      (\_ Mandatory ts p' -> do
         if Set.size ts == 1
           then do
             e <- get
@@ -40,14 +40,14 @@ interpret s = do
             p'
           else error "interpret: impossible"
       )
-      (\() cond pl pr -> do
+      (\_ cond pl pr -> do
         e <- get
         if eval cond e
           then pl
           else pr
       )
       (pure ())
-      ()
+      1
       collapsed
 
 collapseChoice :: Specification -> [Specification]

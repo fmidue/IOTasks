@@ -29,6 +29,7 @@ dependencies:
 - monad-loops
 - express
 - pretty
+- extra
 
 ghc-options:
 - -Wall

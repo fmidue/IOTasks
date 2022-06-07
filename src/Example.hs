@@ -38,6 +38,27 @@ example4 =
   until (Current "x" :==: Product (All "y"))
     (readInput "y" nats AssumeValid)
 
+-- variable merging and multiple exits
+example5 :: Specification
+example5 =
+  optionalTextOutput <>
+  readInput "x" ints AssumeValid <>
+  optionalTextOutput <>
+  readInput "y" ints AssumeValid <>
+  tillExit (
+    branch (Current "x" :+: Current "y" :==: IntLit 0 )
+      exit
+      (optionalTextOutput <>
+       readInput "x" ints AssumeValid <>
+        branch (Current "x" :+: Current "y" :==: IntLit 0 )
+          exit
+          (optionalTextOutput <>
+           readInput "y" ints AssumeValid)
+    )
+  ) <>
+  writeOutput [Wildcard <> Value (length' $ filter' predicate $ all ["x","y"]) <> Wildcard]
+    where predicate x = x > 0 && x `mod` 3 == 0
+
 ints, nats :: ValueSet
 ints = Every
 nats = Eq 0 `Union` GreaterThan 0
@@ -98,6 +119,24 @@ prog4 = do
         y <- readLn
         loop (p*y)
   loop 1
+
+prog5 :: MonadTeletype m => m ()
+prog5 = do
+  putStr "Bitte geben Sie eine Zahl ein: "
+  n <- readLn
+  loop [n]
+  where
+    loop :: MonadTeletype m => [Integer] -> m ()
+    loop (m:ms) = do putStr "Naechste Zahl bitte: "
+                     n <- readLn
+                     if n+m == 0
+                       then do putStrLn "Die Summe der letzten beiden Eingaben war 0."
+                               putStr "Anzahl der durch drei teilbaren positiven Eingaben: "
+                               print $ length $ filter (\n' -> (n' > 0) && (n' `mod` 3 == 0)) (n:m:ms)
+                               putStrLn "Programm beendet."
+                       else do putStrLn "Die Summe war noch nicht 0."
+                               loop (n:m:ms)
+    loop [] = error "does not happen"
 
 --
 stringS1 :: Specification

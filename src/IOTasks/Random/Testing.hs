@@ -65,11 +65,11 @@ genTrace :: Specification -> Int -> Integer -> Int -> Gen Trace
 genTrace spec depth bound maxNeg =
   semM
     (\(e,d,n) x vs mode ->
-      (if d <= (0 :: Int) then pure NoRec
+      (if d > depth then pure NoRec
       else do
         frequency $
-            (5, valueOf vs bound >>= (\i -> pure $ RecSub i (Map.update (\xs -> Just $ i:xs) x e,d-1,n)))
-          : [(1, valueOf (complement vs) bound >>= (\i -> pure $ RecSame i (e,d-1,n+1))) | mode == UntilValid && n < maxNeg]
+            (5, valueOf vs bound >>= (\i -> pure $ RecSub i (Map.update (\xs -> Just $ (i,d):xs) x e,d+1,n)))
+          : [(1, valueOf (complement vs) bound >>= (\i -> pure $ RecSame i (e,d+1,n+1))) | mode == UntilValid && n < maxNeg]
     ))
     (pure . \case
       NoRec -> OutOfInputs
@@ -82,7 +82,7 @@ genTrace spec depth bound maxNeg =
     (\(e,_,_) o ts t' -> ProgWrite o (Set.map (evalPattern e) ts) <$> t')
     (\(e,_,_) c l r -> if eval c e then l else r)
     (pure Terminate)
-    (Map.fromList ((,[]) <$> vars spec),depth,0)
+    (Map.fromList ((,[]) <$> vars spec),1,0)
     spec
 
 runTests :: IOrep () -> Specification -> [Inputs] -> Outcome
