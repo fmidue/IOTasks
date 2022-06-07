@@ -1,5 +1,9 @@
 {-# LANGUAGE DeriveFunctor #-}
-module IOTasks.IOrep where
+module IOTasks.IOrep
+  ( IOrep , Line
+  , runProgram
+  , MonadTeletype(..)
+  ) where
 import Prelude hiding (putChar,putStr,putStrLn,print,getChar,getLine,readLn)
 
 import Data.Set (singleton)

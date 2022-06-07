@@ -3,6 +3,8 @@ module IOTasks.MonadTeletype where
 import Prelude hiding (putChar, putStr, putStrLn, print, getChar, getLine, readLn)
 import qualified Prelude
 
+import System.IO (hSetBuffering, Handle, BufferMode)
+
 class Monad m => MonadTeletype m where
   putChar :: Char -> m ()
   getChar :: m Char
@@ -24,6 +26,9 @@ class Monad m => MonadTeletype m where
   readLn :: Read a => m a
   readLn = read <$> getLine
 
+  hSetBuffering :: Handle -> BufferMode -> m ()
+  hSetBuffering _ _ = pure ()
+
 instance MonadTeletype IO where
   putChar = Prelude.putChar
   getChar = Prelude.getChar
@@ -34,3 +39,5 @@ instance MonadTeletype IO where
 
   getLine = Prelude.getLine
   readLn = Prelude.readLn
+
+  hSetBuffering = System.IO.hSetBuffering

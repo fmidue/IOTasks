@@ -8,8 +8,8 @@ module IOTasks.Random
   , Term(..)
   , ValueSet(..)
   , OutputPattern(..), PatternType(..)
-  , OutputTerm, current, all, (+#), (-#), (*#), length', sum'
-  , taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs,  Outcome(..)
+  , OutputTerm, current, all, (+#), (-#), (*#), length', sum', product', filter', intLit
+  , taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs, Outcome(..)
   , pPrintOutcome, pPrintOutcomeSimple
   , generateStaticTestSuite, taskCheckOn
   , interpret

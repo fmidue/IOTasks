@@ -8,7 +8,7 @@ module IOTasks
   , Term(..)
   , ValueSet(..)
   , OutputPattern(..), PatternType(..)
-  , OutputTerm, current, all, (+#), (-#), (*#), length', sum'
+  , OutputTerm, current, all, (+#), (-#), (*#), length', sum', product', filter', intLit
   , taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs, Outcome(..)
   , pPrintOutcome, pPrintOutcomeSimple
   , generateStaticTestSuite, taskCheckOn

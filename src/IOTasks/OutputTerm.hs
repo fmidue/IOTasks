@@ -5,6 +5,7 @@ module IOTasks.OutputTerm
   --
   , (+#), (-#), (*#)
   , length', sum', product', filter'
+  , intLit
   ) where
 
 import Prelude hiding (all)
@@ -49,6 +50,9 @@ sum' = liftExpr1 $ value "sum" (sum :: [Integer] -> Integer)
 
 product' :: OutputTerm -> OutputTerm
 product' = liftExpr1 $ value "product" (product :: [Integer] -> Integer)
+
+intLit :: Integer -> OutputTerm
+intLit = OutputTerm . val
 
 -- TODO: improve?
 filter' :: (Integer -> Bool) -> OutputTerm -> OutputTerm
