@@ -2,7 +2,7 @@
 module IOTasks.IOrep
   ( IOrep , Line
   , runProgram
-  , MonadTeletype(..)
+  , MonadTeletype(..), BufferMode(..), stdout
   ) where
 import Prelude hiding (putChar,putStr,putStrLn,print,getChar,getLine,readLn)
 
@@ -13,6 +13,8 @@ import Control.Monad (ap, (>=>))
 import IOTasks.Trace
 import IOTasks.OutputPattern
 import IOTasks.MonadTeletype
+
+import System.IO (BufferMode(..), stdout) -- for re-exports
 
 data IOrep a
   = GetChar (Char -> IOrep a)
