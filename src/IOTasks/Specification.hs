@@ -24,7 +24,7 @@ data Specification where
   TillE :: Specification -> Specification -> Specification
   E :: Specification
 
-data InputMode = AssumeValid | UntilValid deriving (Eq,Show)
+data InputMode = AssumeValid | UntilValid | Abort deriving (Eq,Show)
 
 instance Semigroup Specification where
   s <> Nop = s
@@ -82,15 +82,16 @@ runSpecification inputs spec =
   sem
     (\(e,ins) x vs mode ->
       case ins of
-        [] -> NoRec
+        [] -> NoRec OutOfInputs
         ((i,n):is)
           | vs `containsValue` read i -> RecSub i (Map.update (\xs -> Just $ (read i,n):xs) x e,is)
           | otherwise -> case mode of
               AssumeValid -> error "invalid value"
               UntilValid -> RecSame i (e,is)
+              Abort -> NoRec $ foldr ProgRead (ProgRead '\n' Terminate) i
     )
     (\case
-      NoRec -> OutOfInputs
+      NoRec r -> r
       RecSub i t' -> foldr ProgRead (ProgRead '\n' t') i
       RecSame i t' -> foldr ProgRead (ProgRead '\n' t') i
       RecBoth{} -> error "runSpecification: impossible"
@@ -104,10 +105,10 @@ runSpecification inputs spec =
     (Map.fromList ((,[]) <$> vars spec),inputs `zip` [1..])
     spec
 
-data RecStruct p a = NoRec | RecSub p a | RecSame p a | RecBoth p a a
+data RecStruct p a r = NoRec r | RecSub p a | RecSame p a | RecBoth p a a
 
 sem :: forall st p a.
-  (st -> Varname -> ValueSet -> InputMode -> RecStruct p st) -> (RecStruct p a -> a) ->
+  (st -> Varname -> ValueSet -> InputMode -> RecStruct p st a) -> (RecStruct p a a -> a) ->
   (st -> OptFlag -> Set (OutputPattern 'SpecificationP) -> a -> a) ->
   (st -> Term Bool -> a -> a -> a) ->
   a ->
@@ -122,7 +123,7 @@ sem f f' g h z st s = runIdentity $ semM
   s
 
 semM :: forall m st p a. Monad m =>
-  (st -> Varname -> ValueSet -> InputMode -> m (RecStruct p st)) -> (RecStruct p a -> m a) ->
+  (st -> Varname -> ValueSet -> InputMode -> m (RecStruct p st a)) -> (RecStruct p a a -> m a) ->
   (st -> OptFlag -> Set (OutputPattern 'SpecificationP) -> m a -> m a) ->
   (st -> Term Bool -> m a -> m a -> m a) ->
   m a ->
@@ -134,7 +135,7 @@ semM f f' g h z s_I spec = sem' s_I spec k_I where
       let mStruct = f st x vs mode
       struct <- mStruct
       f' =<< case struct of
-        NoRec -> pure NoRec
+        NoRec r -> pure $ NoRec r
         RecSub p st' -> RecSub p <$> sem' st' s' k
         RecSame p st' -> RecSame p <$> sem' st' s k
         RecBoth p st' st'' -> RecBoth p <$> sem' st' s' k <*> sem' st'' s k

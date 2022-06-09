@@ -19,7 +19,7 @@ example1 =
 
 example2 :: Specification
 example2 =
-  readInput "n" nats AssumeValid <>
+  readInput "n" nats UntilValid <>
   until (Length (All "x") :==: Current "n")
     (writeOptionalOutput [Value $ current "n" -# length' (all "x")] <> readInput "x" ints AssumeValid) <>
   writeOutput [Value $ sum' $ all "x"]
@@ -58,6 +58,14 @@ example5 =
   ) <>
   writeOutput [Wildcard <> Value (length' $ filter' predicate $ all ["x","y"]) <> Wildcard]
     where predicate x = x > 0 && x `mod` 3 == 0
+
+-- input modes
+example6 :: Specification
+example6 =
+  readInput "x" nats Abort <>
+  readInput "y" nats AssumeValid <>
+  readInput "z" nats UntilValid <>
+  writeOutput [Value $ sum' $ all ["x","y","z"] ]
 
 ints, nats :: ValueSet
 ints = Every
@@ -137,6 +145,19 @@ prog5 = do
                        else do putStrLn "Die Summe war noch nicht 0."
                                loop (n:m:ms)
     loop [] = error "does not happen"
+
+prog6 :: MonadTeletype m => m ()
+prog6 = do
+  x <- readLn @_ @Integer
+  if x < 0
+    then pure ()
+    else do
+      y <- readLn
+      let loop = do
+            v <- readLn
+            if v < 0 then loop else pure v
+      z <- loop
+      print $ x + y + z
 
 --
 stringS1 :: Specification

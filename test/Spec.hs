@@ -33,6 +33,10 @@ main = hspec $ do
       it "does not fulfill example3 specification" $
         (taskCheckOutcome prog2 example3 <&> not . isSuccess) `shouldReturn` True
 
+    describe "prog2'" $ do
+      it "taskCheck example2 specification" $
+        (taskCheckOutcome prog2' example2 <&> isSuccess) `shouldReturn` False
+
     describe "prog3" $ do
       it "taskCheck example3 specification" $
         (taskCheckOutcome prog3 example3 <&> isSuccess) `shouldReturn` True
@@ -45,6 +49,15 @@ main = hspec $ do
       describe "taskCheck prog5 example5" $
         it "is success" $
           (taskCheckOutcome prog5 example5 <&> isSuccess) `shouldReturn` True
+
+    context "abort input mode" $ do
+      describe "taskCheck prog6 example6" $
+        it "is success" $
+          (taskCheckOutcome prog6 example6 <&> isSuccess) `shouldReturn` True
+      describe "interpretation of example6" $
+        it "satisfies the specification" $
+          (taskCheckOutcome (head $ interpret example6) example6 <&> isSuccess) `shouldReturn` True
+
 
     context "static test generation" $ do
       describe "prog2" $ do

@@ -27,11 +27,20 @@ interpret s = do
           v <- lift readLn
           modify (Map.alter (\case {Just xs -> Just $ (v,n):xs; Nothing -> Just [(v,n)]}) x)
           p'
+        RecSub (x,vs,Abort,n) p' -> do
+          v <- lift readLn
+          if vs `containsValue` v
+            then do
+              modify (Map.alter (\case {Just xs -> Just $ (v,n):xs; Nothing -> Just [(v,n)]}) x)
+              p'
+            else pure ()
         RecSub (x,vs,UntilValid,n) p' -> do
           v <- iterateUntil (vs `containsValue`) $ lift readLn
           modify (Map.alter (\case {Just xs -> Just $ (v,n):xs; Nothing -> Just [(v,n)]}) x)
           p'
-        _ -> error "interpret: impossible")
+        NoRec{} -> error "interpret: impossible"
+        RecSame{} -> error "interpret: impossible"
+        RecBoth{} -> error "interpret: impossible")
       (\_ Mandatory ts p' -> do
         if Set.size ts == 1
           then do
