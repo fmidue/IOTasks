@@ -49,6 +49,12 @@ main = hspec $ do
       describe "taskCheck prog5 example5" $
         it "is success" $
           (taskCheckOutcome prog5 example5 <&> isSuccess) `shouldReturn` True
+      describe "taskCheck prog7 example7" $
+        it "is success" $
+          (taskCheckOutcome prog7 example7 <&> isSuccess) `shouldReturn` True
+      describe "interpretation of example7" $
+        it "satisfies the specification" $
+          (taskCheckOutcome (head $ interpret example7) example7 <&> isSuccess) `shouldReturn` True
 
     context "abort input mode" $ do
       describe "taskCheck prog6 example6" $

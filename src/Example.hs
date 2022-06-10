@@ -67,6 +67,24 @@ example6 =
   readInput "z" nats UntilValid <>
   writeOutput [Value $ sum' $ all ["x","y","z"] ]
 
+-- variable merging
+example7 :: Specification
+example7 =
+  readInput "x" ints AssumeValid <>
+  readInput "y" ints AssumeValid <>
+  branch (Current "y" :>: IntLit 0)
+    (readInput "x" ints AssumeValid <>
+    readInput "x" ints AssumeValid)
+    (readInput "y" ints AssumeValid)
+    <>
+  branch (Current ["x","y"] :>: IntLit 5)
+    (readInput "z" ints AssumeValid)
+    (readInput "y" ints AssumeValid)
+    <>
+  writeOutput [Value $ current ["x","z"]] <>
+  writeOutput [Value $ length' $ all ["x","y","z"]] <>
+  writeOutput [Value $ length' $ all ["x","y","a","z"]]
+
 ints, nats :: ValueSet
 ints = Every
 nats = Eq 0 `Union` GreaterThan 0
@@ -158,6 +176,34 @@ prog6 = do
             if v < 0 then loop else pure v
       z <- loop
       print $ x + y + z
+
+prog7 :: MonadTeletype m => m ()
+prog7 = do
+  x1 <- readLn @_ @Integer
+  y1 <- readLn @_ @Integer
+  st <- cond1 x1 y1
+  (xs,ys,zs,c) <- cond2 st
+  print c
+  print $ length $ xs ++ ys ++ zs
+  print $ length $ xs ++ ys ++ zs
+  where
+    cond1 x1 y1 =
+      if y1 > 0
+        then do
+          x2 <- readLn @_ @Integer
+          x3 <- readLn @_ @Integer
+          pure ([x3,x2,x1],[y1],x3)
+        else do
+          y2 <- readLn @_ @Integer
+          pure ([x1],[y2,y1],y2)
+    cond2 (xs,ys,c) =
+      if c > 5
+        then do
+          z <- readLn @_ @Integer
+          pure (xs,ys,[z],z)
+        else do
+          y3 <- readLn @_ @Integer
+          pure (xs,y3:ys,[],head xs)
 
 --
 stringS1 :: Specification

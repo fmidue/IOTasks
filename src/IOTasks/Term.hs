@@ -4,7 +4,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 module IOTasks.Term where
 
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe,mapMaybe)
 import Data.Map (Map)
 import qualified Data.Map as Map (lookup)
 import Data.List (sortBy, intercalate)
@@ -61,14 +61,14 @@ eval (Length xs) e = fromIntegral . length $ eval xs e
 eval (Sum xs) e = fromIntegral . sum $ eval xs e
 eval (Product xs) e = fromIntegral . product $ eval xs e
 eval (Current x) e = fromMaybe (error $ "empty list for {" ++ intercalate "," (toVarList x) ++ "}") $ safeHead $ eval (All x) e
-eval (All x) e = maybe [] (map fst . sortBy (flip compare `on` snd) . concat) (mapM (`Map.lookup` e) (toVarList x))
+eval (All x) e = (map fst . sortBy (flip compare `on` snd) . concat) $ mapMaybe (`Map.lookup` e) (toVarList x)
 eval (IntLit n) _ = n
 
 safeHead :: [a] -> Maybe a
 safeHead [] = Nothing
 safeHead (x:_) = Just x
 
-printIndexedTerm :: Term a -> Map Varname Int -> String
+printIndexedTerm :: Term a -> Map Varname (Int,[Int]) -> String
 printIndexedTerm (tx :+: ty) m = concat ["(",printIndexedTerm tx m, ") + (", printIndexedTerm ty m,")"]
 printIndexedTerm (tx :-: ty) m = concat ["(",printIndexedTerm tx m, ") - (", printIndexedTerm ty m,")"]
 printIndexedTerm (tx :*: ty) m = concat ["(",printIndexedTerm tx m, ") * (", printIndexedTerm ty m,")"]
@@ -83,6 +83,6 @@ printIndexedTerm (tx :||: ty) m = concat ["(",printIndexedTerm tx m, ") || (", p
 printIndexedTerm (Length t) m = concat ["length (", printIndexedTerm t m, ")"]
 printIndexedTerm (Sum t) m = concat ["sum (", printIndexedTerm t m, ")"]
 printIndexedTerm (Product t) m = concat ["product (", printIndexedTerm t m, ")"]
-printIndexedTerm (Current x) m = maybe ("{" ++ intercalate "," (toVarList x) ++ "}_C") ((\(x,i) -> x ++ "_" ++ show i) . maximumOn snd) $ mapM (\x -> (x,) <$> Map.lookup x m) (toVarList x)
+printIndexedTerm (Current x) m = (\(x,(i,_)) -> x ++ "_" ++ show i) $ maximumOn (head.snd.snd) $ mapMaybe (\x -> (x,) <$> Map.lookup x m) (toVarList x)
 printIndexedTerm (All x) _ = "{" ++ intercalate "," (toVarList x) ++ "}_A"
 printIndexedTerm (IntLit x) _ = show x

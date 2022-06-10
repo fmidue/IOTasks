@@ -21,7 +21,7 @@ interpret s = do
   collapsed <- collapseChoice s
   pure $ flip evalStateT Map.empty $
     sem
-      (\n x vs m -> RecSub (x,vs,m,n) n)
+      (\n x vs m -> RecSub (x,vs,m,n) (n+1))
       (\case
         RecSub (x,_,AssumeValid,n) p' -> do
           v <- lift readLn

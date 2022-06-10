@@ -18,6 +18,7 @@ import qualified Data.Map as Map (lookup)
 import Data.Dynamic (Typeable)
 import Data.List (sortBy, nub)
 import Data.Function (on)
+import Data.Maybe (mapMaybe)
 
 data OutputTerm = OutputTerm Expr [[Varname]]
   deriving (Eq,Ord,Show)
@@ -38,7 +39,7 @@ eval :: Typeable a => OutputTerm -> Map Varname [(Integer,Int)] -> a
 eval (OutputTerm t xss) e = evl (t //- concat [ [(currentE xs,val $ head xs'),(allE xs,val xs')] | xs <- nub xss, let xs' = combinedVars xs ])
   where
     combinedVars :: [Varname] -> [Integer]
-    combinedVars xs = maybe [] (map fst . sortBy (flip compare `on` snd) . concat) (mapM (`Map.lookup` e) xs)
+    combinedVars xs = (map fst . sortBy (flip compare `on` snd) . concat) $ mapMaybe (`Map.lookup` e) xs
 
 --
 (+#) :: OutputTerm -> OutputTerm -> OutputTerm
