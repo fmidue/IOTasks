@@ -58,7 +58,7 @@ printPatternSimple p =
   s -> reverse s
 
 (>:) :: OutputPattern 'TraceP -> OutputPattern 'TraceP -> Bool
-p >: q = isRight $ parse (patternParser p) "" $ printPattern q
+p >: q = isRight $ parse (patternParser p <> eof) "" $ printPattern q
 
 patternParser :: OutputPattern 'TraceP -> Parsec String () ()
 patternParser Wildcard = () <$ many (satisfy isPrint)
