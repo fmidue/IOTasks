@@ -1,8 +1,13 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE TypeOperators #-}
+{-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 module IOTasks.Term where
+
+import IOTasks.Terms
 
 import Data.Maybe (fromMaybe,mapMaybe)
 import Data.Map (Map)
@@ -11,7 +16,7 @@ import Data.List (sortBy, intercalate)
 import Data.Function (on)
 import Data.List.Extra (maximumOn)
 
-type Varname = String
+import GHC.TypeLits
 
 data Term a where
   (:+:) :: Term Integer -> Term Integer -> Term Integer
@@ -32,18 +37,40 @@ data Term a where
   All :: VarExp a => a -> Term [Integer]
   IntLit :: Integer -> Term Integer
 
-class VarExp a where
-  toVarList :: a -> [Varname]
-
-instance VarExp Varname where
-  toVarList = pure
-
-instance VarExp [Varname] where
-  toVarList = id
-
 -- deriving instance Eq (Term a)
 -- deriving instance Ord (Term a)
 -- deriving instance Show (Term a)
+
+instance Accessor Term where
+  currentValue = Current
+  allValues = All
+
+instance Arithmetic Term where
+  (.+.) = (:+:)
+  (.-.) = (:-:)
+  (.*.) = (:*:)
+  intLit = IntLit
+
+instance Compare Term where
+  (.==.) = (:==:)
+  (.>.) = (:>:)
+  (.>=.) = (:>=:)
+  (.<.) = (:<:)
+  (.<=.) = (:<=:)
+
+instance Logic Term where
+  not' = Not
+  (.&&.) = (:&&:)
+  (.||.) = (:||:)
+
+instance BasicLists Term where
+  length' = Length
+  sum' = Sum
+  product' = Product
+
+instance TypeError (Text "complex list functions, like filter, can not be used at type " :<>: ShowType Term)
+  => ComplexLists Term where
+  filter' = error "unreachable"
 
 eval :: Term a -> Map Varname [(Integer,Int)] -> a
 eval (x :+: y) e = eval x e + eval y e

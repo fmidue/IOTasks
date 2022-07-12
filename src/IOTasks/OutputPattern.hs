@@ -7,7 +7,7 @@ module IOTasks.OutputPattern where
 
 import Prelude hiding (all)
 
-import IOTasks.Term (Varname)
+import IOTasks.Terms (Varname)
 import IOTasks.OutputTerm
 
 import Data.Either (isRight)
@@ -20,7 +20,7 @@ data OutputPattern (t :: PatternType) where
   Wildcard :: OutputPattern t
   Text :: String -> OutputPattern t
   Sequence :: OutputPattern t -> OutputPattern t -> OutputPattern t
-  Value :: OutputTerm -> OutputPattern 'SpecificationP
+  Value :: OutputTerm Integer -> OutputPattern 'SpecificationP
 
 data PatternType = SpecificationP | TraceP
 

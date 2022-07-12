@@ -2,8 +2,7 @@
 module Example where
 import Prelude hiding
   (putChar,putStr,putStrLn,print,getChar,getLine,readLn
-  ,until, all)
-
+  ,until)
 
 import IOTasks
 
@@ -13,29 +12,29 @@ example1 :: Specification
 example1 =
   readInput "x" ints AssumeValid <>
   readInput "y" nats AssumeValid <>
-  branch (Current "x" :>: Current "y")
-    (writeOutput [Wildcard <> Value (current "x" +# current "y") <> Wildcard , Value (current "x" -# current "y") <> Wildcard] )
-    (writeOutput [Wildcard <> Text "Result: " <> Value (current "x" *# current "y")] )
+  branch (currentValue "x" .>. currentValue "y")
+    (writeOutput [Wildcard <> Value (currentValue "x" .+. currentValue "y") <> Wildcard , Value (currentValue "x" .-. currentValue "y") <> Wildcard] )
+    (writeOutput [Wildcard <> Text "Result: " <> Value (currentValue "x" .*. currentValue "y")] )
 
 example2 :: Specification
 example2 =
   readInput "n" nats UntilValid <>
-  until (Length (All "x") :==: Current "n")
-    (writeOptionalOutput [Value $ current "n" -# length' (all "x")] <> readInput "x" ints AssumeValid) <>
-  writeOutput [Value $ sum' $ all "x"]
+  until (length' (allValues "x") .==. currentValue "n")
+    (writeOptionalOutput [Value $ currentValue "n" .-. length' (allValues "x")] <> readInput "x" ints AssumeValid) <>
+  writeOutput [Value $ sum' $ allValues "x"]
 
 example3 :: Specification
 example3 =
   readInput "n" nats AssumeValid <>
-  until (Sum (All "x") :>: Current "n")
+  until (sum' (allValues "x") .>. currentValue "n")
     (readInput "x" ints AssumeValid) <>
-  writeOutput [Value $ length' $ all "x"]
+  writeOutput [Value $ length' $ allValues "x"]
 
 -- atempt at 'breaking' the solver
 example4 :: Specification
 example4 =
   readInput "x" nats AssumeValid <>
-  until (Current "x" :==: Product (All "y"))
+  until (currentValue "x" .==. product' (allValues "y"))
     (readInput "y" nats AssumeValid)
 
 -- variable merging and multiple exits
@@ -46,17 +45,17 @@ example5 =
   optionalTextOutput <>
   readInput "y" ints AssumeValid <>
   tillExit (
-    branch (Current "x" :+: Current "y" :==: IntLit 0 )
+    branch (currentValue "x" .+. currentValue "y" .==. intLit 0 )
       exit
       (optionalTextOutput <>
        readInput "x" ints AssumeValid <>
-        branch (Current "x" :+: Current "y" :==: IntLit 0 )
+        branch (currentValue "x" .+. currentValue "y" .==. intLit 0 )
           exit
           (optionalTextOutput <>
            readInput "y" ints AssumeValid)
     )
   ) <>
-  writeOutput [Wildcard <> Value (length' $ filter' predicate $ all ["x","y"]) <> Wildcard]
+  writeOutput [Wildcard <> Value (length' $ filter' predicate $ allValues ["x","y"]) <> Wildcard]
     where predicate x = x > 0 && x `mod` 3 == 0
 
 -- input modes
@@ -65,25 +64,25 @@ example6 =
   readInput "x" nats Abort <>
   readInput "y" nats AssumeValid <>
   readInput "z" nats UntilValid <>
-  writeOutput [Value $ sum' $ all ["x","y","z"] ]
+  writeOutput [Value $ sum' $ allValues ["x","y","z"] ]
 
 -- variable merging
 example7 :: Specification
 example7 =
   readInput "x" ints AssumeValid <>
   readInput "y" ints AssumeValid <>
-  branch (Current "y" :>: IntLit 0)
+  branch (currentValue "y" .>. intLit 0)
     (readInput "x" ints AssumeValid <>
     readInput "x" ints AssumeValid)
     (readInput "y" ints AssumeValid)
     <>
-  branch (Current ["x","y"] :>: IntLit 5)
+  branch (currentValue ["x","y"] .>. intLit 5)
     (readInput "z" ints AssumeValid)
     (readInput "y" ints AssumeValid)
     <>
-  writeOutput [Value $ current ["x","z"]] <>
-  writeOutput [Value $ length' $ all ["x","y","z"]] <>
-  writeOutput [Value $ length' $ all ["x","y","a","z"]]
+  writeOutput [Value $ currentValue ["x","z"]] <>
+  writeOutput [Value $ length' $ allValues ["x","y","z"]] <>
+  writeOutput [Value $ length' $ allValues ["x","y","a","z"]]
 
 ints, nats :: ValueSet
 ints = Every
@@ -227,7 +226,7 @@ addSpec :: Specification
 addSpec =
   readInput "x" nats AssumeValid <>
   readInput "y" nats AssumeValid <>
-  writeOutput [Value $ current "x" +# current "y"]
+  writeOutput [Value $ currentValue "x" .+. currentValue "y"]
 
 nonsense :: MonadTeletype m => m ()
 nonsense = do

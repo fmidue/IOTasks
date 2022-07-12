@@ -6,6 +6,7 @@ module IOTasks.Z3 where
 import IOTasks.Constraints
 import IOTasks.ValueSet
 import IOTasks.Term
+import IOTasks.Terms (Varname, VarExp(..))
 
 import Z3.Monad
 

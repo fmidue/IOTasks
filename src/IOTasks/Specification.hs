@@ -7,6 +7,7 @@ module IOTasks.Specification where
 
 import IOTasks.ValueSet
 import IOTasks.Term
+import IOTasks.Terms (Varname)
 import IOTasks.Trace
 import IOTasks.OutputPattern
 

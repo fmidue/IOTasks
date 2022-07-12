@@ -4,6 +4,7 @@ module IOTasks.Constraints where
 
 import IOTasks.ValueSet
 import IOTasks.Term
+import IOTasks.Terms (Varname)
 import IOTasks.Specification
 
 import Data.List (partition,intercalate)

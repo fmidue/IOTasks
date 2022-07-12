@@ -5,17 +5,22 @@ module IOTasks.Random
   , MonadTeletype(..)
   , IOrep, runProgram, Line
   , Trace, (>:)
-  , Term(..)
+  , Term
   , ValueSet(..)
   , OutputPattern(..), PatternType(..)
-  , OutputTerm, current, all, (+#), (-#), (*#), length', sum', product', filter', intLit
+  , OutputTerm, filter'
+  , (.+.), (.-.), (.*.), intLit
+  , (.==.), (.>.), (.>=.), (.<.), (.<=.)
+  , (.&&.), (.||.), not'
+  , sum', length', product'
+  , currentValue, allValues
   , taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs, Outcome(..)
   , pPrintOutcome, pPrintOutcomeSimple
   , generateStaticTestSuite, taskCheckOn
   , interpret
   ) where
 
-import Prelude hiding (until,all)
+import Prelude hiding (until)
 
 import IOTasks hiding (taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs)
 import IOTasks.Random.Testing

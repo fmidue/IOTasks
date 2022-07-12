@@ -37,6 +37,7 @@ library
       IOTasks.Random.Testing
       IOTasks.Specification
       IOTasks.Term
+      IOTasks.Terms
       IOTasks.Testing
       IOTasks.Trace
       IOTasks.ValueSet
