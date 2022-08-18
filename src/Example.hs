@@ -240,3 +240,40 @@ plus x y = reverse $ plus' (reverse $ filter (>= '0') x) (reverse $ filter (>= '
   plus' [x] ('9':ys) = plus' (pred x:['1']) ('0':ys)
   plus' (x:x':xs) ('9':ys) = plus' (pred x:succ x':xs) ('0':ys)
   plus' (x:xs) (y:ys) = plus' (pred x:xs) (succ y:ys)
+
+
+-- hangman
+hangmanSpec :: [Integer] -> Specification
+hangmanSpec word = tillExit (
+     branch (winCond $ allValues "g") (writeOutput [Text "correct!"] <> exit) mempty
+  <> writeOutput [Text "Game state:"  <> Wildcard]
+  <> readInput "g" digits AssumeValid
+  <> branch ((currentValue "g" `isIn` listLit word) .&&. (currentValue "g" `isNotIn` allValues' "g" 1))
+    (writeOptionalOutput [Text "good guess!"])
+    (writeOptionalOutput [Text "wrong guess!"])
+  )
+  where
+    winCond :: Term [Integer] -> Term Bool
+    winCond g = foldr (\a b -> intLit a `isIn` g .&&. b) true word
+
+digits :: ValueSet
+digits = (Eq 0 `Union` GreaterThan 0) `Intersection` LessThen 10
+
+hangmanProg :: MonadTeletype m => [Int] -> m ()
+hangmanProg word = go [] where
+  go guessed
+    | Prelude.all (`Prelude.elem` guessed) word = putStrLn "correct!"
+    | otherwise = do
+        putStrLn $ "Game state:" ++ printWord word guessed
+        -- putStrLn "guess a number!"
+        x <- read <$> getLine
+        if x `Prelude.elem` word Prelude.&& x `Prelude.notElem` guessed
+          then do
+            -- putStrLn "good guess!" -- this is optional
+            go (x:guessed)
+          else do
+            -- putStrLn "wrong!" -- this is optional
+            go guessed
+
+printWord :: (Eq a, Show a) => [a] -> [a] -> String
+printWord xs guessed = Prelude.foldr (\x -> (++) (if x `Prelude.elem` guessed then show x ++ " " else "_ ")) "" xs

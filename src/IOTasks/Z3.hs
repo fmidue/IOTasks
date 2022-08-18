@@ -11,7 +11,7 @@ import IOTasks.Terms (Varname, VarExp(..))
 import Z3.Monad
 
 import Test.QuickCheck (generate)
-import Control.Monad (forM, forM_)
+import Control.Monad (forM, forM_, (>=>))
 import Control.Monad.IO.Class (liftIO)
 import Data.Maybe (catMaybes, fromMaybe, isJust, mapMaybe)
 import Data.Map (Map)
@@ -59,7 +59,7 @@ pathScript path mode = do
       model <- optimizeGetModel
       Just . catMaybes <$> mapM ((evalInt model . snd) . fst) vars
     _ -> do
-      _str <- optimizeToString
+      -- str <- optimizeToString
       -- liftIO $ print str
       pure Nothing
 
@@ -75,12 +75,27 @@ z3Predicate (x :<=: y) e vars = binRec e vars mkLe x y
 z3Predicate (Not x) e vars = mkNot =<< z3Predicate x e vars
 z3Predicate (x :&&: y) e vars = binRec e vars (\a b -> mkAnd [a,b]) x y
 z3Predicate (x :||: y) e vars = binRec e vars (\a b -> mkOr [a,b]) x y
-z3Predicate (Length (All x)) e _ = mkIntNum $ length $ weaveVariables x e
-z3Predicate (Sum (All x)) e vars = mkAdd $ lookupList (weaveVariables x e) vars
-z3Predicate (Product (All x)) e vars = mkMul $ lookupList (weaveVariables x e) vars
-z3Predicate (Current x) e vars = pure $ fromMaybe (error $ "unknown variable(s) {" ++ intercalate "," (toVarList x) ++ "}" ++ show e ++ show vars) $ (`lookup` vars) . last $ weaveVariables x e
-z3Predicate (All _x) _e _vars = error "generic list"
+z3Predicate (Length (All x n)) e _ = mkIntNum $ length $ weaveVariables x n e
+z3Predicate (Sum (All x n)) e vars = mkAdd $ lookupList (weaveVariables x n e) vars
+z3Predicate (Product (All x n)) e vars = mkMul $ lookupList (weaveVariables x n e) vars
+z3Predicate (Length (ListLit xs)) _ _ = mkIntNum $ length xs
+z3Predicate (Sum (ListLit xs)) _ _ = mkIntNum $ sum xs
+z3Predicate (Product (ListLit xs)) _ _ = mkIntNum $ product xs
+z3Predicate (Current x n) e vars = pure $ fromMaybe (unknownVariablesError x) $ (`lookup` vars) . last $ weaveVariables x n e
+z3Predicate (All _x _) _e _vars = error "generic list"
 z3Predicate (IntLit n) _ _ = mkIntNum n
+z3Predicate (ListLit _) _ _ = error "generic list literal"
+z3Predicate (IsIn x (All y n)) e vars = do
+  xP <- z3Predicate x e vars
+  mkOr =<< mapM (mkEq xP . fromMaybe (unknownVariablesError y) . (`lookup` vars)) (weaveVariables y n e)
+z3Predicate (IsIn x (ListLit xs)) e vars = do
+  xP <- z3Predicate x e vars
+  mkOr =<< mapM (mkIntNum >=> mkEq xP) xs
+z3Predicate TrueT _ _ = mkBool True
+z3Predicate FalseT _ _ = mkBool False
+
+unknownVariablesError :: VarExp a => a -> b
+unknownVariablesError x = error $ "unknown variable(s) {" ++ intercalate "," (toVarList x) ++ "}"
 
 -- helper for binary recursive case
 binRec :: Map Varname (Int,[Int]) -> [((Varname,Int),AST)] -> (AST -> AST -> Z3 AST) -> Term a -> Term a -> Z3 AST
@@ -89,9 +104,10 @@ binRec e vs f x y = do
   yP <- z3Predicate y e vs
   f xP yP
 
-weaveVariables :: VarExp a => a -> Map Varname (Int,[Int]) -> [(Varname,Int)]
-weaveVariables vs e =
-    map (\(x,y,_) -> (x,y))
+weaveVariables :: VarExp a => a -> Int -> Map Varname (Int,[Int]) -> [(Varname,Int)]
+weaveVariables vs n e =
+    reverse . drop n . reverse -- drop last n variables
+  . map (\(x,y,_) -> (x,y))
   . sortOn thd3
   . concatMap (\(x,(i,ks)) -> [(x,j,k) | (j,k) <- zip [i,i-1..1] ks ])
   . mapMaybe (\v -> (v,) <$> Map.lookup v e)

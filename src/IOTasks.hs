@@ -11,9 +11,10 @@ module IOTasks
   , OutputTerm, filter'
   , (.+.), (.-.), (.*.), intLit
   , (.==.), (.>.), (.>=.), (.<.), (.<=.)
-  , (.&&.), (.||.), not'
-  , sum', length', product'
-  , currentValue, allValues
+  , (.&&.), (.||.), not', true, false
+  , sum', length', product', listLit
+  , isIn, isNotIn
+  , currentValue, allValues, currentValue', allValues'
   , taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs, Outcome(..)
   , pPrintOutcome, pPrintOutcomeSimple
   , generateStaticTestSuite, taskCheckOn

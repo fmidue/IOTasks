@@ -19,8 +19,8 @@ data OutputTerm a = OutputTerm Expr [ [Varname]]
   deriving (Eq,Ord,Show)
 
 instance Accessor OutputTerm where
-  currentValue x = OutputTerm (currentE x) [toVarList x]
-  allValues x = OutputTerm (allE x) [toVarList x]
+  currentValue' x 0 = OutputTerm (currentE x) [toVarList x]
+  allValues' x 0 = OutputTerm (allE x) [toVarList x]
 
 currentE :: VarExp a => a -> Expr
 currentE x = var (show (toVarList x) ++ "_C") (undefined :: [Integer])
@@ -45,6 +45,7 @@ instance BasicLists OutputTerm where
   length' = liftExpr1 $ value "length" (fromIntegral . length :: [Integer] -> Integer)
   sum' = liftExpr1 $ value "sum" (sum :: [Integer] -> Integer)
   product' = liftExpr1 $ value "product" (product :: [Integer] -> Integer)
+  listLit = (`OutputTerm` []) . val
 
 instance ComplexLists OutputTerm where
   filter' p = liftExpr1 $ value "filter p?" (filter p)

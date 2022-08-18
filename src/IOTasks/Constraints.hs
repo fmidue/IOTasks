@@ -7,7 +7,7 @@ import IOTasks.Term
 import IOTasks.Terms (Varname)
 import IOTasks.Specification
 
-import Data.List (partition,intercalate)
+import Data.List (partition,intercalate, intersperse)
 import qualified Data.Map as Map
 import Data.Map (Map)
 
@@ -75,7 +75,7 @@ partitionPath :: Path -> ([Constraint],[Constraint])
 partitionPath = partition (\case InputConstraint{} -> True; _ -> False)
 
 printPath :: Path -> String
-printPath = intercalate ";" . map printConstraint
+printPath = unlines . intersperse " |" . map printConstraint
 
 printConstraint :: Constraint -> String
 printConstraint (InputConstraint (x,i) vs) = concat [x,"_",show i," : ",printValueSet vs]
