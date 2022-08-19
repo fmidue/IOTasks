@@ -7,7 +7,7 @@ import IOTasks.Term
 import IOTasks.Terms (Varname)
 import IOTasks.Specification
 
-import Data.List (partition,intercalate, intersperse)
+import Data.List (partition, intersperse)
 import qualified Data.Map as Map
 import Data.Map (Map)
 
@@ -64,9 +64,14 @@ type Path = [Constraint]
 paths :: Int -> ConstraintTree -> [Path]
 paths _ Empty = [[]]
 paths n _ | n < 0 = []
-paths n (Choice lt rt) = paths n lt ++ paths n rt
+paths n (Choice lt rt) = mergePaths (paths n lt) (paths n rt)
 paths n (Assert c@InputConstraint{} t) = (c:) <$> paths (n-1) t
 paths n (Assert c@ConditionConstraint{} t) = (c:) <$> paths n t
+
+mergePaths :: [Path] -> [Path] -> [Path]
+mergePaths xs [] = xs
+mergePaths [] ys = ys
+mergePaths (x:xs) (y:ys) = x:y:mergePaths xs ys
 
 pathDepth :: Path -> Int
 pathDepth =  length . fst . partitionPath

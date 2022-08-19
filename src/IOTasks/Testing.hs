@@ -50,8 +50,9 @@ taskCheckOutcome = taskCheckWithOutcome stdArgs
 
 taskCheckWithOutcome :: Args -> IOrep () -> Specification -> IO Outcome
 taskCheckWithOutcome Args{..} prog spec = do
-  let ps = sortOn pathDepth $ paths maxPathDepth $ constraintTree maxNegative spec
-  (out,satPaths,nInputs,timeouts) <- testPaths ps (0,0,0)
+  -- let ps = sortOn pathDepth $ paths maxPathDepth $ constraintTree maxNegative spec
+  let ps = paths maxPathDepth $ constraintTree maxNegative spec
+  (out,satPaths,nInputs,timeouts) <- testPaths ps (0,0,0) Nothing
   --
   when verbose $ do
     putStrLn $ unwords
@@ -63,21 +64,23 @@ taskCheckWithOutcome Args{..} prog spec = do
   pure out
 
   where
-    testPaths :: [Path] -> (Int,Int,Int) -> IO (Outcome,Int,Int,Int)
-    testPaths [] (m,n,t) = pure (Success n,m,n,t)
-    testPaths _ (m,n,t) | t > maxTimeouts = pure (GaveUp,m,n,t)
-    testPaths (p:ps) (m,n,t) = do
+    testPaths :: [Path] -> (Int,Int,Int) -> Maybe Outcome -> IO (Outcome,Int,Int,Int)
+    testPaths [] (m,n,t) (Just failure) = pure (failure,m,n,t)
+    testPaths [] (m,n,t) Nothing = pure (Success n,m,n,t)
+    testPaths _ (m,n,t) (Just failure) | t > maxTimeouts = pure (failure,m,n,t)
+    testPaths _ (m,n,t) Nothing | t > maxTimeouts = pure (GaveUp,m,n,t)
+    testPaths (p:ps) (m,n,t) mFailure = do
       sat <- isSatPath solverTimeout p
       if sat -- does not account for timeouts yet
         then do
           (out,k) <- testPath p 0 n
           case out of
-            PathSuccess -> testPaths ps (m+1,n+k,t)
-            PathFailure i et at r -> pure (Failure i et at r,m+1,n+k,t)
+            PathSuccess -> testPaths ps (m+1,n+k,t) mFailure
+            PathFailure i et at r -> testPaths (filter ((< pathDepth p) . pathDepth) ps) (m+1,n+k,t) (Just $ Failure i et at r)
             PathTimeout
-              | k > 0 -> testPaths ps (m+1,n+k,t)
-              | otherwise -> testPaths ps (m,n,t+1)
-        else testPaths ps (m,n,t)
+              | k > 0 -> testPaths ps (m+1,n+k,t) mFailure
+              | otherwise -> testPaths ps (m,n,t+1) mFailure
+        else testPaths ps (m,n,t) mFailure
     testPath :: Path -> Int -> Int -> IO (PathOutcome,Int)
     testPath _ n _ | n >= maxSuccessPerPath = pure (PathSuccess,n)
     testPath p n nOtherTests = do
