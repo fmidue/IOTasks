@@ -17,7 +17,6 @@ import Data.Function (on)
 import Data.List.Extra (maximumOn)
 
 import GHC.TypeLits
-import Debug.Trace
 
 data Term a where
   (:+:) :: Term Integer -> Term Integer -> Term Integer
