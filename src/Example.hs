@@ -269,10 +269,10 @@ hangmanProg word = go [] where
         x <- read <$> getLine
         if x `Prelude.elem` word Prelude.&& x `Prelude.notElem` guessed
           then do
-            -- putStrLn "good guess!" -- this is optional
+            putStrLn "good guess!" -- this is optional
             go (x:guessed)
           else do
-            -- putStrLn "wrong!" -- this is optional
+            putStrLn "wrong guess!" -- this is optional
             go guessed
 
 printWord :: (Eq a, Show a) => [a] -> [a] -> String

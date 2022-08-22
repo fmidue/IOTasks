@@ -14,6 +14,7 @@ import Data.List (sortOn)
 import Data.Functor (void)
 
 import Text.PrettyPrint hiding ((<>))
+import Control.Monad.State (evalStateT)
 
 taskCheck :: IOrep () -> Specification -> IO ()
 taskCheck = taskCheckWith stdArgs
@@ -51,7 +52,7 @@ taskCheckOutcome = taskCheckWithOutcome stdArgs
 taskCheckWithOutcome :: Args -> IOrep () -> Specification -> IO Outcome
 taskCheckWithOutcome Args{..} prog spec = do
   -- let ps = sortOn pathDepth $ paths maxPathDepth $ constraintTree maxNegative spec
-  let ps = paths maxPathDepth $ constraintTree maxNegative spec
+  ps <- evalStateT (satPaths maxPathDepth (constraintTree maxNegative spec) ([],0)) NoContext
   (out,satPaths,nInputs,timeouts) <- testPaths ps (0,0,0) Nothing
   --
   when verbose $ do
@@ -70,8 +71,8 @@ taskCheckWithOutcome Args{..} prog spec = do
     testPaths _ (m,n,t) (Just failure) | t > maxTimeouts = pure (failure,m,n,t)
     testPaths _ (m,n,t) Nothing | t > maxTimeouts = pure (GaveUp,m,n,t)
     testPaths (p:ps) (m,n,t) mFailure = do
-      sat <- isSatPath solverTimeout p
-      if sat -- does not account for timeouts yet
+      res <- isSatPath solverTimeout p
+      if res == SAT -- does not account for timeouts yet
         then do
           (out,k) <- testPath p 0 n
           case out of

@@ -1,6 +1,7 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
 module IOTasks.Z3 where
 
 import IOTasks.Constraints
@@ -11,13 +12,17 @@ import IOTasks.Terms (Varname, VarExp(..))
 import Z3.Monad
 
 import Test.QuickCheck (generate)
+
 import Control.Monad (forM, forM_, (>=>))
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.State
+
 import Data.Maybe (catMaybes, fromMaybe, isJust, mapMaybe)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.List (intercalate, sortOn)
 import Data.Tuple.Extra (thd3)
+import qualified Control.Exception as Exception
 
 type Timeout = Int
 
@@ -25,11 +30,56 @@ findPathInput :: Timeout -> Path -> Integer -> IO (Maybe [Integer])
 findPathInput t p bound = do
   evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) $ pathScript p $ WithSoft bound
 
-isSatPath :: Timeout -> Path -> IO Bool
+data SatResult = SAT | NotSAT deriving (Eq, Show)
+
+isSatPath :: Timeout -> Path -> IO SatResult
 isSatPath t p = do
-  isJust <$> evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) (pathScript p WithoutSoft)
+  mRes <- evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) (pathScript p WithoutSoft)
+  pure $ maybe NotSAT (const SAT) mRes
 
 data ScriptMode = WithSoft Integer | WithoutSoft
+
+data SearchContext = NoContext | LastNotSAT Int | RequirePruningCheck
+
+updateContext :: SatResult -> Int -> SearchContext -> SearchContext
+updateContext SAT _ _ = NoContext
+updateContext NotSAT d NoContext = LastNotSAT d
+updateContext NotSAT d (LastNotSAT d')
+  | d < d' = RequirePruningCheck
+  | otherwise = LastNotSAT d
+updateContext _ _ RequirePruningCheck = error "updateContext: should not happen"
+
+type PrefixPath = Path
+satPaths :: Int -> ConstraintTree -> (PrefixPath,Int) -> StateT SearchContext IO [Path]
+satPaths _ Empty (s,d) = do
+  let p = s
+  res <- lift $ isSatPath 1000 p
+  modify $ updateContext res d
+  pure [p | res == SAT ]
+satPaths n _  _ | n < 0 = pure []
+satPaths n (Choice l r) (s,d) = do
+  psl <- satPaths n l (s,d+1)
+  ctx <- get
+  case ctx of
+    RequirePruningCheck -> do
+      res <- lift $ isSatPath 1000 s
+      case res of
+        NotSAT -> pure psl -- might always be empty?
+        SAT -> do
+          put NoContext
+          psr <- satPaths n r (s,d+1)
+          pure $ psl ++ psr
+    _ -> do
+      psr <- satPaths n r (s,d+1)
+      pure $ psl ++ psr
+satPaths n (Assert c@InputConstraint{} t) (s,d) = satPaths (n-1) t (c:s,d+1) -- ordering of constraints not relevant (commutativity of conjunction)
+satPaths n (Assert c@ConditionConstraint{} t) (s,d) = satPaths n t (c:s,d+1) -- ordering of constraints not relevant (commutativity of conjunction)
+
+-- path until next choice
+lookAhead :: ConstraintTree -> Path
+lookAhead Empty = []
+lookAhead (Assert c t) = c : lookAhead t
+lookAhead Choice{} = []
 
 pathScript :: Path -> ScriptMode -> Z3 (Maybe [Integer])
 pathScript path mode = do
