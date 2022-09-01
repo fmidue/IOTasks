@@ -46,7 +46,7 @@ updateContext :: SatResult -> Int -> SearchContext -> SearchContext
 updateContext SAT _ _ = NoContext
 updateContext NotSAT d NoContext = LastNotSAT d
 updateContext NotSAT d (LastNotSAT d')
-  | d < d' = RequirePruningCheck
+  | True = RequirePruningCheck
   | otherwise = LastNotSAT d
 updateContext _ _ RequirePruningCheck = error "updateContext: should not happen"
 
