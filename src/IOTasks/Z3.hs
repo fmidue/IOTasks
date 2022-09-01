@@ -1,7 +1,6 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE ViewPatterns #-}
 module IOTasks.Z3 where
 
 import IOTasks.Constraints
@@ -13,28 +12,30 @@ import Z3.Monad
 
 import Test.QuickCheck (generate)
 
-import Control.Monad (forM, forM_, (>=>))
-import Control.Monad.IO.Class (liftIO)
+import Control.Concurrent.STM
+
 import Control.Monad.State
 
-import Data.Maybe (catMaybes, fromMaybe, isJust, mapMaybe)
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.List (intercalate, sortOn)
 import Data.Tuple.Extra (thd3)
-import qualified Control.Exception as Exception
 
 type Timeout = Int
 
 findPathInput :: Timeout -> Path -> Integer -> IO (Maybe [Integer])
-findPathInput t p bound = do
+findPathInput t p bound = fst <$> findPathInputDebug t p bound
+
+findPathInputDebug :: Timeout -> Path -> Integer -> IO (Maybe [Integer],String)
+findPathInputDebug t p bound = do
   evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) $ pathScript p $ WithSoft bound
 
 data SatResult = SAT | NotSAT deriving (Eq, Show)
 
 isSatPath :: Timeout -> Path -> IO SatResult
 isSatPath t p = do
-  mRes <- evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) (pathScript p WithoutSoft)
+  (mRes,_) <- evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) (pathScript p WithoutSoft)
   pure $ maybe NotSAT (const SAT) mRes
 
 data ScriptMode = WithSoft Integer | WithoutSoft
@@ -50,30 +51,36 @@ updateContext NotSAT d (LastNotSAT d')
 updateContext _ _ RequirePruningCheck = error "updateContext: should not happen"
 
 type PrefixPath = Path
-satPaths :: Int -> ConstraintTree -> (PrefixPath,Int) -> StateT SearchContext IO [Path]
-satPaths _ Empty (s,d) = do
-  let p = s
-  res <- lift $ isSatPath 1000 p
-  modify $ updateContext res d
-  pure [p | res == SAT ]
-satPaths n _  _ | n < 0 = pure []
-satPaths n (Choice l r) (s,d) = do
-  psl <- satPaths n l (s,d+1)
-  ctx <- get
-  case ctx of
-    RequirePruningCheck -> do
-      res <- lift $ isSatPath 1000 s
-      case res of
-        NotSAT -> pure psl -- might always be empty?
-        SAT -> do
-          put NoContext
-          psr <- satPaths n r (s,d+1)
-          pure $ psl ++ psr
-    _ -> do
-      psr <- satPaths n r (s,d+1)
-      pure $ psl ++ psr
-satPaths n (Assert c@InputConstraint{} t) (s,d) = satPaths (n-1) t (c:s,d+1) -- ordering of constraints not relevant (commutativity of conjunction)
-satPaths n (Assert c@ConditionConstraint{} t) (s,d) = satPaths n t (c:s,d+1) -- ordering of constraints not relevant (commutativity of conjunction)
+satPaths :: TVar Int -> Int -> ConstraintTree -> TQueue (Maybe Path) -> IO ()
+satPaths nVar to t q = do
+  evalStateT (satPaths' 0 to t ([],0) q) NoContext
+  atomically $ writeTQueue q Nothing
+  where
+    satPaths' :: Int -> Int -> ConstraintTree -> (PrefixPath,Int) -> TQueue (Maybe Path) -> StateT SearchContext IO ()
+    satPaths' _ to Empty (s,d) q = do
+      let path = reverse s -- constraints are stored reversed
+      res <- lift $ isSatPath to path
+      modify $ updateContext res d
+      when (res == SAT) $ lift $ atomically $ writeTQueue q $ Just path
+    satPaths' nReads to (Choice l r) (s,d) q = do
+      satPaths' nReads to l (s,d+1) q
+      ctx <- get
+      case ctx of
+        RequirePruningCheck -> do
+          res <- lift $ isSatPath to s
+          case res of
+            NotSAT -> pure ()
+            SAT -> do
+              put NoContext
+              satPaths' nReads to r (s,d+1) q
+        _ -> do
+          satPaths' nReads to r (s,d+1) q
+    satPaths' nReads to (Assert c@InputConstraint{} t) (s,d) q = do
+      n <- lift $ readTVarIO nVar
+      if nReads > n
+        then pure ()
+        else satPaths' (nReads+1) to t (c:s,d+1) q -- stores constraints in reversed order
+    satPaths' nReads to (Assert c@ConditionConstraint{} t) (s,d) q = satPaths' nReads to t (c:s,d+1) q -- stores constraints in reversed order
 
 -- path until next choice
 lookAhead :: ConstraintTree -> Path
@@ -81,7 +88,7 @@ lookAhead Empty = []
 lookAhead (Assert c t) = c : lookAhead t
 lookAhead Choice{} = []
 
-pathScript :: Path -> ScriptMode -> Z3 (Maybe [Integer])
+pathScript :: Path -> ScriptMode -> Z3 (Maybe [Integer], String)
 pathScript path mode = do
   let (tyConstr,predConstr) = partitionPath path
   vars <- forM tyConstr $
@@ -101,17 +108,15 @@ pathScript path mode = do
         eq <- mkEq ast =<< mkInteger v
         optimizeAssertSoft eq "1" def -- soft assert with weight 1 and id "default"
     WithoutSoft -> pure ()
-  -- str <- optimizeToString
-  -- liftIO $ print str
+  str <- optimizeToString
   result <- optimizeCheck []
-  case result of
+  mRes <- case result of
     Sat -> do
       model <- optimizeGetModel
       Just . catMaybes <$> mapM ((evalInt model . snd) . fst) vars
     _ -> do
-      -- str <- optimizeToString
-      -- liftIO $ print str
       pure Nothing
+  pure (mRes,str)
 
 z3Predicate :: Term a -> Map Varname (Int,[Int]) -> [((Varname, Int), AST)] -> Z3 AST
 z3Predicate (x :+: y) e vars = binRec e vars (\a b -> mkAdd [a,b]) x y

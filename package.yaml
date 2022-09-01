@@ -30,6 +30,7 @@ dependencies:
 - express
 - pretty
 - extra
+- stm
 
 ghc-options:
 - -Wall

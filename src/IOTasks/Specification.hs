@@ -87,7 +87,7 @@ runSpecification inputs spec =
         ((i,n):is)
           | vs `containsValue` read i -> RecSub i (Map.update (\xs -> Just $ (read i,n):xs) x e,is)
           | otherwise -> case mode of
-              AssumeValid -> error "invalid value"
+              AssumeValid -> error $ "invalid value: " ++ i ++ " is not an element of " ++ printValueSet vs
               UntilValid -> RecSame i (e,is)
               Abort -> NoRec $ foldr ProgRead (ProgRead '\n' Terminate) i
     )
