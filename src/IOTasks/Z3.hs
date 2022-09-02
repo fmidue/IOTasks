@@ -16,7 +16,7 @@ import Control.Concurrent.STM
 
 import Control.Monad.State
 
-import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe, fromJust)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.List (intercalate, sortOn)
@@ -51,6 +51,13 @@ updateContext NotSAT d (LastNotSAT d')
 updateContext _ _ RequirePruningCheck = error "updateContext: should not happen"
 
 type PrefixPath = Path
+satPathsDebug :: Int -> Int -> ConstraintTree -> IO [Path]
+satPathsDebug n to t = do
+  q <- atomically newTQueue
+  nVar <- newTVarIO n
+  satPaths nVar to t q
+  map fromJust . init <$> atomically (flushTQueue q)
+
 satPaths :: TVar Int -> Int -> ConstraintTree -> TQueue (Maybe Path) -> IO ()
 satPaths nVar to t q = do
   evalStateT (satPaths' 0 to t ([],0) q) NoContext
