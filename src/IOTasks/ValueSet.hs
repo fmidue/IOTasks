@@ -1,6 +1,8 @@
 module IOTasks.ValueSet where
 
 import Data.List (intersect, union)
+import Data.Set (Set)
+import qualified Data.Set as Set
 
 import Test.QuickCheck
 
@@ -35,16 +37,16 @@ containsValue None _ = False
 
 valueOf :: ValueSet -> Size -> Gen Integer
 valueOf vs sz =
-  case range vs [-sz..sz] of
+  case Set.toList $ range vs $ Set.fromAscList [-sz..sz] of
     [] -> error "valueOf: no values within size bound"
     xs -> elements xs
   where
-    range :: ValueSet -> [Integer] -> [Integer]
-    range (Union x y) r = range x r `union` range y r
-    range (Intersection x y) r = range x r `intersect` range y r
-    range (GreaterThan n) r = filter (>n) r
-    range (LessThen n) r = filter (<n) r
-    range (Eq n) r = filter (==n) r
+    range :: ValueSet -> Set Integer -> Set Integer
+    range (Union x y) r = range x r `Set.union` range y r
+    range (Intersection x y) r = range x r `Set.intersection` range y r
+    range (GreaterThan n) r = Set.filter (>n) r
+    range (LessThen n) r = Set.filter (<n) r
+    range (Eq n) r = Set.filter (==n) r
     range Every r = r
     range None _ = error "valueOf: empty ValueSet"
 
