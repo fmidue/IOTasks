@@ -259,7 +259,7 @@ hangmanSpec word = tillExit (
 digits :: ValueSet
 digits = (Eq 0 `Union` GreaterThan 0) `Intersection` LessThen 10
 
-hangmanProg :: MonadTeletype m => [Int] -> m ()
+hangmanProg :: MonadTeletype m => [Integer] -> m ()
 hangmanProg word = go [] where
   go guessed
     | Prelude.all (`Prelude.elem` guessed) word = putStrLn "correct!"
