@@ -55,7 +55,6 @@ library
     , extra
     , monad-loops
     , mtl
-    , parallel-io
     , parsec
     , pretty
     , stm
@@ -69,7 +68,7 @@ test-suite mini-IOTasks-test
       Paths_mini_IOTasks
   hs-source-dirs:
       test
-  ghc-options: -Wall -Wno-name-shadowing -fdefer-typed-holes -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -Wno-name-shadowing -fdefer-typed-holes -threaded -rtsopts -with-rtsopts=-N2 -O2
   build-depends:
       QuickCheck
     , base >=4.7 && <5
@@ -80,7 +79,6 @@ test-suite mini-IOTasks-test
     , mini-IOTasks
     , monad-loops
     , mtl
-    , parallel-io
     , parsec
     , pretty
     , stm
@@ -94,7 +92,7 @@ benchmark hangman-benchmark
       Paths_mini_IOTasks
   hs-source-dirs:
       bench
-  ghc-options: -Wall -Wno-name-shadowing -fdefer-typed-holes -threaded -rtsopts -with-rtsopts=-N -O2
+  ghc-options: -Wall -Wno-name-shadowing -fdefer-typed-holes -threaded -rtsopts -with-rtsopts=-N2 -O2
   build-depends:
       QuickCheck
     , base >=4.7 && <5
@@ -105,7 +103,6 @@ benchmark hangman-benchmark
     , mini-IOTasks
     , monad-loops
     , mtl
-    , parallel-io
     , parsec
     , pretty
     , stm

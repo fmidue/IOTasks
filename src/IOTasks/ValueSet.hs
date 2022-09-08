@@ -1,8 +1,7 @@
 module IOTasks.ValueSet where
 
-import Data.List (intersect, union)
 import Data.Set (Set)
-import qualified Data.Set as Set
+import qualified Data.Set as Set (union,intersection,filter,toList,fromAscList)
 
 import Test.QuickCheck
 

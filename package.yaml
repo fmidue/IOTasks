@@ -31,7 +31,6 @@ dependencies:
 - pretty
 - extra
 - stm
-- parallel-io
 
 ghc-options:
 - -Wall
@@ -48,7 +47,8 @@ tests:
     ghc-options:
     - -threaded
     - -rtsopts
-    - -with-rtsopts=-N
+    - -with-rtsopts=-N2
+    - -O2
     dependencies:
     - mini-IOTasks
     - hspec
@@ -60,7 +60,7 @@ benchmarks:
     ghc-options:
     - -threaded
     - -rtsopts
-    - -with-rtsopts=-N
+    - -with-rtsopts=-N2
     - -O2
     dependencies:
     - mini-IOTasks

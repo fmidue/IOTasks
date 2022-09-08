@@ -10,8 +10,7 @@ import IOTasks.Trace
 import IOTasks.Z3
 
 import Control.Concurrent.STM
-import Control.Monad (when, forM, replicateM, foldM)
-import Control.Concurrent.ParallelIO.Local
+import Control.Monad (when, forM,replicateM)
 
 import Data.Maybe (catMaybes)
 import Data.List (sortOn)
@@ -20,7 +19,6 @@ import Data.Functor (void)
 import Text.PrettyPrint hiding ((<>))
 import Control.Concurrent (forkIO, killThread)
 import Control.Exception (finally)
-import Debug.Trace
 import System.IO
 
 taskCheck :: IOrep () -> Specification -> IO ()
@@ -90,11 +88,9 @@ taskCheckWithOutcome Args{..} prog spec = do
           res <- isSatPath solverTimeout p
           if res == SAT -- does not account for timeouts yet
             then do
-              -- (out,k) <- testPathOld p 0 n
-              (out,k) <- testPath p
+              (out,k) <- testPath p 0 n
               case out of
                 PathSuccess -> do
-                  when verbose $ putStr (concat ["(",show (n+k)," tests)\r"]) >> hFlush stdout
                   testPaths nVar q (m+1,n+k,t) mFailure
                 PathFailure i et at r ->
                   if maybe True (\case {Failure j _ _ _ -> length i < length j; _ -> error "impossible"}) mFailure -- there might be paths in the queue that are longer than a found counterexample
@@ -107,48 +103,19 @@ taskCheckWithOutcome Args{..} prog spec = do
                   | k > 0 -> testPaths nVar q (m+1,n+k,t) mFailure
                   | otherwise -> testPaths nVar q (m,n,t+1) mFailure
             else testPaths nVar q (m,n,t) mFailure
-    testPath :: Path -> IO (PathOutcome,Int)
-    testPath p = do
-      results <- withPool maxSuccessPerPath $ \pool -> parallel pool (replicate maxSuccessPerPath (singleTest p))
-      pure $ foldr (\r (o,i) ->
-        case o of
-          PathSuccess -> do
-            case r of
-              PathSuccess -> (o,i+1)
-              PathTimeout -> (PathTimeout,i)
-              PathFailure{} -> (r,i+1)
-          _ -> (o,i)
-          ) (PathSuccess,0) results
-
-    singleTest :: Path -> IO PathOutcome
-    singleTest p = do
-      mNextInput <- fmap @Maybe (map show) <$> findPathInput solverTimeout p valueSize
-      case mNextInput of
-        Nothing -> pure PathTimeout -- should (only?) be the case if solving times out
-        Just nextInput  -> do
-          -- when verbose $ putStr $ concat ["("," tests)\r"]
-          let
-            specTrace = runSpecification nextInput spec
-            progTrace = runProgram nextInput prog
-          case specTrace `covers` progTrace of
-            MatchSuccessfull -> pure PathSuccess
-            failure -> do
-              when verbose $ putStrLn $ unwords ["found counterexample of length",show $ length nextInput]
-              pure $ PathFailure nextInput specTrace progTrace failure
-
-    testPathOld :: Path -> Int -> Int -> IO (PathOutcome,Int)
-    testPathOld _ n _ | n >= maxSuccessPerPath = pure (PathSuccess,n)
-    testPathOld p n nOtherTests = do
+    testPath :: Path -> Int -> Int -> IO (PathOutcome,Int)
+    testPath _ n _ | n >= maxSuccessPerPath = pure (PathSuccess,n)
+    testPath p n nOtherTests = do
       mNextInput <- fmap @Maybe (map show) <$> findPathInput solverTimeout p valueSize
       case mNextInput of
         Nothing -> pure (PathTimeout,n) -- should (only?) be the case if solving times out
         Just nextInput  -> do
-          when verbose $ putStr $ concat ["(",show (n+nOtherTests)," tests)\r"]
+          when verbose (putStr (concat ["(",show (n+nOtherTests)," tests)\r"]) >> hFlush stdout)
           let
             specTrace = runSpecification nextInput spec
             progTrace = runProgram nextInput prog
           case specTrace `covers` progTrace of
-            MatchSuccessfull -> testPathOld p (n+1) nOtherTests
+            MatchSuccessfull -> testPath p (n+1) nOtherTests
             failure -> do
               when verbose $ putStrLn $ unwords ["found counterexample of length",show $ length nextInput]
               pure (PathFailure nextInput specTrace progTrace failure,n+1)
