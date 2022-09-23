@@ -10,6 +10,7 @@ import IOTasks.Term
 import IOTasks.Terms (Varname)
 import IOTasks.Trace
 import IOTasks.OutputPattern
+import IOTasks.Overflow
 
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -78,31 +79,33 @@ vars = nub . go where
   go (TillE bdy s') = go bdy ++ go s'
   go E = []
 
-runSpecification :: [String] -> Specification -> Trace
+runSpecification :: [String] -> Specification -> (Trace,OverflowWarning)
 runSpecification inputs spec =
   sem
     (\(e,ins) x vs mode ->
       case ins of
-        [] -> NoRec OutOfInputs
+        [] -> NoRec (OutOfInputs,NoOverflow)
         ((i,n):is)
           | vs `containsValue` read i -> RecSub i (Map.update (\xs -> Just $ (read i,n):xs) x e,is)
           | otherwise -> case mode of
               AssumeValid -> error $ "invalid value: " ++ i ++ " is not an element of " ++ printValueSet vs
               UntilValid -> RecSame i (e,is)
-              Abort -> NoRec $ foldr ProgRead (ProgRead '\n' Terminate) i
+              Abort -> NoRec (foldr ProgRead (ProgRead '\n' Terminate) i,NoOverflow)
     )
     (\case
       NoRec r -> r
-      RecSub i t' -> foldr ProgRead (ProgRead '\n' t') i
-      RecSame i t' -> foldr ProgRead (ProgRead '\n' t') i
+      RecSub i (t',w) -> (foldr ProgRead (ProgRead '\n' t') i,w)
+      RecSame i (t',w) -> (foldr ProgRead (ProgRead '\n' t') i,w)
       RecBoth{} -> error "runSpecification: impossible"
     )
-    (\(e,_) o ts t' ->
-      let os = Set.map (evalPattern e) ts
-      in progWrite o (os `Set.union` Set.map (<> Text "\n") os) <> t'
+    (\(e,_) o ts (t',w) ->
+      let (warn,os) = Set.foldr (\t (w,s) -> let (w',p) = evalPattern e t in (w <> w', Set.insert p s)) mempty ts
+      in (progWrite o (os `Set.union` Set.map (<> Text "\n") os) <> t',warn <> w)
     )
-    (\(e,_) c l r -> if eval c e then l else r)
-    Terminate
+    (\(e,_) c (l,wl) (r,wr) ->
+      let (w,b) = eval c e
+      in if b then (l,wl <> w) else (r,wr <> w))
+    (Terminate,NoOverflow)
     (Map.fromList ((,[]) <$> vars spec),inputs `zip` [1..])
     spec
 

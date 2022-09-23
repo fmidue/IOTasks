@@ -80,8 +80,8 @@ genTrace spec depth bound maxNeg =
         foldr ProgRead t' (show i ++ "\n")
       RecBoth{} -> error "genTrace: impossible"
     )
-    (\(e,_,_) o ts t' -> ProgWrite o (Set.map (evalPattern e) ts) <$> t')
-    (\(e,_,_) c l r -> if eval c e then l else r)
+    (\(e,_,_) o ts t' -> ProgWrite o (Set.map (snd . evalPattern e) ts) <$> t')
+    (\(e,_,_) c l r -> if snd $ eval c e then l else r)
     (pure Terminate)
     (Map.fromList ((,[]) <$> vars spec),1,0)
     spec
@@ -91,7 +91,7 @@ runTests = go 0 where
   go n _ _ [] = Success n
   go n prog spec (i:is) =
     let
-      specTrace = runSpecification i spec
+      (specTrace,warn) = runSpecification i spec
       progTrace = runProgram i prog
     in case specTrace `covers` progTrace of
       MatchSuccessfull -> go (n+1) prog spec is

@@ -8,38 +8,39 @@
 module IOTasks.Term where
 
 import IOTasks.Terms
+import IOTasks.Overflow
 
 import Data.Maybe (fromMaybe,mapMaybe)
 import Data.Map (Map)
 import qualified Data.Map as Map (lookup)
 import Data.List (sortBy, intercalate)
 import Data.Function (on)
-import Data.List.Extra (maximumOn)
+import Data.List.Extra (maximumOn, mconcatMap)
 
 import GHC.TypeLits
 
 data Term a where
-  (:+:) :: Term Integer -> Term Integer -> Term Integer
-  (:-:) :: Term Integer -> Term Integer -> Term Integer
-  (:*:) :: Term Integer -> Term Integer -> Term Integer
-  (:==:) :: Term Integer -> Term Integer -> Term Bool
-  (:>:) :: Term Integer -> Term Integer -> Term Bool
-  (:>=:) :: Term Integer -> Term Integer -> Term Bool
-  (:<:) :: Term Integer -> Term Integer -> Term Bool
-  (:<=:) :: Term Integer -> Term Integer -> Term Bool
+  (:+:) :: Term I -> Term I -> Term I
+  (:-:) :: Term I -> Term I -> Term I
+  (:*:) :: Term I -> Term I -> Term I
+  (:==:) :: Term I -> Term I -> Term Bool
+  (:>:) :: Term I -> Term I -> Term Bool
+  (:>=:) :: Term I -> Term I -> Term Bool
+  (:<:) :: Term I -> Term I -> Term Bool
+  (:<=:) :: Term I -> Term I -> Term Bool
   Not :: Term Bool -> Term Bool
   (:&&:) :: Term Bool -> Term Bool -> Term Bool
   (:||:) :: Term Bool -> Term Bool -> Term Bool
   TrueT :: Term Bool
   FalseT :: Term Bool
-  Length :: Term [Integer] -> Term Integer
-  Sum :: Term [Integer] -> Term Integer
-  Product :: Term [Integer] -> Term Integer
-  IsIn :: Term Integer -> Term [Integer] -> Term Bool
-  Current :: VarExp a => a -> Int -> Term Integer
-  All :: VarExp a => a -> Int -> Term [Integer]
-  IntLit :: Integer -> Term Integer
-  ListLit :: [Integer] -> Term [Integer]
+  Length :: Term [I] -> Term I
+  Sum :: Term [I] -> Term I
+  Product :: Term [I] -> Term I
+  IsIn :: Term I -> Term [I] -> Term Bool
+  Current :: VarExp a => a -> Int -> Term I
+  All :: VarExp a => a -> Int -> Term [I]
+  IntLit :: Integer -> Term I
+  ListLit :: [Integer] -> Term [I]
 
 
 -- deriving instance Eq (Term a)
@@ -87,31 +88,33 @@ instance TypeError (Text "complex list functions, like filter, can not be used a
   => ComplexLists Term where
   filter' = error "unreachable"
 
-eval :: Term a -> Map Varname [(Integer,Int)] -> a
-eval (x :+: y) e = eval x e + eval y e
-eval (x :-: y) e = eval x e - eval y e
-eval (x :*: y) e = eval x e * eval y e
-eval (x :==: y) e = eval x e == eval y e
-eval (x :>: y) e = eval x e > eval y e
-eval (x :>=: y) e = eval x e >= eval y e
-eval (x :<=: y) e = eval x e <= eval y e
-eval (x :<: y) e = eval x e < eval y e
-eval (Not b) e = not $ eval b e
-eval (x :&&: y) e = eval x e && eval y e
-eval (x :||: y) e = eval x e || eval y e
-eval TrueT _ = True
-eval FalseT _ = False
-eval (Length xs) e = fromIntegral . length $ eval xs e
-eval (Sum xs) e = fromIntegral . sum $ eval xs e
-eval (Product xs) e = fromIntegral . product $ eval xs e
-eval (Current x n) e = fromMaybe (error $ "empty list for {" ++ intercalate "," (toVarList x) ++ "}") $ safeHead $ primEvalVar x n e
-eval (All x n) e = reverse $ primEvalVar x n e
-eval (IntLit n) _ = n
-eval (ListLit xs) _ = xs
-eval (IsIn x xs) e = eval x e `elem` eval xs e
+eval :: Term a -> Map Varname [(Integer,Int)] -> (OverflowWarning,a)
+eval (x :+: y) e = let (w,r) = (+) <$> eval x e <*> eval y e in (checkOverflow r <> w, r)
+eval (x :-: y) e = let (w,r) = (-) <$> eval x e <*> eval y e in (checkOverflow r <> w, r)
+eval (x :*: y) e = let (w,r) = (*) <$> eval x e <*> eval y e in (checkOverflow r <> w, r)
+eval (x :==: y) e = (==) <$> eval x e <*> eval y e
+eval (x :>: y) e = (>) <$> eval x e <*> eval y e
+eval (x :>=: y) e = (>=) <$> eval x e <*> eval y e
+eval (x :<=: y) e = (<=) <$> eval x e <*> eval y e
+eval (x :<: y) e = (<) <$> eval x e <*> eval y e
+eval (Not b) e = not <$> eval b e
+eval (x :&&: y) e = (&&) <$> eval x e <*> eval y e
+eval (x :||: y) e = (||) <$> eval x e <*> eval y e
+eval TrueT _ = (mempty,True)
+eval FalseT _ = (mempty,False)
+eval (Length xs) e = fromIntegral . length <$> eval xs e
+eval (Sum xs) e = let (w,r) = sum <$> eval xs e in (checkOverflow r <> w, r)
+eval (Product xs) e = let (w,r) = product <$> eval xs e in (checkOverflow r <> w, r)
+eval (Current x n) e = fromMaybe (error $ "empty list for {" ++ intercalate "," (toVarList x) ++ "}") . safeHead <$> primEvalVar x n e
+eval (All x n) e = reverse <$> primEvalVar x n e
+eval (IntLit n) _ = (checkOverflow $ fromInteger n ,fromInteger n)
+eval (ListLit xs) _ = let xs' = fromInteger <$> xs in (foldMap checkOverflow xs', xs')
+eval (IsIn x xs) e = elem <$> eval x e <*> eval xs e
 
-primEvalVar :: VarExp a => a -> Int -> Map Varname [(Integer,Int)] -> [Integer]
-primEvalVar x n e = drop n . (map fst . sortBy (flip compare `on` snd) . concat) $ mapMaybe (`Map.lookup` e) (toVarList x)
+primEvalVar :: VarExp a => a -> Int -> Map Varname [(Integer,Int)] -> (OverflowWarning,[I])
+primEvalVar x n e =
+  let xs = drop n . (map (fromInteger . fst) . sortBy (flip compare `on` snd) . concat) $ mapMaybe (`Map.lookup` e) (toVarList x)
+  in (mconcatMap checkOverflow xs,xs)
 
 safeHead :: [a] -> Maybe a
 safeHead [] = Nothing

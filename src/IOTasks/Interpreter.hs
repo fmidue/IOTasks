@@ -45,13 +45,13 @@ interpret s = do
         if Set.size ts == 1
           then do
             e <- get
-            lift $ putStrLn $ printPattern $ evalPattern e (Set.elemAt 0 ts)
+            lift $ putStrLn $ printPattern $ snd $ evalPattern e (Set.elemAt 0 ts)
             p'
           else error "interpret: impossible"
       )
       (\_ cond pl pr -> do
         e <- get
-        if eval cond e
+        if snd $ eval cond e
           then pl
           else pr
       )

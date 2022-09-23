@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeApplications #-}
 module IOTasks.OutputTerm
   ( OutputTerm
   , eval
@@ -6,6 +7,7 @@ module IOTasks.OutputTerm
 import Prelude hiding (all)
 
 import IOTasks.Terms
+import IOTasks.Overflow
 
 import Data.Express (Expr((:$)), var, val, value, (//-), evl)
 import Data.Map (Map)
@@ -23,28 +25,28 @@ instance Accessor OutputTerm where
   allValues' x 0 = OutputTerm (allE x) [toVarList x]
 
 currentE :: VarExp a => a -> Expr
-currentE x = var (show (toVarList x) ++ "_C") (undefined :: [Integer])
+currentE x = var (show (toVarList x) ++ "_C") (undefined :: [I])
 
 allE :: VarExp a => a -> Expr
-allE x = var (show (toVarList x) ++ "_A") (undefined :: [Integer])
+allE x = var (show (toVarList x) ++ "_A") (undefined :: [I])
 
 eval :: Typeable a => OutputTerm a -> Map Varname [(Integer,Int)] -> a
-eval (OutputTerm t xss) e = evl (t //- concat [ [(currentE xs,val $ head xs'),(allE xs,val xs')] | xs <- nub xss, let xs' = combinedVars xs ])
+eval (OutputTerm t xss) e = evl (t //- concat [ [(currentE xs,val $ fromInteger @I $ head xs'),(allE xs,val $ map (fromInteger @I) xs')] | xs <- nub xss, let xs' = combinedVars xs ])
   where
     combinedVars :: [Varname] -> [Integer]
     combinedVars xs = (map fst . sortBy (flip compare `on` snd) . concat) $ mapMaybe (`Map.lookup` e) xs
 
 --
 instance Arithmetic OutputTerm where
-  (.+.) = liftExpr2 $ value "(+)" ((+) :: Integer -> Integer -> Integer)
-  (.-.) = liftExpr2 $ value "(-)" ((-) :: Integer -> Integer -> Integer)
-  (.*.) = liftExpr2 $ value "(*)" ((*) :: Integer -> Integer -> Integer)
+  (.+.) = liftExpr2 $ value "(+)" ((+) :: I -> I -> I)
+  (.-.) = liftExpr2 $ value "(-)" ((-) :: I -> I -> I)
+  (.*.) = liftExpr2 $ value "(*)" ((*) :: I -> I -> I)
   intLit = (`OutputTerm` []) . val
 
 instance BasicLists OutputTerm where
-  length' = liftExpr1 $ value "length" (fromIntegral . length :: [Integer] -> Integer)
-  sum' = liftExpr1 $ value "sum" (sum :: [Integer] -> Integer)
-  product' = liftExpr1 $ value "product" (product :: [Integer] -> Integer)
+  length' = liftExpr1 $ value "length" (fromIntegral . length :: [I] -> I)
+  sum' = liftExpr1 $ value "sum" (sum :: [I] -> I)
+  product' = liftExpr1 $ value "product" (product :: [I] -> I)
   listLit = (`OutputTerm` []) . val
 
 instance ComplexLists OutputTerm where

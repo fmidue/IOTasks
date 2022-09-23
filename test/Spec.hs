@@ -37,6 +37,14 @@ main = hspec $ do
       it "taskCheck example2 specification" $
         (taskCheckOutcome prog2' example2 <&> isSuccess) `shouldReturn` False
 
+    describe "prog2''" $ do
+      it "taskCheck example2' specification" $
+        (taskCheckOutcome prog2'' example2' <&> isSuccess) `shouldReturn` True
+      it "does not fulfill example1 specification" $
+        (taskCheckOutcome prog2'' example1 <&> not . isSuccess) `shouldReturn` True
+      it "does not fulfill example3 specification" $
+        (taskCheckOutcome prog2'' example3 <&> not . isSuccess) `shouldReturn` True
+
     describe "prog3" $ do
       it "taskCheck example3 specification" $
         (taskCheckOutcome prog3 example3 <&> isSuccess) `shouldReturn` True

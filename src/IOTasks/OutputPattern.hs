@@ -8,6 +8,7 @@ module IOTasks.OutputPattern where
 import Prelude hiding (all)
 
 import IOTasks.Terms (Varname)
+import IOTasks.Overflow
 import IOTasks.OutputTerm
 
 import Data.Either (isRight)
@@ -20,7 +21,7 @@ data OutputPattern (t :: PatternType) where
   Wildcard :: OutputPattern t
   Text :: String -> OutputPattern t
   Sequence :: OutputPattern t -> OutputPattern t -> OutputPattern t
-  Value :: OutputTerm Integer -> OutputPattern 'SpecificationP
+  Value :: OutputTerm I -> OutputPattern 'SpecificationP
 
 data PatternType = SpecificationP | TraceP
 
@@ -40,11 +41,11 @@ instance Semigroup (OutputPattern t) where
 instance Monoid (OutputPattern t) where
   mempty = Text ""
 
-evalPattern :: Map Varname [(Integer,Int)] -> OutputPattern t -> OutputPattern 'TraceP
-evalPattern _ Wildcard = Wildcard
-evalPattern _ (Text s) = Text s
+evalPattern :: Map Varname [(Integer,Int)] -> OutputPattern t -> (OverflowWarning, OutputPattern 'TraceP)
+evalPattern _ Wildcard = (NoOverflow, Wildcard)
+evalPattern _ (Text s) = (NoOverflow, Text s)
 evalPattern e (Sequence x y) = evalPattern e x <> evalPattern e y
-evalPattern e (Value t) = Text . show @Integer $ eval t e
+evalPattern e (Value t) = let x = eval t e in (checkOverflow x,Text $ show @I x)
 
 printPattern :: OutputPattern 'TraceP -> String
 printPattern Wildcard = "_"

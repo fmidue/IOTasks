@@ -5,6 +5,7 @@ import Prelude hiding
   ,until)
 
 import IOTasks
+import IOTasks.Overflow
 
 --example specifications
 
@@ -22,6 +23,14 @@ example2 =
   until (length' (allValues "x") .==. currentValue "n")
     (writeOptionalOutput [Value $ currentValue "n" .-. length' (allValues "x")] <> readInput "x" ints AssumeValid) <>
   writeOutput [Value $ sum' $ allValues "x"]
+
+-- simple overflow example
+example2' :: Specification
+example2' =
+  readInput "n" nats UntilValid <>
+  until (length' (allValues "x") .==. currentValue "n")
+    (writeOptionalOutput [Value $ currentValue "n" .-. length' (allValues "x")] <> readInput "x" ints AssumeValid) <>
+  writeOutput [Value $ product' $ allValues "x"]
 
 example3 :: Specification
 example3 =
@@ -122,6 +131,20 @@ prog2' = do
         i <- readLn
         loop (m+1) (x+1+i)
   loop 1 0
+
+prog2'' :: MonadTeletype m => m ()
+prog2'' = do
+  n <- readLn @_ @Integer
+  if n < 0
+    then prog2''
+    else
+      let
+      loop 0 x = print @_ @Integer x
+      loop m x = do
+        print m
+        i <- readLn
+        loop (m-1) (x*i)
+      in loop n 1
 
 prog3 :: MonadTeletype m => m ()
 prog3 = do
@@ -253,7 +276,7 @@ hangmanSpec word = tillExit (
     (writeOptionalOutput [Text "wrong guess!"])
   )
   where
-    winCond :: Term [Integer] -> Term Bool
+    winCond :: Term [I] -> Term Bool
     winCond g = foldr (\a b -> intLit a `isIn` g .&&. b) true word
 
 digits :: ValueSet

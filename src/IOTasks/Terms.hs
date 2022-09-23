@@ -2,6 +2,8 @@
 {-# LANGUAGE DefaultSignatures #-}
 module IOTasks.Terms where
 
+import IOTasks.Overflow
+
 type Varname = String
 
 class VarExp a where
@@ -14,27 +16,27 @@ instance VarExp [Varname] where
   toVarList = id
 
 class Accessor t where
-  currentValue :: VarExp a => a -> t Integer
+  currentValue :: VarExp a => a -> t I
   currentValue x = currentValue' x 0
-  currentValue' :: VarExp a => a -> Int -> t Integer
+  currentValue' :: VarExp a => a -> Int -> t I
 
-  allValues :: VarExp a => a -> t [Integer]
+  allValues :: VarExp a => a -> t [I]
   allValues x = allValues' x 0
-  allValues' :: VarExp a => a -> Int -> t [Integer]
+  allValues' :: VarExp a => a -> Int -> t [I]
 
 -- TODO: good names?
 class Arithmetic t where
-  (.+.) :: t Integer -> t Integer -> t Integer
-  (.-.) :: t Integer -> t Integer -> t Integer
-  (.*.) :: t Integer -> t Integer -> t Integer
-  intLit :: Integer -> t Integer
+  (.+.) :: t I -> t I -> t I
+  (.-.) :: t I -> t I -> t I
+  (.*.) :: t I -> t I -> t I
+  intLit :: Integer -> t I
 
 class Compare t where
-  (.==.) :: t Integer -> t Integer -> t Bool
-  (.>.) :: t Integer -> t Integer -> t Bool
-  (.>=.) :: t Integer -> t Integer -> t Bool
-  (.<.) :: t Integer -> t Integer -> t Bool
-  (.<=.) :: t Integer -> t Integer -> t Bool
+  (.==.) :: t I -> t I -> t Bool
+  (.>.) :: t I -> t I -> t Bool
+  (.>=.) :: t I -> t I -> t Bool
+  (.<.) :: t I -> t I -> t Bool
+  (.<=.) :: t I -> t I -> t Bool
 
 class Logic t where
   not' :: t Bool -> t Bool
@@ -44,20 +46,20 @@ class Logic t where
   false :: t Bool
 
 class BasicLists t where
-  length' :: t [Integer] -> t Integer
-  sum' :: t [Integer] -> t Integer
-  product' :: t [Integer] -> t Integer
-  listLit :: [Integer] -> t [Integer]
+  length' :: t [I] -> t I
+  sum' :: t [I] -> t I
+  product' :: t [I] -> t I
+  listLit :: [Integer] -> t [I]
 
 class Sets t where
-  isIn :: t Integer -> t [Integer] -> t Bool
-  isNotIn :: t Integer -> t [Integer] -> t Bool
+  isIn :: t I -> t [I] -> t Bool
+  isNotIn :: t I -> t [I] -> t Bool
 
-  default isIn :: Logic t => t Integer -> t [Integer] -> t Bool
+  default isIn :: Logic t => t I -> t [I] -> t Bool
   isIn x xs = not' (x `isNotIn` xs)
-  default isNotIn :: Logic t => t Integer -> t [Integer] -> t Bool
+  default isNotIn :: Logic t => t I -> t [I] -> t Bool
   isNotIn x xs = not' (x `isIn` xs)
 
 class ComplexLists t where
   -- TODO: improve signature?
-  filter' :: (Integer -> Bool) -> t [Integer] -> t [Integer]
+  filter' :: (I -> Bool) -> t [I] -> t [I]

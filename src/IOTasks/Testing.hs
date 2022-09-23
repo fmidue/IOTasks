@@ -8,9 +8,10 @@ import IOTasks.Specification
 import IOTasks.Constraints
 import IOTasks.Trace
 import IOTasks.Z3
+import IOTasks.Overflow
 
 import Control.Concurrent.STM
-import Control.Monad (when, forM,replicateM)
+import Control.Monad (when, forM, replicateM)
 
 import Data.Maybe (catMaybes)
 import Data.List (sortOn)
@@ -112,8 +113,9 @@ taskCheckWithOutcome Args{..} prog spec = do
         Just nextInput  -> do
           when verbose (putStr (concat ["(",show (n+nOtherTests)," tests)\r"]) >> hFlush stdout)
           let
-            specTrace = runSpecification nextInput spec
+            (specTrace,warn) = runSpecification nextInput spec
             progTrace = runProgram nextInput prog
+          when (warn == Overflow) $ putStrLn "Overflow of Int range detected."
           case specTrace `covers` progTrace of
             MatchSuccessfull -> testPath p (n+1) nOtherTests
             failure -> do
@@ -165,7 +167,7 @@ taskCheckOn = go 0 where
   go n [] _ _ = Success n
   go n (i:is) prog spec =
     let
-      specTrace = runSpecification i spec
+      (specTrace,w) = runSpecification i spec
       progTrace = runProgram i prog
     in case specTrace `covers` progTrace of
       MatchSuccessfull -> go (n+1) is prog spec

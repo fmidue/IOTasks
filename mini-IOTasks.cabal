@@ -33,6 +33,7 @@ library
       IOTasks.MonadTeletype
       IOTasks.OutputPattern
       IOTasks.OutputTerm
+      IOTasks.Overflow
       IOTasks.Random
       IOTasks.Random.Testing
       IOTasks.Specification
