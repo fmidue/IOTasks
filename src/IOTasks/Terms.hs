@@ -2,8 +2,6 @@
 {-# LANGUAGE DefaultSignatures #-}
 module IOTasks.Terms where
 
-import IOTasks.Overflow
-
 type Varname = String
 
 class VarExp a where

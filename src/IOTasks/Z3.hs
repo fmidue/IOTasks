@@ -1,6 +1,8 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ViewPatterns #-}
 module IOTasks.Z3 where
 
 import IOTasks.Constraints
@@ -126,41 +128,46 @@ pathScript path mode = do
   pure (mRes,str)
 
 z3Predicate :: Term a -> Map Varname (Int,[Int]) -> [((Varname, Int), AST)] -> Z3 AST
-z3Predicate (x :+: y) e vars = binRec e vars (\a b -> mkAdd [a,b]) x y
-z3Predicate (x :-: y) e vars = binRec e vars (\a b -> mkSub [a,b]) x y
-z3Predicate (x :*: y) e vars = binRec e vars (\a b -> mkMul [a,b]) x y
-z3Predicate (x :==: y) e vars = binRec e vars mkEq x y
-z3Predicate (x :>: y) e vars = binRec e vars mkGt x y
-z3Predicate (x :>=: y) e vars = binRec e vars mkGe x y
-z3Predicate (x :<: y) e vars = binRec e vars mkLt x y
-z3Predicate (x :<=: y) e vars = binRec e vars mkLe x y
-z3Predicate (Not x) e vars = mkNot =<< z3Predicate x e vars
-z3Predicate (x :&&: y) e vars = binRec e vars (\a b -> mkAnd [a,b]) x y
-z3Predicate (x :||: y) e vars = binRec e vars (\a b -> mkOr [a,b]) x y
-z3Predicate (Length (All x n)) e _ = mkIntNum $ length $ weaveVariables x n e
-z3Predicate (Sum (All x n)) e vars = mkAdd $ lookupList (weaveVariables x n e) vars
-z3Predicate (Product (All x n)) e vars = mkMul $ lookupList (weaveVariables x n e) vars
-z3Predicate (Length (ListLit xs)) _ _ = mkIntNum $ length xs
-z3Predicate (Sum (ListLit xs)) _ _ = mkIntNum $ sum xs
-z3Predicate (Product (ListLit xs)) _ _ = mkIntNum $ product xs
-z3Predicate (Current x n) e vars = pure $ fromMaybe (unknownVariablesError x) $ (`lookup` vars) . last $ weaveVariables x n e
-z3Predicate (All _x _) _e _vars = error "generic list"
-z3Predicate (IntLit n) _ _ = mkIntNum n
-z3Predicate (ListLit _) _ _ = error "generic list literal"
-z3Predicate (IsIn x (All y n)) e vars = do
+z3Predicate (termStruct -> Binary IsIn x (All y n)) e vars = do
   xP <- z3Predicate x e vars
   mkOr =<< mapM (mkEq xP . fromMaybe (unknownVariablesError y) . (`lookup` vars)) (weaveVariables y n e)
-z3Predicate (IsIn x (ListLit xs)) e vars = do
+z3Predicate (termStruct -> Binary IsIn x (ListLitT xs)) e vars = do
   xP <- z3Predicate x e vars
   mkOr =<< mapM (mkIntNum >=> mkEq xP) xs
-z3Predicate TrueT _ _ = mkBool True
-z3Predicate FalseT _ _ = mkBool False
+z3Predicate (termStruct -> Binary f x y) e vars = binRec e vars (binF f) x y where
+  binF :: BinaryF a b c -> AST -> AST -> Z3 AST
+  binF (:+:) = \a b -> mkAdd [a,b]
+  binF (:-:) = \a b -> mkSub [a,b]
+  binF (:*:) = \a b -> mkMul [a,b]
+  binF (:==:) = mkEq
+  binF (:>:) = mkGt
+  binF (:>=:) = mkGe
+  binF (:<:) = mkLt
+  binF (:<=:) = mkLe
+  binF (:&&:) = \a b -> mkAnd [a,b]
+  binF (:||:) = \a b -> mkOr [a,b]
+  binF _ = error ""
+z3Predicate (termStruct -> Unary Not x) e vars = mkNot =<< z3Predicate x e vars
+z3Predicate (termStruct -> Unary Length (All x n)) e _ = mkIntNum $ length $ weaveVariables x n e
+z3Predicate (termStruct -> Unary Sum (All x n)) e vars = mkAdd $ lookupList (weaveVariables x n e) vars
+z3Predicate (termStruct -> Unary Product (All x n)) e vars = do
+  a <- mkMul $ lookupList (weaveVariables x n e) vars
+  overflowConstraints a
+  return a
+z3Predicate (termStruct -> Unary Length (ListLitT xs)) _ _ = mkIntNum $ length xs
+z3Predicate (termStruct -> Unary Sum (ListLitT xs)) _ _ = mkIntNum $ sum xs
+z3Predicate (termStruct -> Unary Product (ListLitT xs)) _ _ = mkIntNum $ product xs
+z3Predicate (termStruct -> Var C x n) e vars = pure $ fromMaybe (unknownVariablesError x) $ (`lookup` vars) . last $ weaveVariables x n e
+z3Predicate (termStruct -> Var A _x _) _e _vars = error "generic list"
+z3Predicate (termStruct -> Literal (IntLit n)) _ _ = mkIntNum n
+z3Predicate (termStruct -> Literal (ListLit _)) _ _ = error "generic list literal"
+z3Predicate (termStruct -> Literal (BoolLit b)) _ _ = mkBool b
 
 unknownVariablesError :: VarExp a => a -> b
 unknownVariablesError x = error $ "unknown variable(s) {" ++ intercalate "," (toVarList x) ++ "}"
 
 -- helper for binary recursive case
-binRec :: Map Varname (Int,[Int]) -> [((Varname,Int),AST)] -> (AST -> AST -> Z3 AST) -> Term a -> Term a -> Z3 AST
+binRec :: Map Varname (Int,[Int]) -> [((Varname,Int),AST)] -> (AST -> AST -> Z3 AST) -> Term a -> Term b -> Z3 AST
 binRec e vs f x y = do
   xP <- z3Predicate x e vs
   yP <- z3Predicate y e vs
@@ -192,3 +199,10 @@ z3ValueSetConstraint (LessThen n) xVar = mkIntNum n >>= mkLt xVar
 z3ValueSetConstraint (Eq n) xVar = mkIntNum n >>= mkEq xVar
 z3ValueSetConstraint Every _ = mkTrue
 z3ValueSetConstraint None _ = mkFalse
+
+overflowConstraints :: AST -> Z3 ()
+overflowConstraints x = do
+  minInt <- mkInteger (toInteger $ minBound @Int)
+  maxInt <- mkInteger (toInteger $ maxBound @Int)
+  optimizeAssert =<< mkGe x minInt
+  optimizeAssert =<< mkLe x maxInt

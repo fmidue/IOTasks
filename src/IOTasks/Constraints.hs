@@ -46,7 +46,7 @@ constraintTree negMax =
       RecSame{} -> error "constraintTree: impossible"
     )
     (\_ _ _ t -> t)
-    (\(_,e,_) c l r -> Choice (Assert (ConditionConstraint c e) l) (Assert (ConditionConstraint (Not c) e) r))
+    (\(_,e,_) c l r -> Choice (Assert (ConditionConstraint c e) l) (Assert (ConditionConstraint (NotT c) e) r))
     Empty
     (0,Map.empty,1)
 

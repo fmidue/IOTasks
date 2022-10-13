@@ -2,7 +2,6 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeApplications #-}
 module IOTasks.OutputPattern where
 
 import Prelude hiding (all)
@@ -13,6 +12,7 @@ import IOTasks.OutputTerm
 
 import Data.Either (isRight)
 import Data.Map (Map)
+import Data.Bifunctor (second)
 
 import Text.Parsec
 import Data.Char (isPrint, showLitChar)
@@ -46,7 +46,7 @@ evalPattern :: Map Varname [(Integer,Int)] -> OutputPattern t -> (OverflowWarnin
 evalPattern _ Wildcard = (NoOverflow, Wildcard)
 evalPattern _ (Text s) = (NoOverflow, Text s)
 evalPattern e (Sequence x y) = evalPattern e x <> evalPattern e y
-evalPattern e (Value t) = let x = eval t e in (checkOverflow (fromInteger x),Text $ show x)
+evalPattern e (Value t) = second (Text . show) $ eval t e
 
 printPattern :: OutputPattern 'TraceP -> String
 printPattern Wildcard = "_"

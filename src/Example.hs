@@ -5,8 +5,6 @@ import Prelude hiding
   ,until)
 
 import IOTasks
-import IOTasks.Overflow
-
 --example specifications
 
 example1 :: Specification
