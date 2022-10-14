@@ -16,12 +16,13 @@ import Data.Map (Map)
 
 import Text.Parsec
 import Data.Char (isPrint, showLitChar)
+import Control.Monad (void)
 
 data OutputPattern (t :: PatternType) where
   Wildcard :: OutputPattern t
   Text :: String -> OutputPattern t
   Sequence :: OutputPattern t -> OutputPattern t -> OutputPattern t
-  Value :: OutputTerm I -> OutputPattern 'SpecificationP
+  Value :: OutputTerm Integer -> OutputPattern 'SpecificationP
 
 data PatternType = SpecificationP | TraceP
 
@@ -45,7 +46,7 @@ evalPattern :: Map Varname [(Integer,Int)] -> OutputPattern t -> (OverflowWarnin
 evalPattern _ Wildcard = (NoOverflow, Wildcard)
 evalPattern _ (Text s) = (NoOverflow, Text s)
 evalPattern e (Sequence x y) = evalPattern e x <> evalPattern e y
-evalPattern e (Value t) = let x = eval t e in (checkOverflow x,Text $ show @I x)
+evalPattern e (Value t) = let x = eval t e in (checkOverflow (fromInteger x),Text $ show x)
 
 printPattern :: OutputPattern 'TraceP -> String
 printPattern Wildcard = "_"
@@ -62,7 +63,7 @@ printPatternSimple p =
 p >: q = isRight $ parse (patternParser p <> eof) "" $ printPattern q
 
 patternParser :: OutputPattern 'TraceP -> Parsec String () ()
-patternParser Wildcard = () <$ many (satisfy isPrint)
-patternParser (Text s) = () <$ string (foldr showLitChar "" s)
+patternParser Wildcard = void $ many (satisfy isPrint)
+patternParser (Text s) = void $ string (foldr showLitChar "" s)
 patternParser p@(Sequence Wildcard q) = try (anyChar >> patternParser p) <|> patternParser q
 patternParser (Sequence p q) = patternParser p >> patternParser q

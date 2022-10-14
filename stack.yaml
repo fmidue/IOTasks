@@ -1,5 +1,5 @@
 resolver:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/18/14.yaml
+  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/19/28.yaml
 
 packages:
 - .
@@ -8,3 +8,5 @@ extra-deps:
 - parallel-io-0.3.5
 - git: https://github.com/IagoAbal/haskell-z3
   commit: 7e2a3e0977f277b9ed39ad182287317d2b819476
+
+system-ghc: true

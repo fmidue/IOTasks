@@ -4,7 +4,11 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
+{-# LANGUAGE FlexibleContexts #-}
 module IOTasks.Term where
 
 import IOTasks.Terms
@@ -16,31 +20,33 @@ import qualified Data.Map as Map (lookup)
 import Data.List (sortBy, intercalate)
 import Data.Function (on)
 import Data.List.Extra (maximumOn, mconcatMap)
+import Data.Bifunctor (second)
+import Type.Reflection
 
 import GHC.TypeLits
 
 data Term a where
-  (:+:) :: Term I -> Term I -> Term I
-  (:-:) :: Term I -> Term I -> Term I
-  (:*:) :: Term I -> Term I -> Term I
-  (:==:) :: Term I -> Term I -> Term Bool
-  (:>:) :: Term I -> Term I -> Term Bool
-  (:>=:) :: Term I -> Term I -> Term Bool
-  (:<:) :: Term I -> Term I -> Term Bool
-  (:<=:) :: Term I -> Term I -> Term Bool
+  (:+:) :: Term Integer -> Term Integer -> Term Integer
+  (:-:) :: Term Integer -> Term Integer -> Term Integer
+  (:*:) :: Term Integer -> Term Integer -> Term Integer
+  (:==:) :: Term Integer -> Term Integer -> Term Bool
+  (:>:) :: Term Integer -> Term Integer -> Term Bool
+  (:>=:) :: Term Integer -> Term Integer -> Term Bool
+  (:<:) :: Term Integer -> Term Integer -> Term Bool
+  (:<=:) :: Term Integer -> Term Integer -> Term Bool
   Not :: Term Bool -> Term Bool
   (:&&:) :: Term Bool -> Term Bool -> Term Bool
   (:||:) :: Term Bool -> Term Bool -> Term Bool
   TrueT :: Term Bool
   FalseT :: Term Bool
-  Length :: Term [I] -> Term I
-  Sum :: Term [I] -> Term I
-  Product :: Term [I] -> Term I
-  IsIn :: Term I -> Term [I] -> Term Bool
-  Current :: VarExp a => a -> Int -> Term I
-  All :: VarExp a => a -> Int -> Term [I]
-  IntLit :: Integer -> Term I
-  ListLit :: [Integer] -> Term [I]
+  Length :: Term [Integer] -> Term Integer
+  Sum :: Term [Integer] -> Term Integer
+  Product :: Term [Integer] -> Term Integer
+  IsIn :: Term Integer -> Term [Integer] -> Term Bool
+  Current :: VarExp a => a -> Int -> Term Integer
+  All :: VarExp a => a -> Int -> Term [Integer]
+  IntLit :: I -> Term Integer
+  ListLit :: [I] -> Term [Integer]
 
 
 -- deriving instance Eq (Term a)
@@ -55,7 +61,7 @@ instance Arithmetic Term where
   (.+.) = (:+:)
   (.-.) = (:-:)
   (.*.) = (:*:)
-  intLit = IntLit
+  intLit = IntLit . fromInteger
 
 instance Compare Term where
   (.==.) = (:==:)
@@ -82,34 +88,49 @@ instance BasicLists Term where
   length' = Length
   sum' = Sum
   product' = Product
-  listLit = ListLit
+  listLit = ListLit . map fromInteger
 
 instance TypeError (Text "complex list functions, like filter, can not be used at type " :<>: ShowType Term)
   => ComplexLists Term where
   filter' = error "unreachable"
 
-eval :: Term a -> Map Varname [(Integer,Int)] -> (OverflowWarning,a)
-eval (x :+: y) e = let (w,r) = (+) <$> eval x e <*> eval y e in (checkOverflow r <> w, r)
-eval (x :-: y) e = let (w,r) = (-) <$> eval x e <*> eval y e in (checkOverflow r <> w, r)
-eval (x :*: y) e = let (w,r) = (*) <$> eval x e <*> eval y e in (checkOverflow r <> w, r)
-eval (x :==: y) e = (==) <$> eval x e <*> eval y e
-eval (x :>: y) e = (>) <$> eval x e <*> eval y e
-eval (x :>=: y) e = (>=) <$> eval x e <*> eval y e
-eval (x :<=: y) e = (<=) <$> eval x e <*> eval y e
-eval (x :<: y) e = (<) <$> eval x e <*> eval y e
-eval (Not b) e = not <$> eval b e
-eval (x :&&: y) e = (&&) <$> eval x e <*> eval y e
-eval (x :||: y) e = (||) <$> eval x e <*> eval y e
-eval TrueT _ = (mempty,True)
-eval FalseT _ = (mempty,False)
-eval (Length xs) e = fromIntegral . length <$> eval xs e
-eval (Sum xs) e = let (w,r) = sum <$> eval xs e in (checkOverflow r <> w, r)
-eval (Product xs) e = let (w,r) = product <$> eval xs e in (checkOverflow r <> w, r)
-eval (Current x n) e = fromMaybe (error $ "empty list for {" ++ intercalate "," (toVarList x) ++ "}") . safeHead <$> primEvalVar x n e
-eval (All x n) e = reverse <$> primEvalVar x n e
-eval (IntLit n) _ = (checkOverflow $ fromInteger n ,fromInteger n)
-eval (ListLit xs) _ = let xs' = fromInteger <$> xs in (foldMap checkOverflow xs', xs')
-eval (IsIn x xs) e = elem <$> eval x e <*> eval xs e
+-- Overflow detection type
+type family OT a where
+  OT Integer = I
+  OT [a] = [OT a]
+  OT a = a
+
+eval :: forall a. (Typeable a, Typeable (OT a)) => Term a -> Map Varname [(Integer,Int)] -> (OverflowWarning, a)
+eval t m =
+  let r = eval' t m
+  in case eqTypeRep (typeOf r) (typeRep @(OverflowWarning,a)) of
+    Just HRefl -> r
+    Nothing -> case eqTypeRep (typeRep @a) (typeRep @Integer) of
+      Just HRefl -> second toInteger r
+      Nothing -> error "impossible"
+
+eval' :: Term a -> Map Varname [(Integer,Int)] -> (OverflowWarning,OT a)
+eval' (x :+: y) e = let (w,r) = (+) <$> eval' x e <*> eval' y e in (checkOverflow r <> w, r)
+eval' (x :-: y) e = let (w,r) = (-) <$> eval' x e <*> eval' y e in (checkOverflow r <> w, r)
+eval' (x :*: y) e = let (w,r) = (*) <$> eval' x e <*> eval' y e in (checkOverflow r <> w, r)
+eval' (x :==: y) e = (==) <$> eval' x e <*> eval' y e
+eval' (x :>: y) e = (>) <$> eval' x e <*> eval' y e
+eval' (x :>=: y) e = (>=) <$> eval' x e <*> eval' y e
+eval' (x :<=: y) e = (<=) <$> eval' x e <*> eval' y e
+eval' (x :<: y) e = (<) <$> eval' x e <*> eval' y e
+eval' (Not b) e = not <$> eval' b e
+eval' (x :&&: y) e = (&&) <$> eval' x e <*> eval' y e
+eval' (x :||: y) e = (||) <$> eval' x e <*> eval' y e
+eval' TrueT _ = (mempty,True)
+eval' FalseT _ = (mempty,False)
+eval' (Length xs) e = fromIntegral . length <$> eval' xs e
+eval' (Sum xs) e = let (w,r) = sum <$> eval' xs e in (checkOverflow r <> w, r)
+eval' (Product xs) e = let (w,r) = product <$> eval' xs e in (checkOverflow r <> w, r)
+eval' (Current x n) e = fromMaybe (error $ "empty list for {" ++ intercalate "," (toVarList x) ++ "}") . safeHead <$> primEvalVar x n e
+eval' (All x n) e = reverse <$> primEvalVar x n e
+eval' (IntLit n) _ = (checkOverflow n ,n)
+eval' (ListLit xs) _ = let xs' = xs in (foldMap checkOverflow xs', xs')
+eval' (IsIn x xs) e = elem <$> eval' x e <*> eval' xs e
 
 primEvalVar :: VarExp a => a -> Int -> Map Varname [(Integer,Int)] -> (OverflowWarning,[I])
 primEvalVar x n e =

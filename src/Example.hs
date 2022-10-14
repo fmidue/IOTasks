@@ -276,7 +276,7 @@ hangmanSpec word = tillExit (
     (writeOptionalOutput [Text "wrong guess!"])
   )
   where
-    winCond :: Term [I] -> Term Bool
+    winCond :: Term [Integer] -> Term Bool
     winCond g = foldr (\a b -> intLit a `isIn` g .&&. b) true word
 
 digits :: ValueSet
