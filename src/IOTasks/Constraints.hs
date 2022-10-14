@@ -6,7 +6,7 @@
 module IOTasks.Constraints where
 
 import IOTasks.ValueSet
-import IOTasks.Term (Term, printIndexedTerm, castTerm)
+import IOTasks.Term (Term, printIndexedTerm, castTerm, subTerms)
 import IOTasks.Terms (Varname, not')
 import IOTasks.Specification
 import IOTasks.OutputPattern (valueTerms)
@@ -16,7 +16,7 @@ import Data.List (intersperse)
 import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified Data.Set as Set (toList)
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, mapMaybe)
 import Data.Tuple.Extra (fst3)
 
 data Constraint (t :: ConstraintType) where
@@ -60,7 +60,7 @@ constraintTree negMax =
       RecSame{} -> error "constraintTree: impossible"
     )
     (\(_,e,_) _ ps t -> Assert (OverflowConstraints (catMaybes $ [ castTerm @Integer t | p <- Set.toList ps, vt <- valueTerms p, t <- transparentSubterms vt]) e) t)
-    (\(_,e,_) c l r -> Choice (Assert (ConditionConstraint c e) l) (Assert (ConditionConstraint (not' c) e) r))
+    (\(_,e,_) c l r -> Assert (OverflowConstraints (mapMaybe (castTerm @Integer) $ subTerms c) e) $ Choice (Assert (ConditionConstraint c e) l) (Assert (ConditionConstraint (not' c) e) r))
     Empty
     (0,Map.empty,1)
 
