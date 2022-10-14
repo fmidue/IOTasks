@@ -26,18 +26,18 @@ import Data.Tuple.Extra (thd3)
 
 type Timeout = Int
 
-findPathInput :: Timeout -> Path -> Integer -> IO (Maybe [Integer])
-findPathInput t p bound = fst <$> findPathInputDebug t p bound
+findPathInput :: Timeout -> Path -> Integer -> Bool -> IO (Maybe [Integer])
+findPathInput t p bound checkOverflows = fst <$> findPathInputDebug t p bound checkOverflows
 
-findPathInputDebug :: Timeout -> Path -> Integer -> IO (Maybe [Integer],String)
-findPathInputDebug t p bound = do
-  evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) $ pathScript p $ WithSoft bound
+findPathInputDebug :: Timeout -> Path -> Integer -> Bool -> IO (Maybe [Integer],String)
+findPathInputDebug t p bound checkOverflows = do
+  evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) $ pathScript p (WithSoft bound) checkOverflows
 
 data SatResult = SAT | NotSAT deriving (Eq, Show)
 
-isSatPath :: Timeout -> Path -> IO SatResult
-isSatPath t p = do
-  (mRes,_) <- evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) (pathScript p WithoutSoft)
+isSatPath :: Timeout -> Path -> Bool -> IO SatResult
+isSatPath t p checkOverflows = do
+  (mRes,_) <- evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) $ pathScript p WithoutSoft checkOverflows
   pure $ maybe NotSAT (const SAT) mRes
 
 data ScriptMode = WithSoft Integer | WithoutSoft
@@ -53,22 +53,22 @@ updateContext NotSAT d (LastNotSAT d')
 updateContext _ _ RequirePruningCheck = error "updateContext: should not happen"
 
 type PrefixPath = Path
-satPathsDebug :: Int -> Int -> ConstraintTree -> IO [Path]
-satPathsDebug n to t = do
+satPathsDebug :: Int -> Int -> ConstraintTree -> Bool -> IO [Path]
+satPathsDebug n to t checkOverflows = do
   q <- atomically newTQueue
   nVar <- newTVarIO n
-  satPaths nVar to t q
+  satPaths nVar to t checkOverflows q
   map fromJust . init <$> atomically (flushTQueue q)
 
-satPaths :: TVar Int -> Int -> ConstraintTree -> TQueue (Maybe Path) -> IO ()
-satPaths nVar to t q = do
+satPaths :: TVar Int -> Int -> ConstraintTree -> Bool -> TQueue (Maybe Path) -> IO ()
+satPaths nVar to t checkOverflows q = do
   evalStateT (satPaths' 0 to t ([],0) q) NoContext
   atomically $ writeTQueue q Nothing
   where
     satPaths' :: Int -> Int -> ConstraintTree -> (PrefixPath,Int) -> TQueue (Maybe Path) -> StateT SearchContext IO ()
     satPaths' _ to Empty (s,d) q = do
       let path = reverse s -- constraints are stored reversed
-      res <- lift $ isSatPath to path
+      res <- lift $ isSatPath to path checkOverflows
       modify $ updateContext res d
       when (res == SAT) $ lift $ atomically $ writeTQueue q $ Just path
     satPaths' nReads to (Choice l r) (s,d) q = do
@@ -76,7 +76,7 @@ satPaths nVar to t q = do
       ctx <- get
       case ctx of
         RequirePruningCheck -> do
-          res <- lift $ isSatPath to s
+          res <- lift $ isSatPath to s checkOverflows
           case res of
             NotSAT -> pure ()
             SAT -> do
@@ -88,18 +88,19 @@ satPaths nVar to t q = do
       n <- lift $ readTVarIO nVar
       if nReads > n
         then pure ()
-        else satPaths' (nReads+1) to t (c:s,d+1) q -- stores constraints in reversed order
-    satPaths' nReads to (Assert c@ConditionConstraint{} t) (s,d) q = satPaths' nReads to t (c:s,d+1) q -- stores constraints in reversed order
+        else satPaths' (nReads+1) to t (SomeConstraint c:s,d+1) q -- stores constraints in reversed order
+    satPaths' nReads to (Assert c@ConditionConstraint{} t) (s,d) q = satPaths' nReads to t (SomeConstraint c:s,d+1) q -- stores constraints in reversed order
+    satPaths' nReads to (Assert c@OverflowConstraints{} t) (s,d) q = satPaths' nReads to t (SomeConstraint c:s,d+1) q -- stores constraints in reversed order
 
 -- path until next choice
 lookAhead :: ConstraintTree -> Path
 lookAhead Empty = []
-lookAhead (Assert c t) = c : lookAhead t
+lookAhead (Assert c t) = SomeConstraint c : lookAhead t
 lookAhead Choice{} = []
 
-pathScript :: Path -> ScriptMode -> Z3 (Maybe [Integer], String)
-pathScript path mode = do
-  let (tyConstr,predConstr) = partitionPath path
+pathScript :: Path -> ScriptMode -> Bool -> Z3 (Maybe [Integer], String)
+pathScript path mode checkOverflows = do
+  let (tyConstr,predConstr,overflConstr) = partitionPath path
   vars <- forM tyConstr $
     \(InputConstraint (x,i) vs) -> do
       var <- mkFreshIntVar $ x ++ show i
@@ -109,6 +110,12 @@ pathScript path mode = do
   forM_ predConstr $
     \(ConditionConstraint t e) ->
       optimizeAssert =<< z3Predicate t e (map fst vars)
+
+  when checkOverflows $
+    forM_ overflConstr $
+      \(OverflowConstraints ts e) ->
+        forM_ ts (\t -> assertOverflowChecks t e (map fst vars))
+
   case mode of
     WithSoft bound -> do
       vs <- liftIO $ forM vars $ \((_,ast),vs) -> do {v <- generate $ valueOf vs bound; pure (ast,v)}
@@ -150,10 +157,7 @@ z3Predicate (termStruct -> Binary f x y) e vars = binRec e vars (binF f) x y whe
 z3Predicate (termStruct -> Unary Not x) e vars = mkNot =<< z3Predicate x e vars
 z3Predicate (termStruct -> Unary Length (All x n)) e _ = mkIntNum $ length $ weaveVariables x n e
 z3Predicate (termStruct -> Unary Sum (All x n)) e vars = mkAdd $ lookupList (weaveVariables x n e) vars
-z3Predicate (termStruct -> Unary Product (All x n)) e vars = do
-  a <- mkMul $ lookupList (weaveVariables x n e) vars
-  overflowConstraints a
-  return a
+z3Predicate (termStruct -> Unary Product (All x n)) e vars = mkMul $ lookupList (weaveVariables x n e) vars
 z3Predicate (termStruct -> Unary Length (ListLitT xs)) _ _ = mkIntNum $ length xs
 z3Predicate (termStruct -> Unary Sum (ListLitT xs)) _ _ = mkIntNum $ sum xs
 z3Predicate (termStruct -> Unary Product (ListLitT xs)) _ _ = mkIntNum $ product xs
@@ -199,6 +203,11 @@ z3ValueSetConstraint (LessThen n) xVar = mkIntNum n >>= mkLt xVar
 z3ValueSetConstraint (Eq n) xVar = mkIntNum n >>= mkEq xVar
 z3ValueSetConstraint Every _ = mkTrue
 z3ValueSetConstraint None _ = mkFalse
+
+assertOverflowChecks :: Term Integer ->  Map Varname (Int,[Int]) -> [((Varname, Int), AST)] -> Z3 ()
+assertOverflowChecks t e vars = do
+  ast <- z3Predicate t e vars
+  overflowConstraints ast
 
 overflowConstraints :: AST -> Z3 ()
 overflowConstraints x = do

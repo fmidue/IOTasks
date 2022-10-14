@@ -35,6 +35,7 @@ data Args
   , maxNegative :: Int -- maximum number of negative inputs per path
   , verbose :: Bool -- print extra information
   , simplifyFeedback :: Bool -- cleanup feedback for educational use
+  , checkOverflows :: Bool -- check that intermediate results do not cause Int overflows, including (parts of OutputTerms when possible) (best-effort, no gurantees on completness)
   }
 
 stdArgs :: Args
@@ -47,6 +48,7 @@ stdArgs = Args
   , maxNegative = 5
   , verbose = True
   , simplifyFeedback = False
+  , checkOverflows = False
   }
 
 taskCheckWith :: Args -> IOrep () -> Specification -> IO ()
@@ -59,7 +61,7 @@ taskCheckWithOutcome :: Args -> IOrep () -> Specification -> IO Outcome
 taskCheckWithOutcome Args{..} prog spec = do
   q <- atomically newTQueue
   nVar <- newTVarIO maxPathDepth
-  thrdID <- forkIO $ satPaths nVar solverTimeout (constraintTree maxNegative spec) q
+  thrdID <- forkIO $ satPaths nVar solverTimeout (constraintTree maxNegative spec) checkOverflows q
   (out,satPaths,nInputs,timeouts) <- testPaths nVar q (0,0,0) Nothing `finally` killThread thrdID
 
   --
@@ -86,7 +88,7 @@ taskCheckWithOutcome Args{..} prog spec = do
         Just p
           | currentMaxDepth < pathDepth p -> testPaths nVar q (m,n,t) mFailure
           | otherwise -> do
-          res <- isSatPath solverTimeout p
+          res <- isSatPath solverTimeout p checkOverflows
           if res == SAT -- does not account for timeouts yet
             then do
               (out,k) <- testPath p 0 n
@@ -107,7 +109,7 @@ taskCheckWithOutcome Args{..} prog spec = do
     testPath :: Path -> Int -> Int -> IO (PathOutcome,Int)
     testPath _ n _ | n >= maxSuccessPerPath = pure (PathSuccess,n)
     testPath p n nOtherTests = do
-      mNextInput <- fmap @Maybe (map show) <$> findPathInput solverTimeout p valueSize
+      mNextInput <- fmap @Maybe (map show) <$> findPathInput solverTimeout p valueSize checkOverflows
       case mNextInput of
         Nothing -> pure (PathTimeout,n) -- should (only?) be the case if solving times out
         Just nextInput  -> do
@@ -115,7 +117,7 @@ taskCheckWithOutcome Args{..} prog spec = do
           let
             (specTrace,warn) = runSpecification nextInput spec
             progTrace = runProgram nextInput prog
-          when (warn == Overflow) $ putStrLn "Overflow of Int range detected."
+          when (warn == OverflowWarning) $ putStrLn "Overflow of Int range detected."
           case specTrace `covers` progTrace of
             MatchSuccessfull -> testPath p (n+1) nOtherTests
             failure -> do
@@ -176,4 +178,4 @@ taskCheckOn = go 0 where
 generateStaticTestSuite :: Args -> Specification -> IO [Inputs]
 generateStaticTestSuite Args{..} spec =
   let ps = sortOn pathDepth $ paths maxPathDepth $ constraintTree maxNegative spec
-  in map (map show) . concat <$> forM ps (\p -> catMaybes <$> replicateM maxSuccessPerPath (findPathInput solverTimeout p valueSize))
+  in map (map show) . concat <$> forM ps (\p -> catMaybes <$> replicateM maxSuccessPerPath (findPathInput solverTimeout p valueSize checkOverflows))

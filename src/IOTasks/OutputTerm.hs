@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeApplications #-}
 module IOTasks.OutputTerm
   ( OutputTerm
+  , transparentSubterms
   , eval
   ) where
 
@@ -18,7 +19,7 @@ import IOTasks.Overflow (OverflowWarning, checkOverflow, I)
 import Data.Express (Expr((:$)), var, val, value, (//-), evl)
 import Data.Map (Map)
 import qualified Data.Map as Map (lookup)
-import Data.Typeable (eqT, (:~:)(..))
+import Data.Typeable (Typeable, eqT, (:~:)(..))
 import Data.List (sortBy, nub)
 import Data.Function (on)
 import Data.Maybe (mapMaybe)
@@ -30,6 +31,10 @@ data OutputTerm a
 toExpr :: OutputTerm a -> Expr
 toExpr (Transparent t) = termExpr t
 toExpr (Opaque expr _ _) = expr
+
+transparentSubterms :: Typeable a => OutputTerm a -> [SomeTerm]
+transparentSubterms (Transparent t) = subTerms t
+transparentSubterms (Opaque _ _ ts) = ts
 
 -- simple instance liftig based on Expr's instances
 instance Show (OutputTerm a) where
@@ -51,13 +56,13 @@ currentE x = var (show (toVarList x) ++ "_C") (undefined :: [Integer])
 allE :: VarExp a => a -> Expr
 allE x = var (show (toVarList x) ++ "_A") (undefined :: [Integer])
 
-eval :: forall a. Overflow a => OutputTerm a -> Map Varname [(Integer,Int)] -> (OverflowWarning, a)
+eval :: forall a. OverflowType a => OutputTerm a -> Map Varname [(Integer,Int)] -> (OverflowWarning, a)
 eval (Transparent t) e = Term.eval t e
 eval (Opaque expr vss ts) e = let r = eval' expr vss e in case eqT @a @I of
   Just Refl -> (checkOverflow r,r)
   Nothing -> (foldMap (\(SomeTerm t) -> fst $ Term.eval t e) ts,r)
   where
-  eval' :: Overflow a => Expr -> [[Varname]] -> Map Varname [(Integer,Int)] -> a
+  eval' :: OverflowType a => Expr -> [[Varname]] -> Map Varname [(Integer,Int)] -> a
   eval' t xss e = evl (t //- concat [ [(currentE xs,val $ head xs'),(allE xs,val xs')] | xs <- nub xss, let xs' = combinedVars xs ])
     where
       combinedVars :: [Varname] -> [Integer]
@@ -80,7 +85,7 @@ h1 :: (Term a -> Term b) -> Expr -> OutputTerm a -> OutputTerm b
 h1 f _ (Transparent t) = Transparent $ f t
 h1 _ g (Opaque x vs xs) = Opaque (g :$ x) vs xs
 
-h2 :: (Term a -> Term b -> Term c) -> Expr -> OutputTerm a -> OutputTerm b -> OutputTerm c
+h2 :: (Typeable a, Typeable b) => (Term a -> Term b -> Term c) -> Expr -> OutputTerm a -> OutputTerm b -> OutputTerm c
 h2 f _ (Transparent x) (Transparent y) = Transparent $ f x y
 h2 _ g (Opaque x vx tx) (Transparent y) = Opaque (g :$ x :$ termExpr y) (vx ++ varExps y) (tx ++ subTerms y)
 h2 _ g (Transparent x) (Opaque y vy ty) = Opaque (g :$ termExpr x :$ y) (varExps x ++ vy) (subTerms x ++ ty)

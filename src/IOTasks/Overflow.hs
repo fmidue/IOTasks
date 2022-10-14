@@ -1,11 +1,11 @@
 module IOTasks.Overflow where
 
-data OverflowWarning = Overflow | NoOverflow deriving (Eq,Show)
+data OverflowWarning = OverflowWarning | NoOverflow deriving (Eq,Show)
 
 instance Semigroup OverflowWarning where
   NoOverflow <> o = o
   o <> NoOverflow = o
-  Overflow <> Overflow = Overflow
+  OverflowWarning <> OverflowWarning = OverflowWarning
 
 instance Monoid OverflowWarning where
   mempty = NoOverflow
@@ -22,7 +22,7 @@ hasDiverged (I x x') = x /= fromIntegral x'
 
 checkOverflow :: I -> OverflowWarning
 checkOverflow x
-  | hasDiverged x = Overflow
+  | hasDiverged x = OverflowWarning
   | otherwise = NoOverflow
 
 instance Num I where

@@ -6,10 +6,9 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 module IOTasks.Term where
 
@@ -158,23 +157,23 @@ instance TypeError (Text "complex list functions, like filter, can not be used a
   filter' = error "unreachable"
 
 -- Overflow detection type
-class Typeable a => Overflow a where
+class Typeable a => OverflowType a where
   type OT a :: Type
   typeRepT :: TypeRep (OT a)
 
-instance Overflow Integer where
+instance OverflowType Integer where
   type OT Integer = I
   typeRepT = typeRep
 
-instance Overflow Bool where
+instance OverflowType Bool where
   type OT Bool = Bool
   typeRepT = typeRep
 
-instance Overflow a => Overflow [a] where
+instance OverflowType a => OverflowType [a] where
   type OT [a] = [OT a]
   typeRepT = withTypeable (typeRepT @a) typeRep
 
-eval :: forall a. Overflow a => Term a -> Map Varname [(Integer,Int)] -> (OverflowWarning, a)
+eval :: forall a. OverflowType a => Term a -> Map Varname [(Integer,Int)] -> (OverflowWarning, a)
 eval t m =
   let r = eval' t m
   in case eqTypeRep (withTypeable (typeRepT @a) (typeOf r)) (typeRep @(OverflowWarning,a)) of
@@ -254,7 +253,7 @@ printIndexedTerm (termStruct -> Literal (IntLit x)) _ = show x
 printIndexedTerm (termStruct -> Literal (ListLit xs)) _ = show xs
 
 data SomeTerm where
-  SomeTerm :: Overflow a => Term a -> SomeTerm
+  SomeTerm :: OverflowType a => Term a -> SomeTerm
 
 someTerm :: Term a -> SomeTerm
 someTerm t@(Add _ _) = SomeTerm t
@@ -278,7 +277,7 @@ someTerm t@(BoolLitT _) = SomeTerm t
 someTerm t@(Current _ _) = SomeTerm t
 someTerm t@(All _ _) = SomeTerm t
 
-withO :: SomeTerm -> (forall a. Overflow a => Term a -> r) -> r
+withO :: SomeTerm -> (forall a. OverflowType a => Term a -> r) -> r
 withO (SomeTerm t) f = f t
 
 subTerms :: Term a -> [SomeTerm]
@@ -286,6 +285,12 @@ subTerms (termStruct' -> (t,Unary _ (x :: Term a))) = someTerm t : withO (someTe
 subTerms (termStruct' -> (t,Binary _ x y)) = someTerm t : subTerms x ++ subTerms y
 subTerms (termStruct' -> (t,Literal{})) = [someTerm t]
 subTerms (termStruct' -> (t,Var{})) = [someTerm t]
+
+castTerm :: forall a. Typeable a => SomeTerm -> Maybe (Term a)
+castTerm (SomeTerm (t :: Term b)) =
+  case eqTypeRep (typeRep @a) (typeRep @b) of
+    Just HRefl -> Just t
+    Nothing -> Nothing
 
 -- dirty hack
 termStruct' :: Term a -> (Term a, TermStruct a)

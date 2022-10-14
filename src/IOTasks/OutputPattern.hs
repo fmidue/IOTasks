@@ -42,6 +42,12 @@ instance Semigroup (OutputPattern t) where
 instance Monoid (OutputPattern t) where
   mempty = Text ""
 
+valueTerms :: OutputPattern t -> [OutputTerm Integer]
+valueTerms Wildcard = []
+valueTerms Text{} = []
+valueTerms (Sequence x y) = valueTerms x ++ valueTerms y
+valueTerms (Value t) = [t]
+
 evalPattern :: Map Varname [(Integer,Int)] -> OutputPattern t -> (OverflowWarning, OutputPattern 'TraceP)
 evalPattern _ Wildcard = (NoOverflow, Wildcard)
 evalPattern _ (Text s) = (NoOverflow, Text s)
