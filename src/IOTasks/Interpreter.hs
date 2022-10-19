@@ -29,11 +29,9 @@ interpret s = do
           p'
         RecSub (x,vs,Abort,n) p' -> do
           v <- lift readLn
-          if vs `containsValue` v
-            then do
-              modify (Map.alter (\case {Just xs -> Just $ (v,n):xs; Nothing -> Just [(v,n)]}) x)
-              p'
-            else pure ()
+          when (vs `containsValue` v) $ do
+            modify (Map.alter (\case {Just xs -> Just $ (v,n):xs; Nothing -> Just [(v,n)]}) x)
+            p'
         RecSub (x,vs,UntilValid,n) p' -> do
           v <- iterateUntil (vs `containsValue`) $ lift readLn
           modify (Map.alter (\case {Just xs -> Just $ (v,n):xs; Nothing -> Just [(v,n)]}) x)

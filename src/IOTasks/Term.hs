@@ -26,6 +26,7 @@ import Type.Reflection
 
 import GHC.TypeLits
 import Data.Kind
+import Type.Match (matchType, fallbackCase', inCaseOfE', matchTypeOf)
 
 data Term a where
   Add :: Term Integer -> Term Integer -> Term Integer
@@ -176,13 +177,14 @@ instance OverflowType a => OverflowType [a] where
 eval :: forall a. OverflowType a => Term a -> Map Varname [(Integer,Int)] -> (OverflowWarning, a)
 eval t m =
   let r = eval' t m
-  in case eqTypeRep (withTypeable (typeRepT @a) (typeOf r)) (typeRep @(OverflowWarning,a)) of
-    Just HRefl -> r
-    Nothing -> case eqTypeRep (typeRep @a) (typeRep @Integer) of
-      Just HRefl -> second toInteger r
-      Nothing -> case eqTypeRep (typeRep @a) (typeRep @[Integer]) of
-        Just HRefl -> second (map toInteger) r
-        Nothing -> error "eval: impossible"
+  in withTypeable (typeRepT @a) $ matchTypeOf r
+    [ inCaseOfE' @(OverflowWarning, a) $ \HRefl -> r
+    , fallbackCase' $ matchType @a
+        [ inCaseOfE' @Integer $ \HRefl -> second toInteger r
+        , inCaseOfE' @[Integer] $ \HRefl -> second (map toInteger) r
+        , fallbackCase' $ error "eval: impossible"
+        ]
+    ]
 
 evalF :: UnaryF a b -> OT a -> OT b
 evalF Not = not
@@ -205,9 +207,10 @@ evalF2 IsIn = elem
 
 eval' :: Term a -> Map Varname [(Integer,Int)] -> (OverflowWarning,OT a)
 eval' (termStruct -> Binary (f :: BinaryF a b c) x y) e =
-  case eqTypeRep (typeRep @c) (typeRep @Integer) of
-    Just HRefl -> let (w,r) = evalF2 f <$> eval' x e <*> eval' y e in (checkOverflow r <> w, r)
-    Nothing -> evalF2 f <$> eval' x e <*> eval' y e
+  matchType @c
+    [ inCaseOfE' @Integer $ \HRefl -> let (w,r) = evalF2 f <$> eval' x e <*> eval' y e in (checkOverflow r <> w, r)
+    , fallbackCase' (evalF2 f <$> eval' x e <*> eval' y e)
+    ]
 eval' (termStruct -> Unary f b) e = evalF f <$> eval' b e
 eval' (termStruct -> Literal (BoolLit b)) _ = (mempty,b)
 eval' (termStruct -> Literal (IntLit n)) _ = (checkOverflow n ,n)
@@ -277,20 +280,18 @@ someTerm t@(BoolLitT _) = SomeTerm t
 someTerm t@(Current _ _) = SomeTerm t
 someTerm t@(All _ _) = SomeTerm t
 
-withO :: SomeTerm -> (forall a. OverflowType a => Term a -> r) -> r
-withO (SomeTerm t) f = f t
-
 subTerms :: Term a -> [SomeTerm]
-subTerms (termStruct' -> (t,Unary _ (x :: Term a))) = someTerm t : withO (someTerm x) subTerms
+subTerms (termStruct' -> (t,Unary _ x)) = someTerm t : subTerms x
 subTerms (termStruct' -> (t,Binary _ x y)) = someTerm t : subTerms x ++ subTerms y
 subTerms (termStruct' -> (t,Literal{})) = [someTerm t]
 subTerms (termStruct' -> (t,Var{})) = [someTerm t]
 
 castTerm :: forall a. Typeable a => SomeTerm -> Maybe (Term a)
 castTerm (SomeTerm (t :: Term b)) =
-  case eqTypeRep (typeRep @a) (typeRep @b) of
-    Just HRefl -> Just t
-    Nothing -> Nothing
+  matchType @a
+    [ inCaseOfE' @b $ \HRefl -> Just t
+    , fallbackCase' Nothing
+    ]
 
 -- dirty hack
 termStruct' :: Term a -> (Term a, TermStruct a)

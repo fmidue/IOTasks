@@ -19,10 +19,11 @@ import IOTasks.Overflow (OverflowWarning, checkOverflow, I)
 import Data.Express (Expr((:$)), var, val, value, (//-), evl)
 import Data.Map (Map)
 import qualified Data.Map as Map (lookup)
-import Data.Typeable (Typeable, eqT, (:~:)(..))
 import Data.List (sortBy, nub)
 import Data.Function (on)
 import Data.Maybe (mapMaybe)
+import Type.Reflection (Typeable,(:~~:)(..))
+import Type.Match (matchType, fallbackCase', inCaseOfE')
 
 data OutputTerm a
   = Transparent (Term a)
@@ -58,9 +59,9 @@ allE x = var (show (toVarList x) ++ "_A") (undefined :: [Integer])
 
 eval :: forall a. OverflowType a => OutputTerm a -> Map Varname [(Integer,Int)] -> (OverflowWarning, a)
 eval (Transparent t) e = Term.eval t e
-eval (Opaque expr vss ts) e = let r = eval' expr vss e in case eqT @a @I of
-  Just Refl -> (checkOverflow r,r)
-  Nothing -> (foldMap (\(SomeTerm t) -> fst $ Term.eval t e) ts,r)
+eval (Opaque expr vss ts) e = let r = eval' expr vss e in matchType @a
+  [ inCaseOfE' @I $ \HRefl -> (checkOverflow r,r)
+  , fallbackCase' (foldMap (\(SomeTerm t) -> fst $ Term.eval t e) ts,r)]
   where
   eval' :: OverflowType a => Expr -> [[Varname]] -> Map Varname [(Integer,Int)] -> a
   eval' t xss e = evl (t //- concat [ [(currentE xs,val $ head xs'),(allE xs,val xs')] | xs <- nub xss, let xs' = combinedVars xs ])
