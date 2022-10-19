@@ -211,7 +211,10 @@ eval' (termStruct -> Binary (f :: BinaryF a b c) x y) e =
     [ inCaseOfE' @Integer $ \HRefl -> let (w,r) = evalF2 f <$> eval' x e <*> eval' y e in (checkOverflow r <> w, r)
     , fallbackCase' (evalF2 f <$> eval' x e <*> eval' y e)
     ]
-eval' (termStruct -> Unary f b) e = evalF f <$> eval' b e
+eval' (termStruct -> Unary (f :: UnaryF a b) x) e = matchType @b
+  [ inCaseOfE' @Integer $ \HRefl -> let (w,r) = evalF f <$> eval' x e in (checkOverflow r <> w, r)
+  , fallbackCase' (evalF f <$> eval' x e)
+  ]
 eval' (termStruct -> Literal (BoolLit b)) _ = (mempty,b)
 eval' (termStruct -> Literal (IntLit n)) _ = (checkOverflow n ,n)
 eval' (termStruct -> Literal (ListLit xs)) _ = let xs' = xs in (foldMap checkOverflow xs', xs')

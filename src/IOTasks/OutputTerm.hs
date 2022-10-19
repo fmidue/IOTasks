@@ -14,7 +14,7 @@ import Prelude hiding (all)
 import IOTasks.Terms
 import IOTasks.Term hiding (eval)
 import qualified IOTasks.Term as Term
-import IOTasks.Overflow (OverflowWarning, checkOverflow, I)
+import IOTasks.Overflow (OverflowWarning, checkOverflow)
 
 import Data.Express (Expr((:$)), var, val, value, (//-), evl)
 import Data.Map (Map)
@@ -52,7 +52,7 @@ instance Accessor OutputTerm where
   allValues' x 0 = Transparent $ All x 0
 
 currentE :: VarExp a => a -> Expr
-currentE x = var (show (toVarList x) ++ "_C") (undefined :: [Integer])
+currentE x = var (show (toVarList x) ++ "_C") (undefined :: Integer)
 
 allE :: VarExp a => a -> Expr
 allE x = var (show (toVarList x) ++ "_A") (undefined :: [Integer])
@@ -60,7 +60,7 @@ allE x = var (show (toVarList x) ++ "_A") (undefined :: [Integer])
 eval :: forall a. OverflowType a => OutputTerm a -> Map Varname [(Integer,Int)] -> (OverflowWarning, a)
 eval (Transparent t) e = Term.eval t e
 eval (Opaque expr vss ts) e = let r = eval' expr vss e in matchType @a
-  [ inCaseOfE' @I $ \HRefl -> (checkOverflow r,r)
+  [ inCaseOfE' @Integer $ \HRefl -> (checkOverflow (fromInteger r),r)
   , fallbackCase' (foldMap (\(SomeTerm t) -> fst $ Term.eval t e) ts,r)]
   where
   eval' :: OverflowType a => Expr -> [[Varname]] -> Map Varname [(Integer,Int)] -> a

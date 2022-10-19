@@ -98,9 +98,9 @@ runSpecification inputs spec =
       RecSame i (t',w) -> (foldr ProgRead (ProgRead '\n' t') i,w)
       RecBoth{} -> error "runSpecification: impossible"
     )
-    (\(e,_) o ts (t',w) ->
-      let (warn,os) = Set.foldr (\t (w,s) -> let (w',p) = evalPattern e t in (w <> w', Set.insert p s)) mempty ts
-      in (progWrite o (os `Set.union` Set.map (<> Text "\n") os) <> t',warn <> w)
+    (\(e,_) o ts (t',ww) ->
+      let (warn,os) = Set.foldr (\t (w,s) -> let (w',p) = evalPattern e t in (w <> w', Set.insert p s)) (NoOverflow, mempty) ts
+      in (progWrite o (os `Set.union` Set.map (<> Text "\n") os) <> t', warn <> ww)
     )
     (\(e,_) c (l,wl) (r,wr) ->
       let (w,b) = eval c e
