@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TupleSections #-}
 module IOTasks.OutputTerm
   ( OutputTerm
   , transparentSubterms
@@ -16,14 +17,19 @@ import IOTasks.Term hiding (eval)
 import qualified IOTasks.Term as Term
 import IOTasks.Overflow (OverflowWarning, checkOverflow)
 
-import Data.Express (Expr((:$)), var, val, value, (//-), evl)
+import Data.Express (Expr((:$)), var, val, value, (//-), evl, vars, isVar, showExpr)
 import Data.Map (Map)
 import qualified Data.Map as Map (lookup)
-import Data.List (sortBy, nub)
+import Data.List (sortBy, nub, intercalate)
 import Data.Function (on)
 import Data.Maybe (mapMaybe)
+
 import Type.Reflection (Typeable,(:~~:)(..))
 import Type.Match (matchType, fallbackCase', inCaseOfE')
+
+import Text.Parsec (parse, char, many1, alphaNum, sepBy1, (<|>), string, digit)
+import Text.Parsec.String (Parser)
+import Data.Char (isAlphaNum)
 
 data OutputTerm a
   = Transparent (Term a)
@@ -48,14 +54,22 @@ instance Ord (OutputTerm a) where
   compare = compare `on` toExpr
 
 instance Accessor OutputTerm where
-  currentValue' x 0 = Transparent $ Current x 0
-  allValues' x 0 = Transparent $ All x 0
+  currentValue' x n = checkNames x $ Transparent $ Current x n
+  allValues' x n = checkNames x $ Transparent $ All x n
 
-currentE :: VarExp a => a -> Expr
-currentE x = var (show (toVarList x) ++ "_C") (undefined :: Integer)
+checkNames :: VarExp e => e -> a -> a
+checkNames = foldr f id . toVarList
+  where
+    f x c = if legalVarName x then c else error $ "illegal variable name: " ++ x ++ "\variable names can only contain letters, digits, _ and '"
 
-allE :: VarExp a => a -> Expr
-allE x = var (show (toVarList x) ++ "_A") (undefined :: [Integer])
+legalVarName :: String -> Bool
+legalVarName = any (\c -> isAlphaNum c || c == '_' || c == '\'')
+
+currentE :: VarExp a => a -> Int -> Expr
+currentE x n = var ("[" ++ intercalate "," (toVarList x) ++ "]_C^" ++ show n) (undefined :: Integer)
+
+allE :: VarExp a => a -> Int -> Expr
+allE x n = var ("[" ++ intercalate "," (toVarList x) ++ "]_A^" ++ show n) (undefined :: [Integer])
 
 eval :: forall a. OverflowType a => OutputTerm a -> Map Varname [(Integer,Int)] -> (OverflowWarning, a)
 eval (Transparent t) e = Term.eval t e
@@ -64,12 +78,43 @@ eval (Opaque expr vss ts) e = let r = eval' expr vss e in matchType @a
   , fallbackCase' (foldMap (\(SomeTerm t) -> fst $ Term.eval t e) ts,r)]
   where
   eval' :: OverflowType a => Expr -> [[Varname]] -> Map Varname [(Integer,Int)] -> a
-  eval' t xss e = evl (t //- concat [ [(currentE xs,val $ head xs'),(allE xs,val xs')] | xs <- nub xss, let xs' = combinedVars xs ])
-    where
-      combinedVars :: [Varname] -> [Integer]
-      combinedVars xs = (map fst . sortBy (flip compare `on` snd) . concat) $ mapMaybe (`Map.lookup` e) xs
+  eval' expr xss e = evl . fillAVars xss e . reduceAVarsIndex . replaceCVars $ expr
 
+-- evaluation preprocessing
+
+-- replace <var>_C^n with head(<var>_A^n)
+replaceCVars :: Expr -> Expr
+replaceCVars expr = expr //- [(expr, value "head" (head :: [Integer] -> Integer) :$ allE x n) | Just (expr, (n,x)) <- map (varStruct C) (vars expr)]
+
+-- replace <var>_A^n with reverse(tail^n(<var>_A^0))
+reduceAVarsIndex :: Expr -> Expr
+reduceAVarsIndex expr = expr //- [(expr, value ("tail^"++show n) (reverse . replicateF tail n :: [Integer] -> [Integer]) :$ allE x 0) | Just (expr, (n,x)) <- map (varStruct A) (vars expr)]
+
+replicateF :: (a -> a) -> Int -> a -> a
+replicateF f n = foldr (.) id $ replicate n f
+
+varStruct :: AccessType a -> Expr -> Maybe (Expr,(Int,[Varname]))
+varStruct acc x
+  | isVar x = either (const Nothing) (Just . (x,)) $ parse (varParser acc) "" (reverse $ showExpr x)
+  | otherwise = Nothing
+  where
+    varParser :: AccessType a -> Parser (Int,[Varname]) -- parses a variable's string representation in reverse
+    varParser acc = do
+      n <- many1 digit
+      _ <- string ("^"++show acc++"_")
+      _ <- char ']'
+      x <- sepBy1 (many1 (alphaNum <|> char '_' <|> char '\'')) (char ',')
+      _ <- char '['
+      pure (read n,reverse x)
+
+-- replace <var>_A^0 with values from variable environment
+fillAVars :: [[Varname]] -> Map Varname [(Integer,Int)] -> Expr -> Expr
+fillAVars xss e expr = expr //- [ (allE xs 0,val xs') | xs <- nub xss, let xs' = combinedVars xs ]
+  where
+    combinedVars :: [Varname] -> [Integer]
+    combinedVars xs = (map fst . sortBy (flip compare `on` snd) . concat) $ mapMaybe (`Map.lookup` e) xs
 --
+
 instance Arithmetic OutputTerm where
   (.+.) = h2 (.+.) $ value "(+)" ((+) :: Integer -> Integer -> Integer)
   (.-.) = h2 (.-.) $ value "(-)" ((-) :: Integer -> Integer -> Integer)
@@ -95,8 +140,8 @@ h2 _ g (Opaque x vx tx) (Opaque y vy ty) = Opaque (g :$ x :$ y) (vx ++ vy) (tx +
 termExpr :: Term a -> Expr
 termExpr (termStruct -> Binary f x y) = binF f :$ termExpr x :$ termExpr y
 termExpr (termStruct -> Unary f xs) = unaryF f :$ termExpr xs
-termExpr (termStruct -> Var C x n) = currentE x
-termExpr (termStruct -> Var A x n) = allE x
+termExpr (termStruct -> Var C x n) = currentE x n
+termExpr (termStruct -> Var A x n) = allE x n
 termExpr (termStruct -> Literal (BoolLit b)) = val b
 termExpr (termStruct -> Literal (IntLit x)) = val x
 termExpr (termStruct -> Literal (ListLit xs)) = val xs
@@ -121,5 +166,5 @@ binF (:||:) = value "(||)" ((||) :: Bool -> Bool -> Bool)
 binF IsIn = value "elem" (elem :: Integer -> [Integer] -> Bool)
 
 instance ComplexLists OutputTerm where
-  filter' p (Transparent x) = Opaque (value "filter p?" (filter p) :$ termExpr x) (varExps x) (subTerms x)
-  filter' p (Opaque x vs ts) = Opaque (value "filter p?" (filter p) :$ x) vs ts
+  filter' p (Transparent x) = Opaque (value "filter ?p" (filter p) :$ termExpr x) (varExps x) (subTerms x)
+  filter' p (Opaque x vs ts) = Opaque (value "filter ?p" (filter p) :$ x) vs ts

@@ -10,6 +10,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
+{-# LANGUAGE StandaloneDeriving #-}
 module IOTasks.Term where
 
 import IOTasks.Terms
@@ -81,6 +82,7 @@ data TermStruct a where
 data AccessType a where
   C :: AccessType Integer
   A :: AccessType [Integer]
+deriving instance Show (AccessType a)
 
 data UnaryF a b where
   Not :: UnaryF Bool Bool
