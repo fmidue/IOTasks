@@ -17,6 +17,7 @@ import IOTasks.OutputPattern
 import IOTasks.ValueSet
 
 import Test.QuickCheck (Gen, vectorOf, generate, frequency)
+import IOTasks.Overflow (OverflowWarning(..))
 
 taskCheck :: IOrep () -> Specification -> IO ()
 taskCheck = taskCheckWith stdArgs
@@ -87,12 +88,16 @@ genTrace spec depth bound maxNeg =
     spec
 
 runTests :: IOrep () -> Specification -> [Inputs] -> Outcome
-runTests = go 0 where
-  go n _ _ [] = Success n
-  go n prog spec (i:is) =
+runTests p s i = uncurry Outcome $ go 0 0 p s i where
+  go n o _ _ [] = (Success n, overflowHint o)
+  go n o prog spec (i:is) =
     let
       (specTrace,warn) = runSpecification i spec
       progTrace = runProgram i prog
+      o' = if warn == OverflowWarning then o+1 else o
     in case specTrace `covers` progTrace of
-      MatchSuccessfull -> go (n+1) prog spec is
-      failure -> Failure i specTrace progTrace failure
+      MatchSuccessfull -> go (n+1) o' prog spec is
+      failure -> (Failure i specTrace progTrace failure, overflowHint o')
+
+  overflowHint 0 = NoHints
+  overflowHint n = OverflowHint n

@@ -14,7 +14,8 @@ module IOTasks.Random
   , (.&&.), (.||.), not'
   , sum', length', product'
   , currentValue, allValues
-  , taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs, Outcome(..)
+  , taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs
+  , Outcome(..), isSuccess, overflowWarnings
   , pPrintOutcome, pPrintOutcomeSimple
   , generateStaticTestSuite, taskCheckOn
   , interpret

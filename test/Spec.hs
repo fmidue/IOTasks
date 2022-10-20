@@ -3,7 +3,6 @@ import Test.Hspec
 
 import IOTasks
 
-import IOTasks.Testing
 import qualified IOTasks.Random.Testing as Random
 import Example
 
@@ -38,12 +37,11 @@ main = hspec $ do
         (taskCheckOutcome prog2' example2 <&> isSuccess) `shouldReturn` False
 
     describe "prog2''" $ do
-      it "taskCheck example2' specification" $
-        (taskCheckOutcome prog2'' example2' <&> isSuccess) `shouldReturn` True
-      it "does not fulfill example1 specification" $
-        (taskCheckOutcome prog2'' example1 <&> not . isSuccess) `shouldReturn` True
-      it "does not fulfill example3 specification" $
-        (taskCheckOutcome prog2'' example3 <&> not . isSuccess) `shouldReturn` True
+      it "taskCheck example2' specification with overflow warnings" $
+        (taskCheckOutcome prog2'' example2' <&> (\o -> isSuccess o && overflowWarnings o > 0) ) `shouldReturn` True
+      it "taskCheck example2' specification with overflow checks" $
+        (taskCheckWithOutcome stdArgs{checkOverflows=True} prog2'' example2' <&> (\o -> isSuccess o && overflowWarnings o == 0) ) `shouldReturn` True
+
 
     describe "prog3" $ do
       it "taskCheck example3 specification" $

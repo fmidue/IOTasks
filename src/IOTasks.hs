@@ -15,7 +15,8 @@ module IOTasks
   , sum', length', product', listLit
   , isIn, isNotIn
   , currentValue, allValues, currentValue', allValues'
-  , taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs, Outcome(..)
+  , taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs
+  , Outcome(..), isSuccess, overflowWarnings 
   , pPrintOutcome, pPrintOutcomeSimple
   , generateStaticTestSuite, taskCheckOn
   , interpret
