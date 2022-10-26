@@ -84,6 +84,14 @@ main = hspec $ do
       it "all interpretations of a specification satisfy that specification" $
         allM (\p -> isSuccess <$> taskCheckOutcome p example1) (interpret example1) `shouldReturn` True
 
+    context "string inputs" $ do
+      describe "echoProg" $ do
+        it "satisfies echoSpec" $
+          (taskCheckOutcome echoProg echoSpec <&> isSuccess) `shouldReturn` True
+      describe "reverseProg" $ do
+        it "satisfies reverseProg" $
+          (taskCheckOutcome reverseProg reverseSpec <&> isSuccess) `shouldReturn` True
+
     context "string/newline semantics" $ do
       describe "stringS1" $ do
         it "is satisfied by stringP1" $

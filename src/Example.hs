@@ -126,6 +126,25 @@ echoSpec =
   where
     x = stringVar "x"
 
+reverseSpec :: Specification
+reverseSpec =
+  readInput x str AssumeValid <>
+  branch (length' (as @String $ currentValue x) .>. intLit 5)
+    (writeOutput [Value $ reverse' . as @String $ currentValue x])
+    (writeOutput [Value $ as @String $ currentValue x])
+  where
+    x = stringVar "x"
+
+echoProg :: MonadTeletype m => m ()
+echoProg = getLine >>= putStrLn
+
+reverseProg :: MonadTeletype m => m ()
+reverseProg = do
+  str <- getLine
+  if length str > 5
+    then putStrLn $ reverse str
+    else putStrLn str
+
 ints, nats :: ValueSet Integer
 ints = Every
 nats = Eq 0 `Union` GreaterThan 0

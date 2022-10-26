@@ -13,11 +13,11 @@ module IOTasks
   , (.+.), (.-.), (.*.), intLit
   , (.==.), (.>.), (.>=.), (.<.), (.<=.)
   , (.&&.), (.||.), not', true, false
-  , sum', length', product', listLit
+  , sum', length', reverse', product', listLit
   , isIn, isNotIn
   , currentValue, allValues, currentValue', allValues', as
   , taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs
-  , Outcome(..), isSuccess, overflowWarnings 
+  , Outcome(..), isSuccess, overflowWarnings
   , pPrintOutcome, pPrintOutcomeSimple
   , generateStaticTestSuite, taskCheckOn
   , interpret

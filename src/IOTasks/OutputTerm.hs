@@ -7,6 +7,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE InstanceSigs #-}
 module IOTasks.OutputTerm
   ( OutputTerm
   , SomeOutputTerm(..), withSomeOutputTerm
@@ -169,9 +170,14 @@ instance Arithmetic OutputTerm where
   intLit = Transparent . IntLitT . fromInteger
 
 instance BasicLists OutputTerm where
-  length' = h1 length' $ value "length" (fromIntegral . length :: [Integer] -> Integer)
-  sum' = h1 sum' $ value "sum" (sum :: [Integer] -> Integer)
-  product' = h1 product' $ value "product" (product :: [Integer] -> Integer)
+  length' :: forall a. Typeable a => OutputTerm [a] -> OutputTerm Integer
+  length' = h1 (length' @Term @a) $ unaryF (Length @a)
+
+  reverse' :: forall a. OverflowType a => OutputTerm [a] -> OutputTerm [a]
+  reverse' = h1 (reverse' @Term @a) $ unaryF (Reverse @a)
+
+  sum' = h1 sum' $ unaryF Sum
+  product' = h1 product' $ unaryF Product
   listLit = Transparent . ListLitT . map fromInteger
 
 h1 :: (Term a -> Term b) -> Expr -> OutputTerm a -> OutputTerm b
@@ -195,7 +201,8 @@ termExpr (termStruct -> Literal (ListLit xs)) = val xs
 
 unaryF :: forall a b. UnaryF a b -> Expr
 unaryF Not = value "not" (not :: Bool -> Bool)
-unaryF Length = value "length" (fromIntegral . length :: [a] -> Integer)
+unaryF Length = value "length" (fromIntegral . length :: a -> Integer)
+unaryF Reverse = value "reverse" (reverse :: a -> a)
 unaryF Sum = value "sum" (sum :: [Integer] -> Integer)
 unaryF Product = value "product" (product :: [Integer] -> Integer)
 

@@ -48,6 +48,7 @@ data Term a where
   SumT :: Term [Integer] -> Term Integer
   ProductT :: Term [Integer] -> Term Integer
   LengthT :: Typeable a => Term [a] -> Term Integer
+  ReverseT :: OverflowType a => Term [a] -> Term [a]
   IntLitT :: I -> Term Integer
   ListLitT :: [I] -> Term [Integer]
   BoolLitT :: Bool -> Term Bool
@@ -70,6 +71,7 @@ termStruct (NotT x) = Unary Not x
 termStruct (SumT x) = Unary Sum x
 termStruct (ProductT x) = Unary Product x
 termStruct (LengthT x) = Unary Length x
+termStruct (ReverseT x) = Unary Reverse x
 termStruct (IntLitT x) = Literal $ IntLit x
 termStruct (ListLitT x) = Literal $ ListLit x
 termStruct (BoolLitT x) = Literal $ BoolLit x
@@ -90,6 +92,7 @@ deriving instance Show (AccessType a)
 data UnaryF a b where
   Not :: UnaryF Bool Bool
   Length :: Typeable a => UnaryF [a] Integer
+  Reverse :: Typeable a => UnaryF [a] [a]
   Sum :: UnaryF [Integer] Integer
   Product :: UnaryF [Integer] Integer
 
@@ -164,6 +167,7 @@ instance Sets Term where
 
 instance BasicLists Term where
   length' = LengthT
+  reverse' = ReverseT
   sum' = SumT
   product' = ProductT
   listLit = ListLitT . map fromInteger
@@ -188,6 +192,7 @@ eval t m =
 evalF :: UnaryF a b -> OT a -> OT b
 evalF Not = not
 evalF Length = fromIntegral . length
+evalF Reverse = reverse
 evalF Sum = sum
 evalF Product = product
 
@@ -254,9 +259,14 @@ printIndexedTerm (termStruct -> Unary Not (IsInT x xs)) m = printIndexedTerm x m
 printIndexedTerm (termStruct -> Unary Not t) m = concat ["not (", printIndexedTerm t m, ")"]
 printIndexedTerm (termStruct -> Literal (BoolLit True)) _ = "True"
 printIndexedTerm (termStruct -> Literal (BoolLit False)) _ = "False"
-printIndexedTerm (termStruct -> Unary Length t) m = concat ["length (", printIndexedTerm t m, ")"]
-printIndexedTerm (termStruct -> Unary Sum t) m = concat ["sum (", printIndexedTerm t m, ")"]
-printIndexedTerm (termStruct -> Unary Product t) m = concat ["product (", printIndexedTerm t m, ")"]
+printIndexedTerm (termStruct -> Unary f t) m = concat [fSym f ++" (", printIndexedTerm t m, ")"]
+  where
+    fSym :: UnaryF a b -> String
+    fSym Not = "not"
+    fSym Length = "length"
+    fSym Reverse = "reverse"
+    fSym Sum = "sum"
+    fSym Product = "product"
 printIndexedTerm (termStruct -> Variable C x n) m = (\(x,(i,_)) -> x ++ "_" ++ show i) $ maximumOn (head.snd.snd) $ (\xs -> take (length xs - n) xs) $ mapMaybe (\x -> (varname x,) <$> Map.lookup x m) (toVarList x)
 printIndexedTerm (termStruct -> Variable A x n) _ = "{" ++ intercalate "," (map varname $ toVarList x) ++ "}"++":"++show n++"_A"
 printIndexedTerm (termStruct -> Literal (IntLit x)) _ = show x
@@ -281,6 +291,7 @@ someTerm t@(NotT _) = SomeTerm t
 someTerm t@(SumT _) = SomeTerm t
 someTerm t@(ProductT _) = SomeTerm t
 someTerm t@(LengthT _) = SomeTerm t
+someTerm t@(ReverseT _) = SomeTerm t
 someTerm t@(IntLitT _) = SomeTerm t
 someTerm t@(ListLitT _) = SomeTerm t
 someTerm t@(BoolLitT _) = SomeTerm t

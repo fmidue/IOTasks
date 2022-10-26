@@ -83,6 +83,7 @@ class Logic t where
 
 class BasicLists t where
   length' :: Typeable a => t [a] -> t Integer
+  reverse' :: OverflowType a => t [a] -> t [a]
   sum' :: t [Integer] -> t Integer
   product' :: t [Integer] -> t Integer
   listLit :: [Integer] -> t [Integer]

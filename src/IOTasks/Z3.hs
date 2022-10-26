@@ -6,6 +6,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DataKinds #-}
 module IOTasks.Z3 where
 
 import IOTasks.Constraints
@@ -30,7 +31,6 @@ import Data.Tuple.Extra (thd3)
 import Data.Typeable
 
 import Test.QuickCheck.Gen (Gen)
-import Debug.Trace
 
 type Timeout = Int
 
@@ -123,7 +123,7 @@ pathScript path mode checkOverflows = do
       pure ((((x,ty),i),var),ValueGenerator $ valueOf vs)
   forM_ predConstr $
     \(ConditionConstraint t e) ->
-      optimizeAssert =<< z3Predicate t e (map fst vars)
+        optimizeAssert =<< z3Predicate t e (map fst vars)
 
   when checkOverflows $
     forM_ overflConstr $
@@ -181,12 +181,13 @@ mkValueRep (IntegerValue n) = mkInteger n
 mkValueRep (StringValue s) = mkString s
 
 z3Predicate :: Term a -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 AST
-z3Predicate (termStruct -> Binary IsIn x (All y n)) e vars = do
+z3Predicate (termStruct -> Binary IsIn x xs) e vars = do
   xP <- z3Predicate x e vars
-  mkOr =<< mapM (mkEq xP . fromMaybe (unknownVariablesError y) . (`lookup` vars)) (weaveVariables y n e)
-z3Predicate (termStruct -> Binary IsIn x (ListLitT xs)) e vars = do
-  xP <- z3Predicate x e vars
-  mkOr =<< mapM (mkIntNum >=> mkEq xP) xs
+  as <- listASTs xs e vars
+  mkOr =<< mapM (mkEq xP) as
+-- z3Predicate (termStruct -> Binary IsIn x (ListLitT xs)) e vars = do
+--   xP <- z3Predicate x e vars
+--   mkOr =<< mapM (mkIntNum >=> mkEq xP) xs
 z3Predicate (termStruct -> Binary f x y) e vars = binRec e vars (binF f) x y where
   binF :: BinaryF a b c -> AST -> AST -> Z3 AST
   binF (:+:) = \a b -> mkAdd [a,b]
@@ -199,19 +200,25 @@ z3Predicate (termStruct -> Binary f x y) e vars = binRec e vars (binF f) x y whe
   binF (:<=:) = mkLe
   binF (:&&:) = \a b -> mkAnd [a,b]
   binF (:||:) = \a b -> mkOr [a,b]
-  binF _ = error ""
+  binF IsIn = error "handled through special cases"
 z3Predicate (termStruct -> Unary Not x) e vars = mkNot =<< z3Predicate x e vars
-z3Predicate (termStruct -> Unary Length (All x n)) e _ = mkIntNum $ length $ weaveVariables x n e
-z3Predicate (termStruct -> Unary Sum (All x n)) e vars = mkAdd $ lookupList (weaveVariables x n e) vars
-z3Predicate (termStruct -> Unary Product (All x n)) e vars = mkMul $ lookupList (weaveVariables x n e) vars
-z3Predicate (termStruct -> Unary Length (ListLitT xs)) _ _ = mkIntNum $ length xs
-z3Predicate (termStruct -> Unary Sum (ListLitT xs)) _ _ = mkIntNum $ sum xs
-z3Predicate (termStruct -> Unary Product (ListLitT xs)) _ _ = mkIntNum $ product xs
+z3Predicate (termStruct -> Unary Length (Current x n)) e _ = mkIntNum . length . last $ weaveVariables x n e --special case for string variables
+z3Predicate (termStruct -> Unary Length xs) e vars = (mkIntNum . length) =<< listASTs xs e vars
+z3Predicate (termStruct -> Unary Sum xs) e vars = mkAdd =<< listASTs xs e vars
+z3Predicate (termStruct -> Unary Product xs) e vars = mkMul =<< listASTs xs e vars
 z3Predicate (termStruct -> Variable C x n) e vars = pure $ fromMaybe (unknownVariablesError x) $ (`lookup` vars) . last $ weaveVariables x n e
-z3Predicate (termStruct -> Variable A _x _) _e _vars = error "generic list"
 z3Predicate (termStruct -> Literal (IntLit n)) _ _ = mkIntNum n
-z3Predicate (termStruct -> Literal (ListLit _)) _ _ = error "generic list literal"
 z3Predicate (termStruct -> Literal (BoolLit b)) _ _ = mkBool b
+--
+z3Predicate (termStruct -> Variable A _x _) _e _vars = error "z3Predicate: top level list should no happen"
+z3Predicate (termStruct -> Literal (ListLit _)) _ _ = error "z3Predicate: top level list literal should no happen"
+z3Predicate (termStruct -> Unary Reverse _) _ _ = error "z3Predicate: top level reverse should no happen"
+
+listASTs :: Term [a] -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 [AST]
+listASTs (ReverseT t) e vars = reverse <$> listASTs t e vars
+listASTs (ListLitT xs) _ _ = mapM (mkIntNum . toInteger) xs
+listASTs (All x n) e vars = pure $ lookupList (weaveVariables x n e) vars
+listASTs (Current _ _) _ _ = error "listASTs: should not happen"
 
 unknownVariablesError :: VarExp a => a -> b
 unknownVariablesError x = error $ "unknown variable(s) {" ++ intercalate "," (map varname $ toVarList x) ++ "}"
