@@ -1,26 +1,64 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE TypeApplications #-}
 module IOTasks.Terms where
+
+import IOTasks.Overflow
+
+import Data.Typeable
 
 type Varname = String
 
-class VarExp a where
-  toVarList :: a -> [Varname]
+type Var = (Varname, TypeRep)
 
-instance VarExp Varname where
+varname :: Var -> Varname
+varname = fst
+
+varExpType :: VarExp e => e -> Maybe TypeRep
+varExpType = varListType . toVarList
+
+varListType :: [Var] -> Maybe TypeRep
+varListType xs =
+  if same . map snd $ xs
+    then Just $ snd . head $ xs
+    else Nothing
+
+same :: Eq a => [a] -> Bool
+same xs = and $ zipWith (==) xs (tail xs)
+
+var :: forall a. Typeable a => String -> Var
+var x = (x, typeRep $ Proxy @a)
+
+intVar :: String -> Var
+intVar = var @Integer
+
+stringVar :: String -> Var
+stringVar = var @String
+
+class VarExp e where
+  toVarList :: e -> [Var]
+
+instance VarExp Var where
   toVarList = pure
 
-instance VarExp [Varname] where
+instance VarExp [Var] where
   toVarList = id
 
 class Accessor t where
-  currentValue :: VarExp a => a -> t Integer
+  currentValue :: (OverflowType a, VarExp e) => e -> t a
   currentValue x = currentValue' x 0
-  currentValue' :: VarExp a => a -> Int -> t Integer
+  currentValue' :: (OverflowType a, VarExp e) => e -> Int -> t a
 
-  allValues :: VarExp a => a -> t [Integer]
+  allValues :: (OverflowType a, VarExp e) => e -> t [a]
   allValues x = allValues' x 0
-  allValues' :: VarExp a => a -> Int -> t [Integer]
+  allValues' :: (OverflowType a, VarExp e) => e -> Int -> t [a]
+
+as :: Typeable a => t a -> t a
+as = id
 
 -- TODO: good names?
 class Arithmetic t where
@@ -44,7 +82,7 @@ class Logic t where
   false :: t Bool
 
 class BasicLists t where
-  length' :: t [Integer] -> t Integer
+  length' :: Typeable a => t [a] -> t Integer
   sum' :: t [Integer] -> t Integer
   product' :: t [Integer] -> t Integer
   listLit :: [Integer] -> t [Integer]

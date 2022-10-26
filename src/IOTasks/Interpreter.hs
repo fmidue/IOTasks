@@ -1,4 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 module IOTasks.Interpreter where
 
 import Prelude hiding (readLn,putStrLn)
@@ -10,31 +12,32 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import IOTasks.Specification
-import IOTasks.MonadTeletype
+import IOTasks.MonadTeletype as MTT
 import IOTasks.Term
 import IOTasks.ValueSet
 import IOTasks.Trace
 import IOTasks.OutputPattern
+import IOTasks.ValueMap
 
 interpret :: MonadTeletype m => Specification -> [m ()]
 interpret s = do
   collapsed <- collapseChoice s
-  pure $ flip evalStateT Map.empty $
+  pure $ flip evalStateT (Map.empty :: ValueMap) $
     sem
-      (\n x vs m -> RecSub (x,vs,m,n) (n+1))
+      (\n x (vs :: ValueSet v) m -> RecSub (x,wrapValue . readValue @v ,containsValue vs . unwrapValue,m,n) (n+1))
       (\case
-        RecSub (x,_,AssumeValid,n) p' -> do
-          v <- lift readLn
-          modify (Map.alter (\case {Just xs -> Just $ (v,n):xs; Nothing -> Just [(v,n)]}) x)
+        RecSub (x,readF,_,AssumeValid,n) p' -> do
+          v <- lift (readF <$> MTT.getLine)
+          modify $ insertValue (v,n) x
           p'
-        RecSub (x,vs,Abort,n) p' -> do
-          v <- lift readLn
-          when (vs `containsValue` v) $ do
-            modify (Map.alter (\case {Just xs -> Just $ (v,n):xs; Nothing -> Just [(v,n)]}) x)
+        RecSub (x,readF,vsContains,Abort,n) p' -> do
+          v <- lift (readF <$> MTT.getLine)
+          when (vsContains v) $ do
+            modify $ insertValue (v,n) x
             p'
-        RecSub (x,vs,UntilValid,n) p' -> do
-          v <- iterateUntil (vs `containsValue`) $ lift readLn
-          modify (Map.alter (\case {Just xs -> Just $ (v,n):xs; Nothing -> Just [(v,n)]}) x)
+        RecSub (x,readF,vsContains,UntilValid,n) p' -> do
+          v <- iterateUntil vsContains $ lift (readF <$> MTT.getLine)
+          modify $ insertValue (v,n) x
           p'
         NoRec{} -> error "interpret: impossible"
         RecSame{} -> error "interpret: impossible"

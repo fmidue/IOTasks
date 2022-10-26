@@ -9,91 +9,129 @@ import IOTasks
 
 example1 :: Specification
 example1 =
-  readInput "x" ints AssumeValid <>
-  readInput "y" nats AssumeValid <>
-  branch (currentValue "x" .>. currentValue "y")
-    (writeOutput [Wildcard <> Value (currentValue "x" .+. currentValue "y") <> Wildcard , Value (currentValue "x" .-. currentValue "y") <> Wildcard] )
-    (writeOutput [Wildcard <> Text "Result: " <> Value (currentValue "x" .*. currentValue "y")] )
+  readInput x ints AssumeValid <>
+  readInput y nats AssumeValid <>
+  branch (currentValue x .>. currentValue y)
+    (writeOutput [Wildcard <> Value (currentValue x .+. currentValue y) <> Wildcard , Value (currentValue x .-. currentValue y) <> Wildcard] )
+    (writeOutput [Wildcard <> Text "Result: " <> Value (currentValue x .*. currentValue y)] )
+  where
+    x = intVar "x"
+    y = intVar "y"
 
 example2 :: Specification
 example2 =
-  readInput "n" nats UntilValid <>
-  until (length' (allValues "x") .==. currentValue "n")
-    (writeOptionalOutput [Value $ currentValue "n" .-. length' (allValues "x")] <> readInput "x" ints AssumeValid) <>
-  writeOutput [Value $ sum' $ allValues "x"]
+  readInput n nats UntilValid <>
+  until (length' (as @[Integer] $ allValues x) .==. currentValue n)
+    (writeOptionalOutput [Value $ currentValue n .-. length' (as @[Integer] $ allValues x)] <> readInput x ints AssumeValid) <>
+  writeOutput [Value $ sum' $ allValues x]
+  where
+    n = intVar "n"
+    x = intVar "x"
 
 -- simple overflow example
 example2' :: Specification
 example2' =
-  readInput "n" nats UntilValid <>
-  until (length' (allValues "x") .==. currentValue "n")
-    (writeOptionalOutput [Value $ currentValue "n" .-. length' (allValues "x")] <> readInput "x" ints AssumeValid) <>
-  writeOutput [Value $ product' $ allValues "x"]
+  readInput n nats UntilValid <>
+  until (length' (as @[Integer] $ allValues x) .==. currentValue n)
+    (writeOptionalOutput [Value $ currentValue n .-. length' (as @[Integer] $ allValues x)] <> readInput x ints AssumeValid) <>
+  writeOutput [Value $ product' $ allValues x]
+  where
+    n = intVar "n"
+    x = intVar "x"
 
 example3 :: Specification
 example3 =
-  readInput "n" nats AssumeValid <>
-  until (sum' (allValues "x") .>. currentValue "n")
-    (readInput "x" ints AssumeValid) <>
-  writeOutput [Value $ length' $ allValues "x"]
-
+  readInput n nats AssumeValid <>
+  until (sum' (allValues x) .>. currentValue n)
+    (readInput x ints AssumeValid) <>
+  writeOutput [Value $ length' $ as @[Integer] $ allValues x]
+  where
+    n = intVar "n"
+    x = intVar "x"
 -- atempt at 'breaking' the solver
 example4 :: Specification
 example4 =
-  readInput "x" nats AssumeValid <>
-  until (currentValue "x" .==. product' (allValues "y"))
-    (readInput "y" nats AssumeValid)
+  readInput x nats AssumeValid <>
+  until (currentValue x .==. product' (allValues y))
+    (readInput y nats AssumeValid)
+  where
+    x = intVar "x"
+    y = intVar "y"
+
 
 -- variable merging and multiple exits
 example5 :: Specification
 example5 =
   optionalTextOutput <>
-  readInput "x" ints AssumeValid <>
+  readInput x ints AssumeValid <>
   optionalTextOutput <>
-  readInput "y" ints AssumeValid <>
+  readInput y ints AssumeValid <>
   tillExit (
-    branch (currentValue "x" .+. currentValue "y" .==. intLit 0 )
+    branch (currentValue x .+. currentValue y .==. intLit 0 )
       exit
       (optionalTextOutput <>
-       readInput "x" ints AssumeValid <>
-        branch (currentValue "x" .+. currentValue "y" .==. intLit 0 )
+       readInput x ints AssumeValid <>
+        branch (currentValue x .+. currentValue y .==. intLit 0 )
           exit
           (optionalTextOutput <>
-           readInput "y" ints AssumeValid)
+           readInput y ints AssumeValid)
     )
   ) <>
-  writeOutput [Wildcard <> Value (length' $ filter' predicate $ allValues ["x","y"]) <> Wildcard]
-    where predicate x = x > 0 && x `mod` 3 == 0
+  writeOutput [Wildcard <> Value (length' $ filter' predicate $ allValues [x,y]) <> Wildcard]
+  where
+    predicate x = x > 0 && x `mod` 3 == 0
+    x = intVar "x"
+    y = intVar "y"
 
 -- input modes
 example6 :: Specification
 example6 =
-  readInput "x" nats Abort <>
-  readInput "y" nats AssumeValid <>
-  readInput "z" nats UntilValid <>
-  writeOutput [Value $ sum' $ allValues ["x","y","z"] ]
+  readInput x nats Abort <>
+  readInput y nats AssumeValid <>
+  readInput z nats UntilValid <>
+  writeOutput [Value $ sum' $ allValues [x,y,z] ]
+  where
+    x = intVar "x"
+    y = intVar "y"
+    z = intVar "z"
 
 -- variable merging
 example7 :: Specification
 example7 =
-  readInput "x" ints AssumeValid <>
-  readInput "y" ints AssumeValid <>
-  branch (currentValue "y" .>. intLit 0)
-    (readInput "x" ints AssumeValid <>
-    readInput "x" ints AssumeValid)
-    (readInput "y" ints AssumeValid)
+  readInput x ints AssumeValid <>
+  readInput y ints AssumeValid <>
+  branch (currentValue y .>. intLit 0)
+    (readInput x ints AssumeValid <>
+    readInput x ints AssumeValid)
+    (readInput y ints AssumeValid)
     <>
-  branch (currentValue ["x","y"] .>. intLit 5)
-    (readInput "z" ints AssumeValid)
-    (readInput "y" ints AssumeValid)
+  branch (currentValue [x,y] .>. intLit 5)
+    (readInput z ints AssumeValid)
+    (readInput y ints AssumeValid)
     <>
-  writeOutput [Value $ currentValue ["x","z"]] <>
-  writeOutput [Value $ length' $ allValues ["x","y","z"]] <>
-  writeOutput [Value $ length' $ allValues ["x","y","a","z"]]
+  writeOutput [Value $ as @Integer $ currentValue [x,z]] <>
+  writeOutput [Value $ length' $ as @[Integer] $ allValues [x,y,z]] <>
+  writeOutput [Value $ length' $ as @[Integer] $ allValues [x,y,a,z]]
+  where
+    x = intVar "x"
+    y = intVar "y"
+    z = intVar "z"
+    a = intVar "a"
 
-ints, nats :: ValueSet
+-- string input
+echoSpec :: Specification
+echoSpec =
+  readInput x str AssumeValid <>
+  writeOutput [Value $ as @String $ currentValue x]
+  where
+    x = stringVar "x"
+
+ints, nats :: ValueSet Integer
 ints = Every
 nats = Eq 0 `Union` GreaterThan 0
+
+str :: ValueSet String
+str = Every
 
 -- example programs
 
@@ -245,9 +283,12 @@ stringP3 = putStr "A" >> putStr "B"
 
 addSpec :: Specification
 addSpec =
-  readInput "x" nats AssumeValid <>
-  readInput "y" nats AssumeValid <>
-  writeOutput [Value $ currentValue "x" .+. currentValue "y"]
+  readInput x nats AssumeValid <>
+  readInput y nats AssumeValid <>
+  writeOutput [Value $ currentValue x .+. currentValue y]
+  where
+    x = intVar "x"
+    y = intVar "y"
 
 nonsense :: MonadTeletype m => m ()
 nonsense = do
@@ -266,18 +307,19 @@ plus x y = reverse $ plus' (reverse $ filter (>= '0') x) (reverse $ filter (>= '
 -- hangman
 hangmanSpec :: [Integer] -> Specification
 hangmanSpec word = tillExit (
-     branch (winCond $ allValues "g") (writeOutput [Text "correct!"] <> exit) mempty
+     branch (winCond $ allValues g) (writeOutput [Text "correct!"] <> exit) mempty
   <> writeOutput [Text "Game state:"  <> Wildcard]
-  <> readInput "g" digits AssumeValid
-  <> branch ((currentValue "g" `isIn` listLit word) .&&. (currentValue "g" `isNotIn` allValues' "g" 1))
+  <> readInput g digits AssumeValid
+  <> branch ((currentValue g `isIn` listLit word) .&&. (currentValue g `isNotIn` allValues' g 1))
     (writeOptionalOutput [Text "good guess!"])
     (writeOptionalOutput [Text "wrong guess!"])
   )
   where
     winCond :: Term [Integer] -> Term Bool
     winCond g = foldr (\a b -> intLit a `isIn` g .&&. b) true word
+    g = intVar "g"
 
-digits :: ValueSet
+digits :: ValueSet Integer
 digits = (Eq 0 `Union` GreaterThan 0) `Intersection` LessThen 10
 
 hangmanProg :: MonadTeletype m => [Integer] -> m ()

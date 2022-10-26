@@ -7,10 +7,10 @@ module IOTasks.Constraints where
 
 import IOTasks.ValueSet
 import IOTasks.Term (Term, printIndexedTerm, castTerm, subTerms)
-import IOTasks.Terms (Varname, not')
+import IOTasks.Terms (Var, not', varname)
 import IOTasks.Specification
 import IOTasks.OutputPattern (valueTerms)
-import IOTasks.OutputTerm (transparentSubterms)
+import IOTasks.OutputTerm (transparentSubterms, withSomeOutputTerm)
 
 import Data.List (intersperse)
 import qualified Data.Map as Map
@@ -18,11 +18,12 @@ import Data.Map (Map)
 import qualified Data.Set as Set (toList)
 import Data.Maybe (catMaybes, mapMaybe)
 import Data.Tuple.Extra (fst3)
+import Data.Typeable
 
 data Constraint (t :: ConstraintType) where
-  InputConstraint :: (Varname, Int) -> ValueSet -> Constraint 'Input
-  ConditionConstraint :: Term Bool -> Map Varname (Int, [Int]) -> Constraint 'Condition
-  OverflowConstraints :: [Term Integer] -> Map Varname (Int, [Int]) -> Constraint 'Overflow
+  InputConstraint :: Typeable v => (Var, Int) -> ValueSet v -> Constraint 'Input
+  ConditionConstraint :: Term Bool -> Map Var (Int, [Int]) -> Constraint 'Condition
+  OverflowConstraints :: [Term Integer] -> Map Var (Int, [Int]) -> Constraint 'Overflow
 
 data ConstraintType = Input | Condition | Overflow
 
@@ -40,7 +41,9 @@ constraintTree negMax =
     (\(n,e,k) x vs mode ->
       let
         e' = inc x k e
-        p = (x,e',vs, mode == Abort && n < negMax)
+        p = (InputConstraint(x, ix x e') vs
+            ,InputConstraint(x, ix x e') (complement vs)
+            , mode == Abort && n < negMax)
       in case mode of
           AssumeValid -> RecSub p (n,e',k+1)
           UntilValid
@@ -49,25 +52,25 @@ constraintTree negMax =
           Abort -> RecSub p (n,e',k)
     )
     (\case
-      RecSub (x,e',vs, False) s' -> Assert (InputConstraint(x, ix x e') vs) s'
-      RecSub (x,e',vs, True) s' -> Choice
-        (Assert (InputConstraint(x, ix x e') (complement vs)) Empty)
-        (Assert (InputConstraint(x, ix x e') vs) s')
-      RecBoth (x,e',vs,_) s' s -> Choice
-        (Assert (InputConstraint(x, ix x e') (complement vs)) s)
-        (Assert (InputConstraint(x, ix x e') vs) s')
+      RecSub (vsP,_, False) s' -> Assert vsP s'
+      RecSub (vsP,vsN, True) s' -> Choice
+        (Assert vsN Empty)
+        (Assert vsP s')
+      RecBoth (vsP,vsN,_) s' s -> Choice
+        (Assert vsN s)
+        (Assert vsP s')
       NoRec _ -> error "constraintTree: impossible"
       RecSame{} -> error "constraintTree: impossible"
     )
-    (\(_,e,_) _ ps t -> Assert (OverflowConstraints (catMaybes $ [ castTerm @Integer t | p <- Set.toList ps, vt <- valueTerms p, t <- transparentSubterms vt]) e) t)
+    (\(_,e,_) _ ps t -> Assert (OverflowConstraints (catMaybes $ [ castTerm @Integer t | p <- Set.toList ps, vt <- valueTerms p, t <- withSomeOutputTerm vt transparentSubterms]) e) t)
     (\(_,e,_) c l r -> Assert (OverflowConstraints (mapMaybe (castTerm @Integer) $ subTerms c) e) $ Choice (Assert (ConditionConstraint c e) l) (Assert (ConditionConstraint (not' c) e) r))
     Empty
     (0,Map.empty,1)
 
-ix :: Varname -> Map Varname (Int,a) -> Int
+ix :: Var -> Map Var (Int,a) -> Int
 ix x m = maybe 0 fst (Map.lookup x m)
 
-inc :: Varname -> Int -> Map Varname (Int,[Int]) -> Map Varname (Int,[Int])
+inc :: Var -> Int -> Map Var (Int,[Int]) -> Map Var (Int,[Int])
 inc x k m
   | x `elem` Map.keys m = Map.update (\(c,ks) -> Just (c + 1,k:ks)) x m
   | otherwise = Map.insert x (1,[k]) m
@@ -104,6 +107,6 @@ printSomeConstraint :: SomeConstraint -> String
 printSomeConstraint (SomeConstraint c) = printConstraint c
 
 printConstraint :: Constraint t -> String
-printConstraint (InputConstraint (x,i) vs) = concat [x,"_",show i," : ",printValueSet vs]
+printConstraint (InputConstraint (x,i) vs) = concat [varname x,"_",show i," : ",printValueSet vs]
 printConstraint (ConditionConstraint t m) = printIndexedTerm t m
 printConstraint (OverflowConstraints _ _) = "**some overflow checks**"

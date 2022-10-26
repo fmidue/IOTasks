@@ -1,14 +1,18 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 module IOTasks.Z3 where
 
 import IOTasks.Constraints
 import IOTasks.ValueSet
 import IOTasks.Term
-import IOTasks.Terms (Varname, VarExp(..))
+import IOTasks.Terms (Var, VarExp(..), varname)
+import IOTasks.ValueMap
 
 import Z3.Monad
 
@@ -23,13 +27,17 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.List (intercalate, sortOn)
 import Data.Tuple.Extra (thd3)
+import Data.Typeable
+
+import Test.QuickCheck.Gen (Gen)
+import Debug.Trace
 
 type Timeout = Int
 
-findPathInput :: Timeout -> Path -> Integer -> Bool -> IO (Maybe [Integer])
+findPathInput :: Timeout -> Path -> Integer -> Bool -> IO (Maybe [String])
 findPathInput t p bound checkOverflows = fst <$> findPathInputDebug t p bound checkOverflows
 
-findPathInputDebug :: Timeout -> Path -> Integer -> Bool -> IO (Maybe [Integer],String)
+findPathInputDebug :: Timeout -> Path -> Integer -> Bool -> IO (Maybe [String],String)
 findPathInputDebug t p bound checkOverflows = do
   evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) $ pathScript p (WithSoft bound) checkOverflows
 
@@ -98,15 +106,21 @@ lookAhead Empty = []
 lookAhead (Assert c t) = SomeConstraint c : lookAhead t
 lookAhead Choice{} = []
 
-pathScript :: Path -> ScriptMode -> Bool -> Z3 (Maybe [Integer], String)
+data ValueGenerator where
+  ValueGenerator :: Typeable v => (Integer -> Gen v) -> ValueGenerator
+
+withGeneratedValue :: (forall v. Typeable v => v -> r) -> ValueGenerator -> Integer -> IO r
+withGeneratedValue f (ValueGenerator g) bound = f <$> generate (g bound)
+
+pathScript :: Path -> ScriptMode -> Bool -> Z3 (Maybe [String], String)
 pathScript path mode checkOverflows = do
   let (tyConstr,predConstr,overflConstr) = partitionPath path
   vars <- forM tyConstr $
-    \(InputConstraint (x,i) vs) -> do
-      var <- mkFreshIntVar $ x ++ show i
+    \(InputConstraint ((x,ty),i) (vs :: ValueSet v)) -> do
+      var <- mkFreshVar (x ++ show i) =<< mkSort @v
       constraint <- z3ValueSetConstraint vs var
       optimizeAssert constraint
-      pure (((x,i),var),vs)
+      pure ((((x,ty),i),var),ValueGenerator $ valueOf vs)
   forM_ predConstr $
     \(ConditionConstraint t e) ->
       optimizeAssert =<< z3Predicate t e (map fst vars)
@@ -118,10 +132,10 @@ pathScript path mode checkOverflows = do
 
   case mode of
     WithSoft bound -> do
-      vs <- liftIO $ forM vars $ \((_,ast),vs) -> do {v <- generate $ valueOf vs bound; pure (ast,v)}
+      vs <- liftIO $ forM vars $ \((_,ast),gen) -> withGeneratedValue (\v -> (ast,wrapValue v)) gen bound
       def <- mkStringSymbol "default"
       forM_ vs $ \(ast,v) -> do
-        eq <- mkEq ast =<< mkInteger v
+        eq <- mkEq ast =<< mkValueRep v
         optimizeAssertSoft eq "1" def -- soft assert with weight 1 and id "default"
     WithoutSoft -> pure ()
   str <- optimizeToString
@@ -129,12 +143,44 @@ pathScript path mode checkOverflows = do
   mRes <- case result of
     Sat -> do
       model <- optimizeGetModel
-      Just . catMaybes <$> mapM ((evalInt model . snd) . fst) vars
+      Just . catMaybes <$> mapM ((evalAST model . snd) . fst) vars
     _ -> do
       pure Nothing
   pure (mRes,str)
 
-z3Predicate :: Term a -> Map Varname (Int,[Int]) -> [((Varname, Int), AST)] -> Z3 AST
+evalAST :: Model -> AST -> Z3 (Maybe String)
+evalAST m x = do
+  isS <- isStringSort =<< getSort x
+  if isS
+    then do
+      mR <- modelEval m x True
+      case mR of
+        Just r -> Just <$> getString r
+        Nothing -> pure Nothing
+    else fmap show <$> evalInt m x
+
+sortTest :: IO Result
+sortTest = evalZ3 $ do
+  x <- mkFreshVar "x" =<< mkStringSort
+  hi <- mkString "Hi"
+  eq <- mkEq x hi
+  def <- mkStringSymbol "default"
+  _ <- optimizeAssertSoft eq "1" def
+  optimizeCheck []
+
+mkSort :: forall a z3. (Typeable a, MonadZ3 z3) => z3 Sort
+mkSort =
+  case eqT @a @Integer of
+    Just Refl -> mkIntSort
+    Nothing -> case eqT @a @String of
+      Just Refl -> mkStringSort
+      Nothing -> error "mkSort: unsupported type"
+
+mkValueRep :: Value -> Z3 AST
+mkValueRep (IntegerValue n) = mkInteger n
+mkValueRep (StringValue s) = mkString s
+
+z3Predicate :: Term a -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 AST
 z3Predicate (termStruct -> Binary IsIn x (All y n)) e vars = do
   xP <- z3Predicate x e vars
   mkOr =<< mapM (mkEq xP . fromMaybe (unknownVariablesError y) . (`lookup` vars)) (weaveVariables y n e)
@@ -161,23 +207,23 @@ z3Predicate (termStruct -> Unary Product (All x n)) e vars = mkMul $ lookupList 
 z3Predicate (termStruct -> Unary Length (ListLitT xs)) _ _ = mkIntNum $ length xs
 z3Predicate (termStruct -> Unary Sum (ListLitT xs)) _ _ = mkIntNum $ sum xs
 z3Predicate (termStruct -> Unary Product (ListLitT xs)) _ _ = mkIntNum $ product xs
-z3Predicate (termStruct -> Var C x n) e vars = pure $ fromMaybe (unknownVariablesError x) $ (`lookup` vars) . last $ weaveVariables x n e
-z3Predicate (termStruct -> Var A _x _) _e _vars = error "generic list"
+z3Predicate (termStruct -> Variable C x n) e vars = pure $ fromMaybe (unknownVariablesError x) $ (`lookup` vars) . last $ weaveVariables x n e
+z3Predicate (termStruct -> Variable A _x _) _e _vars = error "generic list"
 z3Predicate (termStruct -> Literal (IntLit n)) _ _ = mkIntNum n
 z3Predicate (termStruct -> Literal (ListLit _)) _ _ = error "generic list literal"
 z3Predicate (termStruct -> Literal (BoolLit b)) _ _ = mkBool b
 
 unknownVariablesError :: VarExp a => a -> b
-unknownVariablesError x = error $ "unknown variable(s) {" ++ intercalate "," (toVarList x) ++ "}"
+unknownVariablesError x = error $ "unknown variable(s) {" ++ intercalate "," (map varname $ toVarList x) ++ "}"
 
 -- helper for binary recursive case
-binRec :: Map Varname (Int,[Int]) -> [((Varname,Int),AST)] -> (AST -> AST -> Z3 AST) -> Term a -> Term b -> Z3 AST
+binRec :: Map Var (Int,[Int]) -> [((Var,Int),AST)] -> (AST -> AST -> Z3 AST) -> Term a -> Term b -> Z3 AST
 binRec e vs f x y = do
   xP <- z3Predicate x e vs
   yP <- z3Predicate y e vs
   f xP yP
 
-weaveVariables :: VarExp a => a -> Int -> Map Varname (Int,[Int]) -> [(Varname,Int)]
+weaveVariables :: VarExp a => a -> Int -> Map Var (Int,[Int]) -> [(Var,Int)]
 weaveVariables vs n e =
     reverse . drop n . reverse -- drop last n variables
   . map (\(x,y,_) -> (x,y))
@@ -189,7 +235,7 @@ weaveVariables vs n e =
 lookupList :: Eq a => [a] -> [(a, b)] -> [b]
 lookupList vs vars = mapMaybe (`lookup` vars) vs
 
-z3ValueSetConstraint :: ValueSet -> AST -> Z3 AST
+z3ValueSetConstraint :: ValueSet a -> AST -> Z3 AST
 z3ValueSetConstraint (Union x y) xVar = do
   cx <- z3ValueSetConstraint x xVar
   cy <- z3ValueSetConstraint y xVar
@@ -204,7 +250,7 @@ z3ValueSetConstraint (Eq n) xVar = mkIntNum n >>= mkEq xVar
 z3ValueSetConstraint Every _ = mkTrue
 z3ValueSetConstraint None _ = mkFalse
 
-assertOverflowChecks :: Term Integer ->  Map Varname (Int,[Int]) -> [((Varname, Int), AST)] -> Z3 ()
+assertOverflowChecks :: Term Integer ->  Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 ()
 assertOverflowChecks t e vars = do
   ast <- z3Predicate t e vars
   overflowConstraints ast

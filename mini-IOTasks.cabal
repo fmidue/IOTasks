@@ -41,6 +41,7 @@ library
       IOTasks.Terms
       IOTasks.Testing
       IOTasks.Trace
+      IOTasks.ValueMap
       IOTasks.ValueSet
       IOTasks.Z3
   other-modules:
@@ -51,6 +52,7 @@ library
   build-depends:
       QuickCheck
     , base >=4.7 && <5
+    , constraints
     , containers
     , express
     , extra
@@ -74,6 +76,7 @@ test-suite mini-IOTasks-test
   build-depends:
       QuickCheck
     , base >=4.7 && <5
+    , constraints
     , containers
     , express
     , extra
@@ -99,6 +102,7 @@ benchmark hangman-benchmark
   build-depends:
       QuickCheck
     , base >=4.7 && <5
+    , constraints
     , containers
     , criterion
     , express

@@ -9,12 +9,13 @@ module IOTasks
   , ValueSet(..)
   , OutputPattern(..), PatternType(..)
   , OutputTerm, filter'
+  , var, intVar, stringVar
   , (.+.), (.-.), (.*.), intLit
   , (.==.), (.>.), (.>=.), (.<.), (.<=.)
   , (.&&.), (.||.), not', true, false
   , sum', length', product', listLit
   , isIn, isNotIn
-  , currentValue, allValues, currentValue', allValues'
+  , currentValue, allValues, currentValue', allValues', as
   , taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs
   , Outcome(..), isSuccess, overflowWarnings 
   , pPrintOutcome, pPrintOutcomeSimple

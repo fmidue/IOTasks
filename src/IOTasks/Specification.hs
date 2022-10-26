@@ -3,11 +3,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeApplications #-}
 module IOTasks.Specification where
 
 import IOTasks.ValueSet
 import IOTasks.Term
-import IOTasks.Terms (Varname)
+import IOTasks.Terms (Var)
 import IOTasks.Trace
 import IOTasks.OutputPattern
 import IOTasks.Overflow
@@ -17,9 +19,11 @@ import qualified Data.Set as Set
 import Data.List (nub)
 import qualified Data.Map as Map
 import Data.Functor.Identity (runIdentity,Identity(..))
+import Data.Typeable
+import IOTasks.ValueMap
 
 data Specification where
-  ReadInput :: Varname -> ValueSet -> InputMode -> Specification -> Specification
+  ReadInput :: (Typeable a,Read a,Show a) => Var -> ValueSet a -> InputMode -> Specification -> Specification
   WriteOutput :: OptFlag -> Set (OutputPattern 'SpecificationP) -> Specification -> Specification
   Branch :: Term Bool -> Specification -> Specification -> Specification -> Specification
   Nop :: Specification
@@ -40,8 +44,12 @@ instance Semigroup Specification where
 instance Monoid Specification where
   mempty = nop
 
-readInput :: Varname -> ValueSet -> InputMode -> Specification
-readInput x vs m = ReadInput x vs m nop
+readInput :: (Typeable a,Read a,Show a) => Var -> ValueSet a -> InputMode -> Specification
+readInput = readInput' where
+  readInput' :: forall a. (Typeable a,Read a,Show a) => Var -> ValueSet a -> InputMode -> Specification
+  readInput' (x,ty) vs m
+    | ty == typeRep (Proxy @a) = ReadInput (x,ty) vs m nop
+    | otherwise = error "readInput: types of variable and ValueSet do not match"
 
 writeOutput :: [OutputPattern 'SpecificationP] -> Specification
 writeOutput ts = WriteOutput Mandatory (Set.fromList ts) nop
@@ -70,7 +78,7 @@ until c bdy = TillE (branch c exit bdy) nop
 while :: Term Bool -> Specification -> Specification
 while c bdy = TillE (branch c bdy exit) nop
 
-vars :: Specification -> [Varname]
+vars :: Specification -> [Var]
 vars = nub . go where
   go (ReadInput x _ _ s') = x : go s'
   go (WriteOutput _ _ s') = go s'
@@ -82,11 +90,11 @@ vars = nub . go where
 runSpecification :: [String] -> Specification -> (Trace,OverflowWarning)
 runSpecification inputs spec =
   sem
-    (\(e,ins) x vs mode ->
+    (\(e,ins) x (vs :: ValueSet v) mode ->
       case ins of
         [] -> NoRec (OutOfInputs,NoOverflow)
         ((i,n):is)
-          | vs `containsValue` read i -> RecSub i (Map.update (\xs -> Just $ (read i,n):xs) x e,is)
+          | vs `containsValue` readValue i -> RecSub i (insertValue (wrapValue $ readValue @v i,n) x e,is)
           | otherwise -> case mode of
               AssumeValid -> error $ "invalid value: " ++ i ++ " is not an element of " ++ printValueSet vs
               UntilValid -> RecSame i (e,is)
@@ -106,13 +114,13 @@ runSpecification inputs spec =
       let (w,b) = eval c e
       in if b then (l,wl <> w) else (r,wr <> w))
     (Terminate,NoOverflow)
-    (Map.fromList ((,[]) <$> vars spec),inputs `zip` [1..])
+    (Map.fromList ((,NoEntry) <$> vars spec),inputs `zip` [1..])
     spec
 
 data RecStruct p a r = NoRec r | RecSub p a | RecSame p a | RecBoth p a a
 
 sem :: forall st p a.
-  (st -> Varname -> ValueSet -> InputMode -> RecStruct p st a) -> (RecStruct p a a -> a) ->
+  (forall v. (Typeable v,Read v,Show v) => st -> Var -> ValueSet v -> InputMode -> RecStruct p st a) -> (RecStruct p a a -> a) ->
   (st -> OptFlag -> Set (OutputPattern 'SpecificationP) -> a -> a) ->
   (st -> Term Bool -> a -> a -> a) ->
   a ->
@@ -127,7 +135,7 @@ sem f f' g h z st s = runIdentity $ semM
   s
 
 semM :: forall m st p a. Monad m =>
-  (st -> Varname -> ValueSet -> InputMode -> m (RecStruct p st a)) -> (RecStruct p a a -> m a) ->
+  (forall v. (Typeable v,Read v,Show v) => st -> Var -> ValueSet v -> InputMode -> m (RecStruct p st a)) -> (RecStruct p a a -> m a) ->
   (st -> OptFlag -> Set (OutputPattern 'SpecificationP) -> m a -> m a) ->
   (st -> Term Bool -> m a -> m a -> m a) ->
   m a ->

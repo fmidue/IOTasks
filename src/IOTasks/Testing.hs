@@ -1,5 +1,4 @@
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE LambdaCase #-}
 module IOTasks.Testing where
 
@@ -116,7 +115,7 @@ taskCheckWithOutcome Args{..} prog spec = do
     testPath :: Path -> TestsRun -> NumberOfInputs -> Overflows -> IO (PathOutcome,TestsRun,Overflows)
     testPath _ n _ o | n >= maxSuccessPerPath = pure (PathSuccess,n,o)
     testPath p n nOtherTests o = do
-      mNextInput <- fmap @Maybe (map show) <$> findPathInput solverTimeout p valueSize checkOverflows
+      mNextInput <- findPathInput solverTimeout p valueSize checkOverflows
       case mNextInput of
         Nothing -> pure (PathTimeout,n,o) -- should (only?) be the case if solving times out
         Just nextInput  -> do
@@ -204,4 +203,4 @@ taskCheckOn i p s = uncurry Outcome (go 0 0 i p s) where
 generateStaticTestSuite :: Args -> Specification -> IO [Inputs]
 generateStaticTestSuite Args{..} spec =
   let ps = sortOn pathDepth $ paths maxPathDepth $ constraintTree maxNegative spec
-  in map (map show) . concat <$> forM ps (\p -> catMaybes <$> replicateM maxSuccessPerPath (findPathInput solverTimeout p valueSize checkOverflows))
+  in concat <$> forM ps (\p -> catMaybes <$> replicateM maxSuccessPerPath (findPathInput solverTimeout p valueSize checkOverflows))

@@ -15,6 +15,7 @@ import IOTasks.Trace
 import IOTasks.Term
 import IOTasks.OutputPattern
 import IOTasks.ValueSet
+import IOTasks.ValueMap
 
 import Test.QuickCheck (Gen, vectorOf, generate, frequency)
 import IOTasks.Overflow (OverflowWarning(..))
@@ -69,22 +70,22 @@ genTrace spec depth bound maxNeg =
       (if d > depth then pure $ NoRec OutOfInputs
       else do
         frequency $
-            (5, valueOf vs bound >>= (\i -> pure $ RecSub i (Map.update (\xs -> Just $ (i,d):xs) x e,d+1,n)))
-          : [(1, valueOf (complement vs) bound >>= (\i -> pure $ RecSame i (e,d+1,n+1))) | mode == UntilValid && n < maxNeg]
+            (5, valueOf vs bound >>= (\i -> pure $ RecSub (wrapValue i) (insertValue (wrapValue i,d) x e,d+1,n)))
+          : [(1, valueOf (complement vs) bound >>= (\i -> pure $ RecSame (wrapValue i) (e,d+1,n+1))) | mode == UntilValid && n < maxNeg]
           ++ [(1, valueOf (complement vs) bound >>= (\i -> pure $ NoRec $ foldr ProgRead Terminate (show i ++ "\n"))) | mode == Abort && n < maxNeg]
     ))
     (pure . \case
       NoRec r -> r
       RecSub i t' -> do
-        foldr ProgRead t' (show i ++ "\n")
+        foldr ProgRead t' (printValue i ++ "\n")
       RecSame i t' -> do
-        foldr ProgRead t' (show i ++ "\n")
+        foldr ProgRead t' (printValue i ++ "\n")
       RecBoth{} -> error "genTrace: impossible"
     )
     (\(e,_,_) o ts t' -> ProgWrite o (Set.map (snd . evalPattern e) ts) <$> t')
     (\(e,_,_) c l r -> if snd $ eval c e then l else r)
     (pure Terminate)
-    (Map.fromList ((,[]) <$> vars spec),1,0)
+    (Map.fromList ((,NoEntry) <$> vars spec),1,0)
     spec
 
 runTests :: IOrep () -> Specification -> [Inputs] -> Outcome

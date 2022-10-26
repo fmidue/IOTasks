@@ -1,4 +1,16 @@
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 module IOTasks.Overflow where
+
+import Data.Constraint
+
+import Type.Reflection
+import Data.Void
 
 data OverflowWarning = OverflowWarning | NoOverflow deriving (Eq,Show)
 
@@ -9,6 +21,37 @@ instance Semigroup OverflowWarning where
 
 instance Monoid OverflowWarning where
   mempty = NoOverflow
+
+-- Overflow detection type
+class Typeable a => OverflowType a where
+  type OT a = r | r -> a
+  typeRepT :: TypeRep (OT a)
+  type InnerOT a
+  innerDict :: Maybe (Dict (OverflowType (InnerOT a)))
+
+instance OverflowType Integer where
+  type OT Integer = I
+  typeRepT = typeRep
+  type InnerOT Integer = Void
+  innerDict = Nothing
+
+instance OverflowType Bool where
+  type OT Bool = Bool
+  typeRepT = typeRep
+  type InnerOT Bool = Void
+  innerDict = Nothing
+
+instance OverflowType Char where
+  type OT Char = Char
+  typeRepT = typeRep
+  type InnerOT Char = Void
+  innerDict = Nothing
+
+instance OverflowType a => OverflowType [a] where
+  type OT [a] = [OT a]
+  typeRepT = withTypeable (typeRepT @a) typeRep
+  type InnerOT [a] = a
+  innerDict = Just Dict
 
 data I = I Integer Int deriving (Eq,Ord)
 

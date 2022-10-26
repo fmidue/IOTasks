@@ -1,20 +1,23 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
 module IOTasks.Term where
 
 import IOTasks.Terms
 import IOTasks.Overflow
+import IOTasks.ValueMap
 
 import Data.Maybe (fromMaybe,mapMaybe)
 import Data.Map (Map)
@@ -23,11 +26,11 @@ import Data.List (sortBy, intercalate)
 import Data.Function (on)
 import Data.List.Extra (maximumOn, mconcatMap)
 import Data.Bifunctor (second)
-import Type.Reflection
+import Data.Constraint (Dict(..))
 
+import Type.Reflection
 import GHC.TypeLits
-import Data.Kind
-import Type.Match (matchType, fallbackCase', inCaseOfE', matchTypeOf)
+import Type.Match (matchType, fallbackCase', inCaseOfE', matchTypeOf, inCaseOfE)
 
 data Term a where
   Add :: Term Integer -> Term Integer -> Term Integer
@@ -44,12 +47,12 @@ data Term a where
   NotT :: Term Bool -> Term Bool
   SumT :: Term [Integer] -> Term Integer
   ProductT :: Term [Integer] -> Term Integer
-  LengthT :: Term [Integer] -> Term Integer
+  LengthT :: Typeable a => Term [a] -> Term Integer
   IntLitT :: I -> Term Integer
   ListLitT :: [I] -> Term [Integer]
   BoolLitT :: Bool -> Term Bool
-  Current :: VarExp a => a -> Int -> Term Integer
-  All :: VarExp a => a -> Int -> Term [Integer]
+  Current :: (OverflowType a, VarExp e) => e -> Int -> Term a
+  All :: (OverflowType a, VarExp e) => e -> Int -> Term [a]
 
 termStruct :: Term a -> TermStruct a
 termStruct (Add x y) = Binary (:+:) x y
@@ -70,23 +73,23 @@ termStruct (LengthT x) = Unary Length x
 termStruct (IntLitT x) = Literal $ IntLit x
 termStruct (ListLitT x) = Literal $ ListLit x
 termStruct (BoolLitT x) = Literal $ BoolLit x
-termStruct (Current x n) = Var C x n
-termStruct (All x n) = Var A x n
+termStruct (Current x n) = Variable C x n
+termStruct (All x n) = Variable A x n
 
 data TermStruct a where
   Unary :: (Typeable a, Typeable b) => UnaryF a b -> Term a -> TermStruct b
   Binary :: (Typeable a, Typeable b, Typeable c) => BinaryF a b c -> Term a -> Term b -> TermStruct c
   Literal :: Typeable a => ConstValue a -> TermStruct a
-  Var :: (Typeable a, VarExp e) => AccessType a ->  e -> Int -> TermStruct a
+  Variable :: (OverflowType a, VarExp e) => AccessType a ->  e -> Int -> TermStruct a
 
 data AccessType a where
-  C :: AccessType Integer
-  A :: AccessType [Integer]
+  C :: AccessType a
+  A :: AccessType [a]
 deriving instance Show (AccessType a)
 
 data UnaryF a b where
   Not :: UnaryF Bool Bool
-  Length :: UnaryF [Integer] Integer
+  Length :: Typeable a => UnaryF [a] Integer
   Sum :: UnaryF [Integer] Integer
   Product :: UnaryF [Integer] Integer
 
@@ -112,15 +115,25 @@ data ConstValue a where
 -- deriving instance Ord (Term a)
 -- deriving instance Show (Term a)
 
-varExps :: Term a -> [[Varname]]
+varExps :: Term a -> [[Var]]
 varExps (termStruct -> Binary _ x y) = varExps x ++ varExps y
 varExps (termStruct -> Unary _ x) = varExps x
 varExps (termStruct -> Literal _) = []
-varExps (termStruct -> Var _ e _) = [toVarList e]
+varExps (termStruct -> Variable _ e _) = [toVarList e]
 
 instance Accessor Term where
-  currentValue' = Current
-  allValues' = All
+  currentValue' :: forall a e. (Typeable a, VarExp e) => e -> Int -> Term a
+  currentValue' =  matchType @a
+    [ inCaseOfE' @Integer $ \HRefl -> Current
+    , inCaseOfE' @String $ \HRefl -> Current
+    , fallbackCase' $ error $ "variable type not supported for Terms: " ++ show (typeRep @a)
+    ]
+  allValues' :: forall a e. (Typeable a, VarExp e) => e -> Int -> Term [a]
+  allValues' =  matchType @a
+    [ inCaseOfE' @Integer $ \HRefl -> All
+    , inCaseOfE' @String $ \HRefl -> All
+    , fallbackCase' $ error $ "variable type not supported for Terms: " ++ show (typeRep @a)
+    ]
 
 instance Arithmetic Term where
   (.+.) = Add
@@ -159,24 +172,7 @@ instance TypeError (Text "complex list functions, like filter, can not be used a
   => ComplexLists Term where
   filter' = error "unreachable"
 
--- Overflow detection type
-class Typeable a => OverflowType a where
-  type OT a :: Type
-  typeRepT :: TypeRep (OT a)
-
-instance OverflowType Integer where
-  type OT Integer = I
-  typeRepT = typeRep
-
-instance OverflowType Bool where
-  type OT Bool = Bool
-  typeRepT = typeRep
-
-instance OverflowType a => OverflowType [a] where
-  type OT [a] = [OT a]
-  typeRepT = withTypeable (typeRepT @a) typeRep
-
-eval :: forall a. OverflowType a => Term a -> Map Varname [(Integer,Int)] -> (OverflowWarning, a)
+eval :: forall a. OverflowType a => Term a -> ValueMap -> (OverflowWarning, a)
 eval t m =
   let r = eval' t m
   in withTypeable (typeRepT @a) $ matchTypeOf r
@@ -184,6 +180,7 @@ eval t m =
     , fallbackCase' $ matchType @a
         [ inCaseOfE' @Integer $ \HRefl -> second toInteger r
         , inCaseOfE' @[Integer] $ \HRefl -> second (map toInteger) r
+        , inCaseOfE' @String $ \HRefl -> r
         , fallbackCase' $ error "eval: impossible"
         ]
     ]
@@ -207,7 +204,7 @@ evalF2 (:&&:) = (&&)
 evalF2 (:||:) = (||)
 evalF2 IsIn = elem
 
-eval' :: Term a -> Map Varname [(Integer,Int)] -> (OverflowWarning,OT a)
+eval' :: forall x. Term x -> ValueMap -> (OverflowWarning,OT x)
 eval' (termStruct -> Binary (f :: BinaryF a b c) x y) e =
   matchType @c
     [ inCaseOfE' @Integer $ \HRefl -> let (w,r) = evalF2 f <$> eval' x e <*> eval' y e in (checkOverflow r <> w, r)
@@ -220,19 +217,24 @@ eval' (termStruct -> Unary (f :: UnaryF a b) x) e = matchType @b
 eval' (termStruct -> Literal (BoolLit b)) _ = (mempty,b)
 eval' (termStruct -> Literal (IntLit n)) _ = (checkOverflow n ,n)
 eval' (termStruct -> Literal (ListLit xs)) _ = let xs' = xs in (foldMap checkOverflow xs', xs')
-eval' (termStruct -> Var C x n) e = fromMaybe (error $ "empty list for {" ++ intercalate "," (toVarList x) ++ "}") . safeHead <$> primEvalVar x n e
-eval' (termStruct -> Var A x n) e = reverse <$> primEvalVar x n e
+eval' (termStruct -> Variable C x n) e = fromMaybe (error $ "empty list for {" ++ intercalate "," (map varname $ toVarList x) ++ "}") . safeHead <$> primEvalVar x n e
+eval' (termStruct -> Variable A x n) e = case innerDict @x of
+  Just Dict -> reverse <$> primEvalVar x n e
+  Nothing -> error "impossible"
 
-primEvalVar :: VarExp a => a -> Int -> Map Varname [(Integer,Int)] -> (OverflowWarning,[I])
-primEvalVar x n e =
-  let xs = drop n . (map (fromInteger . fst) . sortBy (flip compare `on` snd) . concat) $ mapMaybe (`Map.lookup` e) (toVarList x)
-  in (mconcatMap checkOverflow xs,xs)
+primEvalVar :: forall a e. (OverflowType a, VarExp e) => e -> Int -> ValueMap -> (OverflowWarning,[OT a])
+primEvalVar x n e = withTypeable (typeRepT @a) $
+  let xs = drop n . map fst . sortBy (flip compare `on` snd) . concatMap unwrapValueEntry $ mapMaybe (`Map.lookup` e) (toVarList x)
+  in matchTypeOf xs
+    [ inCaseOfE @[I] $ \HRefl xs -> (mconcatMap checkOverflow xs,xs)
+    , fallbackCase' (mempty,xs)
+    ]
 
 safeHead :: [a] -> Maybe a
 safeHead [] = Nothing
 safeHead (x:_) = Just x
 
-printIndexedTerm :: Term a -> Map Varname (Int,[Int]) -> String
+printIndexedTerm :: Term a -> Map Var (Int,[Int]) -> String
 printIndexedTerm (termStruct -> Binary IsIn x xs) m = printIndexedTerm x m ++ " ∈ " ++ printIndexedTerm xs m
 printIndexedTerm (termStruct -> Binary f tx ty) m = concat ["(",printIndexedTerm tx m, ") ",fSym f," (", printIndexedTerm ty m,")"]
   where
@@ -255,8 +257,8 @@ printIndexedTerm (termStruct -> Literal (BoolLit False)) _ = "False"
 printIndexedTerm (termStruct -> Unary Length t) m = concat ["length (", printIndexedTerm t m, ")"]
 printIndexedTerm (termStruct -> Unary Sum t) m = concat ["sum (", printIndexedTerm t m, ")"]
 printIndexedTerm (termStruct -> Unary Product t) m = concat ["product (", printIndexedTerm t m, ")"]
-printIndexedTerm (termStruct -> Var C x n) m = (\(x,(i,_)) -> x ++ "_" ++ show i) $ maximumOn (head.snd.snd) $ (\xs -> take (length xs - n) xs) $ mapMaybe (\x -> (x,) <$> Map.lookup x m) (toVarList x)
-printIndexedTerm (termStruct -> Var A x n) _ = "{" ++ intercalate "," (toVarList x) ++ "}"++":"++show n++"_A"
+printIndexedTerm (termStruct -> Variable C x n) m = (\(x,(i,_)) -> x ++ "_" ++ show i) $ maximumOn (head.snd.snd) $ (\xs -> take (length xs - n) xs) $ mapMaybe (\x -> (varname x,) <$> Map.lookup x m) (toVarList x)
+printIndexedTerm (termStruct -> Variable A x n) _ = "{" ++ intercalate "," (map varname $ toVarList x) ++ "}"++":"++show n++"_A"
 printIndexedTerm (termStruct -> Literal (IntLit x)) _ = show x
 printIndexedTerm (termStruct -> Literal (ListLit xs)) _ = show xs
 
@@ -289,7 +291,7 @@ subTerms :: Term a -> [SomeTerm]
 subTerms (termStruct' -> (t,Unary _ x)) = someTerm t : subTerms x
 subTerms (termStruct' -> (t,Binary _ x y)) = someTerm t : subTerms x ++ subTerms y
 subTerms (termStruct' -> (t,Literal{})) = [someTerm t]
-subTerms (termStruct' -> (t,Var{})) = [someTerm t]
+subTerms (termStruct' -> (t,Variable{})) = [someTerm t]
 
 castTerm :: forall a. Typeable a => SomeTerm -> Maybe (Term a)
 castTerm (SomeTerm (t :: Term b)) =

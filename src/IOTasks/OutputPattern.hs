@@ -2,17 +2,19 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module IOTasks.OutputPattern where
 
 import Prelude hiding (all)
 
-import IOTasks.Terms (Varname)
 import IOTasks.Overflow
 import IOTasks.OutputTerm
+import IOTasks.ValueMap
 
 import Data.Either (isRight)
-import Data.Map (Map)
 import Data.Bifunctor (second)
+import Data.Typeable
 
 import Text.Parsec
 import Data.Char (isPrint, showLitChar)
@@ -22,12 +24,32 @@ data OutputPattern (t :: PatternType) where
   Wildcard :: OutputPattern t
   Text :: String -> OutputPattern t
   Sequence :: OutputPattern t -> OutputPattern t -> OutputPattern t
-  Value :: OutputTerm Integer -> OutputPattern 'SpecificationP
+  Value :: (OverflowType a,Show a) => OutputTerm a -> OutputPattern 'SpecificationP
 
 data PatternType = SpecificationP | TraceP
 
-deriving instance Eq (OutputPattern t)
-deriving instance Ord (OutputPattern t)
+instance Eq (OutputPattern t) where
+  x == y = compare x y == EQ
+
+-- syntactic ordering (to put OutputPatterns in Sets)
+instance Ord (OutputPattern t) where
+  compare Wildcard Wildcard = EQ
+  compare Wildcard _ = LT
+  compare _ Wildcard = GT
+  compare (Text s) (Text t) = compare s t
+  compare Text{} _ = LT
+  compare Sequence{} Text{} = GT
+  compare (Sequence x1 x2) (Sequence y1 y2) =
+    case compare x1 y1 of
+      EQ -> compare x2 y2
+      r -> r
+  compare (Value (t :: OutputTerm a)) (Value (u :: OutputTerm b)) =
+    case eqT @a @b of
+      Just Refl -> compare t u
+      Nothing -> compare (typeRep (Proxy @a)) (typeRep (Proxy @b))
+  compare Value{} _ = GT
+  compare _ Value{} = LT
+
 deriving instance Show (OutputPattern t)
 
 instance Semigroup (OutputPattern t) where
@@ -42,17 +64,17 @@ instance Semigroup (OutputPattern t) where
 instance Monoid (OutputPattern t) where
   mempty = Text ""
 
-valueTerms :: OutputPattern t -> [OutputTerm Integer]
+valueTerms :: OutputPattern t -> [SomeOutputTerm]
 valueTerms Wildcard = []
 valueTerms Text{} = []
 valueTerms (Sequence x y) = valueTerms x ++ valueTerms y
-valueTerms (Value t) = [t]
+valueTerms (Value t) = [SomeOutputTerm t]
 
-evalPattern :: Map Varname [(Integer,Int)] -> OutputPattern t -> (OverflowWarning, OutputPattern 'TraceP)
+evalPattern :: ValueMap -> OutputPattern t -> (OverflowWarning, OutputPattern 'TraceP)
 evalPattern _ Wildcard = (NoOverflow, Wildcard)
 evalPattern _ (Text s) = (NoOverflow, Text s)
 evalPattern e (Sequence x y) = evalPattern e x <> evalPattern e y
-evalPattern e (Value t) = second (Text . show) $ eval t e
+evalPattern e (Value t) = second (Text . showValue) $ eval t e
 
 printPattern :: OutputPattern 'TraceP -> String
 printPattern Wildcard = "_"
