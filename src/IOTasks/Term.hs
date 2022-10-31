@@ -36,11 +36,11 @@ data Term a where
   Add :: Term Integer -> Term Integer -> Term Integer
   Sub :: Term Integer -> Term Integer -> Term Integer
   Mul :: Term Integer -> Term Integer -> Term Integer
-  Equals :: Term Integer -> Term Integer -> Term Bool
-  Gt :: Term Integer -> Term Integer -> Term Bool
-  Ge :: Term Integer -> Term Integer -> Term Bool
-  Lt :: Term Integer -> Term Integer -> Term Bool
-  Le :: Term Integer -> Term Integer -> Term Bool
+  Equals :: (OverflowType a, Eq a) => Term a -> Term a -> Term Bool
+  Gt :: (OverflowType a, Ord a) => Term a -> Term a -> Term Bool
+  Ge :: (OverflowType a, Ord a) => Term a -> Term a -> Term Bool
+  Lt :: (OverflowType a, Ord a) => Term a -> Term a -> Term Bool
+  Le :: (OverflowType a, Ord a) => Term a -> Term a -> Term Bool
   And :: Term Bool -> Term Bool -> Term Bool
   Or :: Term Bool -> Term Bool -> Term Bool
   IsInT :: Term Integer -> Term [Integer] -> Term Bool
@@ -80,7 +80,7 @@ termStruct (All x n) = Variable A x n
 
 data TermStruct a where
   Unary :: (Typeable a, Typeable b) => UnaryF a b -> Term a -> TermStruct b
-  Binary :: (Typeable a, Typeable b, Typeable c) => BinaryF a b c -> Term a -> Term b -> TermStruct c
+  Binary :: (OverflowType a, OverflowType b, OverflowType c) => BinaryF a b c -> Term a -> Term b -> TermStruct c
   Literal :: Typeable a => ConstValue a -> TermStruct a
   Variable :: (OverflowType a, VarExp e) => AccessType a ->  e -> Int -> TermStruct a
 
@@ -100,11 +100,11 @@ data BinaryF a b c where
   (:+:) :: BinaryF Integer Integer Integer
   (:-:) :: BinaryF Integer Integer Integer
   (:*:) :: BinaryF Integer Integer Integer
-  (:==:) :: BinaryF Integer Integer Bool
-  (:>:) :: BinaryF Integer Integer Bool
-  (:>=:) :: BinaryF Integer Integer Bool
-  (:<:) :: BinaryF Integer Integer Bool
-  (:<=:) :: BinaryF Integer Integer Bool
+  (:==:) :: (Typeable a, Eq a) => BinaryF a a Bool
+  (:>:) :: (OverflowType a, Ord a) => BinaryF a a Bool
+  (:>=:) :: (OverflowType a, Ord a) => BinaryF a a Bool
+  (:<:) :: (OverflowType a, Ord a) => BinaryF a a Bool
+  (:<=:) :: (OverflowType a, Ord a) => BinaryF a a Bool
   (:&&:) :: BinaryF Bool Bool Bool
   (:||:) :: BinaryF Bool Bool Bool
   IsIn :: BinaryF Integer [Integer] Bool
@@ -196,15 +196,15 @@ evalF Reverse = reverse
 evalF Sum = sum
 evalF Product = product
 
-evalF2 :: BinaryF a b c -> OT a -> OT b -> OT c
+evalF2 :: forall a b c. OverflowType a => BinaryF a b c -> OT a -> OT b -> OT c
 evalF2 (:+:) = (+)
 evalF2 (:-:) = (-)
 evalF2 (:*:) = (*)
-evalF2 (:==:) = (==)
-evalF2 (:>:) = (>)
-evalF2 (:>=:) = (>=)
-evalF2 (:<:) = (<)
-evalF2 (:<=:) = (<=)
+evalF2 (:==:) = case otEqDict @a of Dict -> (==)
+evalF2 (:>:) = case otOrdDict @a of Dict -> (>)
+evalF2 (:>=:) = case otOrdDict @a of Dict -> (>=)
+evalF2 (:<:) = case otOrdDict @a of Dict -> (<)
+evalF2 (:<=:) = case otOrdDict @a of Dict -> (<=)
 evalF2 (:&&:) = (&&)
 evalF2 (:||:) = (||)
 evalF2 IsIn = elem

@@ -11,7 +11,7 @@ example1 :: Specification
 example1 =
   readInput x ints AssumeValid <>
   readInput y nats AssumeValid <>
-  branch (currentValue x .>. currentValue y)
+  branch (currentValue x .>. as @Integer (currentValue y))
     (writeOutput [Wildcard <> Value (currentValue x .+. currentValue y) <> Wildcard , Value (currentValue x .-. currentValue y) <> Wildcard] )
     (writeOutput [Wildcard <> Text "Result: " <> Value (currentValue x .*. currentValue y)] )
   where
@@ -135,6 +135,15 @@ reverseSpec =
   where
     x = stringVar "x"
 
+palindromeSpec :: Specification
+palindromeSpec =
+  readInput x str AssumeValid <>
+  branch (currentValue x .==. as @String (reverse' $ currentValue x))
+    (writeOutput [Text "Yes"])
+    (writeOutput [Text "No"])
+  where
+    x = stringVar "x"
+
 echoProg :: MonadTeletype m => m ()
 echoProg = getLine >>= putStrLn
 
@@ -144,6 +153,13 @@ reverseProg = do
   if length str > 5
     then putStrLn $ reverse str
     else putStrLn str
+
+palindromeProg :: MonadTeletype m => m ()
+palindromeProg = do
+  str <- getLine
+  if str == reverse str
+    then putStrLn "Yes"
+    else putStrLn "No"
 
 ints, nats :: ValueSet Integer
 ints = Every

@@ -26,29 +26,39 @@ instance Monoid OverflowWarning where
 class Typeable a => OverflowType a where
   type OT a = r | r -> a
   typeRepT :: TypeRep (OT a)
+  otEqDict :: Dict (Eq (OT a))
+  otOrdDict :: Dict (Ord (OT a))
   type InnerOT a
   innerDict :: Maybe (Dict (OverflowType (InnerOT a)))
 
 instance OverflowType Integer where
   type OT Integer = I
   typeRepT = typeRep
+  otEqDict = Dict
+  otOrdDict = Dict
   type InnerOT Integer = Void
   innerDict = Nothing
 
 instance OverflowType Bool where
   type OT Bool = Bool
   typeRepT = typeRep
+  otEqDict = Dict
+  otOrdDict = Dict
   type InnerOT Bool = Void
   innerDict = Nothing
 
 instance OverflowType Char where
   type OT Char = Char
   typeRepT = typeRep
+  otEqDict = Dict
+  otOrdDict = Dict
   type InnerOT Char = Void
   innerDict = Nothing
 
 instance OverflowType a => OverflowType [a] where
   type OT [a] = [OT a]
+  otEqDict = case otEqDict @a of Dict -> Dict
+  otOrdDict = case otOrdDict @a of Dict -> Dict
   typeRepT = withTypeable (typeRepT @a) typeRep
   type InnerOT [a] = a
   innerDict = Just Dict

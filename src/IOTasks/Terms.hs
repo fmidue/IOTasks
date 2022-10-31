@@ -68,11 +68,11 @@ class Arithmetic t where
   intLit :: Integer -> t Integer
 
 class Compare t where
-  (.==.) :: t Integer -> t Integer -> t Bool
-  (.>.) :: t Integer -> t Integer -> t Bool
-  (.>=.) :: t Integer -> t Integer -> t Bool
-  (.<.) :: t Integer -> t Integer -> t Bool
-  (.<=.) :: t Integer -> t Integer -> t Bool
+  (.==.) :: (OverflowType a, Eq a) => t a -> t a -> t Bool
+  (.>.) :: (OverflowType a, Ord a) => t a -> t a -> t Bool
+  (.>=.) :: (OverflowType a, Ord a) => t a -> t a -> t Bool
+  (.<.) :: (OverflowType a, Ord a) => t a -> t a -> t Bool
+  (.<=.) :: (OverflowType a, Ord a) => t a -> t a -> t Bool
 
 class Logic t where
   not' :: t Bool -> t Bool

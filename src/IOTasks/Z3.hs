@@ -28,9 +28,12 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.List (intercalate, sortOn)
 import Data.Tuple.Extra (thd3)
-import Data.Typeable
 
 import Test.QuickCheck.Gen (Gen)
+import Type.Match
+import Type.Reflection
+import Unsafe.Coerce
+import Data.Either (fromRight)
 
 type Timeout = Int
 
@@ -133,10 +136,9 @@ pathScript path mode checkOverflows = do
   case mode of
     WithSoft bound -> do
       vs <- liftIO $ forM vars $ \((_,ast),gen) -> withGeneratedValue (\v -> (ast,wrapValue v)) gen bound
-      def <- mkStringSymbol "default"
       forM_ vs $ \(ast,v) -> do
-        eq <- mkEq ast =<< mkValueRep v
-        optimizeAssertSoft eq "1" def -- soft assert with weight 1 and id "default"
+        cs <- mkValueRep ast v
+        forM cs $ \(c,l) -> optimizeAssertSoft c "1" l -- soft assert with weight 1 and id "default"
     WithoutSoft -> pure ()
   str <- optimizeToString
   result <- optimizeCheck []
@@ -170,42 +172,89 @@ sortTest = evalZ3 $ do
 
 mkSort :: forall a z3. (Typeable a, MonadZ3 z3) => z3 Sort
 mkSort =
-  case eqT @a @Integer of
-    Just Refl -> mkIntSort
-    Nothing -> case eqT @a @String of
-      Just Refl -> mkStringSort
+  case eqTypeRep (typeRep @a) (typeRep @Integer) of
+    Just HRefl -> mkIntSort
+    Nothing -> case eqTypeRep (typeRep @a) (typeRep @String) of
+      Just HRefl -> mkStringSort
       Nothing -> error "mkSort: unsupported type"
 
-mkValueRep :: Value -> Z3 AST
-mkValueRep (IntegerValue n) = mkInteger n
-mkValueRep (StringValue s) = mkString s
+mkValueRep :: AST -> Value -> Z3 [(AST,Symbol)]
+mkValueRep x (IntegerValue n) = do
+  def <- mkStringSymbol "default"
+  pure . (,def) <$> (mkEq x =<< mkInteger n)
+mkValueRep x (StringValue s) = do
+  xStr <- astToString x
+  -- length constraint
+  lenSym <- mkStringSymbol $ xStr ++ "_len"
+  len <- mkIntNum $ length s
+  lenEq <- mkEq len =<< mkSeqLength x
+  -- character range constraint
+  rangeSym <- mkStringSymbol $ xStr ++ "_range"
+  r1 <- reRange 'a' 'z'
+  r2 <- reRange 'A' 'Z'
+  rangeEq <- mkSeqInRe x =<< mkReStar =<< mkReUnion (2 :: Integer) [r1,r2]
+  -- value constraints
+  vals <- mapM (positionConstraint xStr) (s `zip` [1..])
+  pure $ (lenEq,lenSym) : (rangeEq,rangeSym) : vals
+  where
+    reRange a b = do
+      aStr <- mkString [a]
+      bStr <- mkString [b]
+      mkReRange aStr bStr
+    positionConstraint xStr (c,i) = do
+      xi <- mkSeqAt x =<< mkInteger i
+      eq <- mkEq xi =<< mkString [c]
+      sym <- mkStringSymbol $ xStr ++ "_val"
+      pure (eq,sym)
 
-z3Predicate :: Term a -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 AST
+z3Predicate :: Term x -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 AST
 z3Predicate (termStruct -> Binary IsIn x xs) e vars = do
   xP <- z3Predicate x e vars
-  as <- listASTs xs e vars
+  Right as <- listASTs xs e vars
   mkOr =<< mapM (mkEq xP) as
--- z3Predicate (termStruct -> Binary IsIn x (ListLitT xs)) e vars = do
---   xP <- z3Predicate x e vars
---   mkOr =<< mapM (mkIntNum >=> mkEq xP) xs
-z3Predicate (termStruct -> Binary f x y) e vars = binRec e vars (binF f) x y where
-  binF :: BinaryF a b c -> AST -> AST -> Z3 AST
-  binF (:+:) = \a b -> mkAdd [a,b]
-  binF (:-:) = \a b -> mkSub [a,b]
-  binF (:*:) = \a b -> mkMul [a,b]
-  binF (:==:) = mkEq
-  binF (:>:) = mkGt
-  binF (:>=:) = mkGe
-  binF (:<:) = mkLt
-  binF (:<=:) = mkLe
-  binF (:&&:) = \a b -> mkAnd [a,b]
-  binF (:||:) = \a b -> mkOr [a,b]
-  binF IsIn = error "handled through special cases"
+z3Predicate (termStruct -> Binary (f :: BinaryF a b c) x y) e vars =
+  case typeRep @a of
+    App ca _ -> case eqTypeRep ca (typeRep @[]) of
+      Just HRefl -> case typeRep @b of
+        App cb _ -> case eqTypeRep cb (typeRep @[]) of
+          Just HRefl ->  case1 f x y -- a ~ [a1], b ~ [b1]
+          Nothing -> case2 f x y -- a ~ [a1], b ~ f b1
+        _ -> case2 f x y -- a ~ [a1]
+      Nothing -> case typeRep @b of
+        App cb _ -> case eqTypeRep cb (typeRep @[]) of
+          Just HRefl ->  case3 f x y -- a ~ f a1, b ~ [b1]
+          Nothing -> case4 f x y -- a ~ f a1, b ~ f b1
+        _ -> case4 f x y-- a ~ f a1
+    _ -> case typeRep @b of
+      App cb _ -> case eqTypeRep cb (typeRep @[]) of
+        Just HRefl ->  case3 f x y -- b ~ [b1]
+        Nothing -> case4 f x y -- b ~ f b1
+      _ -> case4 f x y --
+  where
+  case1 :: forall a b c. BinaryF [a] [b] c -> Term [a] -> Term [b] -> Z3 AST
+  case1 f x y = do
+    rx <- listASTs x e vars
+    ry <- listASTs y e vars
+    case (rx,ry) of
+      (Right xs,Right ys) -> binListAB f xs ys
+      (Left x,Left y) -> binNoList f x y
+  case2 :: forall a b c. BinaryF [a] b c -> Term [a] -> Term b -> Z3 AST
+  case2 f x y = do
+    (Right xs) <- listASTs x e vars
+    y' <- z3Predicate y e vars
+    binListA f xs y'
+  case3 :: forall a b c. BinaryF a [b] c -> Term a -> Term [b] -> Z3 AST
+  case3 f x y = do
+    x' <- z3Predicate x e vars
+    (Right ys) <- listASTs y e vars
+    binListB f x' ys
+  case4 :: forall a b c. BinaryF a b c -> Term a -> Term b -> Z3 AST
+  case4 f = binRec e vars (binNoList f)
 z3Predicate (termStruct -> Unary Not x) e vars = mkNot =<< z3Predicate x e vars
 z3Predicate (termStruct -> Unary Length (Current x n)) e _ = mkIntNum . length . last $ weaveVariables x n e --special case for string variables
 z3Predicate (termStruct -> Unary Length xs) e vars = (mkIntNum . length) =<< listASTs xs e vars
-z3Predicate (termStruct -> Unary Sum xs) e vars = mkAdd =<< listASTs xs e vars
-z3Predicate (termStruct -> Unary Product xs) e vars = mkMul =<< listASTs xs e vars
+z3Predicate (termStruct -> Unary Sum xs) e vars = mkAdd . fromRight (error "unexpected resutl") =<< listASTs xs e vars
+z3Predicate (termStruct -> Unary Product xs) e vars = mkMul . fromRight (error "unexpected resutl") =<< listASTs xs e vars
 z3Predicate (termStruct -> Variable C x n) e vars = pure $ fromMaybe (unknownVariablesError x) $ (`lookup` vars) . last $ weaveVariables x n e
 z3Predicate (termStruct -> Literal (IntLit n)) _ _ = mkIntNum n
 z3Predicate (termStruct -> Literal (BoolLit b)) _ _ = mkBool b
@@ -214,11 +263,61 @@ z3Predicate (termStruct -> Variable A _x _) _e _vars = error "z3Predicate: top l
 z3Predicate (termStruct -> Literal (ListLit _)) _ _ = error "z3Predicate: top level list literal should no happen"
 z3Predicate (termStruct -> Unary Reverse _) _ _ = error "z3Predicate: top level reverse should no happen"
 
-listASTs :: Term [a] -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 [AST]
-listASTs (ReverseT t) e vars = reverse <$> listASTs t e vars
-listASTs (ListLitT xs) _ _ = mapM (mkIntNum . toInteger) xs
-listASTs (All x n) e vars = pure $ lookupList (weaveVariables x n e) vars
-listASTs (Current _ _) _ _ = error "listASTs: should not happen"
+binNoList :: BinaryF a b c -> AST -> AST -> Z3 AST
+binNoList (:+:) = \a b -> mkAdd [a,b]
+binNoList (:-:) = \a b -> mkSub [a,b]
+binNoList (:*:) = \a b -> mkMul [a,b]
+binNoList (:==:) = mkEq
+binNoList (:>:) = mkGt
+binNoList (:>=:) = mkGe
+binNoList (:<:) = mkLt
+binNoList (:<=:) = mkLe
+binNoList (:&&:) = \a b -> mkAnd [a,b]
+binNoList (:||:) = \a b -> mkOr [a,b]
+binNoList IsIn = error "handled through special cases"
+
+binListA :: BinaryF [a] b c -> [AST] -> AST -> Z3 AST
+binListA = _
+
+binListB :: BinaryF a [b] c -> AST -> [AST] -> Z3 AST
+binListB = _
+
+binListAB :: BinaryF [a] [b] c -> [AST] -> [AST] -> Z3 AST
+binListAB (:==:) xs ys
+  | length xs == length ys = mkAnd =<< zipWithM mkEq xs ys
+  | otherwise = mkFalse
+binListAB (:>:) xs ys = _wd
+binListAB (:>=:) xs ys = _we
+binListAB (:<:) xs ys = _wf
+binListAB (:<=:) xs ys = _wg
+
+listASTs :: Term [a] -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 (Either AST [AST])
+listASTs (ReverseT t) e vars = do
+  r <- listASTs t e vars
+  case r of
+    Right as -> pure $ Right $ reverse as
+    Left a -> Left <$> reverseSequence a
+listASTs (ListLitT xs) _ _ = Right <$> mapM (mkIntNum . toInteger) xs
+listASTs (All x n) e vars = pure . Right $ lookupList (weaveVariables x n e) vars
+listASTs (Current x n) e vars = pure . Left . head $ lookupList (weaveVariables x n e) vars
+
+reverseSequence :: AST -> Z3 AST
+reverseSequence x = do
+  y <- mkFreshVar "reversed" =<< getSort x
+  lx <- mkSeqLength x
+  ly <- mkSeqLength y
+  optimizeAssert =<< mkEq lx ly
+  forM_ [0..20] (optimizeAssert <=< pos (x,lx) (y,ly))
+  pure y
+  where
+    pos (x,lx) (y,ly) i = do
+      index <- mkIntNum i
+      pre <- mkGe lx index
+      xi <- mkSeqAt x index
+      index' <- mkIntNum (i+1)
+      yj <- mkSeqAt y =<< mkSub [ly,index']
+      con <- mkEq xi yj
+      mkImplies pre con
 
 unknownVariablesError :: VarExp a => a -> b
 unknownVariablesError x = error $ "unknown variable(s) {" ++ intercalate "," (map varname $ toVarList x) ++ "}"
