@@ -30,9 +30,7 @@ import Data.List (intercalate, sortOn)
 import Data.Tuple.Extra (thd3)
 
 import Test.QuickCheck.Gen (Gen)
-import Type.Match
 import Type.Reflection
-import Unsafe.Coerce
 import Data.Either (fromRight)
 
 type Timeout = Int
@@ -251,8 +249,8 @@ z3Predicate (termStruct -> Binary (f :: BinaryF a b c) x y) e vars =
   case4 :: forall a b c. BinaryF a b c -> Term a -> Term b -> Z3 AST
   case4 f = binRec e vars (binNoList f)
 z3Predicate (termStruct -> Unary Not x) e vars = mkNot =<< z3Predicate x e vars
-z3Predicate (termStruct -> Unary Length (Current x n)) e _ = mkIntNum . length . last $ weaveVariables x n e --special case for string variables
-z3Predicate (termStruct -> Unary Length xs) e vars = (mkIntNum . length) =<< listASTs xs e vars
+z3Predicate (termStruct -> Unary Length (Current x n)) e vars = mkSeqLength . fromJust . (`lookup` vars) . last $ weaveVariables x n e --special case for string variables
+z3Predicate (termStruct -> Unary Length xs) e vars = (mkIntNum . length @[] . fromRight (error "unexpected resutl")) =<< listASTs xs e vars
 z3Predicate (termStruct -> Unary Sum xs) e vars = mkAdd . fromRight (error "unexpected resutl") =<< listASTs xs e vars
 z3Predicate (termStruct -> Unary Product xs) e vars = mkMul . fromRight (error "unexpected resutl") =<< listASTs xs e vars
 z3Predicate (termStruct -> Variable C x n) e vars = pure $ fromMaybe (unknownVariablesError x) $ (`lookup` vars) . last $ weaveVariables x n e
