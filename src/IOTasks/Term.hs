@@ -50,7 +50,7 @@ data Term a where
   LengthT :: Typeable a => Term [a] -> Term Integer
   ReverseT :: OverflowType a => Term [a] -> Term [a]
   IntLitT :: I -> Term Integer
-  ListLitT :: [I] -> Term [Integer]
+  ListLitT :: OverflowType a => [OT a] -> Term [a]
   BoolLitT :: Bool -> Term Bool
   Current :: (OverflowType a, VarExp e) => e -> Int -> Term a
   All :: (OverflowType a, VarExp e) => e -> Int -> Term [a]
@@ -112,7 +112,7 @@ data BinaryF a b c where
 data ConstValue a where
   BoolLit :: Bool -> ConstValue Bool
   IntLit :: I -> ConstValue Integer
-  ListLit :: [I] -> ConstValue [Integer]
+  ListLit :: OverflowType a => [OT a] -> ConstValue [a]
 
 -- deriving instance Eq (Term a)
 -- deriving instance Ord (Term a)
@@ -170,7 +170,7 @@ instance BasicLists Term where
   reverse' = ReverseT
   sum' = SumT
   product' = ProductT
-  listLit = ListLitT . map fromInteger
+  listLit = ListLitT . toOT
 
 instance TypeError (Text "complex list functions, like filter, can not be used at type " :<>: ShowType Term)
   => ComplexLists Term where
@@ -270,7 +270,7 @@ printIndexedTerm (termStruct -> Unary f t) m = concat [fSym f ++" (", printIndex
 printIndexedTerm (termStruct -> Variable C x n) m = (\(x,(i,_)) -> x ++ "_" ++ show i) $ maximumOn (head.snd.snd) $ (\xs -> take (length xs - n) xs) $ mapMaybe (\x -> (varname x,) <$> Map.lookup x m) (toVarList x)
 printIndexedTerm (termStruct -> Variable A x n) _ = "{" ++ intercalate "," (map varname $ toVarList x) ++ "}"++":"++show n++"_A"
 printIndexedTerm (termStruct -> Literal (IntLit x)) _ = show x
-printIndexedTerm (termStruct -> Literal (ListLit xs)) _ = show xs
+printIndexedTerm (termStruct -> Literal (ListLit xs)) _ = showOT xs
 
 data SomeTerm where
   SomeTerm :: OverflowType a => Term a -> SomeTerm

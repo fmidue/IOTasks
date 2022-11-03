@@ -144,6 +144,18 @@ palindromeSpec =
   where
     x = stringVar "x"
 
+pingPongSpec :: Specification
+pingPongSpec =
+  readInput x str AssumeValid <>
+  branch (as @String (currentValue x) .==. listLit "Ping")
+    (writeOutput [Text "Pong"])
+    (branch (as @String (currentValue x) .==. listLit "Pong")
+      (writeOutput [Text "Ping"])
+      nop
+    )
+  where
+    x = stringVar "x"
+
 echoProg :: MonadTeletype m => m ()
 echoProg = getLine >>= putStrLn
 
@@ -160,6 +172,14 @@ palindromeProg = do
   if str == reverse str
     then putStrLn "Yes"
     else putStrLn "No"
+
+pingPongProg :: MonadTeletype m => m ()
+pingPongProg = do
+  str <- getLine
+  case str of
+    "Ping" -> putStrLn "Pong"
+    "Pong" -> putStrLn "Ping"
+    _ -> pure ()
 
 ints, nats :: ValueSet Integer
 ints = Every

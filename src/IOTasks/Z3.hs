@@ -7,6 +7,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 module IOTasks.Z3 where
 
 import IOTasks.Constraints
@@ -32,6 +33,7 @@ import Data.Tuple.Extra (thd3)
 import Test.QuickCheck.Gen (Gen)
 import Type.Reflection
 import Data.Either (fromRight)
+import Type.Match
 
 type Timeout = Int
 
@@ -229,19 +231,19 @@ z3Predicate (termStruct -> Binary (f :: BinaryF a b c) x y) e vars =
         Nothing -> case4 f x y -- b ~ f b1
       _ -> case4 f x y --
   where
-  case1 :: forall a b c. BinaryF [a] [b] c -> Term [a] -> Term [b] -> Z3 AST
+  case1 :: forall a b c. (Typeable [a], Typeable [b]) => BinaryF [a] [b] c -> Term [a] -> Term [b] -> Z3 AST
   case1 f x y = do
     rx <- listASTs x e vars
     ry <- listASTs y e vars
     case (rx,ry) of
       (Right xs,Right ys) -> binListAB f xs ys
       (Left x,Left y) -> binNoList f x y
-  case2 :: forall a b c. BinaryF [a] b c -> Term [a] -> Term b -> Z3 AST
+  case2 :: forall a b c. Typeable [a] => BinaryF [a] b c -> Term [a] -> Term b -> Z3 AST
   case2 f x y = do
     (Right xs) <- listASTs x e vars
     y' <- z3Predicate y e vars
     binListA f xs y'
-  case3 :: forall a b c. BinaryF a [b] c -> Term a -> Term [b] -> Z3 AST
+  case3 :: forall a b c. Typeable [b] => BinaryF a [b] c -> Term a -> Term [b] -> Z3 AST
   case3 f x y = do
     x' <- z3Predicate x e vars
     (Right ys) <- listASTs y e vars
@@ -275,27 +277,35 @@ binNoList (:||:) = \a b -> mkOr [a,b]
 binNoList IsIn = error "handled through special cases"
 
 binListA :: BinaryF [a] b c -> [AST] -> AST -> Z3 AST
-binListA = _
+binListA t xs y = _
 
 binListB :: BinaryF a [b] c -> AST -> [AST] -> Z3 AST
 binListB = _
 
 binListAB :: BinaryF [a] [b] c -> [AST] -> [AST] -> Z3 AST
-binListAB (:==:) xs ys
-  | length xs == length ys = mkAnd =<< zipWithM mkEq xs ys
-  | otherwise = mkFalse
-binListAB (:>:) xs ys = _wd
-binListAB (:>=:) xs ys = _we
-binListAB (:<:) xs ys = _wf
-binListAB (:<=:) xs ys = _wg
+binListAB (:==:) = compareSymbolic (mkEq,(==))
+binListAB (:>:)  = compareSymbolic (mkGt,(>))
+binListAB (:>=:) = compareSymbolic (mkGe,(>=))
+binListAB (:<:) = compareSymbolic (mkLt,(<))
+binListAB (:<=:) = compareSymbolic (mkLe,(<=))
 
-listASTs :: Term [a] -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 (Either AST [AST])
+compareSymbolic :: (AST -> AST -> Z3 AST, Int -> Int -> Bool) -> [AST] -> [AST] -> Z3 AST
+compareSymbolic (f,g) xs ys
+  | length xs == length ys = mkAnd =<< zipWithM f xs ys
+  | otherwise = mkBool $ g (length xs) (length ys)
+
+listASTs :: forall a. Typeable [a] => Term [a] -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 (Either AST [AST])
 listASTs (ReverseT t) e vars = do
   r <- listASTs t e vars
   case r of
     Right as -> pure $ Right $ reverse as
     Left a -> Left <$> reverseSequence a
-listASTs (ListLitT xs) _ _ = Right <$> mapM (mkIntNum . toInteger) xs
+listASTs (ListLitT xs) _ _ =
+  matchType @a
+    [ inCaseOfE' @Integer $ \HRefl -> Right <$> mapM (mkIntNum . toInteger) xs
+    , inCaseOfE' @Char $ \HRefl -> Left <$> mkString xs
+    , fallbackCase' $ error "ähh..."
+    ]
 listASTs (All x n) e vars = pure . Right $ lookupList (weaveVariables x n e) vars
 listASTs (Current x n) e vars = pure . Left . head $ lookupList (weaveVariables x n e) vars
 
@@ -305,7 +315,7 @@ reverseSequence x = do
   lx <- mkSeqLength x
   ly <- mkSeqLength y
   optimizeAssert =<< mkEq lx ly
-  forM_ [0..20] (optimizeAssert <=< pos (x,lx) (y,ly))
+  forM_ [0 :: Int .. 20] (optimizeAssert <=< pos (x,lx) (y,ly))
   pure y
   where
     pos (x,lx) (y,ly) i = do

@@ -1,6 +1,6 @@
 module IOTasks
   ( Specification, runSpecification
-  , readInput, writeOutput, writeOptionalOutput, optionalTextOutput, branch, tillExit, exit, until, while
+  , readInput, writeOutput, writeOptionalOutput, optionalTextOutput, branch, tillExit, exit, nop, until, while
   , InputMode(..)
   , MonadTeletype(..)
   , IOrep, runProgram, Line

@@ -94,6 +94,9 @@ main = hspec $ do
       describe "palindromeProg" $ do
         it "satisfies palindromeProg" $
           (taskCheckOutcome palindromeProg palindromeSpec <&> isSuccess) `shouldReturn` True
+      describe "pingPongProg" $ do
+        it "satisfies pingPongProg" $
+          (taskCheckOutcome pingPongProg pingPongSpec <&> isSuccess) `shouldReturn` True
 
     context "string/newline semantics" $ do
       describe "stringS1" $ do

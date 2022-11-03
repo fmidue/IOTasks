@@ -23,8 +23,13 @@ instance Monoid OverflowWarning where
   mempty = NoOverflow
 
 -- Overflow detection type
-class Typeable a => OverflowType a where
+class (Typeable a, Show a) => OverflowType a where
   type OT a = r | r -> a
+  checkOverflow :: OT a -> OverflowWarning
+
+  toOT :: a -> OT a
+  fromOT :: OT a -> a
+  showOT :: OT a -> String
   typeRepT :: TypeRep (OT a)
   otEqDict :: Dict (Eq (OT a))
   otOrdDict :: Dict (Ord (OT a))
@@ -33,6 +38,13 @@ class Typeable a => OverflowType a where
 
 instance OverflowType Integer where
   type OT Integer = I
+  checkOverflow x
+    | hasDiverged x = OverflowWarning
+    | otherwise = NoOverflow
+
+  toOT = fromInteger
+  fromOT = fromIntegral
+  showOT = show @Integer . fromIntegral
   typeRepT = typeRep
   otEqDict = Dict
   otOrdDict = Dict
@@ -41,6 +53,11 @@ instance OverflowType Integer where
 
 instance OverflowType Bool where
   type OT Bool = Bool
+  checkOverflow = const NoOverflow
+
+  toOT = id
+  fromOT = id
+  showOT = show
   typeRepT = typeRep
   otEqDict = Dict
   otOrdDict = Dict
@@ -49,6 +66,11 @@ instance OverflowType Bool where
 
 instance OverflowType Char where
   type OT Char = Char
+  checkOverflow = const NoOverflow
+
+  toOT = id
+  fromOT = id
+  showOT = show
   typeRepT = typeRep
   otEqDict = Dict
   otOrdDict = Dict
@@ -57,6 +79,11 @@ instance OverflowType Char where
 
 instance OverflowType a => OverflowType [a] where
   type OT [a] = [OT a]
+  checkOverflow = foldMap checkOverflow
+
+  toOT = map toOT
+  fromOT = map fromOT
+  showOT = show . map showOT
   otEqDict = case otEqDict @a of Dict -> Dict
   otOrdDict = case otOrdDict @a of Dict -> Dict
   typeRepT = withTypeable (typeRepT @a) typeRep
@@ -72,11 +99,6 @@ instance Show I where
 
 hasDiverged :: I -> Bool
 hasDiverged (I x x') = x /= fromIntegral x'
-
-checkOverflow :: I -> OverflowWarning
-checkOverflow x
-  | hasDiverged x = OverflowWarning
-  | otherwise = NoOverflow
 
 instance Num I where
   (+) = liftOp2 (+) (+)
