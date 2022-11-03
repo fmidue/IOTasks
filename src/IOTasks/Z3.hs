@@ -208,10 +208,6 @@ mkValueRep x (StringValue s) = do
       pure (eq,sym)
 
 z3Predicate :: Term x -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 AST
-z3Predicate (termStruct -> Binary IsIn x xs) e vars = do
-  xP <- z3Predicate x e vars
-  Right as <- listASTs xs e vars
-  mkOr =<< mapM (mkEq xP) as
 z3Predicate (termStruct -> Binary (f :: BinaryF a b c) x y) e vars =
   case typeRep @a of
     App ca _ -> case eqTypeRep ca (typeRep @[]) of
@@ -274,13 +270,14 @@ binNoList (:<:) = mkLt
 binNoList (:<=:) = mkLe
 binNoList (:&&:) = \a b -> mkAnd [a,b]
 binNoList (:||:) = \a b -> mkOr [a,b]
-binNoList IsIn = error "handled through special cases"
+binNoList IsIn = error "handled by binListB"
 
 binListA :: BinaryF [a] b c -> [AST] -> AST -> Z3 AST
-binListA t xs y = _
+binListA = error "does not happen with currently supported functions"
 
 binListB :: BinaryF a [b] c -> AST -> [AST] -> Z3 AST
-binListB = _
+binListB IsIn x ys = mkOr =<< mapM (mkEq x) ys
+binListB _ _ _ = error "all other functions are handled by binListAB"
 
 binListAB :: BinaryF [a] [b] c -> [AST] -> [AST] -> Z3 AST
 binListAB (:==:) = compareSymbolic (mkEq,(==))
