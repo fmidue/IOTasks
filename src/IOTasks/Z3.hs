@@ -208,24 +208,54 @@ mkValueRep x (StringValue s) = do
       pure (eq,sym)
 
 z3Predicate :: Term x -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 AST
-z3Predicate (termStruct -> Binary (f :: BinaryF a b c) x y) e vars =
-  case typeRep @a of
-    App ca _ -> case eqTypeRep ca (typeRep @[]) of
-      Just HRefl -> case typeRep @b of
-        App cb _ -> case eqTypeRep cb (typeRep @[]) of
-          Just HRefl ->  case1 f x y -- a ~ [a1], b ~ [b1]
-          Nothing -> case2 f x y -- a ~ [a1], b ~ f b1
-        _ -> case2 f x y -- a ~ [a1]
-      Nothing -> case typeRep @b of
-        App cb _ -> case eqTypeRep cb (typeRep @[]) of
-          Just HRefl ->  case3 f x y -- a ~ f a1, b ~ [b1]
-          Nothing -> case4 f x y -- a ~ f a1, b ~ f b1
-        _ -> case4 f x y-- a ~ f a1
-    _ -> case typeRep @b of
+z3Predicate (termStruct -> Binary f x y) e vars = z3PredicateBinary f x y e vars
+z3Predicate (termStruct -> Unary f x) e vars = z3PredicateUnary f x e vars
+z3Predicate (termStruct -> Variable C x n) e vars = pure $ fromMaybe (unknownVariablesError x) $ (`lookup` vars) . last $ weaveVariables x n e
+z3Predicate (termStruct -> Literal (IntLit n)) _ _ = mkIntNum n
+z3Predicate (termStruct -> Literal (BoolLit b)) _ _ = mkBool b
+--
+z3Predicate (termStruct -> Variable A _x _) _e _vars = error "z3Predicate: top level list should not happen"
+z3Predicate (termStruct -> Literal (ListLit _)) _ _ = error "z3Predicate: top level list literal should not happen"
+
+z3PredicateUnary :: forall a b. Typeable a => UnaryF a b -> Term a ->  Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 AST
+z3PredicateUnary f x e vars = case typeRep @a of
+  App c _ -> case eqTypeRep c (typeRep @[]) of
+    Just HRefl -> unaryListA f x e vars  -- a ~ [a1]
+    Nothing -> unaryNoList f x e vars-- a ~ f a1
+  _ -> unaryNoList f x e vars --
+
+unaryListA :: UnaryF [a] b -> Term [a] -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 AST
+unaryListA Length (Current x n) e vars = mkSeqLength . fromJust . (`lookup` vars) . last $ weaveVariables x n e --special case for string variables
+unaryListA Length xs e vars = unaryListRec (mkIntNum . length @[]) xs e vars
+unaryListA Reverse _ _ _ = error "z3Predicate: top level reverse should not happen"
+unaryListA Sum xs e vars = unaryListRec mkAdd xs e vars
+unaryListA Product xs e vars = unaryListRec mkMul xs e vars
+
+unaryNoList :: UnaryF a b -> Term a -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 AST
+unaryNoList Not x e vars = mkNot =<< z3Predicate x e vars
+unaryNoList _ _ _ _ = error "handled by unaryListA"
+
+unaryListRec :: Typeable a => ([AST] -> Z3 AST) -> Term [a] -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 AST
+unaryListRec f xs e vars = f . fromRight (error "unexpected resutl") =<< listASTs xs e vars
+
+z3PredicateBinary :: forall a b c. (Typeable a, Typeable b) => BinaryF a b c -> Term a -> Term b ->  Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 AST
+z3PredicateBinary f x y e vars = case typeRep @a of
+  App ca _ -> case eqTypeRep ca (typeRep @[]) of
+    Just HRefl -> case typeRep @b of
       App cb _ -> case eqTypeRep cb (typeRep @[]) of
-        Just HRefl ->  case3 f x y -- b ~ [b1]
-        Nothing -> case4 f x y -- b ~ f b1
-      _ -> case4 f x y --
+        Just HRefl ->  case1 f x y -- a ~ [a1], b ~ [b1]
+        Nothing -> case2 f x y -- a ~ [a1], b ~ f b1
+      _ -> case2 f x y -- a ~ [a1]
+    Nothing -> case typeRep @b of
+      App cb _ -> case eqTypeRep cb (typeRep @[]) of
+        Just HRefl ->  case3 f x y -- a ~ f a1, b ~ [b1]
+        Nothing -> case4 f x y -- a ~ f a1, b ~ f b1
+      _ -> case4 f x y-- a ~ f a1
+  _ -> case typeRep @b of
+    App cb _ -> case eqTypeRep cb (typeRep @[]) of
+      Just HRefl ->  case3 f x y -- b ~ [b1]
+      Nothing -> case4 f x y -- b ~ f b1
+    _ -> case4 f x y --
   where
   case1 :: forall a b c. (Typeable [a], Typeable [b]) => BinaryF [a] [b] c -> Term [a] -> Term [b] -> Z3 AST
   case1 f x y = do
@@ -233,31 +263,28 @@ z3Predicate (termStruct -> Binary (f :: BinaryF a b c) x y) e vars =
     ry <- listASTs y e vars
     case (rx,ry) of
       (Right xs,Right ys) -> binListAB f xs ys
+      (Right xs,Left y) -> binListA f xs y
+      (Left x,Right ys) -> binListB f x ys
       (Left x,Left y) -> binNoList f x y
   case2 :: forall a b c. Typeable [a] => BinaryF [a] b c -> Term [a] -> Term b -> Z3 AST
   case2 f x y = do
-    (Right xs) <- listASTs x e vars
+    exs <- listASTs x e vars
     y' <- z3Predicate y e vars
-    binListA f xs y'
+    case exs of
+      Right xs -> binListA f xs y'
+      Left x -> binNoList f x y'
   case3 :: forall a b c. Typeable [b] => BinaryF a [b] c -> Term a -> Term [b] -> Z3 AST
   case3 f x y = do
     x' <- z3Predicate x e vars
-    (Right ys) <- listASTs y e vars
-    binListB f x' ys
+    eys <- listASTs y e vars
+    case eys of
+      Right ys -> binListB f x' ys
+      Left y -> binNoList f x' y
   case4 :: forall a b c. BinaryF a b c -> Term a -> Term b -> Z3 AST
-  case4 f = binRec e vars (binNoList f)
-z3Predicate (termStruct -> Unary Not x) e vars = mkNot =<< z3Predicate x e vars
-z3Predicate (termStruct -> Unary Length (Current x n)) e vars = mkSeqLength . fromJust . (`lookup` vars) . last $ weaveVariables x n e --special case for string variables
-z3Predicate (termStruct -> Unary Length xs) e vars = (mkIntNum . length @[] . fromRight (error "unexpected resutl")) =<< listASTs xs e vars
-z3Predicate (termStruct -> Unary Sum xs) e vars = mkAdd . fromRight (error "unexpected resutl") =<< listASTs xs e vars
-z3Predicate (termStruct -> Unary Product xs) e vars = mkMul . fromRight (error "unexpected resutl") =<< listASTs xs e vars
-z3Predicate (termStruct -> Variable C x n) e vars = pure $ fromMaybe (unknownVariablesError x) $ (`lookup` vars) . last $ weaveVariables x n e
-z3Predicate (termStruct -> Literal (IntLit n)) _ _ = mkIntNum n
-z3Predicate (termStruct -> Literal (BoolLit b)) _ _ = mkBool b
---
-z3Predicate (termStruct -> Variable A _x _) _e _vars = error "z3Predicate: top level list should no happen"
-z3Predicate (termStruct -> Literal (ListLit _)) _ _ = error "z3Predicate: top level list literal should no happen"
-z3Predicate (termStruct -> Unary Reverse _) _ _ = error "z3Predicate: top level reverse should no happen"
+  case4 f x y = do
+    xP <- z3Predicate x e vars
+    yP <- z3Predicate y e vars
+    binNoList f xP yP
 
 binNoList :: BinaryF a b c -> AST -> AST -> Z3 AST
 binNoList (:+:) = \a b -> mkAdd [a,b]
@@ -326,13 +353,6 @@ reverseSequence x = do
 
 unknownVariablesError :: VarExp a => a -> b
 unknownVariablesError x = error $ "unknown variable(s) {" ++ intercalate "," (map varname $ toVarList x) ++ "}"
-
--- helper for binary recursive case
-binRec :: Map Var (Int,[Int]) -> [((Var,Int),AST)] -> (AST -> AST -> Z3 AST) -> Term a -> Term b -> Z3 AST
-binRec e vs f x y = do
-  xP <- z3Predicate x e vs
-  yP <- z3Predicate y e vs
-  f xP yP
 
 weaveVariables :: VarExp a => a -> Int -> Map Var (Int,[Int]) -> [(Var,Int)]
 weaveVariables vs n e =
