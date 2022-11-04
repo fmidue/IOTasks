@@ -328,7 +328,7 @@ listASTs (ListLitT xs) _ _ =
   matchType @a
     [ inCaseOfE' @Integer $ \HRefl -> Right <$> mapM (mkIntNum . toInteger) xs
     , inCaseOfE' @Char $ \HRefl -> Left <$> mkString xs
-    , fallbackCase' $ error "ähh..."
+    , fallbackCase' $ error $ "list literal of usupported type " ++ show (typeRep @[a])
     ]
 listASTs (All x n) e vars = pure . Right $ lookupList (weaveVariables x n e) vars
 listASTs (Current x n) e vars = pure . Left . head $ lookupList (weaveVariables x n e) vars
