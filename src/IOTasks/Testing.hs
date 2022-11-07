@@ -35,6 +35,7 @@ data Args
   , verbose :: Bool -- print extra information
   , simplifyFeedback :: Bool -- cleanup feedback for educational use
   , checkOverflows :: Bool -- check that intermediate results do not cause Int overflows, including (parts of OutputTerms when possible) (best-effort, no gurantees on completness)
+  , solverMaxSeqLength :: Int -- maximum length of Sequence values in the the backend solver (affects string length as well). Smaller values may speed up test case generation, at the risk of not finding some satisfiable paths
   }
 
 stdArgs :: Args
@@ -48,6 +49,7 @@ stdArgs = Args
   , verbose = True
   , simplifyFeedback = False
   , checkOverflows = False
+  , solverMaxSeqLength = 25
   }
 
 taskCheckWith :: Args -> IOrep () -> Specification -> IO ()
@@ -66,7 +68,7 @@ taskCheckWithOutcome :: Args -> IOrep () -> Specification -> IO Outcome
 taskCheckWithOutcome Args{..} prog spec = do
   q <- atomically newTQueue
   nVar <- newTVarIO maxPathDepth
-  thrdID <- forkIO $ satPaths nVar solverTimeout (constraintTree maxNegative spec) checkOverflows q
+  thrdID <- forkIO $ satPaths nVar solverTimeout (constraintTree maxNegative spec) solverMaxSeqLength checkOverflows q
   (coreOut,satPaths,nInputs,timeouts,overflows) <- testPaths nVar q (0,0,0,0) Nothing `finally` killThread thrdID
 
   let out = Outcome coreOut (if overflows == 0 then NoHints else OverflowHint overflows)
@@ -94,7 +96,7 @@ taskCheckWithOutcome Args{..} prog spec = do
         Just p
           | currentMaxDepth < pathDepth p -> testPaths nVar q (m,n,t,o) mFailure
           | otherwise -> do
-          res <- isSatPath solverTimeout p checkOverflows
+          res <- isSatPath solverTimeout p solverMaxSeqLength checkOverflows
           if res == SAT -- does not account for timeouts yet
             then do
               (out,k,o') <- testPath p 0 n 0
@@ -115,7 +117,7 @@ taskCheckWithOutcome Args{..} prog spec = do
     testPath :: Path -> TestsRun -> NumberOfInputs -> Overflows -> IO (PathOutcome,TestsRun,Overflows)
     testPath _ n _ o | n >= maxSuccessPerPath = pure (PathSuccess,n,o)
     testPath p n nOtherTests o = do
-      mNextInput <- findPathInput solverTimeout p valueSize checkOverflows
+      mNextInput <- findPathInput solverTimeout p valueSize solverMaxSeqLength checkOverflows
       case mNextInput of
         Nothing -> pure (PathTimeout,n,o) -- should (only?) be the case if solving times out
         Just nextInput  -> do
@@ -203,4 +205,4 @@ taskCheckOn i p s = uncurry Outcome (go 0 0 i p s) where
 generateStaticTestSuite :: Args -> Specification -> IO [Inputs]
 generateStaticTestSuite Args{..} spec =
   let ps = sortOn pathDepth $ paths maxPathDepth $ constraintTree maxNegative spec
-  in concat <$> forM ps (\p -> catMaybes <$> replicateM maxSuccessPerPath (findPathInput solverTimeout p valueSize checkOverflows))
+  in concat <$> forM ps (\p -> catMaybes <$> replicateM maxSuccessPerPath (findPathInput solverTimeout p valueSize solverMaxSeqLength checkOverflows))

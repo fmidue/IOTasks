@@ -51,28 +51,28 @@ taskCheckOutcome = taskCheckWithOutcome stdArgs
 
 taskCheckWithOutcome :: Args -> IOrep () -> Specification -> IO Outcome
 taskCheckWithOutcome Args{..} prog spec  = do
-  is <- generate $ vectorOf maxSuccess $ genInput spec maxPathDepth valueSize maxNegative
+  is <- generate $ vectorOf maxSuccess $ genInput spec maxPathDepth (Size valueSize (fromIntegral $ valueSize `div` 5)) maxNegative
   let outcome = runTests prog spec is
   print $ (if simplifyFeedback then pPrintOutcomeSimple else pPrintOutcome) outcome
   pure outcome
 
-genInput :: Specification -> Int -> Integer -> Int -> Gen Inputs
-genInput s depth bound maxNeg = do
-  t <- genTrace s depth bound maxNeg
+genInput :: Specification -> Int -> Size -> Int -> Gen Inputs
+genInput s depth sz maxNeg = do
+  t <- genTrace s depth sz maxNeg
   if isTerminating t
     then pure $ inputSequence t
-    else genInput s depth bound maxNeg -- repeat sampling until a terminating trace is found
+    else genInput s depth sz maxNeg -- repeat sampling until a terminating trace is found
 
-genTrace :: Specification -> Int -> Integer -> Int -> Gen Trace
-genTrace spec depth bound maxNeg =
+genTrace :: Specification -> Int -> Size -> Int -> Gen Trace
+genTrace spec depth sz maxNeg =
   semM
     (\(e,d,n) x vs mode ->
       (if d > depth then pure $ NoRec OutOfInputs
       else do
         frequency $
-            (5, valueOf vs bound >>= (\i -> pure $ RecSub (wrapValue i) (insertValue (wrapValue i,d) x e,d+1,n)))
-          : [(1, valueOf (complement vs) bound >>= (\i -> pure $ RecSame (wrapValue i) (e,d+1,n+1))) | mode == UntilValid && n < maxNeg]
-          ++ [(1, valueOf (complement vs) bound >>= (\i -> pure $ NoRec $ foldr ProgRead Terminate (show i ++ "\n"))) | mode == Abort && n < maxNeg]
+            (5, valueOf vs sz >>= (\i -> pure $ RecSub (wrapValue i) (insertValue (wrapValue i,d) x e,d+1,n)))
+          : [(1, valueOf (complement vs) sz >>= (\i -> pure $ RecSame (wrapValue i) (e,d+1,n+1))) | mode == UntilValid && n < maxNeg]
+          ++ [(1, valueOf (complement vs) sz >>= (\i -> pure $ NoRec $ foldr ProgRead Terminate (show i ++ "\n"))) | mode == Abort && n < maxNeg]
     ))
     (pure . \case
       NoRec r -> r

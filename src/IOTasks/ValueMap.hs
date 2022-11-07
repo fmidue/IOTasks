@@ -72,7 +72,7 @@ unwrapValueEntry (StringEntry xs) =
     Just Refl -> xs
     Nothing -> error $ "unrwarpValue: incompatible type - String and " ++ show (typeRep @a)
 
-data Value = IntegerValue Integer | StringValue String
+data Value = IntegerValue Integer | StringValue String deriving Show
 
 printValue :: Value -> String
 printValue (IntegerValue i) = show i

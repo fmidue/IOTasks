@@ -8,6 +8,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RecordWildCards #-}
 module IOTasks.Z3 where
 
 import IOTasks.Constraints
@@ -27,7 +28,6 @@ import Control.Monad.State
 import Data.Maybe (catMaybes, fromMaybe, mapMaybe, fromJust)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.List (intercalate, sortOn)
 import Data.Tuple.Extra (thd3)
 
 import Test.QuickCheck.Gen (Gen)
@@ -35,24 +35,31 @@ import Type.Reflection
 import Data.Either (fromRight)
 import Type.Match
 import Data.List.Extra
+import Control.Monad.Reader
+
+type Z3R = ReaderT ImplicitParameters Z3
+
+data ImplicitParameters = ImplicitParameter { valueSizeParameter :: Integer, maxSeqLengthParameter :: Int }
 
 type Timeout = Int
 
-findPathInput :: Timeout -> Path -> Integer -> Bool -> IO (Maybe [String])
-findPathInput t p bound checkOverflows = fst <$> findPathInputDebug t p bound checkOverflows
+findPathInput :: Timeout -> Path -> Integer -> Int -> Bool -> IO (Maybe [String])
+findPathInput t p bound maxSeqLength checkOverflows = fst <$> findPathInputDebug t p bound maxSeqLength checkOverflows
 
-findPathInputDebug :: Timeout -> Path -> Integer -> Bool -> IO (Maybe [String],String)
-findPathInputDebug t p bound checkOverflows = do
-  evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) $ pathScript p (WithSoft bound) checkOverflows
+findPathInputDebug :: Timeout -> Path -> Integer -> Int -> Bool -> IO (Maybe [String],String)
+findPathInputDebug t p bound maxSeqLength checkOverflows = do
+  evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) $ runReaderT (pathScript p WithSoft checkOverflows) implicits
+  where implicits = ImplicitParameter {valueSizeParameter=bound, maxSeqLengthParameter=maxSeqLength}
 
 data SatResult = SAT | NotSAT deriving (Eq, Show)
 
-isSatPath :: Timeout -> Path -> Bool -> IO SatResult
-isSatPath t p checkOverflows = do
-  (mRes,_) <- evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) $ pathScript p WithoutSoft checkOverflows
+isSatPath :: Timeout -> Path-> Int -> Bool -> IO SatResult
+isSatPath t p maxSeqLength checkOverflows = do
+  (mRes,_) <- evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) $ runReaderT (pathScript p WithoutSoft checkOverflows) implicits
   pure $ maybe NotSAT (const SAT) mRes
+  where implicits = ImplicitParameter {valueSizeParameter= error "isSatPath: valueSize not available in isSatPath", maxSeqLengthParameter=maxSeqLength}
 
-data ScriptMode = WithSoft Integer | WithoutSoft
+data ScriptMode = WithSoft | WithoutSoft
 
 data SearchContext = NoContext | LastNotSAT Int | RequirePruningCheck
 
@@ -65,22 +72,22 @@ updateContext NotSAT d (LastNotSAT d')
 updateContext _ _ RequirePruningCheck = error "updateContext: should not happen"
 
 type PrefixPath = Path
-satPathsDebug :: Int -> Int -> ConstraintTree -> Bool -> IO [Path]
-satPathsDebug n to t checkOverflows = do
+satPathsDebug :: Int -> Int -> ConstraintTree -> Int -> Bool -> IO [Path]
+satPathsDebug n to t maxSeqLength checkOverflows = do
   q <- atomically newTQueue
   nVar <- newTVarIO n
-  satPaths nVar to t checkOverflows q
+  satPaths nVar to t maxSeqLength checkOverflows q
   map fromJust . init <$> atomically (flushTQueue q)
 
-satPaths :: TVar Int -> Int -> ConstraintTree -> Bool -> TQueue (Maybe Path) -> IO ()
-satPaths nVar to t checkOverflows q = do
+satPaths :: TVar Int -> Int -> ConstraintTree -> Int -> Bool -> TQueue (Maybe Path) -> IO ()
+satPaths nVar to t maxSeqLength checkOverflows q = do
   evalStateT (satPaths' 0 to t ([],0) q) NoContext
   atomically $ writeTQueue q Nothing
   where
     satPaths' :: Int -> Int -> ConstraintTree -> (PrefixPath,Int) -> TQueue (Maybe Path) -> StateT SearchContext IO ()
     satPaths' _ to Empty (s,d) q = do
       let path = reverse s -- constraints are stored reversed
-      res <- lift $ isSatPath to path checkOverflows
+      res <- lift $ isSatPath to path maxSeqLength checkOverflows
       modify $ updateContext res d
       when (res == SAT) $ lift $ atomically $ writeTQueue q $ Just path
     satPaths' nReads to (Choice l r) (s,d) q = do
@@ -88,7 +95,7 @@ satPaths nVar to t checkOverflows q = do
       ctx <- get
       case ctx of
         RequirePruningCheck -> do
-          res <- lift $ isSatPath to s checkOverflows
+          res <- lift $ isSatPath to s maxSeqLength checkOverflows
           case res of
             NotSAT -> pure ()
             SAT -> do
@@ -111,23 +118,23 @@ lookAhead (Assert c t) = SomeConstraint c : lookAhead t
 lookAhead Choice{} = []
 
 data ValueGenerator where
-  ValueGenerator :: Typeable v => (Integer -> Gen v) -> ValueGenerator
+  ValueGenerator :: Typeable v => (Size -> Gen v) -> ValueGenerator
 
-withGeneratedValue :: (forall v. Typeable v => v -> r) -> ValueGenerator -> Integer -> IO r
-withGeneratedValue f (ValueGenerator g) bound = f <$> generate (g bound)
+withGeneratedValue :: (forall v. Typeable v => v -> r) -> ValueGenerator -> Size -> IO r
+withGeneratedValue f (ValueGenerator g) sz = f <$> generate (g sz)
 
-pathScript :: Path -> ScriptMode -> Bool -> Z3 (Maybe [String], String)
+pathScript :: Path -> ScriptMode -> Bool -> Z3R (Maybe [String], String)
 pathScript path mode checkOverflows = do
   let (tyConstr,predConstr,overflConstr) = partitionPath path
   vars <- forM tyConstr $
     \(InputConstraint ((x,ty),i) (vs :: ValueSet v)) -> do
       var <- mkFreshVar (x ++ show i) =<< mkSort @v
       constraint <- z3ValueSetConstraint vs var
-      optimizeAssert constraint
+      lift $ optimizeAssert constraint
       pure ((((x,ty),i),var),ValueGenerator $ valueOf vs)
   forM_ predConstr $
     \(ConditionConstraint t e) ->
-        optimizeAssert =<< z3Predicate t e (map fst vars)
+        (lift . optimizeAssert) =<< z3Predicate t e (map fst vars)
 
   when checkOverflows $
     forM_ overflConstr $
@@ -135,23 +142,24 @@ pathScript path mode checkOverflows = do
         forM_ ts (\t -> assertOverflowChecks t e (map fst vars))
 
   case mode of
-    WithSoft bound -> do
-      vs <- liftIO $ forM vars $ \((_,ast),gen) -> withGeneratedValue (\v -> (ast,wrapValue v)) gen bound
+    WithSoft -> do
+      ImplicitParameter {..} <- ask
+      vs <- liftIO $ forM vars $ \((_,ast),gen) -> withGeneratedValue (\v -> (ast,wrapValue v)) gen (Size valueSizeParameter (maxSeqLengthParameter `div` 2))
       forM_ vs $ \(ast,v) -> do
         cs <- mkValueRep ast v
-        forM cs $ \(c,l) -> optimizeAssertSoft c "1" l -- soft assert with weight 1 and id "default"
+        forM cs $ \(c,l) -> lift $ optimizeAssertSoft c "1" l -- soft assert with weight 1 and id "default"
     WithoutSoft -> pure ()
-  str <- optimizeToString
-  result <- optimizeCheck []
+  str <- lift optimizeToString
+  result <- lift $ optimizeCheck []
   mRes <- case result of
     Sat -> do
-      model <- optimizeGetModel
+      model <- lift optimizeGetModel
       Just . catMaybes <$> mapM ((evalAST model . snd) . fst) vars
     _ -> do
       pure Nothing
   pure (mRes,str)
 
-evalAST :: Model -> AST -> Z3 (Maybe String)
+evalAST :: MonadZ3 z3 => Model -> AST -> z3 (Maybe String)
 evalAST m x = do
   isS <- isStringSort =<< getSort x
   if isS
@@ -179,7 +187,7 @@ mkSort =
       Just HRefl -> mkStringSort
       Nothing -> error "mkSort: unsupported type"
 
-mkValueRep :: AST -> Value -> Z3 [(AST,Symbol)]
+mkValueRep :: MonadZ3 z3 => AST -> Value -> z3 [(AST,Symbol)]
 mkValueRep x (IntegerValue n) = do
   def <- mkStringSymbol "default"
   pure . (,def) <$> (mkEq x =<< mkInteger n)
@@ -208,7 +216,7 @@ mkValueRep x (StringValue s) = do
       sym <- mkStringSymbol $ xStr ++ "_val"
       pure (eq,sym)
 
-z3Predicate :: Term x -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 AST
+z3Predicate :: Term x -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R AST
 z3Predicate (termStruct -> Binary f x y) e vars = z3PredicateBinary f x y e vars
 z3Predicate (termStruct -> Unary f x) e vars = z3PredicateUnary f x e vars
 z3Predicate (termStruct -> Variable C x n) e vars = pure $ fromMaybe (unknownVariablesError x) $ (`lookup` vars) . last $ weaveVariables x n e
@@ -218,28 +226,28 @@ z3Predicate (termStruct -> Literal (BoolLit b)) _ _ = mkBool b
 z3Predicate (termStruct -> Variable A _x _) _e _vars = error "z3Predicate: top level list should not happen"
 z3Predicate (termStruct -> Literal (ListLit _)) _ _ = error "z3Predicate: top level list literal should not happen"
 
-z3PredicateUnary :: forall a b. Typeable a => UnaryF a b -> Term a ->  Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 AST
+z3PredicateUnary :: forall a b. Typeable a => UnaryF a b -> Term a ->  Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R AST
 z3PredicateUnary f x e vars = case typeRep @a of
   App c _ -> case eqTypeRep c (typeRep @[]) of
     Just HRefl -> unaryListA f x e vars  -- a ~ [a1]
     Nothing -> unaryNoList f x e vars-- a ~ f a1
   _ -> unaryNoList f x e vars --
 
-unaryListA :: UnaryF [a] b -> Term [a] -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 AST
+unaryListA :: UnaryF [a] b -> Term [a] -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R AST
 unaryListA Length (Current x n) e vars = mkSeqLength . fromJust . (`lookup` vars) . last $ weaveVariables x n e --special case for string variables
 unaryListA Length xs e vars = unaryListRec (mkIntNum . length @[]) xs e vars
 unaryListA Reverse _ _ _ = error "z3Predicate: top level reverse should not happen"
 unaryListA Sum xs e vars = unaryListRec mkAdd xs e vars
 unaryListA Product xs e vars = unaryListRec mkMul xs e vars
 
-unaryNoList :: UnaryF a b -> Term a -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 AST
+unaryNoList :: UnaryF a b -> Term a -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R AST
 unaryNoList Not x e vars = mkNot =<< z3Predicate x e vars
 unaryNoList _ _ _ _ = error "handled by unaryListA"
 
-unaryListRec :: Typeable a => ([AST] -> Z3 AST) -> Term [a] -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 AST
+unaryListRec :: Typeable a => ([AST] -> Z3R AST) -> Term [a] -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R AST
 unaryListRec f xs e vars = f . fromRight (error "unexpected resutl") =<< listASTs xs e vars
 
-z3PredicateBinary :: forall a b c. (Typeable a, Typeable b) => BinaryF a b c -> Term a -> Term b ->  Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 AST
+z3PredicateBinary :: forall a b c. (Typeable a, Typeable b) => BinaryF a b c -> Term a -> Term b ->  Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R AST
 z3PredicateBinary f x y e vars = case typeRep @a of
   App ca _ -> case eqTypeRep ca (typeRep @[]) of
     Just HRefl -> case typeRep @b of
@@ -258,7 +266,7 @@ z3PredicateBinary f x y e vars = case typeRep @a of
       Nothing -> case4 f x y -- b ~ f b1
     _ -> case4 f x y --
   where
-  case1 :: forall a b c. (Typeable [a], Typeable [b]) => BinaryF [a] [b] c -> Term [a] -> Term [b] -> Z3 AST
+  case1 :: forall a b c. (Typeable [a], Typeable [b]) => BinaryF [a] [b] c -> Term [a] -> Term [b] -> Z3R AST
   case1 f x y = do
     rx <- listASTs x e vars
     ry <- listASTs y e vars
@@ -267,27 +275,27 @@ z3PredicateBinary f x y e vars = case typeRep @a of
       (Right xs,Left y) -> binListA f xs y
       (Left x,Right ys) -> binListB f x ys
       (Left x,Left y) -> binNoList f x y
-  case2 :: forall a b c. Typeable [a] => BinaryF [a] b c -> Term [a] -> Term b -> Z3 AST
+  case2 :: forall a b c. Typeable [a] => BinaryF [a] b c -> Term [a] -> Term b -> Z3R AST
   case2 f x y = do
     exs <- listASTs x e vars
     y' <- z3Predicate y e vars
     case exs of
       Right xs -> binListA f xs y'
       Left x -> binNoList f x y'
-  case3 :: forall a b c. Typeable [b] => BinaryF a [b] c -> Term a -> Term [b] -> Z3 AST
+  case3 :: forall a b c. Typeable [b] => BinaryF a [b] c -> Term a -> Term [b] -> Z3R AST
   case3 f x y = do
     x' <- z3Predicate x e vars
     eys <- listASTs y e vars
     case eys of
       Right ys -> binListB f x' ys
       Left y -> binNoList f x' y
-  case4 :: forall a b c. BinaryF a b c -> Term a -> Term b -> Z3 AST
+  case4 :: forall a b c. BinaryF a b c -> Term a -> Term b -> Z3R AST
   case4 f x y = do
     xP <- z3Predicate x e vars
     yP <- z3Predicate y e vars
     binNoList f xP yP
 
-binNoList :: forall a b c. BinaryF a b c -> AST -> AST -> Z3 AST
+binNoList :: forall z3 a b c. MonadZ3 z3 => BinaryF a b c -> AST -> AST -> z3 AST
 binNoList (:+:) = \a b -> mkAdd [a,b]
 binNoList (:-:) = \a b -> mkSub [a,b]
 binNoList (:*:) = \a b -> mkMul [a,b]
@@ -300,14 +308,14 @@ binNoList (:&&:) = \a b -> mkAnd [a,b]
 binNoList (:||:) = \a b -> mkOr [a,b]
 binNoList IsIn = error "handled by binListB"
 
-binListA :: BinaryF [a] b c -> [AST] -> AST -> Z3 AST
+binListA :: MonadZ3 z3 => BinaryF [a] b c -> [AST] -> AST -> z3 AST
 binListA = error "does not happen with currently supported functions"
 
-binListB :: BinaryF a [b] c -> AST -> [AST] -> Z3 AST
+binListB :: MonadZ3 z3 => BinaryF a [b] c -> AST -> [AST] -> z3 AST
 binListB IsIn x ys = mkOr =<< mapM (mkEq x) ys
 binListB _ _ _ = error "all other functions are handled by binListAB"
 
-binListAB :: BinaryF [a] [b] c -> [AST] -> [AST] -> Z3 AST
+binListAB :: MonadZ3 z3 => BinaryF [a] [b] c -> [AST] -> [AST] -> z3 AST
 binListAB (:==:) = compareSymbolic $ Strict EQ
 binListAB (:>:)  = compareSymbolic $ Strict GT
 binListAB (:>=:) = compareSymbolic $ ReflexiveClosure GT
@@ -316,7 +324,7 @@ binListAB (:<=:) = compareSymbolic $ ReflexiveClosure LT
 
 data CompareOp = Strict Ordering | ReflexiveClosure Ordering
 
-compareSymbolic :: CompareOp -> [AST] -> [AST] -> Z3 AST
+compareSymbolic :: MonadZ3 z3 => CompareOp -> [AST] -> [AST] -> z3 AST
 compareSymbolic cmpOp xs ys = do
   let (mkCmp,mkConstShort,mkConstLong) = compareParams cmpOp
   strictComps <- mapM mkAnd =<< clauses =<< compareASTLists mkCmp mkConstShort mkConstLong
@@ -326,19 +334,19 @@ compareSymbolic cmpOp xs ys = do
       eqComp <- mkAnd =<< compareASTLists mkEq mkFalse mkFalse
       mkOr $ eqComp : strictComps
   where
-    compareParams :: CompareOp -> (AST -> AST -> Z3 AST, Z3 AST, Z3 AST)
+    compareParams :: MonadZ3 z3 => CompareOp -> (AST -> AST -> z3 AST, z3 AST, z3 AST)
     compareParams (Strict EQ) = (mkEq,mkFalse,mkFalse)
     compareParams (Strict LT) = (mkLt,mkTrue,mkFalse)
     compareParams (Strict GT) = (mkGt,mkFalse,mkTrue)
     compareParams (ReflexiveClosure x) = compareParams $ Strict x
-    compareASTLists :: (AST -> AST -> Z3 AST) -> Z3 AST -> Z3 AST -> Z3 [AST]
+    compareASTLists :: MonadZ3 z3 => (AST -> AST -> z3 AST) -> z3 AST -> z3 AST -> z3 [AST]
     compareASTLists mkCmp mkConstShort mkConstLong = sequence (zipWithLongest (comparePositions mkCmp mkConstShort mkConstLong) xs ys)
-    comparePositions :: (AST -> AST -> Z3 AST) -> Z3 AST -> Z3 AST -> Maybe AST -> Maybe AST -> Z3 AST
+    comparePositions :: MonadZ3 z3 => (AST -> AST -> z3 AST) -> z3 AST -> z3 AST -> Maybe AST -> Maybe AST -> z3 AST
     comparePositions mkCmp _ _ (Just x) (Just y) = mkIntermediateBoolean =<< mkCmp x y
     comparePositions _ mkConstShort _ Nothing (Just _) = mkConstShort
     comparePositions _ _ mkConstLong (Just _) Nothing = mkConstLong
     comparePositions _ _ _ Nothing Nothing = error "impossible: invariant of zipWithLongest"
-    clauses :: [AST] -> Z3 [[AST]]
+    clauses :: MonadZ3 z3 => [AST] -> z3 [[AST]]
     clauses [] = pure []
     clauses [b1] = pure [[b1]]
     clauses (b:bs) = do
@@ -346,12 +354,13 @@ compareSymbolic cmpOp xs ys = do
       r <- clauses bs
       pure $ [b] : ((nb :) <$> r)
 
-mkIntermediateBoolean :: AST -> Z3 AST
+mkIntermediateBoolean :: MonadZ3 z3 => AST -> z3 AST
 mkIntermediateBoolean x = do
   b <- mkFreshBoolVar "b"
   mkEq b x
 
-listASTs :: forall a. Typeable [a] => Term [a] -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 (Either AST [AST])
+listASTs :: forall a. Typeable [a] => Term [a] -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R (Either AST [AST])
+listASTs (ReverseT (ReverseT t)) e vars = listASTs t e vars
 listASTs (ReverseT t) e vars = do
   r <- listASTs t e vars
   case r of
@@ -366,15 +375,18 @@ listASTs (ListLitT xs) _ _ =
 listASTs (All x n) e vars = pure . Right $ lookupList (weaveVariables x n e) vars
 listASTs (Current x n) e vars = pure . Left . head $ lookupList (weaveVariables x n e) vars
 
-reverseSequence :: AST -> Z3 AST
+reverseSequence :: AST -> Z3R AST
 reverseSequence x = do
   y <- mkFreshVar "reversed" =<< getSort x
   lx <- mkSeqLength x
   ly <- mkSeqLength y
-  optimizeAssert =<< mkEq lx ly
-  forM_ [0 :: Int .. 20] (optimizeAssert <=< pos (x,lx) (y,ly))
+  lift (optimizeAssert =<< mkEq lx ly)
+  m <- asks maxSeqLengthParameter
+  lift (optimizeAssert =<< mkLe lx =<< mkIntNum m)
+  forM_ [0 .. m] (lift . optimizeAssert <=< pos (x,lx) (y,ly))
   pure y
   where
+    pos :: MonadZ3 z3 => (AST,AST) -> (AST,AST) -> Int -> z3 AST
     pos (x,lx) (y,ly) i = do
       index <- mkIntNum i
       pre <- mkGe lx index
@@ -399,7 +411,7 @@ weaveVariables vs n e =
 lookupList :: Eq a => [a] -> [(a, b)] -> [b]
 lookupList vs vars = mapMaybe (`lookup` vars) vs
 
-z3ValueSetConstraint :: ValueSet a -> AST -> Z3 AST
+z3ValueSetConstraint :: MonadZ3 z3 => ValueSet a -> AST -> z3 AST
 z3ValueSetConstraint (Union x y) xVar = do
   cx <- z3ValueSetConstraint x xVar
   cy <- z3ValueSetConstraint y xVar
@@ -414,14 +426,14 @@ z3ValueSetConstraint (Eq n) xVar = mkIntNum n >>= mkEq xVar
 z3ValueSetConstraint Every _ = mkTrue
 z3ValueSetConstraint None _ = mkFalse
 
-assertOverflowChecks :: Term Integer ->  Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 ()
+assertOverflowChecks :: Term Integer ->  Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R ()
 assertOverflowChecks t e vars = do
   ast <- z3Predicate t e vars
   overflowConstraints ast
 
-overflowConstraints :: AST -> Z3 ()
+overflowConstraints :: AST -> Z3R ()
 overflowConstraints x = do
   minInt <- mkInteger (toInteger $ minBound @Int)
   maxInt <- mkInteger (toInteger $ maxBound @Int)
-  optimizeAssert =<< mkGe x minInt
-  optimizeAssert =<< mkLe x maxInt
+  lift (optimizeAssert =<< mkGe x minInt)
+  lift (optimizeAssert =<< mkLe x maxInt)

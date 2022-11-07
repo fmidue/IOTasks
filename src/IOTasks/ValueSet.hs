@@ -19,7 +19,7 @@ data ValueSet a where
   Every :: ValueSet a
   None :: ValueSet a
 
-type Size = Integer
+data Size = Size { intAbs :: Integer, strLen :: Int }
 
 complement :: ValueSet a -> ValueSet a
 complement (GreaterThan n) = LessThen n `Union` Eq n
@@ -48,7 +48,7 @@ valueOf =
       Nothing -> error $ "unsupported ValueSet type: " ++ show (typeRep $ Proxy @a)
 
 valueOfInt :: ValueSet Integer -> Size -> Gen Integer
-valueOfInt vs sz =
+valueOfInt vs (Size sz _) =
   case Set.toList $ range vs $ Set.fromAscList [-sz..sz] of
     [] -> error "valueOf: no values within size bound"
     xs -> elements xs
@@ -63,7 +63,7 @@ valueOfInt vs sz =
     range None _ = error "valueOf: empty ValueSet"
 
 valueOfString :: ValueSet String -> Size -> Gen String
-valueOfString Every sz = resize (fromInteger sz `div` 10) . listOf $ elements ['a'..'z']
+valueOfString Every (Size _ len) = resize len . listOf $ elements ['a'..'z']
 valueOfString None _ = error "valueOf: empty ValueSet"
 
 printValueSet :: forall a. Typeable a => ValueSet a -> String
