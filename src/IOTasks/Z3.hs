@@ -34,6 +34,7 @@ import Test.QuickCheck.Gen (Gen)
 import Type.Reflection
 import Data.Either (fromRight)
 import Type.Match
+import Data.List.Extra
 
 type Timeout = Int
 
@@ -286,15 +287,15 @@ z3PredicateBinary f x y e vars = case typeRep @a of
     yP <- z3Predicate y e vars
     binNoList f xP yP
 
-binNoList :: BinaryF a b c -> AST -> AST -> Z3 AST
+binNoList :: forall a b c. BinaryF a b c -> AST -> AST -> Z3 AST
 binNoList (:+:) = \a b -> mkAdd [a,b]
 binNoList (:-:) = \a b -> mkSub [a,b]
 binNoList (:*:) = \a b -> mkMul [a,b]
 binNoList (:==:) = mkEq
-binNoList (:>:) = mkGt
-binNoList (:>=:) = mkGe
-binNoList (:<:) = mkLt
-binNoList (:<=:) = mkLe
+binNoList (:>:) = matchType @a [inCaseOf' @String $ (\a b -> mkNot =<< mkStrLe a b), fallbackCase' mkGt]
+binNoList (:>=:) = matchType @a [inCaseOf' @String $ (\a b -> mkNot =<< mkStrLt a b), fallbackCase' mkGe]
+binNoList (:<:) = matchType @a [inCaseOf' @String $ mkStrLt, fallbackCase' mkLt]
+binNoList (:<=:) = matchType @a [inCaseOf' @String $ mkStrLe, fallbackCase' mkLe]
 binNoList (:&&:) = \a b -> mkAnd [a,b]
 binNoList (:||:) = \a b -> mkOr [a,b]
 binNoList IsIn = error "handled by binListB"
@@ -307,16 +308,48 @@ binListB IsIn x ys = mkOr =<< mapM (mkEq x) ys
 binListB _ _ _ = error "all other functions are handled by binListAB"
 
 binListAB :: BinaryF [a] [b] c -> [AST] -> [AST] -> Z3 AST
-binListAB (:==:) = compareSymbolic (mkEq,(==))
-binListAB (:>:)  = compareSymbolic (mkGt,(>))
-binListAB (:>=:) = compareSymbolic (mkGe,(>=))
-binListAB (:<:) = compareSymbolic (mkLt,(<))
-binListAB (:<=:) = compareSymbolic (mkLe,(<=))
+binListAB (:==:) = compareSymbolic $ Strict EQ
+binListAB (:>:)  = compareSymbolic $ Strict GT
+binListAB (:>=:) = compareSymbolic $ ReflexiveClosure GT
+binListAB (:<:) = compareSymbolic $ Strict LT
+binListAB (:<=:) = compareSymbolic $ ReflexiveClosure LT
 
-compareSymbolic :: (AST -> AST -> Z3 AST, Int -> Int -> Bool) -> [AST] -> [AST] -> Z3 AST
-compareSymbolic (f,g) xs ys
-  | length xs == length ys = mkAnd =<< zipWithM f xs ys
-  | otherwise = mkBool $ g (length xs) (length ys)
+data CompareOp = Strict Ordering | ReflexiveClosure Ordering
+
+compareSymbolic :: CompareOp -> [AST] -> [AST] -> Z3 AST
+compareSymbolic cmpOp xs ys = do
+  let (mkCmp,mkConstShort,mkConstLong) = compareParams cmpOp
+  strictComps <- mapM mkAnd =<< clauses =<< compareASTLists mkCmp mkConstShort mkConstLong
+  case cmpOp of
+    Strict{} -> mkOr strictComps
+    ReflexiveClosure{} -> do
+      eqComp <- mkAnd =<< compareASTLists mkEq mkFalse mkFalse
+      mkOr $ eqComp : strictComps
+  where
+    compareParams :: CompareOp -> (AST -> AST -> Z3 AST, Z3 AST, Z3 AST)
+    compareParams (Strict EQ) = (mkEq,mkFalse,mkFalse)
+    compareParams (Strict LT) = (mkLt,mkTrue,mkFalse)
+    compareParams (Strict GT) = (mkGt,mkFalse,mkTrue)
+    compareParams (ReflexiveClosure x) = compareParams $ Strict x
+    compareASTLists :: (AST -> AST -> Z3 AST) -> Z3 AST -> Z3 AST -> Z3 [AST]
+    compareASTLists mkCmp mkConstShort mkConstLong = sequence (zipWithLongest (comparePositions mkCmp mkConstShort mkConstLong) xs ys)
+    comparePositions :: (AST -> AST -> Z3 AST) -> Z3 AST -> Z3 AST -> Maybe AST -> Maybe AST -> Z3 AST
+    comparePositions mkCmp _ _ (Just x) (Just y) = mkIntermediateBoolean =<< mkCmp x y
+    comparePositions _ mkConstShort _ Nothing (Just _) = mkConstShort
+    comparePositions _ _ mkConstLong (Just _) Nothing = mkConstLong
+    comparePositions _ _ _ Nothing Nothing = error "impossible: invariant of zipWithLongest"
+    clauses :: [AST] -> Z3 [[AST]]
+    clauses [] = pure []
+    clauses [b1] = pure [[b1]]
+    clauses (b:bs) = do
+      nb <- mkNot b
+      r <- clauses bs
+      pure $ [b] : ((nb :) <$> r)
+
+mkIntermediateBoolean :: AST -> Z3 AST
+mkIntermediateBoolean x = do
+  b <- mkFreshBoolVar "b"
+  mkEq b x
 
 listASTs :: forall a. Typeable [a] => Term [a] -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3 (Either AST [AST])
 listASTs (ReverseT t) e vars = do
