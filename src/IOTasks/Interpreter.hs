@@ -6,7 +6,6 @@ module IOTasks.Interpreter where
 import Prelude hiding (readLn,putStrLn)
 
 import Control.Monad.State
-import Control.Monad.Loops (iterateUntil)
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -24,19 +23,24 @@ interpret s = do
   collapsed <- collapseChoice s
   pure $ flip evalStateT (Map.empty :: ValueMap) $
     sem
-      (\n x (vs :: ValueSet v) m -> RecSub (x,wrapValue . readValue @v ,containsValue vs . unwrapValue,m,n) (n+1))
+      (\n x (vs :: ValueSet v) m -> RecSub (x,wrapValue . readValue @v ,containsValue vs . unwrapValue,m,n) id (n+1))
       (\case
-        RecSub (x,readF,_,AssumeValid,n) p' -> do
+        RecSub (x,readF,_,AssumeValid,n) () p' -> do
           v <- lift (readF <$> MTT.getLine)
           modify $ insertValue (v,n) x
           p'
-        RecSub (x,readF,vsContains,Abort,n) p' -> do
+        RecSub (x,readF,vsContains,Abort,n) () p' -> do
           v <- lift (readF <$> MTT.getLine)
-          when (vsContains v) $ do
-            modify $ insertValue (v,n) x
-            p'
-        RecSub (x,readF,vsContains,UntilValid,n) p' -> do
-          v <- iterateUntil vsContains $ lift (readF <$> MTT.getLine)
+          if vsContains v
+            then do
+              modify $ insertValue (v,n) x
+              p'
+            else lift $ MTT.putStrLn "abort: invalid input value"
+        RecSub (x,readF,vsContains,UntilValid,n) () p' -> do
+          let readLoop = do
+                v <- lift (readF <$> MTT.getLine)
+                if vsContains v then pure v else lift (putStrLn "invalid value, try again") >> readLoop
+          v <- readLoop
           modify $ insertValue (v,n) x
           p'
         NoRec{} -> error "interpret: impossible"

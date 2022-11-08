@@ -26,7 +26,6 @@ dependencies:
 - z3
 - parsec
 - mtl
-- monad-loops
 - express
 - pretty
 - extra
@@ -54,6 +53,7 @@ tests:
     dependencies:
     - mini-IOTasks
     - hspec
+    - monad-loops
 
 benchmarks:
   hangman-benchmark:

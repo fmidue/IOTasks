@@ -56,7 +56,6 @@ library
     , containers
     , express
     , extra
-    , monad-loops
     , mtl
     , parsec
     , pretty
@@ -108,7 +107,6 @@ benchmark hangman-benchmark
     , express
     , extra
     , mini-IOTasks
-    , monad-loops
     , mtl
     , parsec
     , pretty

@@ -70,15 +70,15 @@ genTrace spec depth sz maxNeg =
       (if d > depth then pure $ NoRec OutOfInputs
       else do
         frequency $
-            (5, valueOf vs sz >>= (\i -> pure $ RecSub (wrapValue i) (insertValue (wrapValue i,d) x e,d+1,n)))
-          : [(1, valueOf (complement vs) sz >>= (\i -> pure $ RecSame (wrapValue i) (e,d+1,n+1))) | mode == UntilValid && n < maxNeg]
+            (5, valueOf vs sz >>= (\i -> pure $ RecSub (wrapValue i) id (insertValue (wrapValue i,d) x e,d+1,n)))
+          : [(1, valueOf (complement vs) sz >>= (\i -> pure $ RecSame (wrapValue i) id (e,d+1,n+1))) | mode == UntilValid && n < maxNeg]
           ++ [(1, valueOf (complement vs) sz >>= (\i -> pure $ NoRec $ foldr ProgRead Terminate (show i ++ "\n"))) | mode == Abort && n < maxNeg]
     ))
     (pure . \case
       NoRec r -> r
-      RecSub i t' -> do
+      RecSub i () t' -> do
         foldr ProgRead t' (printValue i ++ "\n")
-      RecSame i t' -> do
+      RecSame i () t' -> do
         foldr ProgRead t' (printValue i ++ "\n")
       RecBoth{} -> error "genTrace: impossible"
     )

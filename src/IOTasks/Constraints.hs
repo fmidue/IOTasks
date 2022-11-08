@@ -45,18 +45,18 @@ constraintTree negMax =
             ,InputConstraint(x, ix x e') (complement vs)
             , mode == Abort && n < negMax)
       in case mode of
-          AssumeValid -> RecSub p (n,e',k+1)
+          AssumeValid -> RecSub p id (n,e',k+1)
           UntilValid
-            | n < negMax -> RecBoth p (n,e',k) (n+1,e',k+1)
-            | otherwise -> RecSub p (n,e',k+1)
-          Abort -> RecSub p (n,e',k)
+            | n < negMax -> RecBoth p id (n,e',k) (n+1,e',k+1)
+            | otherwise -> RecSub p id (n,e',k+1)
+          Abort -> RecSub p id (n,e',k)
     )
     (\case
-      RecSub (vsP,_, False) s' -> Assert vsP s'
-      RecSub (vsP,vsN, True) s' -> Choice
+      RecSub (vsP,_, False) () s' -> Assert vsP s'
+      RecSub (vsP,vsN, True) () s' -> Choice
         (Assert vsN Empty)
         (Assert vsP s')
-      RecBoth (vsP,vsN,_) s' s -> Choice
+      RecBoth (vsP,vsN,_) () s' s -> Choice
         (Assert vsN s)
         (Assert vsP s')
       NoRec _ -> error "constraintTree: impossible"

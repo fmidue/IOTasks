@@ -80,9 +80,13 @@ main = hspec $ do
         it "does not fulfill tests generated from example3 specification" $
           (((\is -> taskCheckOn is prog2 example3) <$> generateStaticTestSuite stdArgs example3) <&> not . isSuccess) `shouldReturn` True
 
-    context "interpretation" $
-      it "all interpretations of a specification satisfy that specification" $
-        allM (\p -> isSuccess <$> taskCheckOutcome p example1) (interpret example1) `shouldReturn` True
+    context "interpretation" $ do
+      describe "all interpretations of a specification satisfy that specification" $ do
+        it "holds for example1" $
+          allM (\p -> isSuccess <$> taskCheckOutcome p example1) (interpret example1) `shouldReturn` True
+        it "holds for example6" $
+          allM (\p -> isSuccess <$> taskCheckOutcome p example6) (interpret example6) `shouldReturn` True
+
 
     context "string inputs" $ do
       describe "echoProg" $ do

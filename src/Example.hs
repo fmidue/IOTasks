@@ -281,12 +281,16 @@ prog6 :: MonadTeletype m => m ()
 prog6 = do
   x <- readLn @_ @Integer
   if x < 0
-    then pure ()
+    then putStrLn "abort: invalid input value"
     else do
       y <- readLn
       let loop = do
             v <- readLn
-            if v < 0 then loop else pure v
+            if v < 0
+              then do
+                putStrLn "invalid input value, try again"
+                loop
+              else pure v
       z <- loop
       print $ x + y + z
 

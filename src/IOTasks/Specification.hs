@@ -19,6 +19,7 @@ import qualified Data.Set as Set
 import Data.List (nub)
 import qualified Data.Map as Map
 import Data.Functor.Identity (runIdentity,Identity(..))
+import Data.Bifunctor (first)
 import Data.Typeable
 import IOTasks.ValueMap
 
@@ -94,16 +95,16 @@ runSpecification inputs spec =
       case ins of
         [] -> NoRec (OutOfInputs,NoOverflow)
         ((i,n):is)
-          | vs `containsValue` readValue i -> RecSub i (insertValue (wrapValue $ readValue @v i,n) x e,is)
+          | vs `containsValue` readValue i -> RecSub i id (insertValue (wrapValue $ readValue @v i,n) x e,is)
           | otherwise -> case mode of
               AssumeValid -> error $ "invalid value: " ++ i ++ " is not an element of " ++ printValueSet vs
-              UntilValid -> RecSame i (e,is)
-              Abort -> NoRec (foldr ProgRead (ProgRead '\n' Terminate) i,NoOverflow)
+              UntilValid ->  RecSame i (first $ ProgWrite Optional (Set.singleton Wildcard)) (e,is)
+              Abort -> NoRec (foldr ProgRead (ProgRead '\n' $ ProgWrite Optional (Set.singleton Wildcard) Terminate) i,NoOverflow)
     )
     (\case
       NoRec r -> r
-      RecSub i (t',w) -> (foldr ProgRead (ProgRead '\n' t') i,w)
-      RecSame i (t',w) -> (foldr ProgRead (ProgRead '\n' t') i,w)
+      RecSub i () (t',w) -> (foldr ProgRead (ProgRead '\n' t') i,w)
+      RecSame i () (t',w) -> (foldr ProgRead (ProgRead '\n' t') i,w)
       RecBoth{} -> error "runSpecification: impossible"
     )
     (\(e,_) o ts (t',ww) ->
@@ -117,10 +118,10 @@ runSpecification inputs spec =
     (Map.fromList ((,NoEntry) <$> vars spec),inputs `zip` [1..])
     spec
 
-data RecStruct p a r = NoRec r | RecSub p a | RecSame p a | RecBoth p a a
+data RecStruct p x a r = NoRec r | RecSub p x a | RecSame p x a | RecBoth p x a a
 
 sem :: forall st p a.
-  (forall v. (Typeable v,Read v,Show v) => st -> Var -> ValueSet v -> InputMode -> RecStruct p st a) -> (RecStruct p a a -> a) ->
+  (forall v. (Typeable v,Read v,Show v) => st -> Var -> ValueSet v -> InputMode -> RecStruct p (a->a) st a) -> (RecStruct p () a a -> a) ->
   (st -> OptFlag -> Set (OutputPattern 'SpecificationP) -> a -> a) ->
   (st -> Term Bool -> a -> a -> a) ->
   a ->
@@ -135,7 +136,7 @@ sem f f' g h z st s = runIdentity $ semM
   s
 
 semM :: forall m st p a. Monad m =>
-  (forall v. (Typeable v,Read v,Show v) => st -> Var -> ValueSet v -> InputMode -> m (RecStruct p st a)) -> (RecStruct p a a -> m a) ->
+  (forall v. (Typeable v,Read v,Show v) => st -> Var -> ValueSet v -> InputMode -> m (RecStruct p (a->a) st a)) -> (RecStruct p () a a -> m a) ->
   (st -> OptFlag -> Set (OutputPattern 'SpecificationP) -> m a -> m a) ->
   (st -> Term Bool -> m a -> m a -> m a) ->
   m a ->
@@ -148,9 +149,9 @@ semM f f' g h z s_I spec = sem' s_I spec k_I where
       struct <- mStruct
       f' =<< case struct of
         NoRec r -> pure $ NoRec r
-        RecSub p st' -> RecSub p <$> sem' st' s' k
-        RecSame p st' -> RecSame p <$> sem' st' s k
-        RecBoth p st' st'' -> RecBoth p <$> sem' st' s' k <*> sem' st'' s k
+        RecSub p r st' -> RecSub p () . r <$> sem' st' s' k
+        RecSame p r st' -> RecSame p () . r <$> sem' st' s k
+        RecBoth p r st' st'' -> RecBoth p () . r <$> sem' st' s' k <*> sem' st'' s k
   sem' st (WriteOutput o ts s') k = g st o ts $ sem' st s' k
   sem' st (Branch c l r s') k = h st c (sem' st (l <> s') k) (sem' st (r <> s') k)
   sem' st (TillE s s') k = sem' st s k'
