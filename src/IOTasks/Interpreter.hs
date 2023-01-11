@@ -7,7 +7,6 @@ import Prelude hiding (readLn,putStrLn)
 
 import Control.Monad.State
 
-import qualified Data.Map as Map
 import qualified Data.Set as Set
 
 import IOTasks.Specification
@@ -21,27 +20,27 @@ import IOTasks.ValueMap
 interpret :: MonadTeletype m => Specification -> [m ()]
 interpret s = do
   collapsed <- collapseChoice s
-  pure $ flip evalStateT (Map.empty :: ValueMap) $
+  pure $ flip evalStateT (emptyValueMap [] :: ValueMap) $
     sem
-      (\n x (vs :: ValueSet v) m -> RecSub (x,wrapValue . readValue @v ,containsValue vs . unwrapValue,m,n) id (n+1))
+      (\() x (vs :: ValueSet v) m -> RecSub (x,wrapValue . readValue @v ,containsValue vs . unwrapValue,m) id ())
       (\case
-        RecSub (x,readF,_,AssumeValid,n) () p' -> do
+        RecSub (x,readF,_,AssumeValid) () p' -> do
           v <- lift (readF <$> MTT.getLine)
-          modify $ insertValue (v,n) x
+          modify $ insertValue v x
           p'
-        RecSub (x,readF,vsContains,Abort,n) () p' -> do
+        RecSub (x,readF,vsContains,Abort) () p' -> do
           v <- lift (readF <$> MTT.getLine)
           if vsContains v
             then do
-              modify $ insertValue (v,n) x
+              modify $ insertValue v x
               p'
             else lift $ MTT.putStrLn "abort: invalid input value"
-        RecSub (x,readF,vsContains,UntilValid,n) () p' -> do
+        RecSub (x,readF,vsContains,UntilValid) () p' -> do
           let readLoop = do
                 v <- lift (readF <$> MTT.getLine)
                 if vsContains v then pure v else lift (putStrLn "invalid value, try again") >> readLoop
           v <- readLoop
-          modify $ insertValue (v,n) x
+          modify $ insertValue v x
           p'
         NoRec{} -> error "interpret: impossible"
         RecSame{} -> error "interpret: impossible"
@@ -61,7 +60,7 @@ interpret s = do
           else pr
       )
       (pure ())
-      1
+      ()
       collapsed
 
 collapseChoice :: Specification -> [Specification]

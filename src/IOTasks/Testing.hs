@@ -15,6 +15,7 @@ import Control.Monad (when, forM, replicateM)
 import Data.Maybe (catMaybes)
 import Data.List (sortOn)
 import Data.Functor (void)
+import Data.Bifunctor (first)
 
 import Text.PrettyPrint hiding ((<>))
 import Control.Concurrent (forkIO, killThread)
@@ -123,7 +124,7 @@ taskCheckWithOutcome Args{..} prog spec = do
         Just nextInput  -> do
           when verbose (putStr (concat ["(",show (n+nOtherTests)," tests)\r"]) >> hFlush stdout)
           let
-            (specTrace,warn) = runSpecification nextInput spec
+            (specTrace,warn) = first normalizedTrace $ runSpecification nextInput spec
             progTrace = runProgram nextInput prog
             o' = if warn == OverflowWarning then o+1 else o
           when (verbose && warn == OverflowWarning) $ putStrLn "Overflow of Int range detected."
@@ -134,8 +135,8 @@ taskCheckWithOutcome Args{..} prog spec = do
               pure (PathFailure nextInput specTrace progTrace failure,n+1,o')
 
 type Inputs = [Line]
-type ExpectedRun = Trace
-type ActualRun = Trace
+type ExpectedRun = NTrace
+type ActualRun = NTrace
 
 data Outcome = Outcome CoreOutcome OutcomeHints
   deriving (Eq, Show)
@@ -192,7 +193,7 @@ taskCheckOn i p s = uncurry Outcome (go 0 0 i p s) where
   go n o [] _ _ = (Success n, overflowHint o)
   go n o (i:is) prog spec =
     let
-      (specTrace,warn) = runSpecification i spec
+      (specTrace,warn) = first normalizedTrace $ runSpecification i spec
       progTrace = runProgram i prog
       o' = if warn == OverflowWarning then o+1 else o
     in case specTrace `covers` progTrace of

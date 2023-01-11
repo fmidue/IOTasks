@@ -13,25 +13,28 @@ import Data.Typeable
 
 type Varname = String
 
-type Var = (Varname, TypeRep)
+newtype Var = Var { unVar :: (Varname, TypeRep) } deriving (Eq,Ord, Show)
 
 varname :: Var -> Varname
-varname = fst
+varname = fst . unVar
+
+varType :: Var -> TypeRep
+varType = snd . unVar 
 
 varExpType :: VarExp e => e -> Maybe TypeRep
 varExpType = varListType . toVarList
 
 varListType :: [Var] -> Maybe TypeRep
 varListType xs =
-  if same . map snd $ xs
-    then Just $ snd . head $ xs
+  if same . map varType $ xs
+    then Just $ varType . head $ xs
     else Nothing
 
 same :: Eq a => [a] -> Bool
 same xs = and $ zipWith (==) xs (tail xs)
 
 var :: forall a. Typeable a => String -> Var
-var x = (x, typeRep $ Proxy @a)
+var x = Var (x, typeRep $ Proxy @a)
 
 intVar :: String -> Var
 intVar = var @Integer

@@ -54,6 +54,7 @@ library
     , base >=4.7 && <5
     , constraints
     , containers
+    , deriving-compat
     , express
     , extra
     , mtl
@@ -68,6 +69,9 @@ test-suite mini-IOTasks-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      SpecificationGenerator
+      TestExamples
+      TestProperties
       Paths_mini_IOTasks
   hs-source-dirs:
       test
@@ -77,6 +81,8 @@ test-suite mini-IOTasks-test
     , base >=4.7 && <5
     , constraints
     , containers
+    , deepseq
+    , deriving-compat
     , express
     , extra
     , hspec
@@ -104,6 +110,7 @@ benchmark hangman-benchmark
     , constraints
     , containers
     , criterion
+    , deriving-compat
     , express
     , extra
     , mini-IOTasks

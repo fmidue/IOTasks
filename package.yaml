@@ -32,6 +32,7 @@ dependencies:
 - stm
 - type-match
 - constraints
+- deriving-compat
 
 ghc-options:
 - -Wall
@@ -54,6 +55,7 @@ tests:
     - mini-IOTasks
     - hspec
     - monad-loops
+    - deepseq
 
 benchmarks:
   hangman-benchmark:

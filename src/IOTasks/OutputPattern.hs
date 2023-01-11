@@ -76,12 +76,13 @@ evalPattern _ (Text s) = (NoOverflow, Text s)
 evalPattern e (Sequence x y) = evalPattern e x <> evalPattern e y
 evalPattern e (Value t) = second (Text . showValue) $ eval t e
 
-printPattern :: OutputPattern 'TraceP -> String
+printPattern :: OutputPattern t -> String
 printPattern Wildcard = "_"
 printPattern (Text s) = foldr showLitChar "" s
 printPattern (Sequence x y) = printPattern x ++ printPattern y
+printPattern (Value t) = show t
 
-printPatternSimple :: OutputPattern 'TraceP -> String
+printPatternSimple :: OutputPattern t -> String
 printPatternSimple p =
   case reverse $ printPattern p of
   ('n':'\\':s) -> reverse s

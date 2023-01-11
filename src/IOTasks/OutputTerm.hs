@@ -68,7 +68,7 @@ withSomeOutputTerm :: SomeOutputTerm -> (forall a. Typeable a => OutputTerm a ->
 withSomeOutputTerm (SomeOutputTerm t) f = f t
 
 checkNames :: VarExp e => e -> a -> a
-checkNames = foldr (f . fst) id . toVarList
+checkNames = foldr (f . varname) id . toVarList
   where
     f x c = if legalVar x then c else error $ "illegal variable name: " ++ x ++ "\variable names can only contain letters, digits, _ and '"
 
@@ -79,7 +79,7 @@ currentE :: VarExp e => e -> Int -> Expr
 currentE x n = case varExpType x of
   Just (SomeTypeRep (ty :: TypeRep (a :: k))) -> withTypeable ty $ withTypeable (typeRepKind ty) $
     case eqTypeRep (typeRep @k) (typeRep @Type) of
-      Just HRefl -> Data.Express.var ("[" ++ intercalate "," (map fst $ toVarList x) ++ "]_C^" ++ show n) (undefined :: a)
+      Just HRefl -> Data.Express.var ("[" ++ intercalate "," (map varname $ toVarList x) ++ "]_C^" ++ show n) (undefined :: a)
       Nothing -> error $ "currentE: a does not have kind Type in TypeRep a, with a = " ++ show (typeRep @a)
   Nothing -> error "currentE: inconsistent VarExp type"
 
@@ -87,7 +87,7 @@ allE :: VarExp e => e -> Int -> Expr
 allE x n = case varExpType x of
   Just (SomeTypeRep (ty :: TypeRep (a :: k))) -> withTypeable ty $ withTypeable (typeRepKind ty) $
     case eqTypeRep (typeRep @k) (typeRep @Type) of
-      Just HRefl -> Data.Express.var ("[" ++ intercalate "," (map fst $ toVarList x) ++ "]_A^" ++ show n) (undefined :: [a])
+      Just HRefl -> Data.Express.var ("[" ++ intercalate "," (map varname $ toVarList x) ++ "]_A^" ++ show n) (undefined :: [a])
       Nothing -> error $ "allE: a does not have kind Type in TypeRep a, with a = " ++ show (typeRep @a)
   Nothing -> error "allE: inconsistent VarExp type"
 

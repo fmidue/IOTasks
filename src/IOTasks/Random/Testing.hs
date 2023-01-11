@@ -1,13 +1,12 @@
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE LambdaCase #-}
 module IOTasks.Random.Testing where
 
 import IOTasks.Testing hiding (taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args, stdArgs)
 
-import Data.Map as Map hiding (foldr)
 import Data.Set as Set hiding (foldr)
 import Data.Functor (void)
+import Data.Bifunctor (first)
 
 import IOTasks.IOrep (IOrep, runProgram)
 import IOTasks.Specification
@@ -70,7 +69,7 @@ genTrace spec depth sz maxNeg =
       (if d > depth then pure $ NoRec OutOfInputs
       else do
         frequency $
-            (5, valueOf vs sz >>= (\i -> pure $ RecSub (wrapValue i) id (insertValue (wrapValue i,d) x e,d+1,n)))
+            (5, valueOf vs sz >>= (\i -> pure $ RecSub (wrapValue i) id (insertValue (wrapValue i) x e,d+1,n)))
           : [(1, valueOf (complement vs) sz >>= (\i -> pure $ RecSame (wrapValue i) id (e,d+1,n+1))) | mode == UntilValid && n < maxNeg]
           ++ [(1, valueOf (complement vs) sz >>= (\i -> pure $ NoRec $ foldr ProgRead Terminate (show i ++ "\n"))) | mode == Abort && n < maxNeg]
     ))
@@ -85,7 +84,7 @@ genTrace spec depth sz maxNeg =
     (\(e,_,_) o ts t' -> ProgWrite o (Set.map (snd . evalPattern e) ts) <$> t')
     (\(e,_,_) c l r -> if snd $ eval c e then l else r)
     (pure Terminate)
-    (Map.fromList ((,NoEntry) <$> vars spec),1,0)
+    (emptyValueMap $ vars spec,1,0)
     spec
 
 runTests :: IOrep () -> Specification -> [Inputs] -> Outcome
@@ -93,7 +92,7 @@ runTests p s i = uncurry Outcome $ go 0 0 p s i where
   go n o _ _ [] = (Success n, overflowHint o)
   go n o prog spec (i:is) =
     let
-      (specTrace,warn) = runSpecification i spec
+      (specTrace,warn) = first normalizedTrace $ runSpecification i spec
       progTrace = runProgram i prog
       o' = if warn == OverflowWarning then o+1 else o
     in case specTrace `covers` progTrace of

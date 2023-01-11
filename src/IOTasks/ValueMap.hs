@@ -2,9 +2,10 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TupleSections #-}
 module IOTasks.ValueMap where
 
-import Data.List (sortOn)
+import Data.List as List (sortOn, lookup)
 import Data.Maybe (mapMaybe, isJust)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -13,17 +14,23 @@ import Data.Bifunctor (first)
 import Data.Typeable (eqT)
 import Type.Reflection
 
-import IOTasks.Terms (Var, varname, varExpType, Varname)
+import IOTasks.Terms (Var (..), varname, varExpType, Varname)
 import IOTasks.Overflow (I)
 import Text.Read (readMaybe)
 
-type ValueMap = Map Var ValueEntry
+data ValueMap = ValueMap { valueMap :: Map Var ValueEntry, size :: Int } deriving (Eq,Show)
 
-data ValueEntry = NoEntry | IntegerEntry [(Integer,Int)] | StringEntry [(String,Int)]
+data ValueEntry = NoEntry | IntegerEntry [(Integer,Int)] | StringEntry [(String,Int)] deriving (Eq,Show)
+
+emptyValueMap :: [Var] -> ValueMap
+emptyValueMap xs = ValueMap (Map.fromList ((,NoEntry) <$> xs)) 0
+
+lookup :: Var -> ValueMap -> Maybe ValueEntry
+lookup k = Map.lookup k . valueMap
 
 -- if there is a unique type for all Varnames in the list and it is the same for all names return return the TypeRep of that type
 varnameTypeRep :: [Varname] -> ValueMap -> Maybe SomeTypeRep
-varnameTypeRep xs m = uniqueResult $ map (`lookup` Map.keys m) xs
+varnameTypeRep xs m = uniqueResult $ map (`List.lookup` map unVar (Map.keys $ valueMap m)) xs
 
 uniqueResult :: Eq a => [Maybe a] -> Maybe a
 uniqueResult [] = Nothing
@@ -32,11 +39,11 @@ uniqueResult (Nothing:_) = Nothing
 uniqueResult (Just x:xs) = (\y -> if x == y then Just y else Nothing) =<< uniqueResult xs
 
 varnameVarList :: [Varname] -> ValueMap -> [Var]
-varnameVarList xs = filter ((`elem` xs) . varname) . Map.keys
+varnameVarList xs = filter ((`elem` xs) . varname) . Map.keys . valueMap
 
 combinedEntries :: [Var] -> ValueMap -> Maybe ValueEntry
 combinedEntries x m
-  | isJust (varExpType x) = Just . foldr combineEntries NoEntry $ mapMaybe (`Map.lookup` m) x
+  | isJust (varExpType x) = Just . foldr combineEntries NoEntry $ mapMaybe (`Map.lookup` valueMap m) x
   | otherwise = Nothing
   where
     combineEntries NoEntry y = y
@@ -109,9 +116,12 @@ showValue x = case eqT @a @String of
   Just Refl -> x
   Nothing -> show x
 
-insertValue :: (Value,Int) -> Var -> ValueMap -> ValueMap
-insertValue (v,i) k = Map.alter (f v) k
+insertValue :: Value -> Var -> ValueMap -> ValueMap
+insertValue v k (ValueMap m sz)
+  | v `hasType` k = ValueMap (Map.alter (f v) k m) i
+  | otherwise = error $ "insertValue: type mismatch for variable " ++ varname k
   where
+    i = sz + 1
     f (IntegerValue x) Nothing = Just $ IntegerEntry [(x,i)]
     f (IntegerValue x) (Just NoEntry) = Just $ IntegerEntry [(x,i)]
     f (IntegerValue x) (Just (IntegerEntry xs)) = Just $ IntegerEntry $ (x,i):xs
@@ -120,9 +130,13 @@ insertValue (v,i) k = Map.alter (f v) k
     f (StringValue x) (Just (StringEntry xs)) = Just $ StringEntry $ (x,i):xs
     f _ _ = error $ "insertValue: type mismatch for variable " ++ varname k
 
+hasType :: Value -> Var -> Bool
+hasType (IntegerValue _) (Var (_,ty)) = ty == SomeTypeRep (typeRep @Integer)
+hasType (StringValue _) (Var (_,ty)) = ty == SomeTypeRep (typeRep @String)
+
 lookupInteger :: Var -> ValueMap -> Maybe [(Integer,Int)]
 lookupInteger v m = do
-  r <- Map.lookup v m
+  r <- Map.lookup v $ valueMap m
   case r of
     NoEntry -> Just []
     IntegerEntry xs -> Just xs
@@ -130,7 +144,7 @@ lookupInteger v m = do
 
 lookupString :: Var -> ValueMap -> Maybe [(String,Int)]
 lookupString v m = do
-  r <- Map.lookup v m
+  r <- Map.lookup v $ valueMap m
   case r of
     NoEntry -> Just []
     IntegerEntry _ -> Nothing

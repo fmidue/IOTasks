@@ -67,7 +67,7 @@ valueOfString Every (Size _ len) = resize len . listOf $ elements ['a'..'z']
 valueOfString None _ = error "valueOf: empty ValueSet"
 
 printValueSet :: forall a. Typeable a => ValueSet a -> String
-printValueSet vs = concat ["{ v : ",show (typeRep $ Proxy @a)," | ", printValueSet' vs ,"}"] where
+printValueSet vs = concat ["{ v : ",show (typeRep $ Proxy @a), " | ", printValueSet' vs ,"}"] where
   printValueSet' (Union vs1 vs2) = concat ["(",printValueSet' vs1,") \\/ (", printValueSet' vs2,")"]
   printValueSet' (Intersection vs1 vs2) = concat ["(",printValueSet' vs1,") /\\ (", printValueSet' vs2,")"]
   printValueSet' (GreaterThan n) = "v > " ++ show n

@@ -17,7 +17,7 @@ module IOTasks.Term where
 
 import IOTasks.Terms
 import IOTasks.Overflow
-import IOTasks.ValueMap
+import IOTasks.ValueMap as ValueMap
 
 import Data.Maybe (fromMaybe,mapMaybe)
 import Data.Map (Map)
@@ -229,7 +229,7 @@ eval' (termStruct -> Variable A x n) e = case innerDict @x of
 
 primEvalVar :: forall a e. (OverflowType a, VarExp e) => e -> Int -> ValueMap -> (OverflowWarning,[OT a])
 primEvalVar x n e = withTypeable (typeRepT @a) $
-  let xs = drop n . map fst . sortBy (flip compare `on` snd) . concatMap unwrapValueEntry $ mapMaybe (`Map.lookup` e) (toVarList x)
+  let xs = drop n . map fst . sortBy (flip compare `on` snd) . concatMap unwrapValueEntry $ mapMaybe (`ValueMap.lookup` e) (toVarList x)
   in matchTypeOf xs
     [ inCaseOfE @[I] $ \HRefl xs -> (mconcatMap checkOverflow xs,xs)
     , fallbackCase' (mempty,xs)
@@ -240,8 +240,14 @@ safeHead [] = Nothing
 safeHead (x:_) = Just x
 
 printIndexedTerm :: Term a -> Map Var (Int,[Int]) -> String
-printIndexedTerm (termStruct -> Binary IsIn x xs) m = printIndexedTerm x m ++ " ∈ " ++ printIndexedTerm xs m
-printIndexedTerm (termStruct -> Binary f tx ty) m = concat ["(",printIndexedTerm tx m, ") ",fSym f," (", printIndexedTerm ty m,")"]
+printIndexedTerm t = printTerm' t . Just
+
+printTerm :: Term a -> String
+printTerm t = printTerm' t Nothing
+
+printTerm' :: Term a -> Maybe (Map Var (Int,[Int])) -> String
+printTerm' (termStruct -> Binary IsIn x xs) m = printTerm' x m ++ " ∈ " ++ printTerm' xs m
+printTerm' (termStruct -> Binary f tx ty) m = concat ["(",printTerm' tx m, ") ",fSym f," (", printTerm' ty m,")"]
   where
     fSym :: BinaryF a b c -> String
     fSym (:+:) = "+"
@@ -255,11 +261,11 @@ printIndexedTerm (termStruct -> Binary f tx ty) m = concat ["(",printIndexedTerm
     fSym (:&&:) = "&&"
     fSym (:||:) = "||"
     fSym IsIn = error "handled by special case above"
-printIndexedTerm (termStruct -> Unary Not (IsInT x xs)) m = printIndexedTerm x m ++ " ∉ " ++ printIndexedTerm xs m
-printIndexedTerm (termStruct -> Unary Not t) m = concat ["not (", printIndexedTerm t m, ")"]
-printIndexedTerm (termStruct -> Literal (BoolLit True)) _ = "True"
-printIndexedTerm (termStruct -> Literal (BoolLit False)) _ = "False"
-printIndexedTerm (termStruct -> Unary f t) m = concat [fSym f ++" (", printIndexedTerm t m, ")"]
+printTerm' (termStruct -> Unary Not (IsInT x xs)) m = printTerm' x m ++ " ∉ " ++ printTerm' xs m
+printTerm' (termStruct -> Unary Not t) m = concat ["not (", printTerm' t m, ")"]
+printTerm' (termStruct -> Literal (BoolLit True)) _ = "True"
+printTerm' (termStruct -> Literal (BoolLit False)) _ = "False"
+printTerm' (termStruct -> Unary f t) m = concat [fSym f ++" (", printTerm' t m, ")"]
   where
     fSym :: UnaryF a b -> String
     fSym Not = "not"
@@ -267,10 +273,11 @@ printIndexedTerm (termStruct -> Unary f t) m = concat [fSym f ++" (", printIndex
     fSym Reverse = "reverse"
     fSym Sum = "sum"
     fSym Product = "product"
-printIndexedTerm (termStruct -> Variable C x n) m = (\(x,(i,_)) -> x ++ "_" ++ show i) $ maximumOn (head.snd.snd) $ (\xs -> take (length xs - n) xs) $ mapMaybe (\x -> (varname x,) <$> Map.lookup x m) (toVarList x)
-printIndexedTerm (termStruct -> Variable A x n) _ = "{" ++ intercalate "," (map varname $ toVarList x) ++ "}"++":"++show n++"_A"
-printIndexedTerm (termStruct -> Literal (IntLit x)) _ = show x
-printIndexedTerm (termStruct -> Literal (ListLit xs)) _ = showOT xs
+printTerm' (termStruct -> Variable C x n) (Just m) = (\(x,(i,_)) -> x ++ "_" ++ show i) $ maximumOn (head.snd.snd) $ (\xs -> take (length xs - n) xs) $ mapMaybe (\x -> (varname x,) <$> Map.lookup x m) (toVarList x)
+printTerm' (termStruct -> Variable C x n) Nothing = "{" ++ intercalate "," (map varname $ toVarList x) ++ "}"++":"++show n++"_C"
+printTerm' (termStruct -> Variable A x n) _ = "{" ++ intercalate "," (map varname $ toVarList x) ++ "}"++":"++show n++"_A"
+printTerm' (termStruct -> Literal (IntLit x)) _ = show x
+printTerm' (termStruct -> Literal (ListLit xs)) _ = showOT xs
 
 data SomeTerm where
   SomeTerm :: OverflowType a => Term a -> SomeTerm

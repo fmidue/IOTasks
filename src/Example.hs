@@ -399,3 +399,25 @@ hangmanProg word = go [] where
 
 printWord :: (Eq a, Show a) => [a] -> [a] -> String
 printWord xs guessed = Prelude.foldr (\x -> (++) (if x `Prelude.elem` guessed then show x ++ " " else "_ ")) "" xs
+
+adv :: Specification
+adv = tillExit $
+  branch (sum' (allValues x) .>. intLit 0)
+    exit
+    ( readInput x ints AssumeValid <>
+      branch (currentValue x .>. intLit 0)
+        (writeOutput [Text "1"])
+        (writeOutput [Text "0"])
+    )
+  where
+    x = intVar "x"
+
+advP :: MonadTeletype io => io ()
+advP = loop [] where
+  loop xs =
+    if sum xs > 0
+      then pure ()
+      else do
+        x <- readLn @_ @Integer
+        putStrLn $ if x > 0 then "1" else "0"
+        loop (x:xs)

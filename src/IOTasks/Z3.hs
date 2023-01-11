@@ -14,7 +14,7 @@ module IOTasks.Z3 where
 import IOTasks.Constraints
 import IOTasks.ValueSet
 import IOTasks.Term
-import IOTasks.Terms (Var, VarExp(..), varname)
+import IOTasks.Terms (Var (..), VarExp(..), varname)
 import IOTasks.ValueMap
 
 import Z3.Monad
@@ -30,6 +30,7 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Tuple.Extra (thd3)
 
+import Data.List as List
 import Test.QuickCheck.Gen (Gen)
 import Type.Reflection
 import Data.Either (fromRight)
@@ -75,7 +76,7 @@ type PrefixPath = Path
 satPathsDebug :: Int -> Int -> ConstraintTree -> Int -> Bool -> IO [Path]
 satPathsDebug n to t maxSeqLength checkOverflows = do
   q <- atomically newTQueue
-  nVar <- newTVarIO n
+  nVar <- newTVarIO n -- maxPathDepth
   satPaths nVar to t maxSeqLength checkOverflows q
   map fromJust . init <$> atomically (flushTQueue q)
 
@@ -127,11 +128,11 @@ pathScript :: Path -> ScriptMode -> Bool -> Z3R (Maybe [String], String)
 pathScript path mode checkOverflows = do
   let (tyConstr,predConstr,overflConstr) = partitionPath path
   vars <- forM tyConstr $
-    \(InputConstraint ((x,ty),i) (vs :: ValueSet v)) -> do
+    \(InputConstraint (Var (x,ty),i) (vs :: ValueSet v)) -> do
       var <- mkFreshVar (x ++ show i) =<< mkSort @v
       constraint <- z3ValueSetConstraint vs var
       lift $ optimizeAssert constraint
-      pure ((((x,ty),i),var),ValueGenerator $ valueOf vs)
+      pure (((Var (x,ty),i),var),ValueGenerator $ valueOf vs)
   forM_ predConstr $
     \(ConditionConstraint t e) ->
         (lift . optimizeAssert) =<< z3Predicate t e (map fst vars)
@@ -219,7 +220,7 @@ mkValueRep x (StringValue s) = do
 z3Predicate :: Term x -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R AST
 z3Predicate (termStruct -> Binary f x y) e vars = z3PredicateBinary f x y e vars
 z3Predicate (termStruct -> Unary f x) e vars = z3PredicateUnary f x e vars
-z3Predicate (termStruct -> Variable C x n) e vars = pure $ fromMaybe (unknownVariablesError x) $ (`lookup` vars) . last $ weaveVariables x n e
+z3Predicate (termStruct -> Variable C x n) e vars = pure $ fromMaybe (unknownVariablesError x) $ (`List.lookup` vars) . last $ weaveVariables x n e
 z3Predicate (termStruct -> Literal (IntLit n)) _ _ = mkIntNum n
 z3Predicate (termStruct -> Literal (BoolLit b)) _ _ = mkBool b
 --
@@ -234,7 +235,7 @@ z3PredicateUnary f x e vars = case typeRep @a of
   _ -> unaryNoList f x e vars --
 
 unaryListA :: UnaryF [a] b -> Term [a] -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R AST
-unaryListA Length (Current x n) e vars = mkSeqLength . fromJust . (`lookup` vars) . last $ weaveVariables x n e --special case for string variables
+unaryListA Length (Current x n) e vars = mkSeqLength . fromJust . (`List.lookup` vars) . last $ weaveVariables x n e --special case for string variables
 unaryListA Length xs e vars = unaryListRec (mkIntNum . length @[]) xs e vars
 unaryListA Reverse _ _ _ = error "z3Predicate: top level reverse should not happen"
 unaryListA Sum xs e vars = unaryListRec mkAdd xs e vars
@@ -409,7 +410,7 @@ weaveVariables vs n e =
   $ toVarList vs
 
 lookupList :: Eq a => [a] -> [(a, b)] -> [b]
-lookupList vs vars = mapMaybe (`lookup` vars) vs
+lookupList vs vars = mapMaybe (`List.lookup` vars) vs
 
 z3ValueSetConstraint :: MonadZ3 z3 => ValueSet a -> AST -> z3 AST
 z3ValueSetConstraint (Union x y) xVar = do
