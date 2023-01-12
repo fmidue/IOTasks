@@ -4,7 +4,7 @@
 module TestProperties where
 
 import Test.Hspec
-import Test.Hspec.QuickCheck (prop, modifyArgs)
+import Test.Hspec.QuickCheck (prop)
 import Test.QuickCheck hiding (isSuccess, stdArgs,verbose, Args)
 
 import Control.Monad.Loops (allM)
@@ -18,7 +18,6 @@ import IOTasks.Trace (ordinaryTrace, isTerminatingN, normalizedTrace)
 import SpecificationGenerator
 
 import Control.Applicative
-import Debug.Trace
 
 testProperties :: Spec
 testProperties = do

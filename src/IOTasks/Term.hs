@@ -114,10 +114,6 @@ data ConstValue a where
   IntLit :: I -> ConstValue Integer
   ListLit :: OverflowType a => [OT a] -> ConstValue [a]
 
--- deriving instance Eq (Term a)
--- deriving instance Ord (Term a)
--- deriving instance Show (Term a)
-
 varExps :: Term a -> [[Var]]
 varExps (termStruct -> Binary _ x y) = varExps x ++ varExps y
 varExps (termStruct -> Unary _ x) = varExps x
