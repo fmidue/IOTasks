@@ -13,6 +13,7 @@ module IOTasks.Trace (
   pattern NTerminate, pattern NOutOfInputs, pattern NProgWrite, pattern NProgRead, pattern NProgReadString,
   pPrintTrace, pPrintTraceSimple,
   inputSequence, isTerminating,
+  inputSequenceN, isTerminatingN,
 
   OptFlag(..),
   MatchResult(..), pPrintMatchResult, pPrintMatchResultSimple,
@@ -217,6 +218,12 @@ isTerminating (ProgWrite _ _ t) = isTerminating t
 isTerminating Terminate = True
 isTerminating OutOfInputs = False
 
+isTerminatingN :: NTrace -> Bool
+isTerminatingN (NProgRead _ t) = isTerminatingN t
+isTerminatingN (NProgWrite _ _ t) = isTerminatingN t
+isTerminatingN NTerminate = True
+isTerminatingN NOutOfInputs = False
+
 inputSequence :: Trace -> [String]
 inputSequence = go "" where
   go cs (ProgRead '\n' t) = reverse cs : go "" t
@@ -228,6 +235,18 @@ inputSequence = go "" where
   go cs Terminate = [reverse cs]
   go "" OutOfInputs = []
   go cs OutOfInputs = [reverse cs]
+
+inputSequenceN :: NTrace -> [String]
+inputSequenceN = go "" where
+  go cs (NProgRead '\n' t) = reverse cs : go "" t
+  go cs (NProgRead c t) = go (c:cs) t
+  go "" (NProgWrite _ _ t) = go "" t
+  go cs (NProgWrite _ _ t) = reverse cs : go "" t
+  -- technically this might add an additional linebreak on the last line that might not be there in the Trace
+  go "" NTerminate = []
+  go cs NTerminate = [reverse cs]
+  go "" NOutOfInputs = []
+  go cs NOutOfInputs = [reverse cs]
 
 nextInput :: Trace -> Maybe (String,Trace)
 nextInput (ProgRead '\n' t) = Just ("\n",t)

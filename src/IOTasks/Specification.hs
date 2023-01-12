@@ -104,7 +104,6 @@ runSpecification' addLinebreaks inputs spec =
           | otherwise -> case mode of
               AssumeValid -> error $ "invalid value: " ++ i ++ " is not an element of " ++ printValueSet vs
               UntilValid ->  RecSame i (first (progWrite Optional (Set.singleton Wildcard) <>)) (e,is)
-              -- UntilValid ->  RecSame i _ (first (<> progWrite Optional (Set.singleton Wildcard))) (e,is)
               Abort -> NoRec (foldr ((<>) . progRead) (((<>) . progRead) '\n' $ progWrite Optional (Set.singleton Wildcard)) i,NoOverflow)
     )
     (\case
@@ -117,7 +116,6 @@ runSpecification' addLinebreaks inputs spec =
       let (warn,os) = Set.foldr (\t (w,s) -> let (w',p) = evalPattern e t in (w <> w', Set.insert p s)) (NoOverflow, mempty) ts
           os' = if addLinebreaks then os `Set.union` Set.map (<> Text "\n") os else os
       in (progWrite o os' <> t', warn <> ww)
-      -- in (traceShow (bimap (ordinaryTrace) (ordinaryTrace) $ (progWrite o os', t')) progWrite o os' <> t', warn <> ww)
     )
     (\(e,_) c (l,wl) (r,wr) ->
       let (w,b) = eval c e

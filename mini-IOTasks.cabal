@@ -81,7 +81,6 @@ test-suite mini-IOTasks-test
     , base >=4.7 && <5
     , constraints
     , containers
-    , deepseq
     , deriving-compat
     , express
     , extra

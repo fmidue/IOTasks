@@ -18,6 +18,7 @@ module IOTasks.Random
   , Outcome(..), isSuccess, overflowWarnings
   , pPrintOutcome, pPrintOutcomeSimple
   , generateStaticTestSuite, taskCheckOn
+  , genInput
   , interpret
   ) where
 

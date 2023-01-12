@@ -55,7 +55,6 @@ tests:
     - mini-IOTasks
     - hspec
     - monad-loops
-    - deepseq
 
 benchmarks:
   hangman-benchmark:

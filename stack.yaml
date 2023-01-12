@@ -1,5 +1,5 @@
 resolver:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/19/28.yaml
+  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/20/6.yaml
 
 packages:
 - .
@@ -11,5 +11,3 @@ extra-deps:
   commit: 195e511f58c893df30bad3b46d0acd02f9b00bc4
 - git: https://github.com/owestphal/type-match
   commit: e5c0d104032d7e6ea147009669cbb95f3291b7bb
-
-system-ghc: true
