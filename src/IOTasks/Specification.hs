@@ -88,6 +88,14 @@ vars = nub . go where
   go (TillE bdy s') = go bdy ++ go s'
   go E = []
 
+hasIteration :: Specification -> Bool
+hasIteration (ReadInput _ _ _ s') = hasIteration s'
+hasIteration (WriteOutput _ _ s') = hasIteration s'
+hasIteration (Branch _ l r s') = hasIteration l || hasIteration r || hasIteration s'
+hasIteration TillE{} = True
+hasIteration Nop = False
+hasIteration E = False
+
 runSpecification :: [String] -> Specification -> (AbstractTrace,OverflowWarning)
 runSpecification = runSpecification' True
 
@@ -120,6 +128,7 @@ runSpecification' addLinebreaks inputs spec =
     (\(e,_) c (l,wl) (r,wr) ->
       let (w,b) = eval c e
       in if b then (l,wl <> w) else (r,wr <> w))
+    (const id)
     (terminate,NoOverflow)
     (emptyValueMap $ vars spec,inputs)
     spec
@@ -130,13 +139,15 @@ sem :: forall st p a.
   (forall v. (Typeable v,Read v,Show v) => st -> Var -> ValueSet v -> InputMode -> RecStruct p (a->a) st a) -> (RecStruct p () a a -> a) ->
   (st -> OptFlag -> Set (OutputPattern 'SpecificationP) -> a -> a) ->
   (st -> Term Bool -> a -> a -> a) ->
+  (Action -> a -> a) ->
   a ->
   st -> Specification -> a
-sem f f' g h z st s = runIdentity $ semM
+sem f f' g h i z st s = runIdentity $ semM
   (\a b c d -> Identity $ f a b c d)
   (Identity . f')
   (\a b c -> Identity . g a b c . runIdentity)
   (\a b c d -> Identity $ h a b (runIdentity c) (runIdentity d))
+  (\a b -> Identity $ i a (runIdentity b))
   (pure z)
   st
   s
@@ -145,9 +156,10 @@ semM :: forall m st p a. Monad m =>
   (forall v. (Typeable v,Read v,Show v) => st -> Var -> ValueSet v -> InputMode -> m (RecStruct p (a->a) st a)) -> (RecStruct p () a a -> m a) ->
   (st -> OptFlag -> Set (OutputPattern 'SpecificationP) -> m a -> m a) ->
   (st -> Term Bool -> m a -> m a -> m a) ->
+  (Action -> m a -> m a) ->
   m a ->
   st -> Specification -> m a
-semM f f' g h z s_I spec = sem' s_I spec k_I where
+semM f f' g h i z s_I spec = sem' s_I spec k_I where
   sem' :: st -> Specification -> (Action ->  st -> m a) -> m a
   sem' st s@(ReadInput x vs mode s') k =
     do
@@ -162,8 +174,8 @@ semM f f' g h z s_I spec = sem' s_I spec k_I where
   sem' st (Branch c l r s') k = h st c (sem' st (l <> s') k) (sem' st (r <> s') k)
   sem' st (TillE s s') k = sem' st s k'
     where
-      k' End st = sem' st s k'
-      k' Exit st = sem' st s' k
+      k' End st = i End $ sem' st s k'
+      k' Exit st = i Exit $ sem' st s' k
   sem' st Nop k = k End st
   sem' st E k = k Exit st
 

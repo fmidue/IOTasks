@@ -33,6 +33,7 @@ data SomeConstraint where
 data ConstraintTree where
   Choice :: ConstraintTree -> ConstraintTree -> ConstraintTree
   Assert :: (Constraint t) -> ConstraintTree -> ConstraintTree
+  Unfold :: ConstraintTree -> ConstraintTree -- marker for counting path lengths
   Empty :: ConstraintTree
 
 constraintTree :: Int -> Specification -> ConstraintTree
@@ -64,6 +65,7 @@ constraintTree negMax =
     )
     (\(_,e,_) _ ps t -> Assert (OverflowConstraints (catMaybes $ [ castTerm @Integer t | p <- Set.toList ps, vt <- valueTerms p, t <- withSomeOutputTerm vt transparentSubterms]) e) t)
     (\(_,e,_) c l r -> Assert (OverflowConstraints (mapMaybe (castTerm @Integer) $ subTerms c) e) $ Choice (Assert (ConditionConstraint c e) l) (Assert (ConditionConstraint (not' c) e) r))
+    (\case {End -> Unfold ; Exit -> id})
     Empty
     (0,Map.empty,1)
 
@@ -77,13 +79,15 @@ inc x k m
 
 type Path = [SomeConstraint]
 
+-- paths n t returns all terminating paths in t that use at most n unfoldings of iterations
 paths :: Int -> ConstraintTree -> [Path]
 paths _ Empty = [[]]
 paths n _ | n < 0 = []
 paths n (Choice lt rt) = mergePaths (paths n lt) (paths n rt)
-paths n (Assert c@InputConstraint{} t) = (SomeConstraint c:) <$> paths (n-1) t
-paths n (Assert c@ConditionConstraint{} t) = (SomeConstraint c:) <$> paths n t
-paths n (Assert c@OverflowConstraints{} t) = (SomeConstraint c:) <$> paths n t
+paths n (Assert c t) = (SomeConstraint c:) <$> paths n t
+paths n (Unfold t)
+  | n > 0 = paths (n-1) t
+  | otherwise = []
 
 mergePaths :: [Path] -> [Path] -> [Path]
 mergePaths xs [] = xs
@@ -110,3 +114,45 @@ printConstraint :: Constraint t -> String
 printConstraint (InputConstraint (x,i) vs) = concat [varname x,"_",show i," : ",printValueSet vs]
 printConstraint (ConditionConstraint t m) = printIndexedTerm t m
 printConstraint (OverflowConstraints _ _) = "**some overflow checks**"
+
+numberOfPaths :: Integer -> Specification -> Integer
+numberOfPaths maxIterationDepth s =
+  case go s maxIterationDepth of
+    (i,0) -> i
+    _ -> error "numberOfPaths: unbound top-level exit marker"
+  where
+  go :: Specification -> Integer -> (Integer, Integer)
+  go (ReadInput _ _  _ s') n = go s' n
+  go (WriteOutput _ _ s') n = go s' n
+  go (Branch _ t e s') n =
+    let
+      (it,kt) = go t n
+      (ie,ke) = go e n
+      (i,k) = go s' n
+    in ((it+ie)*i,kt+ke+k)
+  go (TillE bdy s') n
+    | hasIteration bdy = error "numberOfPaths: can't compute number of paths for nested iterations, yet"
+    | hasIteration s' =
+      let
+        rs = do
+          (n1,n2) <- [ (n1,n-n1) | n1 <- [0..n] ]
+          let
+            (ib, kb) = go bdy n1
+            (i,k) = go s' n2
+          pure (p' ib kb n1 *i,k)
+      in foldr (\(i,k) (si,sk) -> (i+si,k+sk)) (0,0) rs
+    | otherwise =
+      let
+        (ib,kb) = go bdy n
+        (i,k) = go s' n
+      in (p ib kb n *i,k)
+  go Nop _ = (1,0)
+  go E _ = (0,1)
+  -- path with length (<=n) in an iteration with i paths to Nop and k paths to E under the iteration
+  p :: Integer -> Integer -> Integer -> Integer
+  p 0 k _ = k
+  p 1 k n = k * (n + 1)
+  p i k n = (k * (i ^ (n+1) - 1)) `div` (i - 1)
+  -- path with length (=n) in an iteration with i paths to Nop and k paths to E under the iteration
+  p' :: Integer -> Integer -> Integer -> Integer
+  p' i k n = k * (i ^ n)

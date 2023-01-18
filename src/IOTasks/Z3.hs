@@ -74,25 +74,29 @@ updateContext _ _ RequirePruningCheck = error "updateContext: should not happen"
 
 type PrefixPath = Path
 satPathsDebug :: Int -> Int -> ConstraintTree -> Int -> Bool -> IO [Path]
-satPathsDebug n to t maxSeqLength checkOverflows = do
+satPathsDebug maxUnfolds to t maxSeqLength checkOverflows = do
   q <- atomically newTQueue
-  nVar <- newTVarIO n -- maxPathDepth
-  satPaths nVar to t maxSeqLength checkOverflows q
+  nVar <- newTVarIO Nothing
+  satPaths nVar to t maxUnfolds maxSeqLength checkOverflows q
   map fromJust . init <$> atomically (flushTQueue q)
 
-satPaths :: TVar Int -> Int -> ConstraintTree -> Int -> Bool -> TQueue (Maybe Path) -> IO ()
-satPaths nVar to t maxSeqLength checkOverflows q = do
-  evalStateT (satPaths' 0 to t ([],0) q) NoContext
+satPaths :: TVar (Maybe Int) -> Int -> ConstraintTree -> Int -> Int -> Bool -> TQueue (Maybe Path) -> IO ()
+satPaths nVar to t maxUnfolds maxSeqLength checkOverflows q = do
+  evalStateT (satPaths' 0 0 to t ([],0) q) NoContext
   atomically $ writeTQueue q Nothing
   where
-    satPaths' :: Int -> Int -> ConstraintTree -> (PrefixPath,Int) -> TQueue (Maybe Path) -> StateT SearchContext IO ()
-    satPaths' _ to Empty (s,d) q = do
+    -- nUnfolds: number of Unfolds on current path
+    -- nInputs: number of inputs on current path (path length)
+    -- to: solver timeout
+    -- (s,d): current prefix path + depth of current position in the tree (d =/= path length)
+    satPaths' :: Int -> Int -> Int -> ConstraintTree -> (PrefixPath,Int) -> TQueue (Maybe Path) -> StateT SearchContext IO ()
+    satPaths' _ _ to Empty (s,d) q = do
       let path = reverse s -- constraints are stored reversed
       res <- lift $ isSatPath to path maxSeqLength checkOverflows
       modify $ updateContext res d
       when (res == SAT) $ lift $ atomically $ writeTQueue q $ Just path
-    satPaths' nReads to (Choice l r) (s,d) q = do
-      satPaths' nReads to l (s,d+1) q
+    satPaths' nUnfolds nInputs to (Choice l r) (s,d) q = do
+      satPaths' nUnfolds nInputs to l (s,d+1) q
       ctx <- get
       case ctx of
         RequirePruningCheck -> do
@@ -101,22 +105,25 @@ satPaths nVar to t maxSeqLength checkOverflows q = do
             NotSAT -> pure ()
             SAT -> do
               put NoContext
-              satPaths' nReads to r (s,d+1) q
+              satPaths' nUnfolds nInputs to r (s,d+1) q
         _ -> do
-          satPaths' nReads to r (s,d+1) q
-    satPaths' nReads to (Assert c@InputConstraint{} t) (s,d) q = do
-      n <- lift $ readTVarIO nVar
-      if nReads > n
-        then pure ()
-        else satPaths' (nReads+1) to t (SomeConstraint c:s,d+1) q -- stores constraints in reversed order
-    satPaths' nReads to (Assert c@ConditionConstraint{} t) (s,d) q = satPaths' nReads to t (SomeConstraint c:s,d+1) q -- stores constraints in reversed order
-    satPaths' nReads to (Assert c@OverflowConstraints{} t) (s,d) q = satPaths' nReads to t (SomeConstraint c:s,d+1) q -- stores constraints in reversed order
+          satPaths' nUnfolds nInputs to r (s,d+1) q
+    satPaths' nUnfolds nInputs to (Assert c@InputConstraint{} t) (s,d) q = do
+      currentMaxPathLength <- lift $ readTVarIO nVar
+      case currentMaxPathLength of
+        Just len | nInputs >= len -> pure ()
+        _ -> satPaths' nUnfolds (nInputs+1) to t (SomeConstraint c:s,d+1) q -- stores constraints in reversed order
+    satPaths' nUnfolds nInputs to (Assert c t) (s,d) q = satPaths' nUnfolds nInputs to t (SomeConstraint c:s,d+1) q -- stores constraints in reversed order
+    satPaths' nUnfolds nInputs to (Unfold t) (s,d) q
+      | nUnfolds <= maxUnfolds = satPaths' (nUnfolds+1) nInputs to t (s,d) q
+      | otherwise = pure ()
 
 -- path until next choice
 lookAhead :: ConstraintTree -> Path
 lookAhead Empty = []
 lookAhead (Assert c t) = SomeConstraint c : lookAhead t
 lookAhead Choice{} = []
+lookAhead (Unfold t) = lookAhead t
 
 data ValueGenerator where
   ValueGenerator :: Typeable v => (Size -> Gen v) -> ValueGenerator

@@ -27,7 +27,7 @@ taskCheck = taskCheckWith stdArgs
 
 data Args
   = Args
-  { maxPathDepth :: Int -- maximum number of inputs to consider
+  { maxIterationUnfold :: Int -- maximum sum of iteration unfoldings when searching for satisfiable paths
   , valueSize :: Integer -- size of randomly generated input candidates (the solver might find bigger solutions)
   , solverTimeout :: Int -- solver timeout in miliseconds
   , maxTimeouts :: Int -- maximum number of solver timeouts before giving up
@@ -41,7 +41,7 @@ data Args
 
 stdArgs :: Args
 stdArgs = Args
-  { maxPathDepth = 25
+  { maxIterationUnfold = 25
   , valueSize = 100
   , solverTimeout = 1000
   , maxTimeouts = 3
@@ -68,8 +68,8 @@ type TestsRun = Int
 taskCheckWithOutcome :: Args -> IOrep () -> Specification -> IO Outcome
 taskCheckWithOutcome Args{..} prog spec = do
   q <- atomically newTQueue
-  nVar <- newTVarIO maxPathDepth
-  thrdID <- forkIO $ satPaths nVar solverTimeout (constraintTree maxNegative spec) solverMaxSeqLength checkOverflows q
+  nVar <- newTVarIO Nothing
+  thrdID <- forkIO $ satPaths nVar solverTimeout (constraintTree maxNegative spec) maxIterationUnfold solverMaxSeqLength checkOverflows q
   (coreOut,satPaths,nInputs,timeouts,overflows) <- testPaths nVar q (0,0,0,0) Nothing `finally` killThread thrdID
 
   let out = Outcome coreOut (if overflows == 0 then NoHints else OverflowHint overflows)
@@ -84,21 +84,21 @@ taskCheckWithOutcome Args{..} prog spec = do
   pure out
 
   where
-    testPaths :: TVar Int -> TQueue (Maybe Path) -> (SatPaths,NumberOfInputs,Timeouts,Overflows) -> Maybe CoreOutcome -> IO (CoreOutcome,SatPaths,NumberOfInputs,Timeouts,Overflows)
+    testPaths :: TVar (Maybe Int) -> TQueue (Maybe Path) -> (SatPaths,NumberOfInputs,Timeouts,Overflows) -> Maybe CoreOutcome -> IO (CoreOutcome,SatPaths,NumberOfInputs,Timeouts,Overflows)
     testPaths _ _ (m,n,t,o) (Just failure) | t > maxTimeouts = pure (failure,m,n,t,o)
     testPaths _ _ (m,n,t,o) Nothing | t > maxTimeouts = pure (GaveUp,m,n,t,o)
     testPaths nVar q (m,n,t,o) mFailure = do
       p <- atomically $ readTQueue q
-      currentMaxDepth <- readTVarIO nVar
+      currentMaxPathLength <- readTVarIO nVar
       case p of
         Nothing -> case mFailure of -- no more paths
            (Just failure) -> pure (failure,m,n,t,o)
            Nothing -> pure (Success n,m,n,t,o)
         Just p
-          | currentMaxDepth < pathDepth p -> testPaths nVar q (m,n,t,o) mFailure
+          | maybe False (pathDepth p >) currentMaxPathLength -> testPaths nVar q (m,n,t,o) mFailure
           | otherwise -> do
           res <- isSatPath solverTimeout p solverMaxSeqLength checkOverflows
-          if res == SAT -- does not account for timeouts yet
+          if res == SAT -- TODO: does not account for timeouts yet
             then do
               (out,k,o') <- testPath p 0 n 0
               case out of
@@ -107,7 +107,7 @@ taskCheckWithOutcome Args{..} prog spec = do
                 PathFailure i et at r ->
                   if maybe True (\case {Failure j _ _ _ -> length i < length j; _ -> error "impossible"}) mFailure -- there might be paths in the queue that are longer than a found counterexample
                     then do
-                      atomically $ writeTVar nVar (length i - 1)
+                      atomically $ writeTVar nVar (Just $ length i - 1)
                       testPaths nVar q (m+1,n+k,t,o+o') (Just $ Failure i et at r)
                     else
                       testPaths nVar q (m+1,n+k,t,o+o') mFailure
@@ -205,5 +205,5 @@ taskCheckOn i p s = uncurry Outcome (go 0 0 i p s) where
 
 generateStaticTestSuite :: Args -> Specification -> IO [Inputs]
 generateStaticTestSuite Args{..} spec =
-  let ps = sortOn pathDepth $ paths maxPathDepth $ constraintTree maxNegative spec
+  let ps = sortOn pathDepth $ paths maxIterationUnfold $ constraintTree maxNegative spec
   in concat <$> forM ps (\p -> catMaybes <$> replicateM maxSuccessPerPath (findPathInput solverTimeout p valueSize solverMaxSeqLength checkOverflows))

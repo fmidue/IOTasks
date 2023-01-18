@@ -59,6 +59,7 @@ interpret s = do
           then pl
           else pr
       )
+      (const id)
       (pure ())
       ()
       collapsed

@@ -23,7 +23,7 @@ testProperties :: Spec
 testProperties = do
   context "testing with random specifications" $ do
     prop "programs built from a spec satisfy that spec" $
-      forAll specGen $ \s -> allM (\p -> isSuccess <$> taskCheckWithOutcome stdArgs{verbose=False,maxPathDepth=15,maxSuccessPerPath=5} p s) (interpret s) `shouldReturn` True
+      forAll specGen $ \s -> allM (\p -> isSuccess <$> taskCheckWithOutcome stdArgs{verbose=False,maxIterationUnfold=15,maxSuccessPerPath=5} p s) (interpret s) `shouldReturn` True
 
     prop "programs built from a spec dont go wrong on (solver based) inputs generated from the same spec" $
       forAll specGen (\s -> ioProperty $ do
