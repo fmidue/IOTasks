@@ -5,9 +5,7 @@ packages:
 - .
 
 extra-deps:
-# - git: https://github.com/IagoAbal/haskell-z3
-#   commit: 7e2a3e0977f277b9ed39ad182287317d2b819476
-- git: https://github.com/owestphal/haskell-z3
-  commit: 195e511f58c893df30bad3b46d0acd02f9b00bc4
+- git: https://github.com/IagoAbal/haskell-z3
+  commit: 6368e451e45359563106da7e917f6594453c5161
 - git: https://github.com/owestphal/type-match
   commit: e5c0d104032d7e6ea147009669cbb95f3291b7bb

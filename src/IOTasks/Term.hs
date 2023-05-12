@@ -227,7 +227,7 @@ primEvalVar :: forall a e. (OverflowType a, VarExp e) => e -> Int -> ValueMap ->
 primEvalVar x n e = withTypeable (typeRepT @a) $
   let xs = drop n . map fst . sortBy (flip compare `on` snd) . concatMap unwrapValueEntry $ mapMaybe (`ValueMap.lookup` e) (toVarList x)
   in matchTypeOf xs
-    [ inCaseOfE @[I] $ \HRefl xs -> (mconcatMap checkOverflow xs,xs)
+    [ inCaseOfE @[I] $ \hrefl@(HRefl) xs -> (mconcatMap (checkOverflow @Integer) xs,xs)
     , fallbackCase' (mempty,xs)
     ]
 
