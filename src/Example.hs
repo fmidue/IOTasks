@@ -118,6 +118,19 @@ example7 =
     z = intVar "z"
     a = intVar "a"
 
+-- sum to 0
+example8 :: Specification
+example8 =
+  readInput x ints AssumeValid <>
+  tillExit (
+    readInput x ints AssumeValid <>
+    branch (currentValue' x 1 .+. currentValue x .==. intLit 0)
+      exit
+      nop
+    ) <>
+  writeOutput [Value $ length' $ as @[Integer] $ allValues x]
+  where x = intVar "x"
+
 -- string input
 echoSpec :: Specification
 echoSpec =
@@ -321,6 +334,18 @@ prog7 = do
         else do
           y3 <- readLn @_ @Integer
           pure (xs,y3:ys,[],head xs)
+
+prog8 :: MonadTeletype m => m ()
+prog8 = do
+  x <- readLn @_ @Integer
+  go x 1
+  where
+    go x n = do
+      y <- readLn @_ @Integer
+      let n' = n+1
+      if x + y == 0
+        then print $ n'
+        else go y n'
 
 --
 stringS1 :: Specification
