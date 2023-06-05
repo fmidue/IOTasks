@@ -7,6 +7,7 @@ import IOTasks.Testing hiding (taskCheck, taskCheckWith, taskCheckOutcome, taskC
 import Data.Set as Set hiding (foldr)
 import Data.Functor (void)
 import Data.Bifunctor (first)
+import Data.Maybe (fromMaybe)
 
 import IOTasks.IOrep (IOrep, runProgram)
 import IOTasks.Specification
@@ -24,7 +25,7 @@ taskCheck = taskCheckWith stdArgs
 
 data Args
   = Args
-  { maxPathDepth :: Int
+  { maxPathDepth :: Maybe Int
   , valueSize :: Integer
   , maxSuccess :: Int
   , maxNegative :: Int
@@ -34,7 +35,7 @@ data Args
 
 stdArgs :: Args
 stdArgs = Args
-  { maxPathDepth = 25
+  { maxPathDepth = Nothing
   , valueSize = 100
   , maxSuccess = 100
   , maxNegative = 5
@@ -55,18 +56,18 @@ taskCheckWithOutcome Args{..} prog spec  = do
   print $ (if simplifyFeedback then pPrintOutcomeSimple else pPrintOutcome) outcome
   pure outcome
 
-genInput :: Specification -> Int -> Size -> Int -> Gen Inputs
+genInput :: Specification -> Maybe Int -> Size -> Int -> Gen Inputs
 genInput s depth sz maxNeg = do
   t <- genTrace s depth sz maxNeg
   if isTerminating t
     then pure $ inputSequence t
     else genInput s depth sz maxNeg -- repeat sampling until a terminating trace is found
 
-genTrace :: Specification -> Int -> Size -> Int -> Gen Trace
+genTrace :: Specification -> Maybe Int -> Size -> Int -> Gen Trace
 genTrace spec depth sz maxNeg =
   semM
     (\(e,d,n) x vs mode ->
-      (if d > depth then pure $ NoRec OutOfInputs
+      (if fromMaybe False ((d >) <$> depth) then pure $ NoRec OutOfInputs
       else do
         frequency $
             (5, valueOf vs sz >>= (\i -> pure $ RecSub (wrapValue i) id (insertValue (wrapValue i) x e,d+1,n)))
