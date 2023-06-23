@@ -31,6 +31,7 @@ library
       IOTasks.Interpreter
       IOTasks.IOrep
       IOTasks.MonadTeletype
+      IOTasks.Output
       IOTasks.OutputPattern
       IOTasks.OutputTerm
       IOTasks.Overflow
@@ -51,6 +52,7 @@ library
   ghc-options: -Wall -Wno-name-shadowing -fdefer-typed-holes
   build-depends:
       QuickCheck
+    , ansi-terminal
     , base >=4.7 && <5
     , constraints
     , containers
@@ -78,6 +80,7 @@ test-suite mini-IOTasks-test
   ghc-options: -Wall -Wno-name-shadowing -fdefer-typed-holes -threaded -rtsopts -with-rtsopts=-N2 -O2
   build-depends:
       QuickCheck
+    , ansi-terminal
     , base >=4.7 && <5
     , constraints
     , containers
@@ -105,6 +108,7 @@ benchmark hangman-benchmark
   ghc-options: -Wall -Wno-name-shadowing -fdefer-typed-holes -threaded -rtsopts -with-rtsopts=-N2 -O2
   build-depends:
       QuickCheck
+    , ansi-terminal
     , base >=4.7 && <5
     , constraints
     , containers

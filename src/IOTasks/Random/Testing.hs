@@ -16,9 +16,12 @@ import IOTasks.Term
 import IOTasks.OutputPattern
 import IOTasks.ValueSet
 import IOTasks.ValueMap
+import IOTasks.Output
 
 import Test.QuickCheck (Gen, vectorOf, generate, frequency)
 import IOTasks.Overflow (OverflowWarning(..))
+
+import System.IO (stdout)
 
 taskCheck :: IOrep () -> Specification -> IO ()
 taskCheck = taskCheckWith stdArgs
@@ -51,9 +54,10 @@ taskCheckOutcome = taskCheckWithOutcome stdArgs
 
 taskCheckWithOutcome :: Args -> IOrep () -> Specification -> IO Outcome
 taskCheckWithOutcome Args{..} prog spec  = do
+  output <- newOutput stdout
   is <- generate $ vectorOf maxSuccess $ genInput spec maxPathDepth (Size valueSize (fromIntegral $ valueSize `div` 5)) maxNegative
   let outcome = runTests prog spec is
-  print $ (if simplifyFeedback then pPrintOutcomeSimple else pPrintOutcome) outcome
+  printP output $ (if simplifyFeedback then pPrintOutcomeSimple else pPrintOutcome) outcome
   pure outcome
 
 genInput :: Specification -> Maybe Int -> Size -> Int -> Gen Inputs

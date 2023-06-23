@@ -20,19 +20,20 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/githubuser/mini-IOTasks#readme>
 
 dependencies:
+- ansi-terminal
 - base >= 4.7 && < 5
-- QuickCheck
+- constraints
 - containers
-- z3
-- parsec
-- mtl
+- deriving-compat
 - express
-- pretty
 - extra
+- mtl
+- parsec
+- pretty
+- QuickCheck
 - stm
 - type-match
-- constraints
-- deriving-compat
+- z3
 
 ghc-options:
 - -Wall

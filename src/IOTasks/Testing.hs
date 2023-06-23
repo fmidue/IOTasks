@@ -8,6 +8,7 @@ import IOTasks.Constraints
 import IOTasks.Trace
 import IOTasks.Z3
 import IOTasks.Overflow
+import IOTasks.Output
 
 import Control.Concurrent.STM
 import Control.Monad (when, forM, replicateM)
@@ -67,27 +68,28 @@ type TestsRun = Int
 
 taskCheckWithOutcome :: Args -> IOrep () -> Specification -> IO Outcome
 taskCheckWithOutcome Args{..} prog spec = do
+  output <- newOutput stdout
   q <- atomically newTQueue
   nVar <- newTVarIO Nothing
   thrdID <- forkIO $ satPaths nVar solverTimeout (constraintTree maxNegative spec) maxIterationUnfold solverMaxSeqLength checkOverflows q
-  (coreOut,satPaths,nInputs,timeouts,overflows) <- testPaths nVar q (0,0,0,0) Nothing `finally` killThread thrdID
+  (coreOut,satPaths,nInputs,timeouts,overflows) <- testPaths output nVar q (0,0,0,0) Nothing `finally` killThread thrdID
 
   let out = Outcome coreOut (if overflows == 0 then NoHints else OverflowHint overflows)
   --
   when verbose $ do
-    putStrLn $ unwords
+    putLnP output $ unwords
       ["generated", show nInputs,"inputs covering", show satPaths, "satisfiable paths"]
     when (timeouts > 0) $
-      putStrLn $ unwords ["---",show timeouts, "paths timed out"]
+      putLnP output $ unwords ["---",show timeouts, "paths timed out"]
   --
-  print $ (if simplifyFeedback then pPrintOutcomeSimple else pPrintOutcome) out
+  printP output $ (if simplifyFeedback then pPrintOutcomeSimple else pPrintOutcome) out
   pure out
 
   where
-    testPaths :: TVar (Maybe Int) -> TQueue (Maybe Path) -> (SatPaths,NumberOfInputs,Timeouts,Overflows) -> Maybe CoreOutcome -> IO (CoreOutcome,SatPaths,NumberOfInputs,Timeouts,Overflows)
-    testPaths _ _ (m,n,t,o) (Just failure) | t > maxTimeouts = pure (failure,m,n,t,o)
-    testPaths _ _ (m,n,t,o) Nothing | t > maxTimeouts = pure (GaveUp,m,n,t,o)
-    testPaths nVar q (m,n,t,o) mFailure = do
+    testPaths :: Output -> TVar (Maybe Int) -> TQueue (Maybe Path) -> (SatPaths,NumberOfInputs,Timeouts,Overflows) -> Maybe CoreOutcome -> IO (CoreOutcome,SatPaths,NumberOfInputs,Timeouts,Overflows)
+    testPaths _ _ _ (m,n,t,o) (Just failure) | t > maxTimeouts = pure (failure,m,n,t,o)
+    testPaths _ _ _ (m,n,t,o) Nothing | t > maxTimeouts = pure (GaveUp,m,n,t,o)
+    testPaths output nVar q (m,n,t,o) mFailure = do
       p <- atomically $ readTQueue q
       currentMaxPathLength <- readTVarIO nVar
       case p of
@@ -95,43 +97,43 @@ taskCheckWithOutcome Args{..} prog spec = do
            (Just failure) -> pure (failure,m,n,t,o)
            Nothing -> pure (Success n,m,n,t,o)
         Just p
-          | maybe False (pathDepth p >) currentMaxPathLength -> testPaths nVar q (m,n,t,o) mFailure
+          | maybe False (pathDepth p >) currentMaxPathLength -> testPaths output nVar q (m,n,t,o) mFailure
           | otherwise -> do
           res <- isSatPath solverTimeout p solverMaxSeqLength checkOverflows
           if res == SAT -- TODO: does not account for timeouts yet
             then do
-              (out,k,o') <- testPath p 0 n 0
+              (out,k,o') <- testPath output p 0 n 0
               case out of
                 PathSuccess -> do
-                  testPaths nVar q (m+1,n+k,t,o+o') mFailure
+                  testPaths output nVar q (m+1,n+k,t,o+o') mFailure
                 PathFailure i et at r ->
                   if maybe True (\case {Failure j _ _ _ -> length i < length j; _ -> error "impossible"}) mFailure -- there might be paths in the queue that are longer than a found counterexample
                     then do
                       atomically $ writeTVar nVar (Just $ length i - 1)
-                      testPaths nVar q (m+1,n+k,t,o+o') (Just $ Failure i et at r)
+                      testPaths output nVar q (m+1,n+k,t,o+o') (Just $ Failure i et at r)
                     else
-                      testPaths nVar q (m+1,n+k,t,o+o') mFailure
+                      testPaths output nVar q (m+1,n+k,t,o+o') mFailure
                 PathTimeout
-                  | k > 0 -> testPaths nVar q (m+1,n+k,t,o+o') mFailure
-                  | otherwise -> testPaths nVar q (m,n,t+1,o+o') mFailure
-            else testPaths nVar q (m,n,t,o) mFailure
-    testPath :: Path -> TestsRun -> NumberOfInputs -> Overflows -> IO (PathOutcome,TestsRun,Overflows)
-    testPath _ n _ o | n >= maxSuccessPerPath = pure (PathSuccess,n,o)
-    testPath p n nOtherTests o = do
+                  | k > 0 -> testPaths output nVar q (m+1,n+k,t,o+o') mFailure
+                  | otherwise -> testPaths output nVar q (m,n,t+1,o+o') mFailure
+            else testPaths output nVar q (m,n,t,o) mFailure
+    testPath :: Output -> Path -> TestsRun -> NumberOfInputs -> Overflows -> IO (PathOutcome,TestsRun,Overflows)
+    testPath _ _ n _ o | n >= maxSuccessPerPath = pure (PathSuccess,n,o)
+    testPath output p n nOtherTests o = do
       mNextInput <- findPathInput solverTimeout p valueSize solverMaxSeqLength checkOverflows
       case mNextInput of
         Nothing -> pure (PathTimeout,n,o) -- should (only?) be the case if solving times out
         Just nextInput  -> do
-          when verbose (putStr (concat ["(",show (n+nOtherTests)," tests)\r"]) >> hFlush stdout)
+          when verbose (putT output (concat ["(",show (n+nOtherTests)," tests)"]) >> oFlush output)
           let
             (specTrace,warn) = first normalizedTrace $ runSpecification nextInput spec
             progTrace = runProgram nextInput prog
             o' = if warn == OverflowWarning then o+1 else o
-          when (verbose && warn == OverflowWarning) $ putStrLn "Overflow of Int range detected."
+          when (verbose && warn == OverflowWarning) $ putLnP output "Overflow of Int range detected."
           case specTrace `covers` progTrace of
-            MatchSuccessfull -> testPath p (n+1) nOtherTests o'
+            MatchSuccessfull -> testPath output p (n+1) nOtherTests o'
             failure -> do
-              when verbose $ putStrLn $ unwords ["found counterexample of length",show $ length nextInput]
+              when verbose $ putLnP output $ unwords ["found counterexample of length",show $ length nextInput]
               pure (PathFailure nextInput specTrace progTrace failure,n+1,o')
 
 type Inputs = [Line]
