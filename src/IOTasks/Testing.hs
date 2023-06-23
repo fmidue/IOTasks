@@ -19,8 +19,7 @@ import Data.Functor (void)
 import Data.Bifunctor (first)
 
 import Text.PrettyPrint hiding ((<>))
-import Control.Concurrent (forkIO, killThread)
-import Control.Exception (finally)
+import Control.Concurrent.Async
 import System.IO
 
 taskCheck :: IOrep () -> Specification -> IO ()
@@ -71,8 +70,10 @@ taskCheckWithOutcome Args{..} prog spec = do
   output <- newOutput stdout
   q <- atomically newTQueue
   nVar <- newTVarIO Nothing
-  thrdID <- forkIO $ satPaths nVar solverTimeout (constraintTree maxNegative spec) maxIterationUnfold solverMaxSeqLength checkOverflows q
-  (coreOut,satPaths,nInputs,timeouts,overflows) <- testPaths output nVar q (0,0,0,0) Nothing `finally` killThread thrdID
+
+  (_,(coreOut,satPaths,nInputs,timeouts,overflows)) <- concurrently
+    (satPaths nVar solverTimeout (constraintTree maxNegative spec) maxIterationUnfold solverMaxSeqLength checkOverflows q)
+    (testPaths output nVar q (0,0,0,0) Nothing)
 
   let out = Outcome coreOut (if overflows == 0 then NoHints else OverflowHint overflows)
   --

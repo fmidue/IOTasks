@@ -53,6 +53,7 @@ library
   build-depends:
       QuickCheck
     , ansi-terminal
+    , async
     , base >=4.7 && <5
     , constraints
     , containers
@@ -81,6 +82,7 @@ test-suite mini-IOTasks-test
   build-depends:
       QuickCheck
     , ansi-terminal
+    , async
     , base >=4.7 && <5
     , constraints
     , containers
@@ -109,6 +111,7 @@ benchmark hangman-benchmark
   build-depends:
       QuickCheck
     , ansi-terminal
+    , async
     , base >=4.7 && <5
     , constraints
     , containers
