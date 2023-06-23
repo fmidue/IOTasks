@@ -29,7 +29,7 @@ data Args
   = Args
   { maxIterationUnfold :: Int -- maximum sum of iteration unfoldings when searching for satisfiable paths
   , valueSize :: Integer -- size of randomly generated input candidates (the solver might find bigger solutions)
-  , solverTimeout :: Int -- solver timeout in miliseconds
+  , solverTimeout :: Int -- solver timeout in milliseconds
   , maxTimeouts :: Int -- maximum number of solver timeouts before giving up
   , maxSuccessPerPath :: Int -- number of tests generated per path
   , maxNegative :: Int -- maximum number of negative inputs per path
@@ -43,7 +43,7 @@ stdArgs :: Args
 stdArgs = Args
   { maxIterationUnfold = 25
   , valueSize = 100
-  , solverTimeout = 1000
+  , solverTimeout = 1000 -- 1 sec
   , maxTimeouts = 3
   , maxSuccessPerPath = 5
   , maxNegative = 5
@@ -150,9 +150,36 @@ data CoreOutcome = Success Int | Failure Inputs ExpectedRun ActualRun MatchResul
 data OutcomeHints = NoHints | OverflowHint Int
   deriving (Eq, Show)
 
+instance Semigroup Outcome where
+  (Outcome f@Failure{} h) <> _ = Outcome f h
+  (Outcome GaveUp h) <> _ = Outcome GaveUp h
+  (Outcome cx hx) <> (Outcome cy hy) = Outcome (cx <> cy) (hx <> hy)
+instance Monoid Outcome where
+  mempty = Outcome mempty mempty
+
+instance Monoid CoreOutcome where
+  mempty = Success 0
+instance Semigroup CoreOutcome where
+  Success x <> Success y = Success $ x + y
+  Success _ <> f@Failure{} = f
+  Success _ <> GaveUp = GaveUp
+  f@Failure{} <> _ = f
+  GaveUp <> _ = GaveUp
+
+instance Monoid OutcomeHints where
+  mempty = NoHints
+instance Semigroup OutcomeHints where
+  NoHints <> y = y
+  x <> NoHints = x
+  OverflowHint x <> OverflowHint y = OverflowHint $ x + y
+
 isSuccess :: Outcome -> Bool
 isSuccess (Outcome Success{} _) = True
 isSuccess _ = False
+
+isFailure :: Outcome -> Bool
+isFailure (Outcome Failure{} _) = True
+isFailure _ = False
 
 overflowWarnings :: Outcome -> Int
 overflowWarnings (Outcome _ NoHints) = 0

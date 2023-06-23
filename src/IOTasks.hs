@@ -19,7 +19,7 @@ module IOTasks
   , currentValue, allValues, currentValue', allValues', as
   , OverflowType
   , taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs
-  , Outcome(..), CoreOutcome(..), OutcomeHints(..), isSuccess, overflowWarnings
+  , Outcome(..), CoreOutcome(..), OutcomeHints(..), isSuccess, isFailure, overflowWarnings
   , pPrintOutcome, pPrintOutcomeSimple
   , generateStaticTestSuite, taskCheckOn
   , interpret

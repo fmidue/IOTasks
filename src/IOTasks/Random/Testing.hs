@@ -18,10 +18,12 @@ import IOTasks.ValueSet
 import IOTasks.ValueMap
 import IOTasks.Output
 
-import Test.QuickCheck (Gen, vectorOf, generate, frequency)
+import Test.QuickCheck (Gen, generate, frequency)
 import IOTasks.Overflow (OverflowWarning(..))
 
 import System.IO (stdout)
+import System.Timeout (timeout)
+import Control.Monad (when, foldM)
 
 taskCheck :: IOrep () -> Specification -> IO ()
 taskCheck = taskCheckWith stdArgs
@@ -34,6 +36,8 @@ data Args
   , maxNegative :: Int
   , verbose :: Bool
   , simplifyFeedback :: Bool
+  , searchTimeout :: Int -- in milliseconds
+  , maxSearchTimeouts :: Int
   }
 
 stdArgs :: Args
@@ -44,6 +48,8 @@ stdArgs = Args
   , maxNegative = 5
   , verbose = True
   , simplifyFeedback = False
+  , searchTimeout = 3000 -- 3 sec
+  , maxSearchTimeouts = 5
   }
 
 taskCheckWith :: Args -> IOrep () -> Specification -> IO ()
@@ -55,10 +61,26 @@ taskCheckOutcome = taskCheckWithOutcome stdArgs
 taskCheckWithOutcome :: Args -> IOrep () -> Specification -> IO Outcome
 taskCheckWithOutcome Args{..} prog spec  = do
   output <- newOutput stdout
-  is <- generate $ vectorOf maxSuccess $ genInput spec maxPathDepth (Size valueSize (fromIntegral $ valueSize `div` 5)) maxNegative
-  let outcome = runTests prog spec is
+  (outcome, _to) <- foldM (\(o',to) n -> first (o' <>) <$> test output n to) (mempty,0) [0..maxSuccess-1]
   printP output $ (if simplifyFeedback then pPrintOutcomeSimple else pPrintOutcome) outcome
   pure outcome
+
+  where
+    test :: Output -> Int -> Int -> IO (Outcome, Int)
+    test o n to
+      | to > maxSearchTimeouts = pure (Outcome GaveUp NoHints,to)
+      | otherwise = do
+        input <- generate $ genInput spec maxPathDepth (Size valueSize (fromIntegral $ valueSize `div` 5)) maxNegative
+        mOutcome <- timeout (searchTimeout * 1000) $ do
+          let o = runTest prog spec input
+          seq (isSuccess o) $ pure o -- force outcome
+        case mOutcome of
+          Just outcome -> do
+            when verbose $ putT o (concat ["(",show n," tests)"]) >> oFlush o
+            pure (outcome,to)
+          Nothing -> do
+            when verbose $ putLnP o "input search: timeout"
+            test o n (to+1)
 
 genInput :: Specification -> Maybe Int -> Size -> Int -> Gen Inputs
 genInput s depth sz maxNeg = do
@@ -93,17 +115,14 @@ genTrace spec depth sz maxNeg =
     (emptyValueMap $ vars spec,1,0)
     spec
 
-runTests :: IOrep () -> Specification -> [Inputs] -> Outcome
-runTests p s i = uncurry Outcome $ go 0 0 p s i where
-  go n o _ _ [] = (Success n, overflowHint o)
-  go n o prog spec (i:is) =
-    let
-      (specTrace,warn) = first normalizedTrace $ runSpecification i spec
-      progTrace = runProgram i prog
-      o' = if warn == OverflowWarning then o+1 else o
-    in case specTrace `covers` progTrace of
-      MatchSuccessfull -> go (n+1) o' prog spec is
-      failure -> (Failure i specTrace progTrace failure, overflowHint o')
-
-  overflowHint 0 = NoHints
-  overflowHint n = OverflowHint n
+runTest :: IOrep () -> Specification -> Inputs -> Outcome
+runTest p spec i =
+  let
+    (specTrace,warn) = first normalizedTrace $ runSpecification i spec
+    progTrace = runProgram i p
+    o = case warn of
+      OverflowWarning -> OverflowHint 1
+      _ -> mempty
+  in case specTrace `covers` progTrace of
+    MatchSuccessfull -> Outcome (Success 1) o
+    failure -> Outcome (Failure i specTrace progTrace failure) o

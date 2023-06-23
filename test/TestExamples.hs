@@ -21,17 +21,17 @@ testExamples = do
       it "taskCheck example1 specification" $
         (taskCheckOutcome prog1 example1 <&> isSuccess) `shouldReturn` True
       it "does not fulfill example2 specification" $
-        (taskCheckOutcome prog1 example2 <&> not . isSuccess) `shouldReturn` True
+        (taskCheckOutcome prog1 example2 <&> isFailure) `shouldReturn` True
       it "does not fulfill example3 specification" $
-        (taskCheckOutcome prog1 example3 <&> not . isSuccess) `shouldReturn` True
+        (taskCheckOutcome prog1 example3 <&> isFailure) `shouldReturn` True
 
     describe "prog2" $ do
       it "taskCheck example2 specification" $
         (taskCheckOutcome prog2 example2 <&> isSuccess) `shouldReturn` True
       it "does not fulfill example1 specification" $
-        (taskCheckOutcome prog2 example1 <&> not . isSuccess) `shouldReturn` True
+        (taskCheckOutcome prog2 example1 <&> isFailure) `shouldReturn` True
       it "does not fulfill example3 specification" $
-        (taskCheckOutcome prog2 example3 <&> not . isSuccess) `shouldReturn` True
+        (taskCheckOutcome prog2 example3 <&> isFailure) `shouldReturn` True
 
     describe "prog2'" $ do
       it "taskCheck example2 specification" $
@@ -48,9 +48,9 @@ testExamples = do
       it "taskCheck example3 specification" $
         (taskCheckOutcome prog3 example3 <&> isSuccess) `shouldReturn` True
       it "does not fulfill example1 specification" $
-        (taskCheckOutcome prog3 example1 <&> not . isSuccess) `shouldReturn` True
+        (taskCheckOutcome prog3 example1 <&> isFailure) `shouldReturn` True
       it "does not fulfill example2 specification" $
-        (taskCheckOutcome prog3 example2 <&> not . isSuccess) `shouldReturn` True
+        (taskCheckOutcome prog3 example2 <&> isFailure) `shouldReturn` True
 
     context "variable merging" $ do
       describe "taskCheck prog5 example5" $
@@ -116,7 +116,7 @@ testExamples = do
         it "is satisfied by stringP1" $
           (taskCheckOutcome stringP1 stringS2 <&> isSuccess) `shouldReturn` True
         it "is not satisfied by stringP2" $
-          (taskCheckOutcome stringP2 stringS2 <&> not . isSuccess) `shouldReturn` True
+          (taskCheckOutcome stringP2 stringS2 <&> isFailure) `shouldReturn` True
         it "is satisfied by stringP3" $
           (taskCheckOutcome stringP3 stringS2 <&> isSuccess) `shouldReturn` True
 
@@ -125,22 +125,22 @@ testExamples = do
       it "taskCheck example1 specification" $
         (Random.taskCheckOutcome prog1 example1 <&> isSuccess) `shouldReturn` True
       it "does not fulfill example2 specification" $
-        (Random.taskCheckOutcome prog1 example2 <&> not . isSuccess) `shouldReturn` True
+        (Random.taskCheckOutcome prog1 example2 <&> isFailure) `shouldReturn` True
       it "does not fulfill example3 specification" $
-        (Random.taskCheckOutcome prog1 example3 <&> not . isSuccess) `shouldReturn` True
+        (Random.taskCheckOutcome prog1 example3 <&> isFailure) `shouldReturn` True
 
     describe "prog2" $ do
       it "taskCheck example2 specification" $
         (Random.taskCheckOutcome prog2 example2 <&> isSuccess) `shouldReturn` True
       it "does not fulfill example1 specification" $
-        (Random.taskCheckOutcome prog2 example1 <&> not . isSuccess) `shouldReturn` True
+        (Random.taskCheckOutcome prog2 example1 <&> isFailure) `shouldReturn` True
       it "does not fulfill example3 specification" $
-        (Random.taskCheckOutcome prog2 example3 <&> not . isSuccess) `shouldReturn` True
+        (Random.taskCheckOutcome prog2 example3 <&> isFailure) `shouldReturn` True
 
     describe "prog3" $ do
       it "taskCheck example3 specification" $
         (Random.taskCheckOutcome prog3 example3 <&> isSuccess) `shouldReturn` True
       it "does not fulfill example1 specification" $
-        (Random.taskCheckOutcome prog3 example1 <&> not . isSuccess) `shouldReturn` True
+        (Random.taskCheckOutcome prog3 example1 <&> isFailure) `shouldReturn` True
       it "does not fulfill example2 specification" $
-        (Random.taskCheckOutcome prog3 example2 <&> not . isSuccess) `shouldReturn` True
+        (Random.taskCheckOutcome prog3 example2 <&> isFailure) `shouldReturn` True
