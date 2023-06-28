@@ -194,13 +194,6 @@ pingPongProg = do
     "Pong" -> putStrLn "Ping"
     _ -> pure ()
 
-ints, nats :: ValueSet Integer
-ints = Every
-nats = Eq 0 `Union` GreaterThan 0
-
-str :: ValueSet String
-str = Every
-
 -- example programs
 
 prog1 :: MonadTeletype m => m ()

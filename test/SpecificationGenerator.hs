@@ -8,12 +8,6 @@ import IOTasks.Specification
 import Test.QuickCheck
 import Type.Reflection
 
-ints :: ValueSet Integer
-ints = Every
-
-nats :: ValueSet Integer
-nats = Eq 0 `Union` GreaterThan 0
-
 instance Arbitrary Specification where
   arbitrary = specGen
   shrink = shrinkSpec

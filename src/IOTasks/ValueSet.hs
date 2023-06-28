@@ -75,3 +75,11 @@ printValueSet vs = concat ["{ v : ",show (typeRep $ Proxy @a), " | ", printValue
   printValueSet' (Eq n) = "v == " ++ show n
   printValueSet' Every = "true"
   printValueSet' None = "false"
+
+-- basic ValueSets
+ints, nats :: ValueSet Integer
+ints = Every
+nats = Eq 0 `Union` GreaterThan 0
+
+str :: ValueSet String
+str = Every

@@ -8,6 +8,7 @@ module IOTasks.Random
   , Trace, (>:)
   , Term
   , ValueSet(..)
+  , ints, nats, str
   , OutputPattern(..), PatternType(..)
   , OutputTerm, filter'
   , Var, Varname, var, intVar, stringVar

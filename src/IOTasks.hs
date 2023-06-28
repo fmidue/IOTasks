@@ -8,6 +8,7 @@ module IOTasks
   , Trace, (>:)
   , Term
   , ValueSet(..)
+  , ints, nats, str
   , OutputPattern(..), PatternType(..)
   , OutputTerm, filter'
   , Var, Varname, var, intVar, stringVar
