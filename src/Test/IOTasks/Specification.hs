@@ -4,15 +4,15 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
-module IOTasks.Specification where
+module Test.IOTasks.Specification where
 
-import IOTasks.ValueSet
-import IOTasks.Term
-import IOTasks.Terms (Var (..), varname)
-import IOTasks.Trace
-import IOTasks.OutputPattern
-import IOTasks.Overflow
-import IOTasks.ValueMap
+import Test.IOTasks.ValueSet
+import Test.IOTasks.Term
+import Test.IOTasks.Terms (Var (..), varname)
+import Test.IOTasks.Trace
+import Test.IOTasks.OutputPattern
+import Test.IOTasks.Overflow
+import Test.IOTasks.ValueMap
 
 import Data.Set (Set)
 import qualified Data.Set as Set

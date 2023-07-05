@@ -4,13 +4,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module IOTasks.OutputPattern where
+module Test.IOTasks.OutputPattern where
 
 import Prelude hiding (all)
 
-import IOTasks.Overflow
-import IOTasks.OutputTerm
-import IOTasks.ValueMap
+import Test.IOTasks.Overflow
+import Test.IOTasks.OutputTerm
+import Test.IOTasks.ValueMap
 
 import Data.Either (isRight)
 import Data.Bifunctor (second)

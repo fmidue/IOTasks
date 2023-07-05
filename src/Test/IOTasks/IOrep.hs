@@ -1,5 +1,5 @@
 {-# LANGUAGE DeriveFunctor #-}
-module IOTasks.IOrep
+module Test.IOTasks.IOrep
   ( IOrep , Line
   , runProgram
   , MonadTeletype(..), BufferMode(..), stdout
@@ -10,9 +10,9 @@ import Data.Set (singleton)
 
 import Control.Monad (ap, (>=>))
 
-import IOTasks.Trace
-import IOTasks.OutputPattern
-import IOTasks.MonadTeletype
+import Test.IOTasks.Trace
+import Test.IOTasks.OutputPattern
+import Test.IOTasks.MonadTeletype
 
 import System.IO (BufferMode(..), stdout) -- for re-exports
 

@@ -5,9 +5,9 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE TypeApplications #-}
-module IOTasks.Terms where
+module Test.IOTasks.Terms where
 
-import IOTasks.Overflow
+import Test.IOTasks.Overflow
 
 import Data.Typeable
 
@@ -19,7 +19,7 @@ varname :: Var -> Varname
 varname = fst . unVar
 
 varType :: Var -> TypeRep
-varType = snd . unVar 
+varType = snd . unVar
 
 varExpType :: VarExp e => e -> Maybe TypeRep
 varExpType = varListType . toVarList

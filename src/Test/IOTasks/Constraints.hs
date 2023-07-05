@@ -3,14 +3,14 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE KindSignatures #-}
-module IOTasks.Constraints where
+module Test.IOTasks.Constraints where
 
-import IOTasks.ValueSet
-import IOTasks.Term (Term, printIndexedTerm, castTerm, subTerms)
-import IOTasks.Terms (Var, not', varname)
-import IOTasks.Specification
-import IOTasks.OutputPattern (valueTerms)
-import IOTasks.OutputTerm (transparentSubterms, withSomeOutputTerm)
+import Test.IOTasks.ValueSet
+import Test.IOTasks.Term (Term, printIndexedTerm, castTerm, subTerms)
+import Test.IOTasks.Terms (Var, not', varname)
+import Test.IOTasks.Specification
+import Test.IOTasks.OutputPattern (valueTerms)
+import Test.IOTasks.OutputTerm (transparentSubterms, withSomeOutputTerm)
 
 import Data.List (intersperse)
 import qualified Data.Map as Map

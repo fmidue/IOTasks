@@ -2,8 +2,8 @@
 {-# LANGUAGE ExistentialQuantification #-}
 module SpecificationGenerator where
 
-import IOTasks
-import IOTasks.Specification
+import Test.IOTasks
+import Test.IOTasks.Specification
 
 import Test.QuickCheck
 import Type.Reflection

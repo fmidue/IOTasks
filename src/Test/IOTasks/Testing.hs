@@ -1,14 +1,14 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase #-}
-module IOTasks.Testing where
+module Test.IOTasks.Testing where
 
-import IOTasks.IOrep (IOrep, Line, runProgram)
-import IOTasks.Specification
-import IOTasks.Constraints
-import IOTasks.Trace
-import IOTasks.Z3
-import IOTasks.Overflow
-import IOTasks.Output
+import Test.IOTasks.IOrep (IOrep, Line, runProgram)
+import Test.IOTasks.Specification
+import Test.IOTasks.Constraints
+import Test.IOTasks.Trace
+import Test.IOTasks.Z3
+import Test.IOTasks.Overflow
+import Test.IOTasks.Output
 
 import Control.Concurrent.STM
 import Control.Monad (when, forM, replicateM)

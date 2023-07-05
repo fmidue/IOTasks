@@ -4,7 +4,7 @@ import Prelude hiding
   (putChar,putStr,putStrLn,print,getChar,getLine,readLn
   ,until)
 
-import IOTasks
+import Test.IOTasks
 --example specifications
 
 example1 :: Specification

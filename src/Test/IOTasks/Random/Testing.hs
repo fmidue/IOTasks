@@ -1,25 +1,25 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase #-}
-module IOTasks.Random.Testing where
+module Test.IOTasks.Random.Testing where
 
-import IOTasks.Testing hiding (taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args, stdArgs)
+import Test.IOTasks.Testing hiding (taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args, stdArgs)
 
 import Data.Set as Set hiding (foldr)
 import Data.Functor (void)
 import Data.Bifunctor (first)
 import Data.Maybe (fromMaybe)
 
-import IOTasks.IOrep (IOrep, runProgram)
-import IOTasks.Specification
-import IOTasks.Trace
-import IOTasks.Term
-import IOTasks.OutputPattern
-import IOTasks.ValueSet
-import IOTasks.ValueMap
-import IOTasks.Output
+import Test.IOTasks.IOrep (IOrep, runProgram)
+import Test.IOTasks.Specification
+import Test.IOTasks.Trace
+import Test.IOTasks.Term
+import Test.IOTasks.OutputPattern
+import Test.IOTasks.ValueSet
+import Test.IOTasks.ValueMap
+import Test.IOTasks.Output
+import Test.IOTasks.Overflow (OverflowWarning(..))
 
 import Test.QuickCheck (Gen, generate, frequency)
-import IOTasks.Overflow (OverflowWarning(..))
 
 import System.IO (stdout)
 import System.Timeout (timeout)

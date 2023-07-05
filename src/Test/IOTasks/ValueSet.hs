@@ -1,7 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-module IOTasks.ValueSet where
+module Test.IOTasks.ValueSet where
 
 import Data.Set (Set)
 import qualified Data.Set as Set (union,intersection,filter,toList,fromAscList)

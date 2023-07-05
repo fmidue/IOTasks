@@ -8,7 +8,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE InstanceSigs #-}
-module IOTasks.OutputTerm
+module Test.IOTasks.OutputTerm
   ( OutputTerm
   , SomeOutputTerm(..), withSomeOutputTerm
   , transparentSubterms
@@ -17,11 +17,11 @@ module IOTasks.OutputTerm
 
 import Prelude hiding (all)
 
-import IOTasks.Terms
-import IOTasks.Term hiding (eval)
-import qualified IOTasks.Term as Term
-import IOTasks.Overflow (OverflowWarning, checkOverflow, OverflowType (..))
-import IOTasks.ValueMap
+import Test.IOTasks.Terms
+import Test.IOTasks.Term hiding (eval)
+import qualified Test.IOTasks.Term as Term
+import Test.IOTasks.Overflow (OverflowWarning, checkOverflow, OverflowType (..))
+import Test.IOTasks.ValueMap
 
 import Data.Express (Expr((:$)), var, val, value, (//-), evl, vars, isVar, showExpr)
 import Data.List (nub, intercalate)

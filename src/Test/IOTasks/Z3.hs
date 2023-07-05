@@ -9,13 +9,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
-module IOTasks.Z3 where
+module Test.IOTasks.Z3 where
 
-import IOTasks.Constraints
-import IOTasks.ValueSet
-import IOTasks.Term
-import IOTasks.Terms (Var (..), VarExp(..), varname)
-import IOTasks.ValueMap
+import Test.IOTasks.Constraints
+import Test.IOTasks.ValueSet
+import Test.IOTasks.Term
+import Test.IOTasks.Terms (Var (..), VarExp(..), varname)
+import Test.IOTasks.ValueMap
 
 import Z3.Monad
 

@@ -3,7 +3,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TupleSections #-}
-module IOTasks.ValueMap where
+module Test.IOTasks.ValueMap where
 
 import Data.List as List (sortOn, lookup)
 import Data.Maybe (mapMaybe, isJust)
@@ -14,8 +14,8 @@ import Data.Bifunctor (first)
 import Data.Typeable (eqT)
 import Type.Reflection
 
-import IOTasks.Terms (Var (..), varname, varExpType, Varname)
-import IOTasks.Overflow (I)
+import Test.IOTasks.Terms (Var (..), varname, varExpType, Varname)
+import Test.IOTasks.Overflow (I)
 import Text.Read (readMaybe)
 
 data ValueMap = ValueMap { valueMap :: Map Var ValueEntry, size :: Int } deriving (Eq,Show)

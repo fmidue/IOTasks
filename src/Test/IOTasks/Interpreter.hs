@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-module IOTasks.Interpreter where
+module Test.IOTasks.Interpreter where
 
 import Prelude hiding (readLn,putStrLn)
 
@@ -9,13 +9,13 @@ import Control.Monad.State
 
 import qualified Data.Set as Set
 
-import IOTasks.Specification
-import IOTasks.MonadTeletype as MTT
-import IOTasks.Term
-import IOTasks.ValueSet
-import IOTasks.Trace
-import IOTasks.OutputPattern
-import IOTasks.ValueMap
+import Test.IOTasks.Specification
+import Test.IOTasks.MonadTeletype as MTT
+import Test.IOTasks.Term
+import Test.IOTasks.ValueSet
+import Test.IOTasks.Trace
+import Test.IOTasks.OutputPattern
+import Test.IOTasks.ValueMap
 
 interpret :: MonadTeletype m => Specification -> [m ()]
 interpret s = do

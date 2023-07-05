@@ -5,7 +5,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Move brackets to avoid $" #-}
-module IOTasks.Trace (
+module Test.IOTasks.Trace (
   AbstractTrace, Trace, NTrace,
   ordinaryTrace, normalizedTrace,
   terminate, outOfInputs, progWrite, progRead,
@@ -20,7 +20,7 @@ module IOTasks.Trace (
   covers,
 ) where
 
-import IOTasks.OutputPattern
+import Test.IOTasks.OutputPattern
 
 import Data.Set (Set)
 import qualified Data.Set as Set

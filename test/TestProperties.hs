@@ -9,11 +9,11 @@ import Test.QuickCheck hiding (isSuccess, stdArgs,verbose, Args)
 
 import Control.Monad.Loops (allM)
 
-import IOTasks
-import IOTasks.Random (genInput)
-import qualified IOTasks.Random as Random (stdArgs, Args(..))
-import IOTasks.ValueSet
-import IOTasks.Trace (ordinaryTrace, isTerminatingN, normalizedTrace)
+import Test.IOTasks
+import Test.IOTasks.Random (genInput)
+import qualified Test.IOTasks.Random as Random (stdArgs, Args(..))
+import Test.IOTasks.ValueSet
+import Test.IOTasks.Trace (ordinaryTrace, isTerminatingN, normalizedTrace)
 
 import SpecificationGenerator
 

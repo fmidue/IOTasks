@@ -1,4 +1,4 @@
-module IOTasks.Random
+module Test.IOTasks.Random
   ( Specification, runSpecification, runSpecification', accept
   , readInput, writeOutput, writeOptionalOutput, optionalTextOutput, branch, tillExit, exit, nop, until, while
   , pPrintSpecification
@@ -29,5 +29,5 @@ module IOTasks.Random
 
 import Prelude hiding (until)
 
-import IOTasks hiding (taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs)
-import IOTasks.Random.Testing
+import Test.IOTasks hiding (taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs)
+import Test.IOTasks.Random.Testing

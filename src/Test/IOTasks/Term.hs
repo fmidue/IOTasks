@@ -13,11 +13,11 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
-module IOTasks.Term where
+module Test.IOTasks.Term where
 
-import IOTasks.Terms
-import IOTasks.Overflow
-import IOTasks.ValueMap as ValueMap
+import Test.IOTasks.Terms
+import Test.IOTasks.Overflow
+import Test.IOTasks.ValueMap as ValueMap
 
 import Data.Maybe (fromMaybe,mapMaybe)
 import Data.Map (Map)

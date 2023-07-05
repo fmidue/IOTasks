@@ -1,10 +1,10 @@
-name:                mini-IOTasks
-version:             0.1.1.0
-github:              "githubuser/mini-IOTasks"
+name:                IOTasks
+version:             0.2.0.0
+github:              "fmidue/IOTasks"
 license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2021 Author name here"
+author:              "Oliver Westphal"
+maintainer:          "oliver.westphal@uni-due.de"
+copyright:           "2023 Oliver Westphal"
 
 extra-source-files:
 - README.md
@@ -12,12 +12,12 @@ extra-source-files:
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package
-# category:            Web
+category:            Testing
 
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/mini-IOTasks#readme>
+description:         Please see the README on GitHub at <https://github.com/fmidue/IOTasks#readme>
 
 dependencies:
 - ansi-terminal
@@ -43,6 +43,7 @@ ghc-options:
 
 library:
   source-dirs: src
+  other-modules: Example
 
 tests:
   mini-IOTasks-test:
@@ -51,22 +52,9 @@ tests:
     ghc-options:
     - -threaded
     - -rtsopts
-    - -with-rtsopts=-N2
+    - -with-rtsopts=-N
     - -O2
     dependencies:
-    - mini-IOTasks
+    - IOTasks
     - hspec
     - monad-loops
-
-benchmarks:
-  hangman-benchmark:
-    main: Main.hs
-    source-dirs: bench
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N2
-    - -O2
-    dependencies:
-    - mini-IOTasks
-    - criterion

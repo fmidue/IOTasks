@@ -2,9 +2,9 @@
 module TestExamples where
 import Test.Hspec
 
-import IOTasks
+import Test.IOTasks
 
-import qualified IOTasks.Random.Testing as Random
+import qualified Test.IOTasks.Random.Testing as Random
 import Example
 
 import Test.Hspec.QuickCheck

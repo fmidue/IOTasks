@@ -1,0 +1,101 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.35.2.
+--
+-- see: https://github.com/sol/hpack
+
+name:           IOTasks
+version:        0.2.0.0
+description:    Please see the README on GitHub at <https://github.com/fmidue/IOTasks#readme>
+category:       Testing
+homepage:       https://github.com/fmidue/IOTasks#readme
+bug-reports:    https://github.com/fmidue/IOTasks/issues
+author:         Oliver Westphal
+maintainer:     oliver.westphal@uni-due.de
+copyright:      2023 Oliver Westphal
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/fmidue/IOTasks
+
+library
+  exposed-modules:
+      Test.IOTasks
+      Test.IOTasks.Constraints
+      Test.IOTasks.Interpreter
+      Test.IOTasks.IOrep
+      Test.IOTasks.MonadTeletype
+      Test.IOTasks.Output
+      Test.IOTasks.OutputPattern
+      Test.IOTasks.OutputTerm
+      Test.IOTasks.Overflow
+      Test.IOTasks.Random
+      Test.IOTasks.Random.Testing
+      Test.IOTasks.Specification
+      Test.IOTasks.Term
+      Test.IOTasks.Terms
+      Test.IOTasks.Testing
+      Test.IOTasks.Trace
+      Test.IOTasks.ValueMap
+      Test.IOTasks.ValueSet
+      Test.IOTasks.Z3
+  other-modules:
+      Example
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Wno-name-shadowing -fdefer-typed-holes
+  build-depends:
+      QuickCheck
+    , ansi-terminal
+    , async
+    , base >=4.7 && <5
+    , constraints
+    , containers
+    , deriving-compat
+    , express
+    , extra
+    , mtl
+    , parsec
+    , pretty
+    , stm
+    , type-match
+    , z3
+  default-language: Haskell2010
+
+test-suite mini-IOTasks-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      SpecificationGenerator
+      TestExamples
+      TestProperties
+      Paths_IOTasks
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -Wno-name-shadowing -fdefer-typed-holes -threaded -rtsopts -with-rtsopts=-N -O2
+  build-depends:
+      IOTasks
+    , QuickCheck
+    , ansi-terminal
+    , async
+    , base >=4.7 && <5
+    , constraints
+    , containers
+    , deriving-compat
+    , express
+    , extra
+    , hspec
+    , monad-loops
+    , mtl
+    , parsec
+    , pretty
+    , stm
+    , type-match
+    , z3
+  default-language: Haskell2010
