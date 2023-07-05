@@ -43,12 +43,11 @@ ghc-options:
 
 library:
   source-dirs: src
-  other-modules: Example
 
 tests:
   mini-IOTasks-test:
     main:                Spec.hs
-    source-dirs:         test
+    source-dirs:         [test, examples]
     ghc-options:
     - -threaded
     - -rtsopts

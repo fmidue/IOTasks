@@ -46,7 +46,7 @@ library
       Test.IOTasks.ValueSet
       Test.IOTasks.Z3
   other-modules:
-      Example
+      Paths_IOTasks
   hs-source-dirs:
       src
   ghc-options: -Wall -Wno-name-shadowing -fdefer-typed-holes
@@ -75,9 +75,11 @@ test-suite mini-IOTasks-test
       SpecificationGenerator
       TestExamples
       TestProperties
+      Example
       Paths_IOTasks
   hs-source-dirs:
       test
+      examples
   ghc-options: -Wall -Wno-name-shadowing -fdefer-typed-holes -threaded -rtsopts -with-rtsopts=-N -O2
   build-depends:
       IOTasks
