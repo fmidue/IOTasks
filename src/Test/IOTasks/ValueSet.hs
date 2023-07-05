@@ -1,7 +1,15 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-module Test.IOTasks.ValueSet where
+module Test.IOTasks.ValueSet (
+  ValueSet(..),
+  Size(..),
+  complement,
+  valueOf, containsValue,
+  printValueSet,
+
+  ints, nats, str,
+  ) where
 
 import Data.Set (Set)
 import qualified Data.Set as Set (union,intersection,filter,toList,fromAscList)

@@ -1,7 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-module Test.IOTasks.Interpreter where
+module Test.IOTasks.Interpreter (interpret) where
 
 import Prelude hiding (readLn,putStrLn)
 
@@ -45,13 +45,15 @@ interpret s = do
         NoRec{} -> error "interpret: impossible"
         RecSame{} -> error "interpret: impossible"
         RecBoth{} -> error "interpret: impossible")
-      (\_ Mandatory ts p' -> do
-        if Set.size ts == 1
-          then do
-            e <- get
-            lift $ putStrLn $ printPattern $ snd $ evalPattern e (Set.elemAt 0 ts)
-            p'
-          else error "interpret: impossible"
+      (\_ opt ts p' -> case opt of
+        Mandatory -> do
+          if Set.size ts == 1
+            then do
+              e <- get
+              lift $ putStrLn $ printPattern $ snd $ evalPattern e (Set.elemAt 0 ts)
+              p'
+            else error "interpret: impossible (due to collapseChoice)"
+        Optional -> error "interpret: impossible (due to collapseChoice)"
       )
       (\_ cond pl pr -> do
         e <- get

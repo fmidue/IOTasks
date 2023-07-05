@@ -13,9 +13,9 @@ import Data.IORef
 
 data Output = Output
   { handle :: Handle
-  , tempSize :: IORef TextDim
-  , tempOutput :: IORef TextDim -> Handle -> String -> IO ()
-  , permanentOutput :: IORef TextDim -> Handle -> String -> IO ()
+  , _tempSize :: IORef TextDim
+  , _tempOutput :: IORef TextDim -> Handle -> String -> IO ()
+  , _permanentOutput :: IORef TextDim -> Handle -> String -> IO ()
   }
 
 oFlush :: Output -> IO ()

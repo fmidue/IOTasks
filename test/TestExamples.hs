@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds #-}
-module TestExamples where
+module TestExamples (testExamples) where
 import Test.Hspec
 
 import Test.IOTasks
@@ -7,9 +7,6 @@ import Test.IOTasks
 import qualified Test.IOTasks.Random.Testing as Random
 import Example
 
-import Test.Hspec.QuickCheck
-import Test.QuickCheck hiding (Success, stdArgs,isSuccess)
-import Control.Applicative (liftA2)
 import Control.Monad.Loops (allM)
 
 import Data.Functor ((<&>))

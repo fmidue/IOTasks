@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# LANGUAGE RecordWildCards #-}
-module TestProperties where
+module TestProperties (testProperties) where
 
 import Test.Hspec
 import Test.Hspec.QuickCheck (prop)

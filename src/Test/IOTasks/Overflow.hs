@@ -5,7 +5,11 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
-module Test.IOTasks.Overflow where
+module Test.IOTasks.Overflow (
+  OverflowWarning(..),
+  OverflowType(..),
+  I,
+  ) where
 
 import Data.Constraint
 

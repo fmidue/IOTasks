@@ -4,7 +4,14 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Test.IOTasks.OutputPattern where
+module Test.IOTasks.OutputPattern (
+  PatternType (..),
+  OutputPattern(..),
+  valueTerms,
+  printPattern, printPatternSimple,
+  evalPattern,
+  (>:),
+  ) where
 
 import Prelude hiding (all)
 

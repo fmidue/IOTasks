@@ -5,7 +5,23 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE TypeApplications #-}
-module Test.IOTasks.Terms where
+module Test.IOTasks.Terms (
+  Varname,
+  Var(..),
+  var, intVar, stringVar,
+  as,
+  VarExp(..),
+  varname,
+  varExpType,
+
+  Accessor(..),
+  Arithmetic(..),
+  Compare(..),
+  Logic(..),
+  BasicLists(..),
+  ComplexLists(..),
+  Sets(..),
+  ) where
 
 import Test.IOTasks.Overflow
 

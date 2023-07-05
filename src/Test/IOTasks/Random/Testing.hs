@@ -1,6 +1,11 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase #-}
-module Test.IOTasks.Random.Testing where
+module Test.IOTasks.Random.Testing (
+  taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome,
+  taskCheckOn,
+  Args (..), stdArgs,
+  genInput,
+  ) where
 
 import Test.IOTasks.Testing hiding (taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args, stdArgs)
 

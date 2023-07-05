@@ -4,7 +4,19 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
-module Test.IOTasks.Specification where
+module Test.IOTasks.Specification (
+  Specification(..),
+  readInput, writeOutput, writeOptionalOutput, optionalTextOutput,
+  branch, tillExit, exit, while, until, nop,
+  runSpecification,  runSpecification', AddLinebreaks,
+  vars, hasIteration,
+  pPrintSpecification,
+  InputMode(..),
+  sem, semM, RecStruct(..),
+  accept, Action(..),
+  ) where
+
+import Prelude hiding (until)
 
 import Test.IOTasks.ValueSet
 import Test.IOTasks.Term

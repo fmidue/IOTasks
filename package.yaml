@@ -38,6 +38,7 @@ dependencies:
 
 ghc-options:
 - -Wall
+- -Wmissing-export-lists
 - -Wno-name-shadowing
 - -fdefer-typed-holes
 

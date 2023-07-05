@@ -1,6 +1,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ExistentialQuantification #-}
-module SpecificationGenerator where
+{-# OPTIONS_GHC -Wno-orphans #-}
+module SpecificationGenerator (specGen, loopBodyGen) where
 
 import Test.IOTasks
 import Test.IOTasks.Specification
@@ -19,7 +20,7 @@ specGen :: Gen Specification
 specGen = simpleSpec
 
 shrinkSpec :: Specification -> [Specification]
-shrinkSpec (ReadInput _ _ _ s) = []
+shrinkSpec ReadInput{} = []
 shrinkSpec (WriteOutput _ _ s) = [s]
 shrinkSpec (Branch c s1 s2 s) = [s1, s2, s, Branch c s1 s2 nop]
 shrinkSpec Nop = []
@@ -103,10 +104,10 @@ data Condition = forall a. (Typeable a, Read a, Show a) => Condition { condTerm 
 -- that contains every variable at most once
 progressCondition :: (Typeable a, Read a, Show a) => [(Var,ValueSet a)] -> [Var] -> Gen Condition
 progressCondition lists nums = do
-  comp <- elements [(.>.)]
+  let comp = (.>.)
   n <- oneof [as @Integer . currentValue <$> elements nums, intLit <$> choose (0,10)]
   (xs,vs) <- elements lists
-  f <- elements [length']
+  let f = length'
   return $ Condition (f (as @[Integer] $ allValues xs) `comp` n) (xs,vs)
 
 -- simple terms

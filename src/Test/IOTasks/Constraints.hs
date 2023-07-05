@@ -3,7 +3,13 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE KindSignatures #-}
-module Test.IOTasks.Constraints where
+module Test.IOTasks.Constraints (
+  Constraint(..), SomeConstraint(..),
+  ConstraintTree(..),
+  constraintTree,
+  Path, paths,
+  partitionPath, pathDepth,
+  ) where
 
 import Test.IOTasks.ValueSet
 import Test.IOTasks.Term (Term, printIndexedTerm, castTerm, subTerms)

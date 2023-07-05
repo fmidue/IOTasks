@@ -9,11 +9,22 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
-{-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
-module Test.IOTasks.Term where
+{-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
+module Test.IOTasks.Term (
+  Term(..),
+  eval,
+  varExps, subTerms,
+  printTerm, printIndexedTerm,
+  SomeTerm(..),
+  castTerm,
+  AccessType(..),
+  TermStruct(..),
+  termStruct,
+  UnaryF(..), BinaryF(..), ConstValue(..)
+  ) where
 
 import Test.IOTasks.Terms
 import Test.IOTasks.Overflow
@@ -227,7 +238,7 @@ primEvalVar :: forall a e. (OverflowType a, VarExp e) => e -> Int -> ValueMap ->
 primEvalVar x n e = withTypeable (typeRepT @a) $
   let xs = drop n . map fst . sortBy (flip compare `on` snd) . concatMap unwrapValueEntry $ mapMaybe (`ValueMap.lookup` e) (toVarList x)
   in matchTypeOf xs
-    [ inCaseOfE @[I] $ \hrefl@(HRefl) xs -> (mconcatMap (checkOverflow @Integer) xs,xs)
+    [ inCaseOfE @[I] $ \HRefl xs -> (mconcatMap (checkOverflow @Integer) xs,xs)
     , fallbackCase' (mempty,xs)
     ]
 

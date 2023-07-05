@@ -1,6 +1,16 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase #-}
-module Test.IOTasks.Testing where
+module Test.IOTasks.Testing (
+  taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome,
+  taskCheckOn, generateStaticTestSuite,
+  Args(..), stdArgs,
+  Outcome(..), CoreOutcome(..), OutcomeHints(..),
+  ExpectedRun, ActualRun,
+  isSuccess, isFailure,
+  pPrintOutcome, pPrintOutcomeSimple, pPrintOutcomeHints,
+  overflowWarnings,
+  Inputs,
+  ) where
 
 import Test.IOTasks.IOrep (IOrep, Line, runProgram)
 import Test.IOTasks.Specification

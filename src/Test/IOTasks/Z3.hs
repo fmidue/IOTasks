@@ -9,7 +9,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
-module Test.IOTasks.Z3 where
+module Test.IOTasks.Z3 (findPathInput, satPaths, isSatPath, SatResult(..)) where
 
 import Test.IOTasks.Constraints
 import Test.IOTasks.ValueSet
@@ -64,12 +64,11 @@ data ScriptMode = WithSoft | WithoutSoft
 
 data SearchContext = NoContext | LastNotSAT Int | RequirePruningCheck
 
+-- depth is currently not used to trigger pruning
 updateContext :: SatResult -> Int -> SearchContext -> SearchContext
 updateContext SAT _ _ = NoContext
 updateContext NotSAT d NoContext = LastNotSAT d
-updateContext NotSAT d (LastNotSAT d')
-  | True = RequirePruningCheck
-  | otherwise = LastNotSAT d
+updateContext NotSAT _ (LastNotSAT _) = RequirePruningCheck
 updateContext _ _ RequirePruningCheck = error "updateContext: should not happen"
 
 type PrefixPath = Path

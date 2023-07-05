@@ -49,7 +49,7 @@ library
       Paths_IOTasks
   hs-source-dirs:
       src
-  ghc-options: -Wall -Wno-name-shadowing -fdefer-typed-holes
+  ghc-options: -Wall -Wmissing-export-lists -Wno-name-shadowing -fdefer-typed-holes
   build-depends:
       QuickCheck
     , ansi-terminal
@@ -80,7 +80,7 @@ test-suite mini-IOTasks-test
   hs-source-dirs:
       test
       examples
-  ghc-options: -Wall -Wno-name-shadowing -fdefer-typed-holes -threaded -rtsopts -with-rtsopts=-N -O2
+  ghc-options: -Wall -Wmissing-export-lists -Wno-name-shadowing -fdefer-typed-holes -threaded -rtsopts -with-rtsopts=-N -O2
   build-depends:
       IOTasks
     , QuickCheck

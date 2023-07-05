@@ -26,6 +26,7 @@ import Test.IOTasks.ValueMap
 import Data.Express (Expr((:$)), var, val, value, (//-), evl, vars, isVar, showExpr)
 import Data.List (nub, intercalate)
 import Data.Function (on)
+import Data.Maybe (maybeToList)
 
 import Type.Reflection
 import Data.Kind (Type)
@@ -107,7 +108,7 @@ replaceCVars :: ValueMap -> Expr -> Expr
 replaceCVars m expr = expr //-
   [ (oldExpr, headF ty :$ allE (varnameVarList x m) n)
   | Just (oldExpr, (n,x)) <- map (varStruct C) (vars expr)
-  , let Just ty = varnameTypeRep x m
+  , ty <- maybeToList $ varnameTypeRep x m
   ]
 
 -- given SomeTypeRep of a build Expr for head :: [a] -> a
@@ -124,7 +125,7 @@ reduceAVarsIndex :: ValueMap -> Expr -> Expr
 reduceAVarsIndex m expr = expr //-
   [ (expr, tailF ty n :$ allE (varnameVarList x m) 0)
   | Just (expr, (n,x)) <- map (varStruct A) (vars expr)
-  , let Just ty = varnameTypeRep x m
+  , ty <- maybeToList $ varnameTypeRep x m
   ]
 
 -- given SomeTypeRep of a build Expr for reverse . replicateF tail n :: [a] -> [a]

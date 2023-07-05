@@ -1,4 +1,6 @@
-module Test.IOTasks.MonadTeletype where
+module Test.IOTasks.MonadTeletype (
+  MonadTeletype(..),
+  ) where
 
 import Prelude hiding (putChar, putStr, putStrLn, print, getChar, getLine, readLn)
 import qualified Prelude

@@ -3,7 +3,19 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TupleSections #-}
-module Test.IOTasks.ValueMap where
+module Test.IOTasks.ValueMap (
+  ValueMap,
+  emptyValueMap, insertValue,
+  sortedEntries,
+  varnameTypeRep, varnameVarList,
+  Value(..),
+  wrapValue, unwrapValue,
+  readValue, printValue, showValue,
+  ValueEntry(..),
+  withValueEntry,
+  unwrapValueEntry,
+  Test.IOTasks.ValueMap.lookup,
+  ) where
 
 import Data.List as List (sortOn, lookup)
 import Data.Maybe (mapMaybe, isJust)
@@ -28,7 +40,7 @@ emptyValueMap xs = ValueMap (Map.fromList ((,NoEntry) <$> xs)) 0
 lookup :: Var -> ValueMap -> Maybe ValueEntry
 lookup k = Map.lookup k . valueMap
 
--- if there is a unique type for all Varnames in the list and it is the same for all names return return the TypeRep of that type
+-- if there is a unique type for all Varnames in the list and it is the same for all names return the TypeRep of that type
 varnameTypeRep :: [Varname] -> ValueMap -> Maybe SomeTypeRep
 varnameTypeRep xs m = uniqueResult $ map (`List.lookup` map unVar (Map.keys $ valueMap m)) xs
 
