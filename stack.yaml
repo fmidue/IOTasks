@@ -4,6 +4,7 @@ packages:
 - IOTasks
 - transparent-terms
 - dynamic-environment
+- task-api
 
 extra-deps:
 - quickcheck-transformer-0.3.1

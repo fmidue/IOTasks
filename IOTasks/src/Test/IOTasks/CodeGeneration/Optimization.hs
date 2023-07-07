@@ -23,8 +23,6 @@ import Data.Environment
 import Test.IOTasks.CodeGeneration.IR
 import Test.IOTasks.CodeGeneration.FreshVar
 
-import Debug.Trace
-
 -- general infrastructure
 data Rewrite m = Rewrite
   { rewrite :: IRProgram -> Maybe (IRProgram -> m IRProgram)

@@ -61,7 +61,6 @@ library:
   - Test.IOTasks.Examples.PTermExamples
   - Test.IOTasks.Examples.Hangman
   - Test.IOTasks.CodeGeneration
-  - Test.IOTasks.TaskGeneration.Task
 
 tests:
   IOTasks-test:
