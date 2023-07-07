@@ -6,6 +6,7 @@
 module Test.IOTasks.ValueMap (
   ValueMap,
   emptyValueMap, insertValue,
+  Test.IOTasks.ValueMap.lookup,
   sortedEntries,
   varnameTypeRep, varnameVarList,
   Value(..),
@@ -14,7 +15,6 @@ module Test.IOTasks.ValueMap (
   ValueEntry(..),
   withValueEntry,
   unwrapValueEntry,
-  Test.IOTasks.ValueMap.lookup,
   ) where
 
 import Data.List as List (sortOn, lookup)
@@ -27,7 +27,7 @@ import Data.Typeable (eqT)
 import Type.Reflection
 
 import Test.IOTasks.Terms (Var (..), varname, varExpType, Varname)
-import Test.IOTasks.Overflow (I)
+import Test.IOTasks.Internal.Overflow (I)
 import Text.Read (readMaybe)
 
 data ValueMap = ValueMap { valueMap :: Map Var ValueEntry, size :: Int } deriving (Eq,Show)

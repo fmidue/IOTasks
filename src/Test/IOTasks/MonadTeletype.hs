@@ -28,6 +28,12 @@ class Monad m => MonadTeletype m where
   readLn :: Read a => m a
   readLn = read <$> getLine
 
+  -- | for compatibility with regular IO programs.
+  --
+  --   Defaults to
+  --   @
+  --   hSetBuffering _ _ = pure ()
+  --   @
   hSetBuffering :: Handle -> BufferMode -> m ()
   hSetBuffering _ _ = pure ()
 

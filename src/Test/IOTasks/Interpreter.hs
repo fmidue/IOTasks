@@ -9,7 +9,7 @@ import Control.Monad.State
 
 import qualified Data.Set as Set
 
-import Test.IOTasks.Specification
+import Test.IOTasks.Internal.Specification
 import Test.IOTasks.MonadTeletype as MTT
 import Test.IOTasks.Term
 import Test.IOTasks.ValueSet
@@ -17,6 +17,12 @@ import Test.IOTasks.Trace
 import Test.IOTasks.OutputPattern
 import Test.IOTasks.ValueMap
 
+-- | Interpret a specification as a program in 'Monad' m.
+--
+--   Returns a list containing all possible ways of resolving optionality, e.g.
+--
+-- >>> length (interpret $ writeOptionalOutput [x,y])
+-- 3
 interpret :: MonadTeletype m => Specification -> [m ()]
 interpret s = do
   collapsed <- collapseChoice s

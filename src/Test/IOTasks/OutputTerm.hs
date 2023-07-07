@@ -8,19 +8,19 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE InstanceSigs #-}
-module Test.IOTasks.OutputTerm
-  ( OutputTerm
-  , SomeOutputTerm(..), withSomeOutputTerm
-  , transparentSubterms
-  , eval
+module Test.IOTasks.OutputTerm (
+  OutputTerm ,
+  SomeOutputTerm(..), withSomeOutputTerm,
+  outputTermVarExps, transparentSubterms,
+  eval,
   ) where
 
 import Prelude hiding (all)
 
 import Test.IOTasks.Terms
-import Test.IOTasks.Term hiding (eval)
-import qualified Test.IOTasks.Term as Term
-import Test.IOTasks.Overflow (OverflowWarning, checkOverflow, OverflowType (..))
+import Test.IOTasks.Internal.Term hiding (eval)
+import qualified Test.IOTasks.Internal.Term as Term
+import Test.IOTasks.Internal.Overflow (OverflowWarning, checkOverflow, OverflowType (..))
 import Test.IOTasks.ValueMap
 
 import Data.Express (Expr((:$)), var, val, value, (//-), evl, vars, isVar, showExpr)
@@ -43,6 +43,10 @@ data OutputTerm a
 toExpr :: OutputTerm a -> Expr
 toExpr (Transparent t) = termExpr t
 toExpr (Opaque expr _ _) = expr
+
+outputTermVarExps :: OutputTerm a -> [[Var]]
+outputTermVarExps (Transparent t) = termVarExps t
+outputTermVarExps (Opaque _ vars _) = vars
 
 transparentSubterms :: Typeable a => OutputTerm a -> [SomeTerm]
 transparentSubterms (Transparent t) = subTerms t
@@ -140,12 +144,14 @@ tailF (SomeTypeRep (ta :: TypeRep (a :: k))) n =
 replicateF :: (a -> a) -> Int -> a -> a
 replicateF f n = foldr (.) id $ replicate n f
 
-varStruct :: AccessType a -> Expr -> Maybe (Expr,(Int,[Varname]))
+data AccessType = C | A deriving Show
+
+varStruct :: AccessType -> Expr -> Maybe (Expr,(Int,[Varname]))
 varStruct acc x
   | isVar x = either (const Nothing) (Just . (x,)) $ parse (varParser acc) "" (reverse $ showExpr x)
   | otherwise = Nothing
   where
-    varParser :: AccessType a -> Parser (Int,[Varname]) -- parses a variable's string representation in reverse
+    varParser :: AccessType -> Parser (Int,[Varname]) -- parses a variable's string representation in reverse
     varParser acc = do
       n <- many1 digit
       _ <- string ("^"++show acc++"_")
@@ -187,15 +193,15 @@ h1 _ g (Opaque x vs xs) = Opaque (g :$ x) vs xs
 
 h2 :: (Typeable a, Typeable b) => (Term a -> Term b -> Term c) -> Expr -> OutputTerm a -> OutputTerm b -> OutputTerm c
 h2 f _ (Transparent x) (Transparent y) = Transparent $ f x y
-h2 _ g (Opaque x vx tx) (Transparent y) = Opaque (g :$ x :$ termExpr y) (vx ++ varExps y) (tx ++ subTerms y)
-h2 _ g (Transparent x) (Opaque y vy ty) = Opaque (g :$ termExpr x :$ y) (varExps x ++ vy) (subTerms x ++ ty)
+h2 _ g (Opaque x vx tx) (Transparent y) = Opaque (g :$ x :$ termExpr y) (vx ++ termVarExps y) (tx ++ subTerms y)
+h2 _ g (Transparent x) (Opaque y vy ty) = Opaque (g :$ termExpr x :$ y) (termVarExps x ++ vy) (subTerms x ++ ty)
 h2 _ g (Opaque x vx tx) (Opaque y vy ty) = Opaque (g :$ x :$ y) (vx ++ vy) (tx ++ ty)
 
 termExpr :: Term a -> Expr
 termExpr (termStruct -> Binary f x y) = binF f :$ termExpr x :$ termExpr y
 termExpr (termStruct -> Unary f xs) = unaryF f :$ termExpr xs
-termExpr (termStruct -> Variable C x n) = currentE x n
-termExpr (termStruct -> Variable A x n) = allE x n
+termExpr (termStruct -> VariableC x n) = currentE x n
+termExpr (termStruct -> VariableA x n) = allE x n
 termExpr (termStruct -> Literal (BoolLit b)) = val b
 termExpr (termStruct -> Literal (IntLit x)) = val x
 termExpr (termStruct -> Literal (ListLit xs)) = val $ fromOT xs
@@ -221,5 +227,10 @@ binF (:||:) = value "(||)" ((||) :: Bool -> Bool -> Bool)
 binF IsIn = value "elem" (elem :: Integer -> [Integer] -> Bool)
 
 instance ComplexLists OutputTerm where
-  filter' p (Transparent x) = Opaque (value "filter ?p" (filter p) :$ termExpr x) (varExps x) (subTerms x)
+  filter' p (Transparent x) = Opaque (value "filter ?p" (filter p) :$ termExpr x) (termVarExps x) (subTerms x)
   filter' p (Opaque x vs ts) = Opaque (value "filter ?p" (filter p) :$ x) vs ts
+
+instance Opaque OutputTerm where
+  liftOpaqueValue (x,str) = Opaque (value str x) [] []
+  liftOpaque2 (f,str) x = Opaque (value str f) (outputTermVarExps x) (transparentSubterms x)
+  liftOpaque3 (f,str) x y = Opaque (value str f) (outputTermVarExps x ++ outputTermVarExps y) (transparentSubterms x ++ transparentSubterms y)

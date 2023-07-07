@@ -95,6 +95,7 @@ printPatternSimple p =
   ('n':'\\':s) -> reverse s
   s -> reverse s
 
+-- | coverage relation on patterns
 (>:) :: OutputPattern 'TraceP -> OutputPattern 'TraceP -> Bool
 p >: q = isRight $ parse (patternParser p <> eof) "" $ printPattern q
 

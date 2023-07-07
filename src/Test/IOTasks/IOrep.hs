@@ -1,8 +1,10 @@
 {-# LANGUAGE DeriveFunctor #-}
-module Test.IOTasks.IOrep
-  ( IOrep , Line
-  , runProgram
-  , MonadTeletype(..), BufferMode(..), stdout
+module Test.IOTasks.IOrep (
+  IOrep , Line,
+  runProgram,
+  MonadTeletype(..),
+  -- ** Re-exports from "System.IO"
+  BufferMode(..), stdout,
   ) where
 import Prelude hiding (putChar,putStr,putStrLn,print,getChar,getLine,readLn)
 

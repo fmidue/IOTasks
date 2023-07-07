@@ -18,9 +18,10 @@ module Test.IOTasks.Terms (
   Arithmetic(..),
   Compare(..),
   Logic(..),
+  Sets(..),
   BasicLists(..),
   ComplexLists(..),
-  Sets(..),
+  Opaque(..),
   ) where
 
 import Test.IOTasks.Overflow
@@ -119,3 +120,8 @@ class Sets t where
 class ComplexLists t where
   -- TODO: improve signature?
   filter' :: (Integer -> Bool) -> t [Integer] -> t [Integer]
+
+class Opaque t where
+  liftOpaqueValue :: Typeable a => (a, String) -> t a
+  liftOpaque2 :: (Typeable a, Typeable b) => (a -> b, String) -> t a -> t b
+  liftOpaque3 :: (Typeable a, Typeable b, Typeable c) => (a -> b -> c, String) -> t a -> t b -> t c

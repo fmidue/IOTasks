@@ -3,11 +3,13 @@
 {-# LANGUAGE TypeApplications #-}
 module Test.IOTasks.ValueSet (
   ValueSet(..),
-  Size(..),
   complement,
-  valueOf, containsValue,
+  containsValue,
   printValueSet,
-
+  -- | = random value generation
+  valueOf,
+  Size(..),
+  -- | = standard value sets
   ints, nats, str,
   ) where
 

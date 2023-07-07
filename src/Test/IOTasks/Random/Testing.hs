@@ -2,8 +2,9 @@
 {-# LANGUAGE LambdaCase #-}
 module Test.IOTasks.Random.Testing (
   taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome,
-  taskCheckOn,
   Args (..), stdArgs,
+  -- | = pre-computed test suites
+  taskCheckOn,
   genInput,
   ) where
 
@@ -12,16 +13,15 @@ import Test.IOTasks.Testing hiding (taskCheck, taskCheckWith, taskCheckOutcome, 
 import Data.Set as Set hiding (foldr)
 import Data.Functor (void)
 import Data.Bifunctor (first)
-import Data.Maybe (fromMaybe)
 
 import Test.IOTasks.IOrep (IOrep, runProgram)
-import Test.IOTasks.Specification
+import Test.IOTasks.Internal.Specification
 import Test.IOTasks.Trace
 import Test.IOTasks.Term
 import Test.IOTasks.OutputPattern
 import Test.IOTasks.ValueSet
 import Test.IOTasks.ValueMap
-import Test.IOTasks.Output
+import Test.IOTasks.Internal.Output
 import Test.IOTasks.Overflow (OverflowWarning(..))
 
 import Test.QuickCheck (Gen, generate, frequency)
@@ -35,19 +35,27 @@ taskCheck = taskCheckWith stdArgs
 
 data Args
   = Args
-  { maxPathDepth :: Maybe Int
+  -- | maximum length of input sequences, unbounded if 'Nothing'
+  { maxInputLength :: Maybe Int
+  -- | size of randomly generated input candidates (the solver might find bigger solutions)
   , valueSize :: Integer
+  -- | maximum number of generated tests
   , maxSuccess :: Int
+  -- | maximum number of negative inputs per path (for 'InputMode' 'UntilValid')
   , maxNegative :: Int
+  -- | print extra information
   , verbose :: Bool
+  -- | cleanup feedback for educational use
   , simplifyFeedback :: Bool
-  , searchTimeout :: Int -- in milliseconds
+  -- | timeout for restarting input search, in milliseconds
+  , searchTimeout :: Int
+  -- | maximum number timeouts before giving up
   , maxSearchTimeouts :: Int
   }
 
 stdArgs :: Args
 stdArgs = Args
-  { maxPathDepth = Nothing
+  { maxInputLength = Nothing
   , valueSize = 100
   , maxSuccess = 100
   , maxNegative = 5
@@ -75,7 +83,7 @@ taskCheckWithOutcome Args{..} prog spec  = do
     test o n to
       | to > maxSearchTimeouts = pure (Outcome GaveUp NoHints,to)
       | otherwise = do
-        input <- generate $ genInput spec maxPathDepth (Size valueSize (fromIntegral $ valueSize `div` 5)) maxNegative
+        input <- generate $ genInput spec maxInputLength (Size valueSize (fromIntegral $ valueSize `div` 5)) maxNegative
         mOutcome <- timeout (searchTimeout * 1000) $ do
           let o = runTest prog spec input
           seq (isSuccess o) $ pure o -- force outcome
@@ -98,7 +106,7 @@ genTrace :: Specification -> Maybe Int -> Size -> Int -> Gen Trace
 genTrace spec depth sz maxNeg =
   semM
     (\(e,d,n) x vs mode ->
-      (if fromMaybe False ((d >) <$> depth) then pure $ NoRec OutOfInputs
+      (if maybe False (d >) depth then pure $ NoRec OutOfInputs
       else do
         frequency $
             (5, valueOf vs sz >>= (\i -> pure $ RecSub (wrapValue i) id (insertValue (wrapValue i) x e,d+1,n)))
@@ -126,8 +134,8 @@ runTest p spec i =
     (specTrace,warn) = first normalizedTrace $ runSpecification i spec
     progTrace = runProgram i p
     o = case warn of
-      OverflowWarning -> OverflowHint 1
+      OverflowOccured -> OverflowHint 1
       _ -> mempty
   in case specTrace `covers` progTrace of
-    MatchSuccessfull -> Outcome (Success 1) o
+    result | isSuccessfulMatch result -> Outcome (Success 1) o
     failure -> Outcome (Failure i specTrace progTrace failure) o

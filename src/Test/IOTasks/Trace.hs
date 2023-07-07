@@ -6,18 +6,26 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Move brackets to avoid $" #-}
 module Test.IOTasks.Trace (
-  AbstractTrace, Trace, NTrace,
-  ordinaryTrace, normalizedTrace,
-  terminate, outOfInputs, progWrite, progRead,
-  pattern Terminate, pattern OutOfInputs, pattern ProgWrite, pattern ProgRead, pattern ProgReadString,
-  pattern NTerminate, pattern NOutOfInputs, pattern NProgWrite, pattern NProgRead, pattern NProgReadString,
-  pPrintTrace, pPrintTraceSimple,
-  inputSequence, isTerminating,
-  inputSequenceN, isTerminatingN,
-
+  AbstractTrace,
   OptFlag(..),
-  MatchResult(..), pPrintMatchResult, pPrintMatchResultSimple,
+  progRead, progWrite,
+  terminate, outOfInputs,
+  Trace,
+  ordinaryTrace,
+  pattern ProgRead, pattern ProgReadString, pattern ProgWrite,
+  pattern Terminate, pattern OutOfInputs,
+  inputSequence, isTerminating,
+  NTrace,
+  normalizedTrace,
+  pattern NProgRead, pattern NProgReadString, pattern NProgWrite,
+  pattern NTerminate, pattern NOutOfInputs,
+  inputSequenceN, isTerminatingN,
+  pPrintTrace, pPrintTraceSimple,
+
   covers,
+  MatchResult,
+  isSuccessfulMatch,
+  pPrintMatchResult, pPrintMatchResultSimple,
 ) where
 
 import Test.IOTasks.OutputPattern
@@ -125,16 +133,20 @@ outOfInputs :: AbstractTrace
 outOfInputs = AbstractTrace $ OutOfInputsC :| []
 
 data MatchResult
-  = MatchSuccessfull
+  = MatchSuccessful
   | InputMismatch NTrace NTrace
   | OutputMismatch NTrace NTrace
   | AlignmentMismatch NTrace (Maybe NTrace) NTrace
   | TerminationMismatch NTrace (Maybe NTrace) NTrace
   deriving (Eq,Show)
 
+isSuccessfulMatch :: MatchResult -> Bool
+isSuccessfulMatch MatchSuccessful = True
+isSuccessfulMatch _ = False
+
 instance Semigroup MatchResult where
-  MatchSuccessfull <> _ = MatchSuccessfull
-  _ <> MatchSuccessfull = MatchSuccessfull
+  MatchSuccessful <> _ = MatchSuccessful
+  _ <> MatchSuccessful = MatchSuccessful
   r <> _ = r
 
 addExpect :: NTrace -> MatchResult -> MatchResult
@@ -154,10 +166,10 @@ covers s@(NProgWrite Mandatory is t1) t@(NProgWrite Mandatory js t2)
 covers s@(NProgWrite Optional is t1) t = (NProgWrite Mandatory is t1 `covers` t) <> addExpect s (t1 `covers` t)
 covers s t@(NProgWrite Optional _ _) = OutputMismatch s t
 
-covers NTerminate NTerminate = MatchSuccessfull
+covers NTerminate NTerminate = MatchSuccessful
 covers s@NTerminate t = TerminationMismatch s Nothing t
 
-covers NOutOfInputs NOutOfInputs = MatchSuccessfull
+covers NOutOfInputs NOutOfInputs = MatchSuccessful
 
 covers s t = AlignmentMismatch s Nothing t
 
@@ -168,7 +180,7 @@ pPrintMatchResultSimple :: MatchResult -> Doc
 pPrintMatchResultSimple = pPrintMatchResult' True
 
 pPrintMatchResult' :: Bool -> MatchResult -> Doc
-pPrintMatchResult' _ MatchSuccessfull = text "MatchSuccessfull"
+pPrintMatchResult' _ MatchSuccessful = text "MatchSuccessful"
 pPrintMatchResult' simple (InputMismatch s t) = text "InputMismatch:" $$ nest 2 (reportMismatch simple s Nothing t)
 pPrintMatchResult' simple (OutputMismatch s t) = text "OutputMismatch:" $$ nest 2 (reportOutputMismatch simple s t)
 pPrintMatchResult' simple (AlignmentMismatch s s' t) = text "AlignmentMismatch:" $$ nest 2 (reportMismatch simple s s' t)

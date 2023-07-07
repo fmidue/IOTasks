@@ -1,17 +1,16 @@
 module Test.IOTasks (
+  -- * Specifications
   Specification, runSpecification, runSpecification', accept,
-  readInput, writeOutput, writeOptionalOutput, optionalTextOutput, branch, tillExit, exit, nop, until, while,
-  pPrintSpecification,
-  InputMode(..),
-  MonadTeletype(..),
-  IOrep, runProgram, Line,
-  Trace, (>:),
-  Term,
-  ValueSet(..),
+  readInput,
+  writeOutput, writeOptionalOutput, optionalTextOutput, branch, tillExit, exit, nop, until, while,
+  InputMode(..), ValueSet(..),
   ints, nats, str,
-  OutputPattern(..), PatternType(..),
-  OutputTerm,
+  OutputPattern(..),
   Var, Varname, var, intVar, stringVar,
+  pPrintSpecification,
+  -- * Terms
+  Term,
+  OutputTerm,
   Arithmetic(..),
   Compare(..),
   Logic(..),
@@ -20,10 +19,17 @@ module Test.IOTasks (
   Accessor(..),
   as,
   OverflowType,
+  -- * Programs
+  MonadTeletype(..),
+  IOrep, runProgram, Line,
+  Trace, covers,
+  -- * Testing
   taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs,
   Outcome(..), CoreOutcome(..), OutcomeHints(..), isSuccess, isFailure, overflowWarnings,
   pPrintOutcome, pPrintOutcomeSimple,
+  -- ** pre-computed test suites
   generateStaticTestSuite, taskCheckOn,
+  -- * Interpreter
   interpret,
   ) where
 

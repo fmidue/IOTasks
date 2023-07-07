@@ -23,7 +23,6 @@ dependencies:
 - ansi-terminal
 - async
 - base >= 4.7 && < 5
-- constraints
 - containers
 - deriving-compat
 - express
@@ -44,6 +43,11 @@ ghc-options:
 
 library:
   source-dirs: src
+  other-modules:
+    - Test.IOTasks.Internal.Output
+    - Test.IOTasks.Internal.Overflow
+    - Test.IOTasks.Internal.Specification
+    - Test.IOTasks.Internal.Term
 
 tests:
   mini-IOTasks-test:

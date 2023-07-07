@@ -5,16 +5,19 @@
 {-# LANGUAGE KindSignatures #-}
 module Test.IOTasks.Constraints (
   Constraint(..), SomeConstraint(..),
+  ConstraintType(..),
   ConstraintTree(..),
   constraintTree,
   Path, paths,
   partitionPath, pathDepth,
+  numberOfPaths,
+  printPath, printConstraint, printSomeConstraint,
   ) where
 
 import Test.IOTasks.ValueSet
 import Test.IOTasks.Term (Term, printIndexedTerm, castTerm, subTerms)
 import Test.IOTasks.Terms (Var, not', varname)
-import Test.IOTasks.Specification
+import Test.IOTasks.Internal.Specification
 import Test.IOTasks.OutputPattern (valueTerms)
 import Test.IOTasks.OutputTerm (transparentSubterms, withSomeOutputTerm)
 

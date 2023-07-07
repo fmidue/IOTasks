@@ -1,4 +1,4 @@
-module Test.IOTasks.Output (
+module Test.IOTasks.Internal.Output (
   Output, newOutput,
   putT, putLnT, printT,
   putP, putLnP, printP,

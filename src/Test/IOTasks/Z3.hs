@@ -9,11 +9,11 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
-module Test.IOTasks.Z3 (findPathInput, satPaths, isSatPath, SatResult(..)) where
+module Test.IOTasks.Z3 (findPathInput, satPaths, satPathsQ, isSatPath, SatResult(..), Timeout) where
 
 import Test.IOTasks.Constraints
 import Test.IOTasks.ValueSet
-import Test.IOTasks.Term
+import Test.IOTasks.Internal.Term
 import Test.IOTasks.Terms (Var (..), VarExp(..), varname)
 import Test.IOTasks.ValueMap
 
@@ -72,15 +72,15 @@ updateContext NotSAT _ (LastNotSAT _) = RequirePruningCheck
 updateContext _ _ RequirePruningCheck = error "updateContext: should not happen"
 
 type PrefixPath = Path
-satPathsDebug :: Int -> Int -> ConstraintTree -> Int -> Bool -> IO [Path]
-satPathsDebug maxUnfolds to t maxSeqLength checkOverflows = do
+satPaths :: Int -> Int -> ConstraintTree -> Int -> Bool -> IO [Path]
+satPaths maxUnfolds to t maxSeqLength checkOverflows = do
   q <- atomically newTQueue
   nVar <- newTVarIO Nothing
-  satPaths nVar to t maxUnfolds maxSeqLength checkOverflows q
+  satPathsQ nVar to t maxUnfolds maxSeqLength checkOverflows q
   map fromJust . init <$> atomically (flushTQueue q)
 
-satPaths :: TVar (Maybe Int) -> Int -> ConstraintTree -> Int -> Int -> Bool -> TQueue (Maybe Path) -> IO ()
-satPaths nVar to t maxUnfolds maxSeqLength checkOverflows q = do
+satPathsQ :: TVar (Maybe Int) -> Int -> ConstraintTree -> Int -> Int -> Bool -> TQueue (Maybe Path) -> IO ()
+satPathsQ nVar to t maxUnfolds maxSeqLength checkOverflows q = do
   evalStateT (satPaths' 0 0 to t ([],0) q) NoContext
   atomically $ writeTQueue q Nothing
   where
@@ -116,13 +116,6 @@ satPaths nVar to t maxUnfolds maxSeqLength checkOverflows q = do
     satPaths' nUnfolds nInputs to (Unfold t) (s,d) q
       | nUnfolds <= maxUnfolds = satPaths' (nUnfolds+1) nInputs to t (s,d) q
       | otherwise = pure ()
-
--- path until next choice
-lookAhead :: ConstraintTree -> Path
-lookAhead Empty = []
-lookAhead (Assert c t) = SomeConstraint c : lookAhead t
-lookAhead Choice{} = []
-lookAhead (Unfold t) = lookAhead t
 
 data ValueGenerator where
   ValueGenerator :: Typeable v => (Size -> Gen v) -> ValueGenerator
@@ -177,15 +170,6 @@ evalAST m x = do
         Nothing -> pure Nothing
     else fmap show <$> evalInt m x
 
-sortTest :: IO Result
-sortTest = evalZ3 $ do
-  x <- mkFreshVar "x" =<< mkStringSort
-  hi <- mkString "Hi"
-  eq <- mkEq x hi
-  def <- mkStringSymbol "default"
-  _ <- optimizeAssertSoft eq "1" def
-  optimizeCheck []
-
 mkSort :: forall a z3. (Typeable a, MonadZ3 z3) => z3 Sort
 mkSort =
   case eqTypeRep (typeRep @a) (typeRep @Integer) of
@@ -226,11 +210,11 @@ mkValueRep x (StringValue s) = do
 z3Predicate :: Term x -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R AST
 z3Predicate (termStruct -> Binary f x y) e vars = z3PredicateBinary f x y e vars
 z3Predicate (termStruct -> Unary f x) e vars = z3PredicateUnary f x e vars
-z3Predicate (termStruct -> Variable C x n) e vars = pure $ fromMaybe (unknownVariablesError x) $ (`List.lookup` vars) . last $ weaveVariables x n e
+z3Predicate (termStruct -> VariableC x n) e vars = pure $ fromMaybe (unknownVariablesError x) $ (`List.lookup` vars) . last $ weaveVariables x n e
 z3Predicate (termStruct -> Literal (IntLit n)) _ _ = mkIntNum n
 z3Predicate (termStruct -> Literal (BoolLit b)) _ _ = mkBool b
 --
-z3Predicate (termStruct -> Variable A _x _) _e _vars = error "z3Predicate: top level list should not happen"
+z3Predicate (termStruct -> VariableA _x _) _e _vars = error "z3Predicate: top level list should not happen"
 z3Predicate (termStruct -> Literal (ListLit _)) _ _ = error "z3Predicate: top level list literal should not happen"
 
 z3PredicateUnary :: forall a b. Typeable a => UnaryF a b -> Term a ->  Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R AST

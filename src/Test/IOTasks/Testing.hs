@@ -2,13 +2,14 @@
 {-# LANGUAGE LambdaCase #-}
 module Test.IOTasks.Testing (
   taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome,
-  taskCheckOn, generateStaticTestSuite,
   Args(..), stdArgs,
   Outcome(..), CoreOutcome(..), OutcomeHints(..),
   ExpectedRun, ActualRun,
   isSuccess, isFailure,
-  pPrintOutcome, pPrintOutcomeSimple, pPrintOutcomeHints,
   overflowWarnings,
+  pPrintOutcome, pPrintOutcomeSimple, pPrintOutcomeHints,
+  -- | = pre-computed test suites
+  taskCheckOn, generateStaticTestSuite,
   Inputs,
   ) where
 
@@ -18,7 +19,7 @@ import Test.IOTasks.Constraints
 import Test.IOTasks.Trace
 import Test.IOTasks.Z3
 import Test.IOTasks.Overflow
-import Test.IOTasks.Output
+import Test.IOTasks.Internal.Output
 
 import Control.Concurrent.STM
 import Control.Monad (when, forM, replicateM)
@@ -37,16 +38,29 @@ taskCheck = taskCheckWith stdArgs
 
 data Args
   = Args
-  { maxIterationUnfold :: Int -- maximum sum of iteration unfoldings when searching for satisfiable paths
-  , valueSize :: Integer -- size of randomly generated input candidates (the solver might find bigger solutions)
-  , solverTimeout :: Int -- solver timeout in milliseconds
-  , maxTimeouts :: Int -- maximum number of solver timeouts before giving up
-  , maxSuccessPerPath :: Int -- number of tests generated per path
-  , maxNegative :: Int -- maximum number of negative inputs per path
-  , verbose :: Bool -- print extra information
-  , simplifyFeedback :: Bool -- cleanup feedback for educational use
-  , checkOverflows :: Bool -- check that intermediate results do not cause Int overflows, including (parts of OutputTerms when possible) (best-effort, no gurantees on completness)
-  , solverMaxSeqLength :: Int -- maximum length of Sequence values in the the backend solver (affects string length as well). Smaller values may speed up test case generation, at the risk of not finding some satisfiable paths
+    -- | maximum number of iteration unfoldings when searching for satisfiable paths.
+    --   (indirectly controls maximum path length)
+  { maxIterationUnfold :: Int
+    -- | size of randomly generated input candidates (the solver might find bigger solutions)
+  , valueSize :: Integer
+    -- | solver timeout in milliseconds
+  , solverTimeout :: Int
+    -- | maximum number of solver timeouts before giving up
+  , maxTimeouts :: Int
+    -- | number of tests generated per path
+  , maxSuccessPerPath :: Int
+    -- | maximum number of negative inputs per path (for 'InputMode' 'UntilValid')
+  , maxNegative :: Int
+    -- | print extra information
+  , verbose :: Bool
+    -- | cleanup feedback for educational use
+  , simplifyFeedback :: Bool
+    -- | check that intermediate results do not cause Int overflows,
+    --   including parts of 'OutputTerms' when possible (best-effort, no gurantees on completness)
+  , checkOverflows :: Bool
+    -- | maximum length of string values in the the backend solver.
+    --   Smaller values may speed up test case generation, at the risk of not finding some satisfiable paths
+  , solverMaxSeqLength :: Int
   }
 
 stdArgs :: Args
@@ -82,7 +96,7 @@ taskCheckWithOutcome Args{..} prog spec = do
   nVar <- newTVarIO Nothing
 
   (_,(coreOut,satPaths,nInputs,timeouts,overflows)) <- concurrently
-    (satPaths nVar solverTimeout (constraintTree maxNegative spec) maxIterationUnfold solverMaxSeqLength checkOverflows q)
+    (satPathsQ nVar solverTimeout (constraintTree maxNegative spec) maxIterationUnfold solverMaxSeqLength checkOverflows q)
     (testPaths output nVar q (0,0,0,0) Nothing)
 
   let out = Outcome coreOut (if overflows == 0 then NoHints else OverflowHint overflows)
@@ -139,10 +153,10 @@ taskCheckWithOutcome Args{..} prog spec = do
           let
             (specTrace,warn) = first normalizedTrace $ runSpecification nextInput spec
             progTrace = runProgram nextInput prog
-            o' = if warn == OverflowWarning then o+1 else o
-          when (verbose && warn == OverflowWarning) $ putLnP output "Overflow of Int range detected."
+            o' = if warn == OverflowOccured then o+1 else o
+          when (verbose && warn == OverflowOccured) $ putLnP output "Overflow of Int range detected."
           case specTrace `covers` progTrace of
-            MatchSuccessfull -> testPath output p (n+1) nOtherTests o'
+            result | isSuccessfulMatch result -> testPath output p (n+1) nOtherTests o'
             failure -> do
               when verbose $ putLnP output $ unwords ["found counterexample of length",show $ length nextInput]
               pure (PathFailure nextInput specTrace progTrace failure,n+1,o')
@@ -235,9 +249,9 @@ taskCheckOn i p s = uncurry Outcome (go 0 0 i p s) where
     let
       (specTrace,warn) = first normalizedTrace $ runSpecification i spec
       progTrace = runProgram i prog
-      o' = if warn == OverflowWarning then o+1 else o
+      o' = if warn == OverflowOccured then o+1 else o
     in case specTrace `covers` progTrace of
-      MatchSuccessfull -> go (n+1) o' is prog spec
+      result | isSuccessfulMatch result -> go (n+1) o' is prog spec
       failure -> (Failure i specTrace progTrace failure, overflowHint o')
 
   overflowHint 0 = NoHints
