@@ -69,7 +69,7 @@ library
     , z3
   default-language: Haskell2010
 
-test-suite mini-IOTasks-test
+test-suite IOTasks-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:

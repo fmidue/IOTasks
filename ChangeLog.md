@@ -1,3 +1,3 @@
-# Changelog for mini-IOTasks
+# Changelog for IOTasks
 
 ## Unreleased changes
