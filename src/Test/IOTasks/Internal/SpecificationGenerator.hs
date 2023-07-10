@@ -1,17 +1,18 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ExistentialQuantification #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
-module SpecificationGenerator (specGen, loopBodyGen) where
+module Test.IOTasks.Internal.SpecificationGenerator (specGen, shrinkSpec, loopBodyGen) where
 
-import Test.IOTasks
-import Test.IOTasks.Specification
+import Test.IOTasks.Terms
+import Test.IOTasks.OutputTerm
+import Test.IOTasks.OutputPattern
+import Test.IOTasks.ValueSet
+import Test.IOTasks.Term
+import Test.IOTasks.Overflow
+import Test.IOTasks.ValueMap
+import {-# SOURCE #-} Test.IOTasks.Internal.Specification
 
 import Test.QuickCheck
 import Type.Reflection
-
-instance Arbitrary Specification where
-  arbitrary = specGen
-  shrink = shrinkSpec
 
 instance Show Specification where
   show = (++ "\n--\n") . show . pPrintSpecification

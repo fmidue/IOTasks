@@ -14,6 +14,7 @@ module Test.IOTasks.Internal.Specification (
   InputMode(..),
   sem, semM, RecStruct(..),
   accept, Action(..),
+  LoopBody(..),
   ) where
 
 import Prelude hiding (until)
@@ -25,6 +26,7 @@ import Test.IOTasks.Trace
 import Test.IOTasks.OutputPattern
 import Test.IOTasks.Overflow
 import Test.IOTasks.ValueMap
+import Test.IOTasks.Internal.SpecificationGenerator
 
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -33,6 +35,7 @@ import Data.Functor.Identity (runIdentity,Identity(..))
 import Data.Bifunctor (first)
 import Data.Typeable
 
+import Test.QuickCheck (Arbitrary(..))
 import Text.PrettyPrint hiding ((<>))
 
 data Specification where
@@ -249,3 +252,21 @@ accept s_ t_ = accept' s_ k_I t_ d_I
     k_I Exit _ _ = error "ill-formed specification: exit marker at top-level"
     d_I :: ValueMap
     d_I = emptyValueMap $ vars s_
+
+-- generators
+instance Arbitrary Specification where
+  arbitrary = specGen
+  shrink = shrinkSpec
+
+data LoopBody = LoopBody { body :: Specification, progress :: Specification}
+
+instance Show LoopBody where
+  show (LoopBody b p) = unlines
+    [ "LoopBody {"
+    , "  body = " ++ render (pPrintSpecification b) ++ ","
+    , "  progress = " ++ render (pPrintSpecification p)
+    , "}"
+    ]
+
+instance Arbitrary LoopBody where
+  arbitrary = uncurry LoopBody <$> loopBodyGen

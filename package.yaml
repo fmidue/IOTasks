@@ -47,6 +47,7 @@ library:
     - Test.IOTasks.Internal.Output
     - Test.IOTasks.Internal.Overflow
     - Test.IOTasks.Internal.Specification
+    - Test.IOTasks.Internal.SpecificationGenerator
     - Test.IOTasks.Internal.Term
 
 tests:

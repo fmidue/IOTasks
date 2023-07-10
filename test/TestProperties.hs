@@ -10,12 +10,12 @@ import Test.QuickCheck hiding (isSuccess, stdArgs,verbose, Args)
 import Control.Monad.Loops (allM)
 
 import Test.IOTasks
+import Test.IOTasks.Specification (LoopBody(..))
 import Test.IOTasks.Random (genInput)
 import qualified Test.IOTasks.Random as Random (stdArgs, Args(..))
 import Test.IOTasks.ValueSet
 import Test.IOTasks.Trace (ordinaryTrace, isTerminatingN, normalizedTrace)
-
-import SpecificationGenerator
+import Test.IOTasks.OutputPattern (PatternType(TraceP),(>:))
 
 import Control.Applicative
 
@@ -23,32 +23,30 @@ testProperties :: Spec
 testProperties = do
   context "testing with random specifications" $ do
     prop "programs built from a spec satisfy that spec" $
-      forAll specGen $ \s -> allM (\p -> isSuccess <$> taskCheckWithOutcome stdArgs{verbose=False,maxIterationUnfold=15,maxSuccessPerPath=5} p s) (interpret s) `shouldReturn` True
+      \s -> allM (\p -> isSuccess <$> taskCheckWithOutcome stdArgs{verbose=False,maxIterationUnfold=15,maxSuccessPerPath=5} p s) (interpret s) `shouldReturn` True
 
     prop "programs built from a spec dont go wrong on (solver based) inputs generated from the same spec" $
-      forAll specGen (\s -> ioProperty $ do
+      \s -> ioProperty $ do
         is <- generateStaticTestSuite stdArgs s
         pure $ all (\p -> all (\i -> isTerminatingN $ runProgram i p) is) (interpret s)
-      )
 
     prop "programs built from a spec dont go wrong on (random) inputs generated from the same spec" $
-      forAll specGen (\s ->
+      \s ->
         let Random.Args{..} = Random.stdArgs
-        in forAll (genInput s maxPathDepth (Size valueSize (fromIntegral $ valueSize `div` 5)) maxNegative) (\is ->
-          all (isTerminatingN . runProgram is) (interpret s)
-      ))
+        in
+          forAll (genInput s maxInputLength (Size valueSize (fromIntegral $ valueSize `div` 5)) maxNegative)
+            (\is -> all (isTerminatingN . runProgram is) (interpret s))
 
     prop "relate runSpecification based semantics to accept (cf FLOPS 2020)" $
-      forAll specGen (\s -> testAgainst s s)
+      \s -> testAgainst s s
 
     prop "inputs are never optional for a fixed input prefix (traces obtained from too less inputs never terminate)" $
-      forAll specGen (\s -> ioProperty $ do
+      \s -> ioProperty $ do
         is <- filter (not . null) <$> generateStaticTestSuite stdArgs s
         pure $ all (\i -> not . isTerminatingN . normalizedTrace . fst $ runSpecification i s) (init <$> is)
-      )
 
     prop "tillExit s === tillExit (s <> tillExit s <> exit) " $
-      forAll loopBodyGen $ \(s,i) -> testEquiv
+      \(LoopBody s i) -> testEquiv
         (i <> tillExit s)
         (i <> tillExit (s <> tillExit s <> exit))
 

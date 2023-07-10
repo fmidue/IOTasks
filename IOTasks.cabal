@@ -48,6 +48,7 @@ library
       Test.IOTasks.Internal.Output
       Test.IOTasks.Internal.Overflow
       Test.IOTasks.Internal.Specification
+      Test.IOTasks.Internal.SpecificationGenerator
       Test.IOTasks.Internal.Term
   hs-source-dirs:
       src
@@ -73,7 +74,6 @@ test-suite IOTasks-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      SpecificationGenerator
       TestExamples
       TestProperties
       Example
