@@ -1,10 +1,16 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DataKinds #-}
-module Test.IOTasks.Internal.Specification where
+module Test.IOTasks.Internal.Specification (
+  Specification(..),
+  InputMode(..),
+  readInput,writeOutput,writeOptionalOutput,optionalTextOutput,branch,nop,tillExit,exit,
+  vars,
+  pPrintSpecification,
+  ) where
 
 import Test.IOTasks.ValueSet
 import Test.IOTasks.Term
-import Test.IOTasks.Terms (Var (..), varname)
+import Test.IOTasks.Terms (Var (..))
 import Test.IOTasks.Trace
 import Test.IOTasks.OutputPattern
 
@@ -12,7 +18,6 @@ import Data.Set (Set)
 import Data.Typeable (Typeable)
 
 import Text.PrettyPrint (Doc)
-
 
 data Specification where
   ReadInput :: (Typeable a,Read a,Show a) => Var -> ValueSet a -> InputMode -> Specification -> Specification

@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Test.IOTasks.Internal.SpecificationGenerator (specGen, shrinkSpec, loopBodyGen) where
 
 import Test.IOTasks.Terms
@@ -8,7 +9,6 @@ import Test.IOTasks.OutputPattern
 import Test.IOTasks.ValueSet
 import Test.IOTasks.Term
 import Test.IOTasks.Overflow
-import Test.IOTasks.ValueMap
 import {-# SOURCE #-} Test.IOTasks.Internal.Specification
 
 import Test.QuickCheck
@@ -66,8 +66,8 @@ someInputsWithHole xs nMax = do
 outputOneof :: OverflowType a => Gen (OutputTerm a) -> Gen Specification
 outputOneof = outputOneof' False
 
-optionalOutputOneof :: OverflowType a => Gen (OutputTerm a) -> Gen Specification
-optionalOutputOneof = outputOneof' True
+_optionalOutputOneof :: OverflowType a => Gen (OutputTerm a) -> Gen Specification
+_optionalOutputOneof = outputOneof' True
 
 outputOneof' :: OverflowType a => Bool -> Gen (OutputTerm a) -> Gen Specification
 outputOneof' b ts = do
@@ -75,8 +75,8 @@ outputOneof' b ts = do
   pure $ (if b then writeOptionalOutput else writeOutput) [Value t]
 
 -- branch free sequence of inputs and outputs
-linearSpec :: (Typeable a, Read a, Show a) => [(Var,ValueSet a,InputMode)] -> [(Var,ValueSet a,InputMode)] -> Gen (Specification, [Var])
-linearSpec lists xs = sized $ \n -> do
+_linearSpec :: (Typeable a, Read a, Show a) => [(Var,ValueSet a,InputMode)] -> [(Var,ValueSet a,InputMode)] -> Gen (Specification, [Var])
+_linearSpec lists xs = sized $ \n -> do
   is <- ($ nop) <$> someInputsWithHole (lists ++ xs) (n `div` 2)
   let vs = vars is
   os <- resize (n `div` 2) $ listOf1 $ outputOneof (intTerm vs vs)
@@ -98,7 +98,7 @@ loopBody xs loopCondition = do
     , pure $ branch (not' $ condTerm cond) s1' exit
     ]
 
-data Condition = forall a. (Typeable a, Read a, Show a) => Condition { condTerm :: Term Bool, progressInfo :: (Var,ValueSet a) }
+data Condition = forall a. (Typeable a, Read a, Show a) => Condition { condTerm :: Term Bool, _progressInfo :: (Var,ValueSet a) }
 
 -- generates a numeric condition of the form
 -- f xs `comp` n

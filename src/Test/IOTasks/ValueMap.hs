@@ -15,6 +15,7 @@ module Test.IOTasks.ValueMap (
   ValueEntry(..),
   withValueEntry,
   unwrapValueEntry,
+  lookupInteger, lookupString,
   ) where
 
 import Data.List as List (sortOn, lookup)
