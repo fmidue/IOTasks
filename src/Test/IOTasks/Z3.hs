@@ -9,6 +9,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE DeriveFunctor #-}
 module Test.IOTasks.Z3 (findPathInput, satPaths, satPathsQ, isSatPath, SatResult(..), Timeout) where
 
 import Test.IOTasks.Constraints
@@ -23,6 +24,7 @@ import Test.QuickCheck (generate)
 
 import Control.Concurrent.STM
 
+import Control.Monad (void)
 import Control.Monad.State
 
 import Data.Maybe (catMaybes, fromMaybe, mapMaybe, fromJust)
@@ -44,20 +46,20 @@ data ImplicitParameters = ImplicitParameter { valueSizeParameter :: Integer, max
 
 type Timeout = Int
 
-findPathInput :: Timeout -> Path -> Integer -> Int -> Bool -> IO (Maybe [String])
+findPathInput :: Timeout -> Path -> Integer -> Int -> Bool -> IO (SatResult [String])
 findPathInput t p bound maxSeqLength checkOverflows = fst <$> findPathInputDebug t p bound maxSeqLength checkOverflows
 
-findPathInputDebug :: Timeout -> Path -> Integer -> Int -> Bool -> IO (Maybe [String],String)
+findPathInputDebug :: Timeout -> Path -> Integer -> Int -> Bool -> IO (SatResult [String],String)
 findPathInputDebug t p bound maxSeqLength checkOverflows = do
   evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) $ runReaderT (pathScript p WithSoft checkOverflows) implicits
   where implicits = ImplicitParameter {valueSizeParameter=bound, maxSeqLengthParameter=maxSeqLength}
 
-data SatResult = SAT | NotSAT deriving (Eq, Show)
+data SatResult a = SAT a | NotSAT | Timeout deriving (Eq, Show, Functor)
 
-isSatPath :: Timeout -> Path-> Int -> Bool -> IO SatResult
+isSatPath :: Timeout -> Path-> Int -> Bool -> IO (SatResult ())
 isSatPath t p maxSeqLength checkOverflows = do
   (mRes,_) <- evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) $ runReaderT (pathScript p WithoutSoft checkOverflows) implicits
-  pure $ maybe NotSAT (const SAT) mRes
+  pure $ void mRes
   where implicits = ImplicitParameter {valueSizeParameter= error "isSatPath: valueSize not available in isSatPath", maxSeqLengthParameter=maxSeqLength}
 
 data ScriptMode = WithSoft | WithoutSoft
@@ -65,8 +67,8 @@ data ScriptMode = WithSoft | WithoutSoft
 data SearchContext = NoContext | LastNotSAT Int | RequirePruningCheck
 
 -- depth is currently not used to trigger pruning
-updateContext :: SatResult -> Int -> SearchContext -> SearchContext
-updateContext SAT _ _ = NoContext
+updateContext :: SatResult a -> Int -> SearchContext -> SearchContext
+updateContext (SAT _) _ _ = NoContext
 updateContext NotSAT d NoContext = LastNotSAT d
 updateContext NotSAT _ (LastNotSAT _) = RequirePruningCheck
 updateContext _ _ RequirePruningCheck = error "updateContext: should not happen"
@@ -93,7 +95,7 @@ satPathsQ nVar to t maxUnfolds maxSeqLength checkOverflows q = do
       let path = reverse s -- constraints are stored reversed
       res <- lift $ isSatPath to path maxSeqLength checkOverflows
       modify $ updateContext res d
-      when (res == SAT) $ lift $ atomically $ writeTQueue q $ Just path
+      when (res == SAT ()) $ lift $ atomically $ writeTQueue q $ Just path
     satPaths' nUnfolds nInputs to (Choice l r) (s,d) q = do
       satPaths' nUnfolds nInputs to l (s,d+1) q
       ctx <- get
@@ -102,7 +104,7 @@ satPathsQ nVar to t maxUnfolds maxSeqLength checkOverflows q = do
           res <- lift $ isSatPath to s maxSeqLength checkOverflows
           case res of
             NotSAT -> pure ()
-            SAT -> do
+            SAT _ -> do
               put NoContext
               satPaths' nUnfolds nInputs to r (s,d+1) q
         _ -> do
@@ -123,7 +125,7 @@ data ValueGenerator where
 withGeneratedValue :: (forall v. Typeable v => v -> r) -> ValueGenerator -> Size -> IO r
 withGeneratedValue f (ValueGenerator g) sz = f <$> generate (g sz)
 
-pathScript :: Path -> ScriptMode -> Bool -> Z3R (Maybe [String], String)
+pathScript :: Path -> ScriptMode -> Bool -> Z3R (SatResult [String], String)
 pathScript path mode checkOverflows = do
   let (tyConstr,predConstr,overflConstr) = partitionPath path
   vars <- forM tyConstr $
@@ -154,9 +156,10 @@ pathScript path mode checkOverflows = do
   mRes <- case result of
     Sat -> do
       model <- lift optimizeGetModel
-      Just . catMaybes <$> mapM ((evalAST model . snd) . fst) vars
-    _ -> do
-      pure Nothing
+      SAT . catMaybes <$> mapM ((evalAST model . snd) . fst) vars
+    Unsat -> do
+      pure NotSAT
+    Undef -> pure Timeout
   pure (mRes,str)
 
 evalAST :: MonadZ3 z3 => Model -> AST -> z3 (Maybe String)

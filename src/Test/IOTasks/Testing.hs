@@ -125,8 +125,8 @@ taskCheckWithOutcome Args{..} prog spec = do
           | maybe False (pathDepth p >) currentMaxPathLength -> testPaths output nVar q (m,n,t,o) mFailure
           | otherwise -> do
           res <- isSatPath solverTimeout p solverMaxSeqLength checkOverflows
-          if res == SAT -- TODO: does not account for timeouts yet
-            then do
+          case res of
+            SAT () -> do
               (out,k,o') <- testPath output p 0 n 0
               case out of
                 PathSuccess -> do
@@ -141,14 +141,15 @@ taskCheckWithOutcome Args{..} prog spec = do
                 PathTimeout
                   | k > 0 -> testPaths output nVar q (m+1,n+k,t,o+o') mFailure
                   | otherwise -> testPaths output nVar q (m,n,t+1,o+o') mFailure
-            else testPaths output nVar q (m,n,t,o) mFailure
+            NotSAT -> testPaths output nVar q (m,n,t,o) mFailure
+            Timeout -> testPaths output nVar q (m,n,t+1,o) mFailure
     testPath :: Output -> Path -> TestsRun -> NumberOfInputs -> Overflows -> IO (PathOutcome,TestsRun,Overflows)
     testPath _ _ n _ o | n >= maxSuccessPerPath = pure (PathSuccess,n,o)
     testPath output p n nOtherTests o = do
       mNextInput <- findPathInput solverTimeout p valueSize solverMaxSeqLength checkOverflows
       case mNextInput of
-        Nothing -> pure (PathTimeout,n,o) -- should (only?) be the case if solving times out
-        Just nextInput  -> do
+        Timeout -> pure (PathTimeout,n,o)
+        SAT nextInput  -> do
           when verbose (putT output (concat ["(",show (n+nOtherTests)," tests)"]) >> oFlush output)
           let
             (specTrace,warn) = first normalizedTrace $ runSpecification nextInput spec
@@ -160,6 +161,7 @@ taskCheckWithOutcome Args{..} prog spec = do
             failure -> do
               when verbose $ putLnP output $ unwords ["found counterexample of length",show $ length nextInput]
               pure (PathFailure nextInput specTrace progTrace failure,n+1,o')
+        NotSAT -> error "impossible"
 
 type Inputs = [Line]
 type ExpectedRun = NTrace
@@ -260,4 +262,9 @@ taskCheckOn i p s = uncurry Outcome (go 0 0 i p s) where
 generateStaticTestSuite :: Args -> Specification -> IO [Inputs]
 generateStaticTestSuite Args{..} spec =
   let ps = sortOn pathDepth $ paths maxIterationUnfold $ constraintTree maxNegative spec
-  in concat <$> forM ps (\p -> catMaybes <$> replicateM maxSuccessPerPath (findPathInput solverTimeout p valueSize solverMaxSeqLength checkOverflows))
+  in concat <$> forM ps (\p -> catSATs <$> replicateM maxSuccessPerPath (findPathInput solverTimeout p valueSize solverMaxSeqLength checkOverflows))
+
+catSATs :: [SatResult a] -> [a]
+catSATs [] = []
+catSATs (SAT x : xs) = x : catSATs xs
+catSATs (_:xs) = catSATs xs
