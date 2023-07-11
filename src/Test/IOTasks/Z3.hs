@@ -10,7 +10,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DeriveFunctor #-}
-module Test.IOTasks.Z3 (findPathInput, satPaths, satPathsQ, isSatPath, SatResult(..), Timeout) where
+module Test.IOTasks.Z3 (findPathInput, printPathScript, satPaths, satPathsQ, isSatPath, SatResult(..), Timeout) where
 
 import Test.IOTasks.Constraints
 import Test.IOTasks.ValueSet
@@ -46,10 +46,13 @@ data ImplicitParameters = ImplicitParameter { valueSizeParameter :: Integer, max
 type Timeout = Int
 
 findPathInput :: Timeout -> Path -> Integer -> Int -> Bool -> IO (SatResult [String])
-findPathInput t p bound maxSeqLength checkOverflows = fst <$> findPathInputDebug t p bound maxSeqLength checkOverflows
+findPathInput t p bound maxSeqLength checkOverflows = fst <$> evalPathScript t p bound maxSeqLength checkOverflows
 
-findPathInputDebug :: Timeout -> Path -> Integer -> Int -> Bool -> IO (SatResult [String],String)
-findPathInputDebug t p bound maxSeqLength checkOverflows = do
+printPathScript :: Timeout -> Path -> Integer -> Int -> Bool -> IO String
+printPathScript t p bound maxSeqLength checkOverflows = snd <$> evalPathScript t p bound maxSeqLength checkOverflows
+
+evalPathScript :: Timeout -> Path -> Integer -> Int -> Bool -> IO (SatResult [String],String)
+evalPathScript t p bound maxSeqLength checkOverflows = do
   evalZ3With Nothing (stdOpts +? opt "timeout" (show t)) $ runReaderT (pathScript p WithSoft checkOverflows) implicits
   where implicits = ImplicitParameter {valueSizeParameter=bound, maxSeqLengthParameter=maxSeqLength}
 
