@@ -24,7 +24,6 @@ import Test.QuickCheck (generate)
 
 import Control.Concurrent.STM
 
-import Control.Monad (void)
 import Control.Monad.State
 
 import Data.Maybe (catMaybes, fromMaybe, mapMaybe, fromJust)
@@ -69,6 +68,7 @@ data SearchContext = NoContext | LastNotSAT Int | RequirePruningCheck
 -- depth is currently not used to trigger pruning
 updateContext :: SatResult a -> Int -> SearchContext -> SearchContext
 updateContext (SAT _) _ _ = NoContext
+updateContext Timeout _ _ = NoContext
 updateContext NotSAT d NoContext = LastNotSAT d
 updateContext NotSAT _ (LastNotSAT _) = RequirePruningCheck
 updateContext _ _ RequirePruningCheck = error "updateContext: should not happen"
@@ -104,7 +104,10 @@ satPathsQ nVar to t maxUnfolds maxSeqLength checkOverflows q = do
           res <- lift $ isSatPath to s maxSeqLength checkOverflows
           case res of
             NotSAT -> pure ()
-            SAT _ -> do
+            Timeout -> do
+              put NoContext
+              satPaths' nUnfolds nInputs to r (s,d+1) q
+            SAT () -> do
               put NoContext
               satPaths' nUnfolds nInputs to r (s,d+1) q
         _ -> do

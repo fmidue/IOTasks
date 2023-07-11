@@ -24,7 +24,6 @@ import Test.IOTasks.Internal.Output
 import Control.Concurrent.STM
 import Control.Monad (when, forM, replicateM)
 
-import Data.Maybe (catMaybes)
 import Data.List (sortOn)
 import Data.Functor (void)
 import Data.Bifunctor (first)
