@@ -10,7 +10,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DeriveFunctor #-}
-module Test.IOTasks.Z3 (findPathInput, printPathScript, satPaths, satPathsQ, isSatPath, SatResult(..), Timeout) where
+module Test.IOTasks.Z3 (findPathInput, printPathScript, evalPathScript, satPaths, satPathsQ, isSatPath, SatResult(..), Timeout) where
 
 import Test.IOTasks.Constraints
 import Test.IOTasks.ValueSet
