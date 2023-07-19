@@ -5,6 +5,7 @@ module Test.IOTasks.Random.Testing (
   Args (..), stdArgs,
   -- | = pre-computed test suites
   taskCheckOn,
+  genInput,
   ) where
 
 import Test.IOTasks.Testing hiding (taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args, stdArgs)
