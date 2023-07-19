@@ -6,6 +6,7 @@ module Test.IOTasks.Random.Testing (
   -- | = pre-computed test suites
   taskCheckOn,
   genInput,
+  runTest,
   ) where
 
 import Test.IOTasks.Testing hiding (taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args, stdArgs)
@@ -85,11 +86,13 @@ taskCheckWithOutcome Args{..} prog spec  = do
       | otherwise = do
         input <- generate $ genInput spec maxInputLength (Size valueSize (fromIntegral $ valueSize `div` 5)) maxNegative
         mOutcome <- timeout (searchTimeout * 1000) $ do
-          let o = runTest prog spec input
-          seq (isSuccess o) $ pure o -- force outcome
+          let outcome = runTest prog spec input
+          seq (isSuccess outcome) $ pure outcome -- force outcome
         case mOutcome of
           Just outcome -> do
-            when verbose $ putT o (concat ["(",show n," tests)"]) >> oFlush o
+            when verbose $ do
+              putT o (concat ["(",show n," tests)"]) >> oFlush o
+              when (overflowWarnings outcome > 0) $ putLnP o "Overflow of Int range detected."
             pure (outcome,to)
           Nothing -> do
             when verbose $ putLnP o "input search: timeout"
