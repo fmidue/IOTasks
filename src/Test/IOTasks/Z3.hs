@@ -10,12 +10,13 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE PatternSynonyms #-}
 module Test.IOTasks.Z3 (findPathInput, printPathScript, evalPathScript, satPaths, satPathsQ, isSatPath, SatResult(..), Timeout) where
 
 import Test.IOTasks.Constraints
 import Test.IOTasks.ValueSet
 import Test.IOTasks.Internal.Term
-import Test.IOTasks.Terms (Var (..), VarExp(..), varname)
+import Test.IOTasks.Terms (Var(..), SomeVar, pattern SomeVar, VarExp(..), someVarname)
 import Test.IOTasks.ValueMap
 
 import Z3.Monad
@@ -139,7 +140,7 @@ pathScript path mode checkOverflows = do
       var <- mkFreshVar (x ++ show i) =<< mkSort @v
       constraint <- z3ValueSetConstraint vs var
       lift $ optimizeAssert constraint
-      pure (((Var (x,ty),i),var),ValueGenerator $ valueOf vs)
+      pure (((SomeVar (x,SomeTypeRep ty),i),var),ValueGenerator $ valueOf vs)
   forM_ predConstr $
     \(ConditionConstraint t e) ->
         (lift . optimizeAssert) =<< z3Predicate t e (map fst vars)
@@ -216,7 +217,7 @@ mkValueRep x (StringValue s) = do
       sym <- mkStringSymbol $ xStr ++ "_val"
       pure (eq,sym)
 
-z3Predicate :: Term x -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R AST
+z3Predicate :: Term x -> Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R AST
 z3Predicate (termStruct -> Binary f x y) e vars = z3PredicateBinary f x y e vars
 z3Predicate (termStruct -> Unary f x) e vars = z3PredicateUnary f x e vars
 z3Predicate (termStruct -> VariableC x n) e vars = pure $ fromMaybe (unknownVariablesError x) $ (`List.lookup` vars) . last $ weaveVariables x n e
@@ -226,28 +227,28 @@ z3Predicate (termStruct -> Literal (BoolLit b)) _ _ = mkBool b
 z3Predicate (termStruct -> VariableA _x _) _e _vars = error "z3Predicate: top level list should not happen"
 z3Predicate (termStruct -> Literal (ListLit _)) _ _ = error "z3Predicate: top level list literal should not happen"
 
-z3PredicateUnary :: forall a b. Typeable a => UnaryF a b -> Term a ->  Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R AST
+z3PredicateUnary :: forall a b. Typeable a => UnaryF a b -> Term a ->  Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R AST
 z3PredicateUnary f x e vars = case typeRep @a of
   App c _ -> case eqTypeRep c (typeRep @[]) of
     Just HRefl -> unaryListA f x e vars  -- a ~ [a1]
     Nothing -> unaryNoList f x e vars-- a ~ f a1
   _ -> unaryNoList f x e vars --
 
-unaryListA :: UnaryF [a] b -> Term [a] -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R AST
+unaryListA :: UnaryF [a] b -> Term [a] -> Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R AST
 unaryListA Length (Current x n) e vars = mkSeqLength . fromJust . (`List.lookup` vars) . last $ weaveVariables x n e --special case for string variables
 unaryListA Length xs e vars = unaryListRec (mkIntNum . length @[]) xs e vars
 unaryListA Reverse _ _ _ = error "z3Predicate: top level reverse should not happen"
 unaryListA Sum xs e vars = unaryListRec mkAdd xs e vars
 unaryListA Product xs e vars = unaryListRec mkMul xs e vars
 
-unaryNoList :: UnaryF a b -> Term a -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R AST
+unaryNoList :: UnaryF a b -> Term a -> Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R AST
 unaryNoList Not x e vars = mkNot =<< z3Predicate x e vars
 unaryNoList _ _ _ _ = error "handled by unaryListA"
 
-unaryListRec :: Typeable a => ([AST] -> Z3R AST) -> Term [a] -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R AST
+unaryListRec :: Typeable a => ([AST] -> Z3R AST) -> Term [a] -> Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R AST
 unaryListRec f xs e vars = f . fromRight (error "unexpected resutl") =<< listASTs xs e vars
 
-z3PredicateBinary :: forall a b c. (Typeable a, Typeable b) => BinaryF a b c -> Term a -> Term b ->  Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R AST
+z3PredicateBinary :: forall a b c. (Typeable a, Typeable b) => BinaryF a b c -> Term a -> Term b ->  Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R AST
 z3PredicateBinary f x y e vars = case typeRep @a of
   App ca _ -> case eqTypeRep ca (typeRep @[]) of
     Just HRefl -> case typeRep @b of
@@ -359,7 +360,7 @@ mkIntermediateBoolean x = do
   b <- mkFreshBoolVar "b"
   mkEq b x
 
-listASTs :: forall a. Typeable [a] => Term [a] -> Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R (Either AST [AST])
+listASTs :: forall a. Typeable [a] => Term [a] -> Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R (Either AST [AST])
 listASTs (ReverseT (ReverseT t)) e vars = listASTs t e vars
 listASTs (ReverseT t) e vars = do
   r <- listASTs t e vars
@@ -397,9 +398,9 @@ reverseSequence x = do
       mkImplies pre con
 
 unknownVariablesError :: VarExp a => a -> b
-unknownVariablesError x = error $ "unknown variable(s) {" ++ intercalate "," (map varname $ toVarList x) ++ "}"
+unknownVariablesError x = error $ "unknown variable(s) {" ++ intercalate "," (map someVarname $ toVarList x) ++ "}"
 
-weaveVariables :: VarExp a => a -> Int -> Map Var (Int,[Int]) -> [(Var,Int)]
+weaveVariables :: VarExp a => a -> Int -> Map SomeVar (Int,[Int]) -> [(SomeVar,Int)]
 weaveVariables vs n e =
     reverse . drop n . reverse -- drop last n variables
   . map (\(x,y,_) -> (x,y))
@@ -426,7 +427,7 @@ z3ValueSetConstraint (Eq n) xVar = mkIntNum n >>= mkEq xVar
 z3ValueSetConstraint Every _ = mkTrue
 z3ValueSetConstraint None _ = mkFalse
 
-assertOverflowChecks :: Term Integer ->  Map Var (Int,[Int]) -> [((Var, Int), AST)] -> Z3R ()
+assertOverflowChecks :: Term Integer ->  Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R ()
 assertOverflowChecks t e vars = do
   ast <- z3Predicate t e vars
   overflowConstraints ast

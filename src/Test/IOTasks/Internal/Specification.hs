@@ -21,7 +21,7 @@ import Prelude hiding (until)
 
 import Test.IOTasks.ValueSet
 import Test.IOTasks.Term
-import Test.IOTasks.Terms (Var (..), varname)
+import Test.IOTasks.Terms (Var (..), SomeVar, varname, someVar)
 import Test.IOTasks.Trace
 import Test.IOTasks.OutputPattern
 import Test.IOTasks.Overflow
@@ -33,13 +33,14 @@ import qualified Data.Set as Set
 import Data.List (nub,intersperse)
 import Data.Functor.Identity (runIdentity,Identity(..))
 import Data.Bifunctor (first)
-import Data.Typeable
+
+import Type.Reflection (Typeable)
 
 import Test.QuickCheck (Arbitrary(..))
 import Text.PrettyPrint hiding ((<>))
 
 data Specification where
-  ReadInput :: (Typeable a,Read a,Show a) => Var -> ValueSet a -> InputMode -> Specification -> Specification
+  ReadInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification -> Specification
   WriteOutput :: OptFlag -> Set (OutputPattern 'SpecificationP) -> Specification -> Specification
   Branch :: Term Bool -> Specification -> Specification -> Specification -> Specification
   Nop :: Specification
@@ -60,12 +61,10 @@ instance Semigroup Specification where
 instance Monoid Specification where
   mempty = nop
 
-readInput :: (Typeable a,Read a,Show a) => Var -> ValueSet a -> InputMode -> Specification
+readInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification
 readInput = readInput' where
-  readInput' :: forall a. (Typeable a,Read a,Show a) => Var -> ValueSet a -> InputMode -> Specification
-  readInput' (Var (x,ty)) vs m
-    | ty == typeRep (Proxy @a) = ReadInput (Var (x,ty)) vs m nop
-    | otherwise = error "readInput: types of variable and ValueSet do not match"
+  readInput' :: forall a. (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification
+  readInput' x vs m = ReadInput x vs m nop
 
 writeOutput :: [OutputPattern 'SpecificationP] -> Specification
 writeOutput ts = WriteOutput Mandatory (Set.fromList ts) nop
@@ -94,9 +93,9 @@ until c bdy = TillE (branch c exit bdy) nop
 while :: Term Bool -> Specification -> Specification
 while c bdy = TillE (branch c bdy exit) nop
 
-vars :: Specification -> [Var]
+vars :: Specification -> [SomeVar]
 vars = nub . go where
-  go (ReadInput x _ _ s') = x : go s'
+  go (ReadInput x _ _ s') = someVar x : go s'
   go (WriteOutput _ _ s') = go s'
   go (Branch _ l r s') = go l ++ go r ++ go s'
   go Nop = []
@@ -123,7 +122,7 @@ runSpecification' addLinebreaks inputs spec =
       case ins of
         [] -> NoRec (outOfInputs,NoOverflow)
         (i:is)
-          | vs `containsValue` readValue i -> RecSub i id (insertValue (wrapValue $ readValue @v i) x e,is)
+          | vs `containsValue` readValue i -> RecSub i id (insertValue (wrapValue $ readValue @v i) (someVar x) e,is)
           | otherwise -> case mode of
               AssumeValid -> error $ "invalid value: " ++ i ++ " is not an element of " ++ printValueSet vs
               UntilValid ->  RecSame i (first (progWrite Optional (Set.singleton Wildcard) <>)) (e,is)
@@ -151,7 +150,7 @@ runSpecification' addLinebreaks inputs spec =
 data RecStruct p x a r = NoRec r | RecSub p x a | RecSame p x a | RecBoth p x a a
 
 sem :: forall st p a.
-  (forall v. (Typeable v,Read v,Show v) => st -> Var -> ValueSet v -> InputMode -> RecStruct p (a->a) st a) -> (RecStruct p () a a -> a) ->
+  (forall v. (Typeable v,Read v,Show v) => st -> Var v -> ValueSet v -> InputMode -> RecStruct p (a->a) st a) -> (RecStruct p () a a -> a) ->
   (st -> OptFlag -> Set (OutputPattern 'SpecificationP) -> a -> a) ->
   (st -> Term Bool -> a -> a -> a) ->
   (Action -> a -> a) ->
@@ -168,7 +167,7 @@ sem f f' g h i z st s = runIdentity $ semM
   s
 
 semM :: forall m st p a. Monad m =>
-  (forall v. (Typeable v,Read v,Show v) => st -> Var -> ValueSet v -> InputMode -> m (RecStruct p (a->a) st a)) -> (RecStruct p () a a -> m a) ->
+  (forall v. (Typeable v,Read v,Show v) => st -> Var v -> ValueSet v -> InputMode -> m (RecStruct p (a->a) st a)) -> (RecStruct p () a a -> m a) ->
   (st -> OptFlag -> Set (OutputPattern 'SpecificationP) -> m a -> m a) ->
   (st -> Term Bool -> m a -> m a -> m a) ->
   (Action -> m a -> m a) ->
@@ -218,17 +217,17 @@ accept s_ t_ = accept' s_ k_I t_ d_I
   where
     accept' :: Specification -> (Action -> Trace -> ValueMap -> Bool) -> Trace -> ValueMap -> Bool
     accept' (ReadInput x (ty :: ValueSet a) AssumeValid s') k t d = case t of
-      ProgReadString v t' | ty `containsValue` val -> accept' s' k t' (insertValue (wrapValue val) x d)
+      ProgReadString v t' | ty `containsValue` val -> accept' s' k t' (insertValue (wrapValue val) (someVar x) d)
                           where val = readValue @a v
       _ -> False
     accept' (ReadInput x (ty :: ValueSet a) Abort s') k t d = case t of
-      ProgReadString v t'| ty `containsValue` val -> accept' s' k t' (insertValue (wrapValue val) x d)
+      ProgReadString v t'| ty `containsValue` val -> accept' s' k t' (insertValue (wrapValue val) (someVar x) d)
                          where val = readValue @a v
       ProgReadString v Terminate | not (ty `containsValue` readValue v) -> True
       _ -> False
     accept' s@(ReadInput x (ty :: ValueSet a) UntilValid s') k t d = case t of
       ProgReadString v t'
-        | ty `containsValue` val -> accept' s' k t' (insertValue (wrapValue val) x d)
+        | ty `containsValue` val -> accept' s' k t' (insertValue (wrapValue val) (someVar x) d)
         | not (ty `containsValue` val) -> accept' s k t d
         where val = readValue @a v
       _ -> False

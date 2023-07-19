@@ -41,7 +41,7 @@ simpleSpec :: Gen Specification
 simpleSpec = do
   i <- input [(intVar "n",ints,AssumeValid)]
   l <- loop [(intVar "xs",ints,AssumeValid)] (progressCondition [(intVar "xs",ints)] [intVar "n"])
-  p <- outputOneof (intTerm [intVar "xs", intVar "y"] [intVar "n"])
+  p <- outputOneof (intTerm [someVar $ intVar "xs", someVar $ intVar "y"] [someVar $ intVar "n"])
   pure $ i <> l <> p
 
 -- generator for standalone loop bodies
@@ -51,12 +51,12 @@ loopBodyGen = do
   return (s, readInput (intVar "n") nats AssumeValid)
 
 -- basic generators
-input :: (Typeable a,Read a, Show a) => [(Var,ValueSet a,InputMode)] -> Gen Specification
+input :: (Typeable a,Read a, Show a) => [(Var a,ValueSet a,InputMode)] -> Gen Specification
 input xs = do
   (x,vs,m) <- elements xs
   pure $ readInput x vs m
 
-someInputsWithHole ::  (Typeable a,Read a, Show a) =>  [(Var,ValueSet a,InputMode)] -> Int -> Gen (Specification -> Specification)
+someInputsWithHole ::  (Typeable a,Read a, Show a) =>  [(Var a,ValueSet a,InputMode)] -> Int -> Gen (Specification -> Specification)
 someInputsWithHole xs nMax = do
   n <- choose (1,nMax)
   p <- choose (0,n-1)
@@ -75,7 +75,7 @@ outputOneof' b ts = do
   pure $ (if b then writeOptionalOutput else writeOutput) [Value t]
 
 -- branch free sequence of inputs and outputs
-_linearSpec :: (Typeable a, Read a, Show a) => [(Var,ValueSet a,InputMode)] -> [(Var,ValueSet a,InputMode)] -> Gen (Specification, [Var])
+_linearSpec :: (Typeable a, Read a, Show a) => [(Var a,ValueSet a,InputMode)] -> [(Var a,ValueSet a,InputMode)] -> Gen (Specification, [SomeVar])
 _linearSpec lists xs = sized $ \n -> do
   is <- ($ nop) <$> someInputsWithHole (lists ++ xs) (n `div` 2)
   let vs = vars is
@@ -84,10 +84,10 @@ _linearSpec lists xs = sized $ \n -> do
   return (spec,vars spec)
 
 -- simple loop
-loop :: (Typeable a,Read a, Show a) => [(Var,ValueSet a,InputMode)] -> Gen Condition -> Gen Specification
+loop :: (Typeable a,Read a, Show a) => [(Var a,ValueSet a,InputMode)] -> Gen Condition -> Gen Specification
 loop xs loopCondition = tillExit <$> loopBody xs loopCondition
 
-loopBody :: (Typeable a,Read a, Show a) => [(Var,ValueSet a,InputMode)] -> Gen Condition -> Gen Specification
+loopBody :: (Typeable a,Read a, Show a) => [(Var a,ValueSet a,InputMode)] -> Gen Condition -> Gen Specification
 loopBody xs loopCondition = do
   cond <- loopCondition
   let progress = case cond of  Condition _ (xp,vs) -> readInput xp vs AssumeValid
@@ -98,12 +98,12 @@ loopBody xs loopCondition = do
     , pure $ branch (not' $ condTerm cond) s1' exit
     ]
 
-data Condition = forall a. (Typeable a, Read a, Show a) => Condition { condTerm :: Term Bool, _progressInfo :: (Var,ValueSet a) }
+data Condition = forall a. (Typeable a, Read a, Show a) => Condition { condTerm :: Term Bool, _progressInfo :: (Var a,ValueSet a) }
 
 -- generates a numeric condition of the form
 -- f xs `comp` n
 -- that contains every variable at most once
-progressCondition :: (Typeable a, Read a, Show a) => [(Var,ValueSet a)] -> [Var] -> Gen Condition
+progressCondition :: (Typeable a, Read a, Show a) => [(Var a,ValueSet a)] -> [Var Integer] -> Gen Condition
 progressCondition lists nums = do
   let comp = (.>.)
   n <- oneof [as @Integer . currentValue <$> elements nums, intLit <$> choose (0,10)]
@@ -112,7 +112,7 @@ progressCondition lists nums = do
   return $ Condition (f (as @[Integer] $ allValues xs) `comp` n) (xs,vs)
 
 -- simple terms
-intTerm :: [Var] -> [Var] -> Gen (OutputTerm Integer)
+intTerm :: [SomeVar] -> [SomeVar] -> Gen (OutputTerm Integer)
 intTerm lists xs =
   oneof $ concat
     [ [ unary  | not $ null lists ]

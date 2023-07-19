@@ -16,7 +16,7 @@ module Test.IOTasks.Constraints (
 
 import Test.IOTasks.ValueSet
 import Test.IOTasks.Term (Term, printIndexedTerm, castTerm, subTerms)
-import Test.IOTasks.Terms (Var, not', varname)
+import Test.IOTasks.Terms (Var, SomeVar, someVar, not', varname)
 import Test.IOTasks.Internal.Specification
 import Test.IOTasks.OutputPattern (valueTerms)
 import Test.IOTasks.OutputTerm (transparentSubterms, withSomeOutputTerm)
@@ -30,9 +30,9 @@ import Data.Tuple.Extra (fst3)
 import Data.Typeable
 
 data Constraint (t :: ConstraintType) where
-  InputConstraint :: Typeable v => (Var, Int) -> ValueSet v -> Constraint 'Input
-  ConditionConstraint :: Term Bool -> Map Var (Int, [Int]) -> Constraint 'Condition
-  OverflowConstraints :: [Term Integer] -> Map Var (Int, [Int]) -> Constraint 'Overflow
+  InputConstraint :: Typeable v => (Var v, Int) -> ValueSet v -> Constraint 'Input
+  ConditionConstraint :: Term Bool -> Map SomeVar (Int, [Int]) -> Constraint 'Condition
+  OverflowConstraints :: [Term Integer] -> Map SomeVar (Int, [Int]) -> Constraint 'Overflow
 
 data ConstraintType = Input | Condition | Overflow
 
@@ -50,9 +50,9 @@ constraintTree negMax =
   sem
     (\(n,e,k) x vs mode ->
       let
-        e' = inc x k e
-        p = (InputConstraint(x, ix x e') vs
-            ,InputConstraint(x, ix x e') (complement vs)
+        e' = inc (someVar x) k e
+        p = (InputConstraint(x, ix (someVar x) e') vs
+            ,InputConstraint(x, ix (someVar x) e') (complement vs)
             , mode == Abort && n < negMax)
       in case mode of
           AssumeValid -> RecSub p id (n,e',k+1)
@@ -78,10 +78,10 @@ constraintTree negMax =
     Empty
     (0,Map.empty,1)
 
-ix :: Var -> Map Var (Int,a) -> Int
+ix :: SomeVar -> Map SomeVar (Int,a) -> Int
 ix x m = maybe 0 fst (Map.lookup x m)
 
-inc :: Var -> Int -> Map Var (Int,[Int]) -> Map Var (Int,[Int])
+inc :: SomeVar -> Int -> Map SomeVar (Int,[Int]) -> Map SomeVar (Int,[Int])
 inc x k m
   | x `elem` Map.keys m = Map.update (\(c,ks) -> Just (c + 1,k:ks)) x m
   | otherwise = Map.insert x (1,[k]) m

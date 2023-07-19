@@ -5,13 +5,20 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE PolyKinds #-}
 module Test.IOTasks.Terms (
   Varname,
+  SomeVar, someVar, unSomeVar,
+  pattern SomeVar,
   Var(..),
   var, intVar, stringVar,
   as,
   VarExp(..),
-  varname,
+  varname, someVarname,
   varExpType,
 
   Accessor(..),
@@ -26,47 +33,81 @@ module Test.IOTasks.Terms (
 
 import Test.IOTasks.Overflow
 
-import Data.Typeable
+import Data.Function (on)
+import Data.Bifunctor (second)
+
+import Type.Reflection
 
 type Varname = String
 
-newtype Var = Var { unVar :: (Varname, TypeRep) } deriving (Eq,Ord, Show)
+newtype Var (a :: k) = Var { unVar :: (Varname, TypeRep a) } deriving (Eq,Ord, Show)
 
-varname :: Var -> Varname
+data SomeVar where
+  SomeVarC :: Typeable a => Var a -> SomeVar
+
+{-# COMPLETE SomeVar #-}
+pattern SomeVar :: (Varname, SomeTypeRep) -> SomeVar
+pattern SomeVar x <- SomeVarC (Var (second SomeTypeRep -> x))
+  where
+    SomeVar (x,SomeTypeRep ty) = withTypeable ty $ SomeVarC $ Var (x,ty)
+
+someVar :: Typeable a => Var a -> SomeVar
+someVar = SomeVarC
+
+unSomeVar :: SomeVar -> (Varname, SomeTypeRep)
+unSomeVar (SomeVar x) = x
+
+
+instance Eq SomeVar where
+  (==) = (==) `on` unSomeVar
+instance Ord SomeVar where
+  compare = compare `on` unSomeVar
+deriving instance Show SomeVar
+
+varname :: Var a -> Varname
 varname = fst . unVar
 
-varType :: Var -> TypeRep
-varType = snd . unVar
+someVarname :: SomeVar -> Varname
+someVarname = fst . unSomeVar
 
-varExpType :: VarExp e => e -> Maybe TypeRep
+someVarType :: SomeVar -> SomeTypeRep
+someVarType = snd . unSomeVar
+
+varExpType :: VarExp e => e -> Maybe SomeTypeRep
 varExpType = varListType . toVarList
 
-varListType :: [Var] -> Maybe TypeRep
+varListType :: [SomeVar] -> Maybe SomeTypeRep
 varListType xs =
-  if same . map varType $ xs
-    then Just $ varType . head $ xs
+  if same . map someVarType $ xs
+    then Just $ someVarType . head $ xs
     else Nothing
 
 same :: Eq a => [a] -> Bool
 same xs = and $ zipWith (==) xs (tail xs)
 
-var :: forall a. Typeable a => String -> Var
-var x = Var (x, typeRep $ Proxy @a)
+var :: forall a. Typeable a => String -> Var a
+var x = Var (x, typeRep)
 
-intVar :: String -> Var
+intVar :: String -> Var Integer
 intVar = var @Integer
 
-stringVar :: String -> Var
+stringVar :: String -> Var String
 stringVar = var @String
 
 class VarExp e where
-  toVarList :: e -> [Var]
+  toVarList :: e -> [SomeVar]
 
-instance VarExp Var where
+instance VarExp SomeVar where
   toVarList = pure
 
-instance VarExp [Var] where
+instance Typeable a => VarExp (Var a) where
+  toVarList = pure . someVar
+
+instance VarExp [SomeVar] where
   toVarList = id
+
+instance Typeable a => VarExp [Var a] where
+  toVarList = map someVar
 
 class Accessor t where
   currentValue :: (OverflowType a, VarExp e) => e -> t a

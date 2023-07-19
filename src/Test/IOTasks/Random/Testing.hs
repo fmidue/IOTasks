@@ -18,6 +18,7 @@ import Test.IOTasks.IOrep (IOrep, runProgram)
 import Test.IOTasks.Internal.Specification
 import Test.IOTasks.Trace
 import Test.IOTasks.Term
+import Test.IOTasks.Terms (someVar)
 import Test.IOTasks.OutputPattern
 import Test.IOTasks.ValueSet
 import Test.IOTasks.ValueMap
@@ -111,7 +112,7 @@ genTrace spec depth sz maxNeg =
       (if maybe False (d >) depth then pure $ NoRec OutOfInputs
       else do
         frequency $
-            (5, valueOf vs sz >>= (\i -> pure $ RecSub (wrapValue i) id (insertValue (wrapValue i) x e,d+1,n)))
+            (5, valueOf vs sz >>= (\i -> pure $ RecSub (wrapValue i) id (insertValue (wrapValue i) (someVar x) e,d+1,n)))
           : [(1, valueOf (complement vs) sz >>= (\i -> pure $ RecSame (wrapValue i) id (e,d+1,n+1))) | mode == UntilValid && n < maxNeg]
           ++ [(1, valueOf (complement vs) sz >>= (\i -> pure $ NoRec $ foldr ProgRead Terminate (show i ++ "\n"))) | mode == Abort && n < maxNeg]
     ))

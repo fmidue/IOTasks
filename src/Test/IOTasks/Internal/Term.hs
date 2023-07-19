@@ -118,7 +118,7 @@ data ConstValue a where
   IntLit :: I -> ConstValue Integer
   ListLit :: OverflowType a => [OT a] -> ConstValue [a]
 
-termVarExps :: Term a -> [[Var]]
+termVarExps :: Term a -> [[SomeVar]]
 termVarExps (termStruct -> Binary _ x y) = termVarExps x ++ termVarExps y
 termVarExps (termStruct -> Unary _ x) = termVarExps x
 termVarExps (termStruct -> Literal _) = []
@@ -223,7 +223,7 @@ eval' (termStruct -> Unary (f :: UnaryF a b) x) e = matchType @b
 eval' (termStruct -> Literal (BoolLit b)) _ = (mempty,b)
 eval' (termStruct -> Literal (IntLit n)) _ = (checkOverflow n ,n)
 eval' (termStruct -> Literal (ListLit xs)) _ = let xs' = xs in (foldMap checkOverflow xs', xs')
-eval' (termStruct -> VariableC x n) e = fromMaybe (error $ "empty list for {" ++ intercalate "," (map varname $ toVarList x) ++ "}") . safeHead <$> primEvalVar x n e
+eval' (termStruct -> VariableC x n) e = fromMaybe (error $ "empty list for {" ++ intercalate "," (map someVarname $ toVarList x) ++ "}") . safeHead <$> primEvalVar x n e
 eval' (termStruct -> (VariableA x n)) e = reverse <$> primEvalVar x n e
 
 primEvalVar :: forall a e. (OverflowType a, VarExp e) => e -> Int -> ValueMap -> (OverflowWarning,[OT a])
@@ -238,13 +238,13 @@ safeHead :: [a] -> Maybe a
 safeHead [] = Nothing
 safeHead (x:_) = Just x
 
-printIndexedTerm :: Term a -> Map Var (Int,[Int]) -> String
+printIndexedTerm :: Term a -> Map SomeVar (Int,[Int]) -> String
 printIndexedTerm t = printTerm' t . Just
 
 printTerm :: Term a -> String
 printTerm t = printTerm' t Nothing
 
-printTerm' :: Term a -> Maybe (Map Var (Int,[Int])) -> String
+printTerm' :: Term a -> Maybe (Map SomeVar (Int,[Int])) -> String
 printTerm' (termStruct -> Binary IsIn x xs) m = printTerm' x m ++ " ∈ " ++ printTerm' xs m
 printTerm' (termStruct -> Binary f tx ty) m = concat ["(",printTerm' tx m, ") ",fSym f," (", printTerm' ty m,")"]
   where
@@ -272,9 +272,9 @@ printTerm' (termStruct -> Unary f t) m = concat [fSym f ++" (", printTerm' t m, 
     fSym Reverse = "reverse"
     fSym Sum = "sum"
     fSym Product = "product"
-printTerm' (termStruct -> VariableC x n) (Just m) = (\(x,(i,_)) -> x ++ "_" ++ show i) $ maximumOn (head.snd.snd) $ (\xs -> take (length xs - n) xs) $ mapMaybe (\x -> (varname x,) <$> Map.lookup x m) (toVarList x)
-printTerm' (termStruct -> VariableC x n) Nothing = "{" ++ intercalate "," (map varname $ toVarList x) ++ "}"++":"++show n++"_C"
-printTerm' (termStruct -> VariableA x n) _ = "{" ++ intercalate "," (map varname $ toVarList x) ++ "}"++":"++show n++"_A"
+printTerm' (termStruct -> VariableC x n) (Just m) = (\(x,(i,_)) -> x ++ "_" ++ show i) $ maximumOn (head.snd.snd) $ (\xs -> take (length xs - n) xs) $ mapMaybe (\x -> (someVarname x,) <$> Map.lookup x m) (toVarList x)
+printTerm' (termStruct -> VariableC x n) Nothing = "{" ++ intercalate "," (map someVarname $ toVarList x) ++ "}"++":"++show n++"_C"
+printTerm' (termStruct -> VariableA x n) _ = "{" ++ intercalate "," (map someVarname $ toVarList x) ++ "}"++":"++show n++"_A"
 printTerm' (termStruct -> Literal (IntLit x)) _ = show x
 printTerm' (termStruct -> Literal (ListLit xs)) _ = showOT xs
 

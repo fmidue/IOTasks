@@ -12,6 +12,7 @@ import qualified Data.Set as Set
 import Test.IOTasks.Internal.Specification
 import Test.IOTasks.MonadTeletype as MTT
 import Test.IOTasks.Term
+import Test.IOTasks.Terms (someVar)
 import Test.IOTasks.ValueSet
 import Test.IOTasks.Trace
 import Test.IOTasks.OutputPattern
@@ -28,7 +29,7 @@ interpret s = do
   collapsed <- collapseChoice s
   pure $ flip evalStateT (emptyValueMap [] :: ValueMap) $
     sem
-      (\() x (vs :: ValueSet v) m -> RecSub (x,wrapValue . readValue @v ,containsValue vs . unwrapValue,m) id ())
+      (\() x (vs :: ValueSet v) m -> RecSub (someVar x,wrapValue . readValue @v ,containsValue vs . unwrapValue,m) id ())
       (\case
         RecSub (x,readF,_,AssumeValid) () p' -> do
           v <- lift (readF <$> MTT.getLine)

@@ -38,13 +38,13 @@ import Data.Char (isAlphaNum)
 
 data OutputTerm a
   = Transparent (Term a)
-  | Opaque Expr [[Var]] [SomeTerm]
+  | Opaque Expr [[SomeVar]] [SomeTerm]
 
 toExpr :: OutputTerm a -> Expr
 toExpr (Transparent t) = termExpr t
 toExpr (Opaque expr _ _) = expr
 
-outputTermVarExps :: OutputTerm a -> [[Var]]
+outputTermVarExps :: OutputTerm a -> [[SomeVar]]
 outputTermVarExps (Transparent t) = termVarExps t
 outputTermVarExps (Opaque _ vars _) = vars
 
@@ -73,7 +73,7 @@ withSomeOutputTerm :: SomeOutputTerm -> (forall a. Typeable a => OutputTerm a ->
 withSomeOutputTerm (SomeOutputTerm t) f = f t
 
 checkNames :: VarExp e => e -> a -> a
-checkNames = foldr (f . varname) id . toVarList
+checkNames = foldr (f . someVarname) id . toVarList
   where
     f x c = if legalVar x then c else error $ "illegal variable name: " ++ x ++ "\variable names can only contain letters, digits, _ and '"
 
@@ -84,7 +84,7 @@ currentE :: VarExp e => e -> Int -> Expr
 currentE x n = case varExpType x of
   Just (SomeTypeRep (ty :: TypeRep (a :: k))) -> withTypeable ty $ withTypeable (typeRepKind ty) $
     case eqTypeRep (typeRep @k) (typeRep @Type) of
-      Just HRefl -> Data.Express.var ("[" ++ intercalate "," (map varname $ toVarList x) ++ "]_C^" ++ show n) (undefined :: a)
+      Just HRefl -> Data.Express.var ("[" ++ intercalate "," (map someVarname $ toVarList x) ++ "]_C^" ++ show n) (undefined :: a)
       Nothing -> error $ "currentE: a does not have kind Type in TypeRep a, with a = " ++ show (typeRep @a)
   Nothing -> error "currentE: inconsistent VarExp type"
 
@@ -92,7 +92,7 @@ allE :: VarExp e => e -> Int -> Expr
 allE x n = case varExpType x of
   Just (SomeTypeRep (ty :: TypeRep (a :: k))) -> withTypeable ty $ withTypeable (typeRepKind ty) $
     case eqTypeRep (typeRep @k) (typeRep @Type) of
-      Just HRefl -> Data.Express.var ("[" ++ intercalate "," (map varname $ toVarList x) ++ "]_A^" ++ show n) (undefined :: [a])
+      Just HRefl -> Data.Express.var ("[" ++ intercalate "," (map someVarname $ toVarList x) ++ "]_A^" ++ show n) (undefined :: [a])
       Nothing -> error $ "allE: a does not have kind Type in TypeRep a, with a = " ++ show (typeRep @a)
   Nothing -> error "allE: inconsistent VarExp type"
 
@@ -102,7 +102,7 @@ eval (Opaque expr vss ts) e = let r = eval' expr vss e in matchType @a
   [ inCaseOfE' @Integer $ \HRefl -> (checkOverflow @Integer (fromInteger r),r)
   , fallbackCase' (foldMap (\(SomeTerm t) -> fst $ Term.eval t e) ts,r)]
   where
-  eval' :: OverflowType a => Expr -> [[Var]] -> ValueMap -> a
+  eval' :: OverflowType a => Expr -> [[SomeVar]] -> ValueMap -> a
   eval' expr xss e = evl . fillAVars xss e . reduceAVarsIndex e . replaceCVars e $ expr
 
 -- evaluation preprocessing
@@ -161,10 +161,10 @@ varStruct acc x
       pure (read n,reverse x)
 
 -- replace <var>_A^0 with values from variable environment
-fillAVars :: [[Var]] -> ValueMap -> Expr -> Expr
+fillAVars :: [[SomeVar]] -> ValueMap -> Expr -> Expr
 fillAVars xss e expr = expr //- [ (allE xs 0,xs') | xs <- nub xss, let xs' = combinedVarsExpr xs ]
   where
-    combinedVarsExpr :: [Var] -> Expr
+    combinedVarsExpr :: [SomeVar] -> Expr
     combinedVarsExpr xs = case sortedEntries xs e of
       Just x -> withValueEntry x (error "....ähhh") (val . map fst)
       Nothing -> error "fillAVars: inconsistent type"

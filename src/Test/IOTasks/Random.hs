@@ -6,7 +6,7 @@ module Test.IOTasks.Random (
   InputMode(..), ValueSet(..),
   ints, nats, str,
   OutputPattern(..),
-  Var, Varname, var, intVar, stringVar,
+  SomeVar, Varname, var, intVar, stringVar,
   pPrintSpecification,
   -- * Terms
   Term,
