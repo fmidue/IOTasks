@@ -123,7 +123,7 @@ satPathsQ nVar to t maxUnfolds maxSeqLength checkOverflows q = do
         _ -> satPaths' nUnfolds (nInputs+1) to t (SomeConstraint c:s,d+1) q -- stores constraints in reversed order
     satPaths' nUnfolds nInputs to (Assert c t) (s,d) q = satPaths' nUnfolds nInputs to t (SomeConstraint c:s,d+1) q -- stores constraints in reversed order
     satPaths' nUnfolds nInputs to (Unfold t) (s,d) q
-      | nUnfolds <= maxUnfolds = satPaths' (nUnfolds+1) nInputs to t (s,d) q
+      | nUnfolds < maxUnfolds = satPaths' (nUnfolds+1) nInputs to t (s,d) q
       | otherwise = pure ()
 
 data ValueGenerator where
