@@ -1,0 +1,60 @@
+name: Haddock to GitHub pages
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    permissions:
+      contents: read
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Cache Stack
+      id: cache-stack-unix
+      uses: actions/cache@v3
+      with:
+        path: ~/.stack
+        key: ubuntu-latest-stack-home-${{ hashFiles('stack.yaml') }}-${{ hashFiles('package.yaml') }}
+
+    - name: Setup stack
+      uses: haskell/actions/setup@v2
+      with:
+        enable-stack: true
+        stack-no-global: true
+
+    - name: Build Haddock
+      shell: bash
+      run: |
+        shopt -s globstar && \
+        stack exec haddock -- ./{app,src}/**/*.hs --html --odir docs
+
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v2
+      with:
+        name: github-pages
+        path: docs
+        retention-days: 1
+
+  deploy:
+    needs: build
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v2
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
