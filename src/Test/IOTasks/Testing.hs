@@ -240,7 +240,7 @@ pPrintInputs = unwords . map ('?':)
 
 pPrintOutcomeHints :: OutcomeHints -> Doc
 pPrintOutcomeHints NoHints = mempty
-pPrintOutcomeHints (OverflowHint n) = text $ unwords [show n,"overflows of Int range where detected during testing"]
+pPrintOutcomeHints (OverflowHint n) = text $ unwords [show n,"overflows of Int range were detected during testing"]
 
 -- static test suite generation
 taskCheckOn :: [Inputs] -> IOrep () -> Specification -> Outcome
