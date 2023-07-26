@@ -31,7 +31,8 @@ jobs:
       shell: bash
       run: |
         shopt -s globstar && \
-        stack exec haddock -- ./src/**/*.hs --html --odir docs
+        shopt -s extglob && \
+        stack exec haddock -- ./src/**/!(Internal)/*.hs --html --odir docs
 
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v2
