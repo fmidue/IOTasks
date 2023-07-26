@@ -31,7 +31,7 @@ jobs:
       shell: bash
       run: |
         shopt -s globstar && \
-        stack exec haddock -- ./{app,src}/**/*.hs --html --odir docs
+        stack exec haddock -- ./src/**/*.hs --html --odir docs
 
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v2
