@@ -126,14 +126,14 @@ termVarExps (termStruct -> VariableC e _) = [toVarList e]
 termVarExps (termStruct -> VariableA e _) = [toVarList e]
 
 instance Accessor Term where
-  currentValue' :: forall a e. (Typeable a, VarExp e) => e -> Int -> Term a
-  currentValue' =  matchType @a
+  recentValue :: forall a e. (Typeable a, VarExp e) => e -> Int -> Term a
+  recentValue =  matchType @a
     [ inCaseOfE' @Integer $ \HRefl -> Current
     , inCaseOfE' @String $ \HRefl -> Current
     , fallbackCase' $ error $ "variable type not supported for Terms: " ++ show (typeRep @a)
     ]
-  allValues' :: forall a e. (Typeable a, VarExp e) => e -> Int -> Term [a]
-  allValues' =  matchType @a
+  recentValues :: forall a e. (Typeable a, VarExp e) => e -> Int -> Term [a]
+  recentValues =  matchType @a
     [ inCaseOfE' @Integer $ \HRefl -> All
     , inCaseOfE' @String $ \HRefl -> All
     , fallbackCase' $ error $ "variable type not supported for Terms: " ++ show (typeRep @a)

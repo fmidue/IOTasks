@@ -124,7 +124,7 @@ example8 =
   readInput x ints AssumeValid <>
   tillExit (
     readInput x ints AssumeValid <>
-    branch (currentValue' x 1 .+. currentValue x .==. intLit 0)
+    branch (recentValue x 1 .+. currentValue x .==. intLit 0)
       exit
       nop
     ) <>
@@ -387,7 +387,7 @@ hangmanSpec word = tillExit (
      branch (winCond $ allValues g) (writeOutput [Text "correct!"] <> exit) mempty
   <> writeOutput [Text "Game state:"  <> Wildcard]
   <> readInput g digits AssumeValid
-  <> branch ((currentValue g `isIn` listLit word) .&&. (currentValue g `isNotIn` allValues' g 1))
+  <> branch ((currentValue g `isIn` listLit word) .&&. (currentValue g `isNotIn` recentValues g 1))
     (writeOptionalOutput [Text "good guess!"])
     (writeOptionalOutput [Text "wrong guess!"])
   )

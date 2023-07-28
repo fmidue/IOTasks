@@ -111,12 +111,12 @@ instance Typeable a => VarExp [Var a] where
 
 class Accessor t where
   currentValue :: (OverflowType a, VarExp e) => e -> t a
-  currentValue x = currentValue' x 0
-  currentValue' :: (OverflowType a, VarExp e) => e -> Int -> t a
+  currentValue x = recentValue x 0
+  recentValue :: (OverflowType a, VarExp e) => e -> Int -> t a
 
   allValues :: (OverflowType a, VarExp e) => e -> t [a]
-  allValues x = allValues' x 0
-  allValues' :: (OverflowType a, VarExp e) => e -> Int -> t [a]
+  allValues x = recentValues x 0
+  recentValues :: (OverflowType a, VarExp e) => e -> Int -> t [a]
 
 as :: Typeable a => t a -> t a
 as = id
