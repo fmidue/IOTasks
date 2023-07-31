@@ -23,3 +23,9 @@
 
 # ignore long runs of a single character:
 \b([A-Za-z])\g{-1}{3,}\b
+
+# GHC LANGUAGE extension, HLINT options etc.
+\{-# .* #-\}
+
+# Umlaute
+\b\w*[äöüßÄÖÜ]\w*\b

@@ -48,7 +48,7 @@ example3 =
   where
     n = intVar "n"
     x = intVar "x"
--- atempt at 'breaking' the solver
+-- attempt at 'breaking' the solver
 example4 :: Specification
 example4 =
   readInput x nats AssumeValid <>
@@ -272,7 +272,7 @@ prog5 = do
   loop [n]
   where
     loop :: MonadTeletype m => [Integer] -> m ()
-    loop (m:ms) = do putStr "Naechste Zahl bitte: "
+    loop (m:ms) = do putStr "Nächste Zahl bitte: "
                      n <- readLn
                      if n+m == 0
                        then do putStrLn "Die Summe der letzten beiden Eingaben war 0."

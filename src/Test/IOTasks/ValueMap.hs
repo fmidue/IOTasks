@@ -66,7 +66,7 @@ combinedEntries x m
     combineEntries (StringEntry xs) (StringEntry ys) = StringEntry $ xs ++ ys
     combineEntries _ _ = error "combinedEntries: impossible"
 
--- TODO: before combining each entry is already sorted, switch to mergesort?
+-- TODO: before combining each entry is already sorted, switch to merge sort?
 sortedEntries :: [SomeVar] -> ValueMap -> Maybe ValueEntry
 sortedEntries x m = sortEntry <$> combinedEntries x m
 
@@ -87,11 +87,11 @@ unwrapValueEntry (IntegerEntry xs) =
     Just Refl -> xs
     Nothing -> case eqT @a @I of
       Just Refl -> map (first fromInteger) xs
-      Nothing -> error $ "unrwarpValue: incompatible type - Integer (or I) and " ++ show (typeRep @a)
+      Nothing -> error $ "unwrapValue: incompatible type - Integer (or I) and " ++ show (typeRep @a)
 unwrapValueEntry (StringEntry xs) =
   case eqT @a @String of
     Just Refl -> xs
-    Nothing -> error $ "unrwarpValue: incompatible type - String and " ++ show (typeRep @a)
+    Nothing -> error $ "unwrapValue: incompatible type - String and " ++ show (typeRep @a)
 
 data Value = IntegerValue Integer | StringValue String deriving Show
 
@@ -115,7 +115,7 @@ unwrapValue :: forall a. Typeable a => Value -> a
 unwrapValue v = withValue v $ \(x :: b) ->
   case eqT @a @b of
     Just Refl -> x
-    Nothing -> error $ "unrwarpValue: incompatible type - "++ show (typeRep @b) ++ " and " ++ show (typeRep @a)
+    Nothing -> error $ "unwrapValue: incompatible type - "++ show (typeRep @b) ++ " and " ++ show (typeRep @a)
 
 readValue :: forall a. (Typeable a, Read a) => String -> a
 readValue x =

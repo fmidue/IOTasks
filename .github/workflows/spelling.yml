@@ -63,8 +63,6 @@ jobs:
             cspell:companies/src/companies.txt
             cspell:haskell/haskell.txt
             cspell:html/html.txt
-            cspell:aws/aws.txt
-
   comment:
     name: Report
     runs-on: ubuntu-latest
@@ -75,7 +73,7 @@ jobs:
     if: (success() || failure()) && needs.spelling.outputs.followup
     steps:
       - name: comment
-        uses: check-spelling/check-spelling@v0.0.20
+        uses: check-spelling/check-spelling@v0.0.21
         with:
           checkout: true
           spell_check_this: check-spelling/spell-check-this@prerelease
@@ -98,7 +96,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: apply spelling updates
-        uses: check-spelling/check-spelling@v0.0.20
+        uses: check-spelling/check-spelling@v0.0.21
         with:
           experimental_apply_changes_via_bot: 1
           checkout: true

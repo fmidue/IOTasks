@@ -109,6 +109,6 @@ xprop s = xit s . property
 fprop :: (HasCallStack, Testable prop) => String -> prop -> Spec
 fprop s = fit s . property
 
--- disable a propertiy for faster testing
+-- disable a property for faster testing
 xPerfprop :: (HasCallStack, Testable prop) => String -> prop -> Spec
 xPerfprop s _ = it s $ pendingWith "disabled for faster testing"
