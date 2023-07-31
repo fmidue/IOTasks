@@ -38,7 +38,7 @@ testExamples = do
       it "taskCheck example2' specification with overflow warnings" $
         (taskCheckOutcome prog2'' example2' <&> (\o -> isSuccess o && overflowWarnings o > 0) ) `shouldReturn` True
       it "taskCheck example2' specification with overflow checks" $
-        (taskCheckWithOutcome stdArgs{checkOverflows=True} prog2'' example2' <&> (\o -> isSuccess o && overflowWarnings o == 0) ) `shouldReturn` True
+        (taskCheckWithOutcome stdArgs{avoidOverflows=True} prog2'' example2' <&> (\o -> isSuccess o && overflowWarnings o == 0) ) `shouldReturn` True
 
 
     describe "prog3" $ do
