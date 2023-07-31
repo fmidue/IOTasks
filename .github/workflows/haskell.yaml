@@ -24,7 +24,7 @@ jobs:
         key: ubuntu-latest-stack-home-${{ hashFiles('stack.yaml') }}-${{ hashFiles('package.yaml') }}
 
     - name: Setup stack
-      uses: haskell/actions/setup@v1
+      uses: haskell/actions/setup@v2
       with:
         enable-stack: true
         stack-no-global: true
