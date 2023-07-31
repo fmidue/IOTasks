@@ -61,8 +61,8 @@ jobs:
             cspell:filetypes/filetypes.txt
             cspell:software-terms/src/software-terms.txt
             cspell:companies/src/companies.txt
-            cspell:haskell/haskell.txt
-            cspell:html/html.txt
+            cspell:haskell/dict/haskell.txt
+            cspell:html/dict/html.txt
             cspell:de_DE/de_DE.trie
 
   comment:
