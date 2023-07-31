@@ -13,10 +13,12 @@ fst
 GHC
 HRefl
 hspec
+implicits
 ints
 IOrep
 len
 Linebreak
+Linebreaks
 mconcat
 mempty
 MTT

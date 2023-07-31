@@ -12,6 +12,7 @@ geben
 github
 https
 letzten
+Nächste
 noch
 positiven
 Programm
@@ -20,3 +21,4 @@ standalone
 Summe
 teilbaren
 ubuntu
+unfoldings
