@@ -242,7 +242,7 @@ inputSequence = go "" where
   go cs (ProgRead c t) = go (c:cs) t
   go "" (ProgWrite _ _ t) = go "" t
   go cs (ProgWrite _ _ t) = reverse cs : go "" t
-  -- technically this might add an additional linebreak on the last line that might not be there in the Trace
+  -- technically this might add an additional line break on the last line that might not be there in the Trace
   go "" Terminate = []
   go cs Terminate = [reverse cs]
   go "" OutOfInputs = []
@@ -254,7 +254,7 @@ inputSequenceN = go "" where
   go cs (NProgRead c t) = go (c:cs) t
   go "" (NProgWrite _ _ t) = go "" t
   go cs (NProgWrite _ _ t) = reverse cs : go "" t
-  -- technically this might add an additional linebreak on the last line that might not be there in the Trace
+  -- technically this might add an additional line break on the last line that might not be there in the Trace
   go "" NTerminate = []
   go cs NTerminate = [reverse cs]
   go "" NOutOfInputs = []

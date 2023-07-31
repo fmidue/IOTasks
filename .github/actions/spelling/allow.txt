@@ -1,7 +1,3 @@
-github
-https
-ssh
-ubuntu
 Anzahl
 AVars
 bdy
@@ -13,8 +9,14 @@ ein
 eine
 Eingaben
 geben
+github
+https
 letzten
+noch
 positiven
 Programm
+ssh
+standalone
 Summe
 teilbaren
+ubuntu

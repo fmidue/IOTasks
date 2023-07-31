@@ -166,7 +166,7 @@ fillAVars xss e expr = expr //- [ (allE xs 0,xs') | xs <- nub xss, let xs' = com
   where
     combinedVarsExpr :: [SomeVar] -> Expr
     combinedVarsExpr xs = case sortedEntries xs e of
-      Just x -> withValueEntry x (error "....ähhh") (val . map fst)
+      Just x -> withValueEntry x (error "fillAVars: something went wrong") (val . map fst)
       Nothing -> error "fillAVars: inconsistent type"
 --
 

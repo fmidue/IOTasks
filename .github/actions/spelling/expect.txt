@@ -16,6 +16,7 @@ hspec
 ints
 IOrep
 len
+Linebreak
 mconcat
 mempty
 MTT
