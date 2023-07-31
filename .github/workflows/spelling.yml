@@ -56,7 +56,7 @@ jobs:
           spell_check_this: check-spelling/spell-check-this@prerelease
           post_comment: 0
           experimental_apply_changes_via_bot: 1
-          dictionary_source_prefixes: '{"cspell": "https://raw.githubusercontent.com/check-spelling/cspell-dicts/v20220816/dictionaries/"}'
+          dictionary_source_prefixes: '{"cspell": "https://raw.githubusercontent.com/check-spelling/cspell-dicts/main/dictionaries/"}'
           extra_dictionaries:
             cspell:filetypes/filetypes.txt
             cspell:software-terms/src/software-terms.txt
