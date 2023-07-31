@@ -135,7 +135,7 @@ withGeneratedValue f (ValueGenerator g) sz = f <$> generate (g sz)
 
 pathScript :: Path -> ScriptMode -> Bool -> Z3R (SatResult [String], String)
 pathScript path mode checkOverflows = do
-  let (tyConstr,predConstr,overflConstr) = partitionPath path
+  let (tyConstr,predConstr,overflowConstr) = partitionPath path
 
   goal <- mkGoal True False False
   vars <- forM tyConstr $
@@ -149,7 +149,7 @@ pathScript path mode checkOverflows = do
         goalAssert goal =<< z3Predicate goal t e (map fst vars)
 
   when checkOverflows $
-    forM_ overflConstr $
+    forM_ overflowConstr $
       \(OverflowConstraints ts e) ->
         forM_ ts (\t -> assertOverflowChecks goal t e (map fst vars))
 

@@ -26,3 +26,6 @@
 
 # GHC LANGUAGE extension, HLINT options etc.
 \{-# .* #-\}
+
+# Umlaute
+\b\w*[äöüßÄÖÜ]\w*\b

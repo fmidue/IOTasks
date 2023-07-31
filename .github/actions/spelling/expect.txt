@@ -17,6 +17,7 @@ implicits
 ints
 IOrep
 len
+Line
 Linebreak
 Linebreaks
 mconcat
@@ -32,6 +33,7 @@ NTrace
 nums
 Occured
 oneof
+Perfprop
 SATs
 snd
 Subterms

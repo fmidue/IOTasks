@@ -12,7 +12,6 @@ geben
 github
 https
 letzten
-Nächste
 noch
 positiven
 Programm
