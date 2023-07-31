@@ -72,7 +72,7 @@ stdArgs = Args
   , maxNegative = 5
   , verbose = True
   , simplifyFeedback = False
-  , avoidOverflows = False
+  , avoidOverflows = True
   , solverMaxSeqLength = 25
   }
 
