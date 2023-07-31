@@ -63,7 +63,7 @@ jobs:
             cspell:companies/src/companies.txt
             cspell:haskell/haskell.txt
             cspell:html/html.txt
-            cspell:de_DE/de-de.txt
+            cspell:de_DE/cspell-ext.json
 
   comment:
     name: Report
