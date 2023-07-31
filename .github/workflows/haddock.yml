@@ -35,6 +35,7 @@ jobs:
           $(for m in src/**/Internal/*.hs; do echo -n " --hide  $m" | sed -r -e 's|/|.|g' -e 's|.src.||' -e 's|.hs||'; done) \
           --html --pretty-html --hyperlinked-source --quickjump \
           --title="IOTasks" \
+          --prologue=haddock/prologue \
           --odir docs
 
     - name: Upload artifact
