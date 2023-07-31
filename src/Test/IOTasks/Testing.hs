@@ -55,8 +55,8 @@ data Args
     -- | cleanup feedback for educational use
   , simplifyFeedback :: Bool
     -- | check that intermediate results do not cause Int overflows,
-    --   including parts of 'OutputTerms' when possible (best-effort, no gurantees on completness)
-  , checkOverflows :: Bool
+    --   including parts of 'OutputTerms' when possible (best-effort, no guarantees on completeness)
+  , avoidOverflows :: Bool
     -- | maximum length of string values in the the backend solver.
     --   Smaller values may speed up test case generation, at the risk of not finding some satisfiable paths
   , solverMaxSeqLength :: Int
@@ -72,7 +72,7 @@ stdArgs = Args
   , maxNegative = 5
   , verbose = True
   , simplifyFeedback = False
-  , checkOverflows = False
+  , avoidOverflows = False
   , solverMaxSeqLength = 25
   }
 
@@ -95,7 +95,7 @@ taskCheckWithOutcome Args{..} prog spec = do
   nVar <- newTVarIO Nothing
 
   (_,(coreOut,satPaths,nInputs,timeouts,overflows)) <- concurrently
-    (satPathsQ nVar solverTimeout (constraintTree maxNegative spec) maxIterationUnfold solverMaxSeqLength checkOverflows q)
+    (satPathsQ nVar solverTimeout (constraintTree maxNegative spec) maxIterationUnfold solverMaxSeqLength avoidOverflows q)
     (testPaths output nVar q (0,0,0,0) Nothing)
 
   let out = Outcome coreOut (if overflows == 0 then NoHints else OverflowHint overflows)
@@ -123,7 +123,7 @@ taskCheckWithOutcome Args{..} prog spec = do
         Just p
           | maybe False (pathDepth p >) currentMaxPathLength -> testPaths output nVar q (m,n,t,o) mFailure
           | otherwise -> do
-          res <- isSatPath solverTimeout p solverMaxSeqLength checkOverflows
+          res <- isSatPath solverTimeout p solverMaxSeqLength avoidOverflows
           case res of
             SAT () -> do
               (out,k,o') <- testPath output p 0 n 0
@@ -145,7 +145,7 @@ taskCheckWithOutcome Args{..} prog spec = do
     testPath :: Output -> Path -> TestsRun -> NumberOfInputs -> Overflows -> IO (PathOutcome,TestsRun,Overflows)
     testPath _ _ n _ o | n >= maxSuccessPerPath = pure (PathSuccess,n,o)
     testPath output p n nOtherTests o = do
-      mNextInput <- findPathInput solverTimeout p valueSize solverMaxSeqLength checkOverflows
+      mNextInput <- findPathInput solverTimeout p valueSize solverMaxSeqLength avoidOverflows
       case mNextInput of
         Timeout -> pure (PathTimeout,n,o)
         SAT nextInput  -> do
@@ -261,7 +261,7 @@ taskCheckOn i p s = uncurry Outcome (go 0 0 i p s) where
 generateStaticTestSuite :: Args -> Specification -> IO [Inputs]
 generateStaticTestSuite Args{..} spec =
   let ps = sortOn pathDepth $ paths maxIterationUnfold $ constraintTree maxNegative spec
-  in concat <$> forM ps (\p -> catSATs <$> replicateM maxSuccessPerPath (findPathInput solverTimeout p valueSize solverMaxSeqLength checkOverflows))
+  in concat <$> forM ps (\p -> catSATs <$> replicateM maxSuccessPerPath (findPathInput solverTimeout p valueSize solverMaxSeqLength avoidOverflows))
 
 catSATs :: [SatResult a] -> [a]
 catSATs [] = []

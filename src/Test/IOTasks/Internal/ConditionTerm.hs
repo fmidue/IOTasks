@@ -12,8 +12,8 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
-module Test.IOTasks.Internal.Term (
-  Term(..),
+module Test.IOTasks.Internal.ConditionTerm (
+  ConditionTerm(..),
   eval,
   termVarExps, subTerms,
   printTerm, printIndexedTerm,
@@ -40,30 +40,30 @@ import Type.Reflection
 import GHC.TypeLits
 import Type.Match (matchType, fallbackCase', inCaseOfE', matchTypeOf, inCaseOfE)
 
-data Term a where
-  Add :: Term Integer -> Term Integer -> Term Integer
-  Sub :: Term Integer -> Term Integer -> Term Integer
-  Mul :: Term Integer -> Term Integer -> Term Integer
-  Equals :: (OverflowType a, Eq a) => Term a -> Term a -> Term Bool
-  Gt :: (OverflowType a, Ord a) => Term a -> Term a -> Term Bool
-  Ge :: (OverflowType a, Ord a) => Term a -> Term a -> Term Bool
-  Lt :: (OverflowType a, Ord a) => Term a -> Term a -> Term Bool
-  Le :: (OverflowType a, Ord a) => Term a -> Term a -> Term Bool
-  And :: Term Bool -> Term Bool -> Term Bool
-  Or :: Term Bool -> Term Bool -> Term Bool
-  IsInT :: Term Integer -> Term [Integer] -> Term Bool
-  NotT :: Term Bool -> Term Bool
-  SumT :: Term [Integer] -> Term Integer
-  ProductT :: Term [Integer] -> Term Integer
-  LengthT :: Typeable a => Term [a] -> Term Integer
-  ReverseT :: OverflowType a => Term [a] -> Term [a]
-  IntLitT :: I -> Term Integer
-  ListLitT :: OverflowType a => [OT a] -> Term [a]
-  BoolLitT :: Bool -> Term Bool
-  Current :: (OverflowType a, VarExp e) => e -> Int -> Term a
-  All :: (OverflowType a, VarExp e) => e -> Int -> Term [a]
+data ConditionTerm a where
+  Add :: ConditionTerm Integer -> ConditionTerm Integer -> ConditionTerm Integer
+  Sub :: ConditionTerm Integer -> ConditionTerm Integer -> ConditionTerm Integer
+  Mul :: ConditionTerm Integer -> ConditionTerm Integer -> ConditionTerm Integer
+  Equals :: (OverflowType a, Eq a) => ConditionTerm a -> ConditionTerm a -> ConditionTerm Bool
+  Gt :: (OverflowType a, Ord a) => ConditionTerm a -> ConditionTerm a -> ConditionTerm Bool
+  Ge :: (OverflowType a, Ord a) => ConditionTerm a -> ConditionTerm a -> ConditionTerm Bool
+  Lt :: (OverflowType a, Ord a) => ConditionTerm a -> ConditionTerm a -> ConditionTerm Bool
+  Le :: (OverflowType a, Ord a) => ConditionTerm a -> ConditionTerm a -> ConditionTerm Bool
+  And :: ConditionTerm Bool -> ConditionTerm Bool -> ConditionTerm Bool
+  Or :: ConditionTerm Bool -> ConditionTerm Bool -> ConditionTerm Bool
+  IsInT :: ConditionTerm Integer -> ConditionTerm [Integer] -> ConditionTerm Bool
+  NotT :: ConditionTerm Bool -> ConditionTerm Bool
+  SumT :: ConditionTerm [Integer] -> ConditionTerm Integer
+  ProductT :: ConditionTerm [Integer] -> ConditionTerm Integer
+  LengthT :: Typeable a => ConditionTerm [a] -> ConditionTerm Integer
+  ReverseT :: OverflowType a => ConditionTerm [a] -> ConditionTerm [a]
+  IntLitT :: I -> ConditionTerm Integer
+  ListLitT :: OverflowType a => [OT a] -> ConditionTerm [a]
+  BoolLitT :: Bool -> ConditionTerm Bool
+  Current :: (OverflowType a, VarExp e) => e -> Int -> ConditionTerm a
+  All :: (OverflowType a, VarExp e) => e -> Int -> ConditionTerm [a]
 
-termStruct :: Term a -> TermStruct a
+termStruct :: ConditionTerm a -> TermStruct a
 termStruct (Add x y) = Binary (:+:) x y
 termStruct (Sub x y) = Binary (:-:) x y
 termStruct (Mul x y) = Binary (:*:) x y
@@ -87,8 +87,8 @@ termStruct (Current x n) = VariableC x n
 termStruct (All x n) = VariableA x n
 
 data TermStruct a where
-  Unary :: (Typeable a, Typeable b) => UnaryF a b -> Term a -> TermStruct b
-  Binary :: (OverflowType a, OverflowType b, OverflowType c) => BinaryF a b c -> Term a -> Term b -> TermStruct c
+  Unary :: (Typeable a, Typeable b) => UnaryF a b -> ConditionTerm a -> TermStruct b
+  Binary :: (OverflowType a, OverflowType b, OverflowType c) => BinaryF a b c -> ConditionTerm a -> ConditionTerm b -> TermStruct c
   Literal :: Typeable a => ConstValue a -> TermStruct a
   VariableC :: (OverflowType a, VarExp e) => e -> Int -> TermStruct a
   VariableA :: (OverflowType a, VarExp e) => e -> Int -> TermStruct [a]
@@ -118,41 +118,41 @@ data ConstValue a where
   IntLit :: I -> ConstValue Integer
   ListLit :: OverflowType a => [OT a] -> ConstValue [a]
 
-termVarExps :: Term a -> [[SomeVar]]
+termVarExps :: ConditionTerm a -> [[SomeVar]]
 termVarExps (termStruct -> Binary _ x y) = termVarExps x ++ termVarExps y
 termVarExps (termStruct -> Unary _ x) = termVarExps x
 termVarExps (termStruct -> Literal _) = []
 termVarExps (termStruct -> VariableC e _) = [toVarList e]
 termVarExps (termStruct -> VariableA e _) = [toVarList e]
 
-instance Accessor Term where
-  recentValue :: forall a e. (Typeable a, VarExp e) => e -> Int -> Term a
+instance Accessor ConditionTerm where
+  recentValue :: forall a e. (Typeable a, VarExp e) => e -> Int -> ConditionTerm a
   recentValue =  matchType @a
     [ inCaseOfE' @Integer $ \HRefl -> Current
     , inCaseOfE' @String $ \HRefl -> Current
     , fallbackCase' $ error $ "variable type not supported for Terms: " ++ show (typeRep @a)
     ]
-  recentValues :: forall a e. (Typeable a, VarExp e) => e -> Int -> Term [a]
+  recentValues :: forall a e. (Typeable a, VarExp e) => e -> Int -> ConditionTerm [a]
   recentValues =  matchType @a
     [ inCaseOfE' @Integer $ \HRefl -> All
     , inCaseOfE' @String $ \HRefl -> All
     , fallbackCase' $ error $ "variable type not supported for Terms: " ++ show (typeRep @a)
     ]
 
-instance Arithmetic Term where
+instance Arithmetic ConditionTerm where
   (.+.) = Add
   (.-.) = Sub
   (.*.) = Mul
   intLit = IntLitT . fromInteger
 
-instance Compare Term where
+instance Compare ConditionTerm where
   (.==.) = Equals
   (.>.) = Gt
   (.>=.) = Ge
   (.<.) = Lt
   (.<=.) = Le
 
-instance Logic Term where
+instance Logic ConditionTerm where
   not' = NotT
   x .&&. (BoolLitT True) = x
   BoolLitT True .&&. y  = y
@@ -163,21 +163,21 @@ instance Logic Term where
   true = BoolLitT True
   false = BoolLitT False
 
-instance Sets Term where
+instance Sets ConditionTerm where
   isIn = IsInT
 
-instance BasicLists Term where
+instance BasicLists ConditionTerm where
   length' = LengthT
   reverse' = ReverseT
   sum' = SumT
   product' = ProductT
   listLit = ListLitT . toOT
 
-instance TypeError (Text "complex list functions, like filter, can not be used at type " :<>: ShowType Term)
-  => ComplexLists Term where
+instance TypeError (Text "complex list functions, like filter, can not be used at type " :<>: ShowType ConditionTerm)
+  => ComplexLists ConditionTerm where
   filter' = error "unreachable"
 
-eval :: forall a. OverflowType a => Term a -> ValueMap -> (OverflowWarning, a)
+eval :: forall a. OverflowType a => ConditionTerm a -> ValueMap -> (OverflowWarning, a)
 eval t m =
   let r = eval' t m
   in matchTypeOf r
@@ -210,7 +210,7 @@ evalF2 (:&&:) = (&&)
 evalF2 (:||:) = (||)
 evalF2 IsIn = elem
 
-eval' :: forall x. Term x -> ValueMap -> (OverflowWarning,OT x)
+eval' :: forall x. ConditionTerm x -> ValueMap -> (OverflowWarning,OT x)
 eval' (termStruct -> Binary (f :: BinaryF a b c) x y) e =
   matchType @c
     [ inCaseOfE' @Integer $ \HRefl -> let (w,r) = evalF2 f <$> eval' x e <*> eval' y e in (checkOverflow r <> w, r)
@@ -238,13 +238,13 @@ safeHead :: [a] -> Maybe a
 safeHead [] = Nothing
 safeHead (x:_) = Just x
 
-printIndexedTerm :: Term a -> Map SomeVar (Int,[Int]) -> String
+printIndexedTerm :: ConditionTerm a -> Map SomeVar (Int,[Int]) -> String
 printIndexedTerm t = printTerm' t . Just
 
-printTerm :: Term a -> String
+printTerm :: ConditionTerm a -> String
 printTerm t = printTerm' t Nothing
 
-printTerm' :: Term a -> Maybe (Map SomeVar (Int,[Int])) -> String
+printTerm' :: ConditionTerm a -> Maybe (Map SomeVar (Int,[Int])) -> String
 printTerm' (termStruct -> Binary IsIn x xs) m = printTerm' x m ++ " ∈ " ++ printTerm' xs m
 printTerm' (termStruct -> Binary f tx ty) m = concat ["(",printTerm' tx m, ") ",fSym f," (", printTerm' ty m,")"]
   where
@@ -279,9 +279,9 @@ printTerm' (termStruct -> Literal (IntLit x)) _ = show x
 printTerm' (termStruct -> Literal (ListLit xs)) _ = showOT xs
 
 data SomeTerm where
-  SomeTerm :: OverflowType a => Term a -> SomeTerm
+  SomeTerm :: OverflowType a => ConditionTerm a -> SomeTerm
 
-someTerm :: Term a -> SomeTerm
+someTerm :: ConditionTerm a -> SomeTerm
 someTerm t@(Add _ _) = SomeTerm t
 someTerm t@(Sub _ _) = SomeTerm t
 someTerm t@(Mul _ _) = SomeTerm t
@@ -304,20 +304,20 @@ someTerm t@(BoolLitT _) = SomeTerm t
 someTerm t@(Current _ _) = SomeTerm t
 someTerm t@(All _ _) = SomeTerm t
 
-subTerms :: Term a -> [SomeTerm]
+subTerms :: ConditionTerm a -> [SomeTerm]
 subTerms (termStruct' -> (t,Unary _ x)) = someTerm t : subTerms x
 subTerms (termStruct' -> (t,Binary _ x y)) = someTerm t : subTerms x ++ subTerms y
 subTerms (termStruct' -> (t,Literal{})) = [someTerm t]
 subTerms (termStruct' -> (t,VariableC{})) = [someTerm t]
 subTerms (termStruct' -> (t,VariableA{})) = [someTerm t]
 
-castTerm :: forall a. Typeable a => SomeTerm -> Maybe (Term a)
-castTerm (SomeTerm (t :: Term b)) =
+castTerm :: forall a. Typeable a => SomeTerm -> Maybe (ConditionTerm a)
+castTerm (SomeTerm (t :: ConditionTerm b)) =
   matchType @a
     [ inCaseOfE' @b $ \HRefl -> Just t
     , fallbackCase' Nothing
     ]
 
 -- dirty hack
-termStruct' :: Term a -> (Term a, TermStruct a)
+termStruct' :: ConditionTerm a -> (ConditionTerm a, TermStruct a)
 termStruct' t = (t, termStruct t)

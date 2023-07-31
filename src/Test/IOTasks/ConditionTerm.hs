@@ -1,5 +1,5 @@
-module Test.IOTasks.Term (
-  Term,
+module Test.IOTasks.ConditionTerm (
+  ConditionTerm,
   eval,
   termVarExps, subTerms,
   printTerm, printIndexedTerm,
@@ -7,4 +7,4 @@ module Test.IOTasks.Term (
   castTerm,
   ) where
 
-import Test.IOTasks.Internal.Term
+import Test.IOTasks.Internal.ConditionTerm

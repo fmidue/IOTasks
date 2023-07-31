@@ -7,7 +7,7 @@ import Test.IOTasks.Terms
 import Test.IOTasks.OutputTerm
 import Test.IOTasks.OutputPattern
 import Test.IOTasks.ValueSet
-import Test.IOTasks.Term
+import Test.IOTasks.ConditionTerm
 import Test.IOTasks.Overflow
 import {-# SOURCE #-} Test.IOTasks.Internal.Specification
 
@@ -98,7 +98,7 @@ loopBody xs loopCondition = do
     , pure $ branch (not' $ condTerm cond) s1' exit
     ]
 
-data Condition = forall a. (Typeable a, Read a, Show a) => Condition { condTerm :: Term Bool, _progressInfo :: (Var a,ValueSet a) }
+data Condition = forall a. (Typeable a, Read a, Show a) => Condition { condTerm :: ConditionTerm Bool, _progressInfo :: (Var a,ValueSet a) }
 
 -- generates a numeric condition of the form
 -- f xs `comp` n

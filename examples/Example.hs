@@ -392,7 +392,7 @@ hangmanSpec word = tillExit (
     (writeOptionalOutput [Text "wrong guess!"])
   )
   where
-    winCond :: Term [Integer] -> Term Bool
+    winCond :: ConditionTerm [Integer] -> ConditionTerm Bool
     winCond g = foldr (\a b -> intLit a `isIn` g .&&. b) true word
     g = intVar "g"
 

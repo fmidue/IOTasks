@@ -9,7 +9,7 @@ module Test.IOTasks.Internal.Specification (
   ) where
 
 import Test.IOTasks.ValueSet
-import Test.IOTasks.Term
+import Test.IOTasks.ConditionTerm
 import Test.IOTasks.Terms (Var (..), SomeVar)
 import Test.IOTasks.Trace
 import Test.IOTasks.OutputPattern
@@ -22,7 +22,7 @@ import Text.PrettyPrint (Doc)
 data Specification where
   ReadInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification -> Specification
   WriteOutput :: OptFlag -> Set (OutputPattern 'SpecificationP) -> Specification -> Specification
-  Branch :: Term Bool -> Specification -> Specification -> Specification -> Specification
+  Branch :: ConditionTerm Bool -> Specification -> Specification -> Specification -> Specification
   Nop :: Specification
   TillE :: Specification -> Specification -> Specification
   E :: Specification
@@ -36,7 +36,7 @@ readInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> S
 writeOutput :: [OutputPattern 'SpecificationP] -> Specification
 writeOptionalOutput :: [OutputPattern 'SpecificationP] -> Specification
 optionalTextOutput :: Specification
-branch :: Term Bool -> Specification -> Specification -> Specification
+branch :: ConditionTerm Bool -> Specification -> Specification -> Specification
 nop :: Specification
 tillExit :: Specification -> Specification
 exit :: Specification

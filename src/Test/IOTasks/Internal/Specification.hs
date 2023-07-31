@@ -20,7 +20,7 @@ module Test.IOTasks.Internal.Specification (
 import Prelude hiding (until)
 
 import Test.IOTasks.ValueSet
-import Test.IOTasks.Term
+import Test.IOTasks.ConditionTerm
 import Test.IOTasks.Terms (Var (..), SomeVar, varname, someVar)
 import Test.IOTasks.Trace
 import Test.IOTasks.OutputPattern
@@ -42,7 +42,7 @@ import Text.PrettyPrint hiding ((<>))
 data Specification where
   ReadInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification -> Specification
   WriteOutput :: OptFlag -> Set (OutputPattern 'SpecificationP) -> Specification -> Specification
-  Branch :: Term Bool -> Specification -> Specification -> Specification -> Specification
+  Branch :: ConditionTerm Bool -> Specification -> Specification -> Specification -> Specification
   Nop :: Specification
   TillE :: Specification -> Specification -> Specification
   E :: Specification
@@ -75,7 +75,7 @@ writeOptionalOutput ts = WriteOutput Optional (Set.fromList ts) nop
 optionalTextOutput :: Specification
 optionalTextOutput = writeOptionalOutput [Wildcard]
 
-branch :: Term Bool -> Specification -> Specification -> Specification
+branch :: ConditionTerm Bool -> Specification -> Specification -> Specification
 branch c t e = Branch c t e nop
 
 nop :: Specification
@@ -87,10 +87,10 @@ tillExit bdy = TillE bdy nop
 exit :: Specification
 exit = E
 
-until :: Term Bool -> Specification -> Specification
+until :: ConditionTerm Bool -> Specification -> Specification
 until c bdy = TillE (branch c exit bdy) nop
 
-while :: Term Bool -> Specification -> Specification
+while :: ConditionTerm Bool -> Specification -> Specification
 while c bdy = TillE (branch c bdy exit) nop
 
 vars :: Specification -> [SomeVar]
@@ -152,7 +152,7 @@ data RecStruct p x a r = NoRec r | RecSub p x a | RecSame p x a | RecBoth p x a 
 sem :: forall st p a.
   (forall v. (Typeable v,Read v,Show v) => st -> Var v -> ValueSet v -> InputMode -> RecStruct p (a->a) st a) -> (RecStruct p () a a -> a) ->
   (st -> OptFlag -> Set (OutputPattern 'SpecificationP) -> a -> a) ->
-  (st -> Term Bool -> a -> a -> a) ->
+  (st -> ConditionTerm Bool -> a -> a -> a) ->
   (Action -> a -> a) ->
   a ->
   st -> Specification -> a
@@ -169,7 +169,7 @@ sem f f' g h i z st s = runIdentity $ semM
 semM :: forall m st p a. Monad m =>
   (forall v. (Typeable v,Read v,Show v) => st -> Var v -> ValueSet v -> InputMode -> m (RecStruct p (a->a) st a)) -> (RecStruct p () a a -> m a) ->
   (st -> OptFlag -> Set (OutputPattern 'SpecificationP) -> m a -> m a) ->
-  (st -> Term Bool -> m a -> m a -> m a) ->
+  (st -> ConditionTerm Bool -> m a -> m a -> m a) ->
   (Action -> m a -> m a) ->
   m a ->
   st -> Specification -> m a

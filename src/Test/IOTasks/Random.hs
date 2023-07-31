@@ -9,7 +9,7 @@ module Test.IOTasks.Random (
   SomeVar, Varname, var, intVar, stringVar,
   pPrintSpecification,
   -- * Terms
-  Term,
+  ConditionTerm,
   OutputTerm,
   Arithmetic(..),
   Compare(..),

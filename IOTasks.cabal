@@ -27,6 +27,7 @@ source-repository head
 library
   exposed-modules:
       Test.IOTasks
+      Test.IOTasks.ConditionTerm
       Test.IOTasks.Constraints
       Test.IOTasks.Interpreter
       Test.IOTasks.IOrep
@@ -37,7 +38,6 @@ library
       Test.IOTasks.Random
       Test.IOTasks.Random.Testing
       Test.IOTasks.Specification
-      Test.IOTasks.Term
       Test.IOTasks.Terms
       Test.IOTasks.Testing
       Test.IOTasks.Trace
@@ -49,7 +49,7 @@ library
       Test.IOTasks.Internal.Overflow
       Test.IOTasks.Internal.Specification
       Test.IOTasks.Internal.SpecificationGenerator
-      Test.IOTasks.Internal.Term
+      Test.IOTasks.Internal.ConditionTerm
   hs-source-dirs:
       src
   ghc-options: -Wall -Wmissing-export-lists -Wno-name-shadowing -fdefer-typed-holes

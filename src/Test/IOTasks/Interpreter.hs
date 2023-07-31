@@ -11,7 +11,7 @@ import qualified Data.Set as Set
 
 import Test.IOTasks.Internal.Specification
 import Test.IOTasks.MonadTeletype as MTT
-import Test.IOTasks.Term
+import Test.IOTasks.ConditionTerm
 import Test.IOTasks.Terms (someVar)
 import Test.IOTasks.ValueSet
 import Test.IOTasks.Trace

@@ -15,7 +15,7 @@ module Test.IOTasks.Constraints (
   ) where
 
 import Test.IOTasks.ValueSet
-import Test.IOTasks.Term (Term, printIndexedTerm, castTerm, subTerms)
+import Test.IOTasks.ConditionTerm (ConditionTerm, printIndexedTerm, castTerm, subTerms)
 import Test.IOTasks.Terms (Var, SomeVar, someVar, not', varname)
 import Test.IOTasks.Internal.Specification
 import Test.IOTasks.OutputPattern (valueTerms)
@@ -31,8 +31,8 @@ import Data.Typeable
 
 data Constraint (t :: ConstraintType) where
   InputConstraint :: Typeable v => (Var v, Int) -> ValueSet v -> Constraint 'Input
-  ConditionConstraint :: Term Bool -> Map SomeVar (Int, [Int]) -> Constraint 'Condition
-  OverflowConstraints :: [Term Integer] -> Map SomeVar (Int, [Int]) -> Constraint 'Overflow
+  ConditionConstraint :: ConditionTerm Bool -> Map SomeVar (Int, [Int]) -> Constraint 'Condition
+  OverflowConstraints :: [ConditionTerm Integer] -> Map SomeVar (Int, [Int]) -> Constraint 'Overflow
 
 data ConstraintType = Input | Condition | Overflow
 

@@ -18,8 +18,8 @@ module Test.IOTasks.OutputTerm (
 import Prelude hiding (all)
 
 import Test.IOTasks.Terms
-import Test.IOTasks.Internal.Term hiding (eval)
-import qualified Test.IOTasks.Internal.Term as Term
+import Test.IOTasks.Internal.ConditionTerm hiding (eval)
+import qualified Test.IOTasks.Internal.ConditionTerm as ConditionTerm
 import Test.IOTasks.Internal.Overflow (OverflowWarning, checkOverflow, OverflowType (..))
 import Test.IOTasks.ValueMap
 
@@ -37,7 +37,7 @@ import Text.Parsec.String (Parser)
 import Data.Char (isAlphaNum)
 
 data OutputTerm a
-  = Transparent (Term a)
+  = Transparent (ConditionTerm a)
   | Opaque Expr [[SomeVar]] [SomeTerm]
 
 toExpr :: OutputTerm a -> Expr
@@ -52,7 +52,7 @@ transparentSubterms :: Typeable a => OutputTerm a -> [SomeTerm]
 transparentSubterms (Transparent t) = subTerms t
 transparentSubterms (Opaque _ _ ts) = ts
 
--- simple instance liftig based on Expr's instances
+-- simple instance lifting based on Expr's instances
 instance Show (OutputTerm a) where
   show = show . toExpr
 
@@ -97,10 +97,10 @@ allE x n = case varExpType x of
   Nothing -> error "allE: inconsistent VarExp type"
 
 eval :: forall a. OverflowType a => OutputTerm a -> ValueMap -> (OverflowWarning, a)
-eval (Transparent t) e = Term.eval t e
+eval (Transparent t) e = ConditionTerm.eval t e
 eval (Opaque expr vss ts) e = let r = eval' expr vss e in matchType @a
   [ inCaseOfE' @Integer $ \HRefl -> (checkOverflow @Integer (fromInteger r),r)
-  , fallbackCase' (foldMap (\(SomeTerm t) -> fst $ Term.eval t e) ts,r)]
+  , fallbackCase' (foldMap (\(SomeTerm t) -> fst $ ConditionTerm.eval t e) ts,r)]
   where
   eval' :: OverflowType a => Expr -> [[SomeVar]] -> ValueMap -> a
   eval' expr xss e = evl . fillAVars xss e . reduceAVarsIndex e . replaceCVars e $ expr
@@ -178,26 +178,26 @@ instance Arithmetic OutputTerm where
 
 instance BasicLists OutputTerm where
   length' :: forall a. Typeable a => OutputTerm [a] -> OutputTerm Integer
-  length' = h1 (length' @Term @a) $ unaryF (Length @a)
+  length' = h1 (length' @ConditionTerm @a) $ unaryF (Length @a)
 
   reverse' :: forall a. OverflowType a => OutputTerm [a] -> OutputTerm [a]
-  reverse' = h1 (reverse' @Term @a) $ unaryF (Reverse @a)
+  reverse' = h1 (reverse' @ConditionTerm @a) $ unaryF (Reverse @a)
 
   sum' = h1 sum' $ unaryF Sum
   product' = h1 product' $ unaryF Product
   listLit = Transparent . ListLitT . toOT
 
-h1 :: (Term a -> Term b) -> Expr -> OutputTerm a -> OutputTerm b
+h1 :: (ConditionTerm a -> ConditionTerm b) -> Expr -> OutputTerm a -> OutputTerm b
 h1 f _ (Transparent t) = Transparent $ f t
 h1 _ g (Opaque x vs xs) = Opaque (g :$ x) vs xs
 
-h2 :: (Typeable a, Typeable b) => (Term a -> Term b -> Term c) -> Expr -> OutputTerm a -> OutputTerm b -> OutputTerm c
+h2 :: (Typeable a, Typeable b) => (ConditionTerm a -> ConditionTerm b -> ConditionTerm c) -> Expr -> OutputTerm a -> OutputTerm b -> OutputTerm c
 h2 f _ (Transparent x) (Transparent y) = Transparent $ f x y
 h2 _ g (Opaque x vx tx) (Transparent y) = Opaque (g :$ x :$ termExpr y) (vx ++ termVarExps y) (tx ++ subTerms y)
 h2 _ g (Transparent x) (Opaque y vy ty) = Opaque (g :$ termExpr x :$ y) (termVarExps x ++ vy) (subTerms x ++ ty)
 h2 _ g (Opaque x vx tx) (Opaque y vy ty) = Opaque (g :$ x :$ y) (vx ++ vy) (tx ++ ty)
 
-termExpr :: Term a -> Expr
+termExpr :: ConditionTerm a -> Expr
 termExpr (termStruct -> Binary f x y) = binF f :$ termExpr x :$ termExpr y
 termExpr (termStruct -> Unary f xs) = unaryF f :$ termExpr xs
 termExpr (termStruct -> VariableC x n) = currentE x n

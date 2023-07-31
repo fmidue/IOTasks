@@ -9,7 +9,7 @@ module Test.IOTasks (
   SomeVar, Varname, var, intVar, stringVar,
   pPrintSpecification,
   -- * Terms
-  Term,
+  ConditionTerm,
   OutputTerm,
   Arithmetic(..),
   Compare(..),
@@ -38,7 +38,7 @@ import Prelude hiding (until)
 import Test.IOTasks.Specification
 import Test.IOTasks.MonadTeletype
 import Test.IOTasks.IOrep
-import Test.IOTasks.Term
+import Test.IOTasks.ConditionTerm
 import Test.IOTasks.Terms
 import Test.IOTasks.ValueSet
 import Test.IOTasks.OutputPattern
