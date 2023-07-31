@@ -63,8 +63,8 @@ instance Ord (OutputTerm a) where
   compare = compare `on` toExpr
 
 instance Accessor OutputTerm where
-  recentValue x n = checkNames x $ Transparent $ Current x n
-  recentValues x n = checkNames x $ Transparent $ All x n
+  valueBefore n x = checkNames x $ Transparent $ Current x n
+  valuesBefore n x = checkNames x $ Transparent $ All x n
 
 data SomeOutputTerm where
   SomeOutputTerm :: Typeable a => OutputTerm a -> SomeOutputTerm
