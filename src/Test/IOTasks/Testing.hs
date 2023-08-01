@@ -57,7 +57,7 @@ data Args
     -- | check that intermediate results do not cause Int overflows,
     --   including parts of 'OutputTerms' when possible (best-effort, no guarantees on completeness)
   , avoidOverflows :: Bool
-    -- | maximum length of string values in the the backend solver.
+    -- | maximum length of string values in the backend solver.
     --   Smaller values may speed up test case generation, at the risk of not finding some satisfiable paths
   , solverMaxSeqLength :: Int
   }
