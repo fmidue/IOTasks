@@ -153,8 +153,8 @@ taskCheckWithOutcome Args{..} prog spec = do
           let
             (specTrace,warn) = first normalizedTrace $ runSpecification nextInput spec
             progTrace = runProgram nextInput prog
-            o' = if warn == OverflowOccured then o+1 else o
-          when (verbose && warn == OverflowOccured) $ putLnP output "Overflow of Int range detected."
+            o' = if warn == OverflowOccurred then o+1 else o
+          when (verbose && warn == OverflowOccurred) $ putLnP output "Overflow of Int range detected."
           case specTrace `covers` progTrace of
             result | isSuccessfulMatch result -> testPath output p (n+1) nOtherTests o'
             failure -> do
@@ -250,7 +250,7 @@ taskCheckOn i p s = uncurry Outcome (go 0 0 i p s) where
     let
       (specTrace,warn) = first normalizedTrace $ runSpecification i spec
       progTrace = runProgram i prog
-      o' = if warn == OverflowOccured then o+1 else o
+      o' = if warn == OverflowOccurred then o+1 else o
     in case specTrace `covers` progTrace of
       result | isSuccessfulMatch result -> go (n+1) o' is prog spec
       failure -> (Failure i specTrace progTrace failure, overflowHint o')

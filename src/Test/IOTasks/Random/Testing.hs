@@ -137,7 +137,7 @@ runTest p spec i =
     (specTrace,warn) = first normalizedTrace $ runSpecification i spec
     progTrace = runProgram i p
     o = case warn of
-      OverflowOccured -> OverflowHint 1
+      OverflowOccurred -> OverflowHint 1
       _ -> mempty
   in case specTrace `covers` progTrace of
     result | isSuccessfulMatch result -> Outcome (Success 1) o

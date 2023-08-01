@@ -31,7 +31,6 @@ NProg
 NTerminate
 NTrace
 nums
-Occured
 oneof
 Perfprop
 SATs

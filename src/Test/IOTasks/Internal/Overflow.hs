@@ -15,12 +15,12 @@ module Test.IOTasks.Internal.Overflow (
 
 import Type.Reflection
 
-data OverflowWarning = OverflowOccured | NoOverflow deriving (Eq,Show)
+data OverflowWarning = OverflowOccurred | NoOverflow deriving (Eq,Show)
 
 instance Semigroup OverflowWarning where
   NoOverflow <> o = o
   o <> NoOverflow = o
-  OverflowOccured <> OverflowOccured = OverflowOccured
+  OverflowOccurred <> OverflowOccurred = OverflowOccurred
 
 instance Monoid OverflowWarning where
   mempty = NoOverflow
@@ -39,7 +39,7 @@ class (Typeable a, Show a, Typeable (OT a), Eq (OT a), Ord (OT a)) => OverflowTy
 instance OverflowType Integer where
   type OT Integer = I
   checkOverflow x
-    | hasDiverged x = OverflowOccured
+    | hasDiverged x = OverflowOccurred
     | otherwise = NoOverflow
 
   toOT = fromInteger
