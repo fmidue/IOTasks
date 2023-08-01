@@ -1,0 +1,52 @@
+name: Haskell CI
+
+on:
+  shedule:
+    - cron: '0 3 * * *' # daily at 3 am
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check for new commits today
+      id: new-commits
+      uses: adriangl/check-new-commits-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          seconds: 86400 # One day in seconds
+          branch: ${{ github.event.repository.default_branch }}
+
+    - uses: actions/checkout@v3
+      if: ${{ steps.check-new-commits.outputs.has-new-commits == 'true' }}
+
+    - name: Cache Stack
+      if: ${{ steps.check-new-commits.outputs.has-new-commits == 'true' }}
+      id: cache-stack-unix
+      uses: actions/cache@v3
+      with:
+        path: ~/.stack
+        key: ubuntu-latest-stack-home-${{ hashFiles('stack.yaml') }}-${{ hashFiles('package.yaml') }}
+
+    - name: Setup stack
+      if: ${{ steps.check-new-commits.outputs.has-new-commits == 'true' }}
+      uses: haskell/actions/setup@v2
+      with:
+        enable-stack: true
+        stack-no-global: true
+
+
+    - name: Install dependencies
+      if: ${{ steps.check-new-commits.outputs.has-new-commits == 'true' }}
+      run: |
+        set -ex
+        stack --no-terminal --install-ghc test --bench --only-dependencies
+        set +ex
+
+    - name: Build
+      if: ${{ steps.check-new-commits.outputs.has-new-commits == 'true' }}
+      run: |
+        set -ex
+        stack --no-terminal $ARGS test --bench --no-run-benchmarks --haddock --no-haddock-deps
+        set +ex

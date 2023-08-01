@@ -1,12 +1,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# LANGUAGE RecordWildCards #-}
-module TestProperties (testProperties) where
+module TestProperties (testCheapProperties, testExpensiveProperties) where
 
 import Test.Hspec
 import Test.Hspec.QuickCheck (prop)
 import Test.QuickCheck hiding (isSuccess, stdArgs,verbose, Args)
 
+import Control.Applicative (liftA2)
 import Control.Monad.Loops (allM)
 
 import Test.IOTasks
@@ -17,28 +18,16 @@ import Test.IOTasks.ValueSet
 import Test.IOTasks.Trace (ordinaryTrace, isTerminatingN, normalizedTrace)
 import Test.IOTasks.OutputPattern (PatternType(TraceP),(>:))
 
-import Control.Applicative
-
-testProperties :: Spec
-testProperties = do
+testExpensiveProperties :: Spec
+testExpensiveProperties = do
   context "testing with random specifications" $ do
-    prop "programs built from a spec satisfy that spec" $
-      \s -> allM (\p -> isSuccess <$> taskCheckWithOutcome stdArgs{verbose=False,maxIterationUnfold=15,maxSuccessPerPath=5} p s) (interpret s) `shouldReturn` True
+    prop "sanity check" $
+      \s -> s `testAgainst` s
 
-    prop "programs built from a spec dont go wrong on (solver based) inputs generated from the same spec" $
+    prop "programs built from a spec don't go wrong on (solver based) inputs generated from the same spec" $
       \s -> ioProperty $ do
         is <- generateStaticTestSuite stdArgs s
         pure $ all (\p -> all (\i -> isTerminatingN $ runProgram i p) is) (interpret s)
-
-    prop "programs built from a spec dont go wrong on (random) inputs generated from the same spec" $
-      \s ->
-        let Random.Args{..} = Random.stdArgs
-        in
-          forAll (genInput s maxInputLength (Size valueSize (fromIntegral $ valueSize `div` 5)) maxNegative)
-            (\is -> all (isTerminatingN . runProgram is) (interpret s))
-
-    prop "relate runSpecification based semantics to accept (cf FLOPS 2020)" $
-      \s -> testAgainst s s
 
     prop "inputs are never optional for a fixed input prefix (traces obtained from too less inputs never terminate)" $
       \s -> ioProperty $ do
@@ -50,19 +39,32 @@ testProperties = do
         (i <> tillExit s)
         (i <> tillExit (s <> tillExit s <> exit))
 
-    prop "sanity check" $
-      \s -> s `testAgainst` s
-
-    -- extremely slow - TODO:improve
-    xPerfprop "s1 <> (s2 <> s3) === (s1 <> s2) <> s3" $
-      \s1 s2 s3 -> testEquiv
-          (s1 <> (s2 <> s3))
-          ((s1 <> s2) <> s3)
-
     prop "tillExit (s1 <> exit) === tillExit (s1 <> exit <> s2)" $
       \s1 s2 -> testEquiv
         (tillExit (s1 <> exit))
         (tillExit (s1 <> exit <> s2))
+
+        -- extremely slow - TODO:improve
+    xPerfprop "s1 <> (s2 <> s3) === (s1 <> s2) <> s3" $
+      \s1 s2 s3 -> testEquiv
+      (s1 <> (s2 <> s3))
+      ((s1 <> s2) <> s3)
+
+testCheapProperties :: Spec
+testCheapProperties = do
+  context "testing with random specifications" $ do
+    prop "programs built from a spec satisfy that spec" $
+      \s -> allM (\p -> isSuccess <$> taskCheckWithOutcome stdArgs{verbose=False,maxIterationUnfold=15,maxSuccessPerPath=5} p s) (interpret s) `shouldReturn` True
+
+    prop "relate runSpecification based semantics to accept (cf FLOPS 2020)" $
+      \s -> testAgainst s s
+
+    prop "programs built from a spec don't go wrong on (random) inputs generated from the same spec" $
+      \s ->
+        let Random.Args{..} = Random.stdArgs
+        in
+          forAll (genInput s maxInputLength (Size valueSize (fromIntegral $ valueSize `div` 5)) maxNegative)
+            (\is -> all (isTerminatingN . runProgram is) (interpret s))
 
   context "string pattern matching" $ do
     prop "wildcard >: x == True" $
