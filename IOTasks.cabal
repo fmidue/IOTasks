@@ -45,11 +45,12 @@ library
       Test.IOTasks.ValueSet
       Test.IOTasks.Z3
   other-modules:
+      Test.IOTasks.Internal.ConditionTerm
       Test.IOTasks.Internal.Output
       Test.IOTasks.Internal.Overflow
       Test.IOTasks.Internal.Specification
       Test.IOTasks.Internal.SpecificationGenerator
-      Test.IOTasks.Internal.ConditionTerm
+      Test.IOTasks.Internal.ValueSet
   hs-source-dirs:
       src
   ghc-options: -Wall -Wmissing-export-lists -Wno-name-shadowing -fdefer-typed-holes

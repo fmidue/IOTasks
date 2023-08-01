@@ -44,11 +44,12 @@ ghc-options:
 library:
   source-dirs: src
   other-modules:
+    - Test.IOTasks.Internal.ConditionTerm
     - Test.IOTasks.Internal.Output
     - Test.IOTasks.Internal.Overflow
     - Test.IOTasks.Internal.Specification
     - Test.IOTasks.Internal.SpecificationGenerator
-    - Test.IOTasks.Internal.ConditionTerm
+    - Test.IOTasks.Internal.ValueSet
 
 tests:
   IOTasks-test:

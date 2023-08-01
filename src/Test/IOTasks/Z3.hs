@@ -14,7 +14,7 @@
 module Test.IOTasks.Z3 (findPathInput, printPathScript, evalPathScript, satPaths, satPathsQ, isSatPath, SatResult(..), Timeout) where
 
 import Test.IOTasks.Constraints
-import Test.IOTasks.ValueSet
+import Test.IOTasks.Internal.ValueSet
 import Test.IOTasks.Internal.ConditionTerm
 import Test.IOTasks.Terms (Var(..), SomeVar, pattern SomeVar, VarExp(..), someVarname)
 import Test.IOTasks.ValueMap
