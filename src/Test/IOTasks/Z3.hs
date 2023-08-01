@@ -432,7 +432,7 @@ z3ValueSetConstraint (Intersection x y) xVar = do
   cy <- z3ValueSetConstraint y xVar
   mkAnd [cx,cy]
 z3ValueSetConstraint (GreaterThan n) xVar = mkIntNum n >>= mkGt xVar
-z3ValueSetConstraint (LessThen n) xVar = mkIntNum n >>= mkLt xVar
+z3ValueSetConstraint (LessThan n) xVar = mkIntNum n >>= mkLt xVar
 z3ValueSetConstraint (Eq n) xVar = mkIntNum n >>= mkEq xVar
 z3ValueSetConstraint Every _ = mkTrue
 z3ValueSetConstraint None _ = mkFalse

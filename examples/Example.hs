@@ -397,7 +397,7 @@ hangmanSpec word = tillExit (
     g = intVar "g"
 
 digits :: ValueSet Integer
-digits = (Eq 0 `Union` GreaterThan 0) `Intersection` LessThen 10
+digits = (Eq 0 `Union` GreaterThan 0) `Intersection` LessThan 10
 
 hangmanProg :: MonadTeletype m => [Integer] -> m ()
 hangmanProg word = go [] where

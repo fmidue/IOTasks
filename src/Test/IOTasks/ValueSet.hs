@@ -24,7 +24,7 @@ data ValueSet a where
   Union :: ValueSet Integer -> ValueSet Integer -> ValueSet Integer
   Intersection :: ValueSet Integer -> ValueSet Integer -> ValueSet Integer
   GreaterThan :: Integer -> ValueSet Integer
-  LessThen :: Integer -> ValueSet Integer
+  LessThan :: Integer -> ValueSet Integer
   Eq :: Integer -> ValueSet Integer
   Every :: ValueSet a
   None :: ValueSet a
@@ -32,11 +32,11 @@ data ValueSet a where
 data Size = Size { intAbs :: Integer, strLen :: Int }
 
 complement :: ValueSet a -> ValueSet a
-complement (GreaterThan n) = LessThen n `Union` Eq n
-complement (LessThen n) =  GreaterThan n `Union` Eq n
+complement (GreaterThan n) = LessThan n `Union` Eq n
+complement (LessThan n) =  GreaterThan n `Union` Eq n
 complement (Intersection va vb) = Union (complement va) (complement vb)
 complement (Union va vb) = Intersection (complement va) (complement vb)
-complement (Eq n) = GreaterThan n `Union` LessThen n
+complement (Eq n) = GreaterThan n `Union` LessThan n
 complement Every = None
 complement None = Every
 
@@ -44,7 +44,7 @@ containsValue :: ValueSet a -> a -> Bool
 containsValue (Union vs1 vs2) n = vs1 `containsValue` n || vs2 `containsValue` n
 containsValue (Intersection vs1 vs2) n = vs1 `containsValue` n && vs2 `containsValue` n
 containsValue (GreaterThan i) n = n > i
-containsValue (LessThen i) n = n < i
+containsValue (LessThan i) n = n < i
 containsValue (Eq i) n = i == n
 containsValue Every _ = True
 containsValue None _ = False
@@ -67,7 +67,7 @@ valueOfInt vs (Size sz _) =
     range (Union x y) r = range x r `Set.union` range y r
     range (Intersection x y) r = range x r `Set.intersection` range y r
     range (GreaterThan n) r = Set.filter (>n) r
-    range (LessThen n) r = Set.filter (<n) r
+    range (LessThan n) r = Set.filter (<n) r
     range (Eq n) r = Set.filter (==n) r
     range Every r = r
     range None _ = error "valueOf: empty ValueSet"
@@ -81,7 +81,7 @@ printValueSet vs = concat ["{ v : ",show (typeRep $ Proxy @a), " | ", printValue
   printValueSet' (Union vs1 vs2) = concat ["(",printValueSet' vs1,") \\/ (", printValueSet' vs2,")"]
   printValueSet' (Intersection vs1 vs2) = concat ["(",printValueSet' vs1,") /\\ (", printValueSet' vs2,")"]
   printValueSet' (GreaterThan n) = "v > " ++ show n
-  printValueSet' (LessThen n) = "v < " ++ show n
+  printValueSet' (LessThan n) = "v < " ++ show n
   printValueSet' (Eq n) = "v == " ++ show n
   printValueSet' Every = "true"
   printValueSet' None = "false"
