@@ -267,19 +267,19 @@ prog4 = do
 
 prog5 :: MonadTeletype m => m ()
 prog5 = do
-  putStr "Bitte geben Sie eine Zahl ein: "
+  putStr "Please enter a number: "
   n <- readLn
   loop [n]
   where
     loop :: MonadTeletype m => [Integer] -> m ()
-    loop (m:ms) = do putStr "Nächste Zahl bitte: "
+    loop (m:ms) = do putStr "Next number please: "
                      n <- readLn
                      if n+m == 0
-                       then do putStrLn "Die Summe der letzten beiden Eingaben war 0."
-                               putStr "Anzahl der durch drei teilbaren positiven Eingaben: "
+                       then do putStrLn "The sum of the last two inputs was 0."
+                               putStr "Number of positive inputs divisible by three: "
                                print $ length $ filter (\n' -> (n' > 0) && (n' `mod` 3 == 0)) (n:m:ms)
-                               putStrLn "Programm beendet."
-                       else do putStrLn "Die Summe war noch nicht 0."
+                               putStrLn "Program finished."
+                       else do putStrLn "The sum was not 0 yet."
                                loop (n:m:ms)
     loop [] = error "does not happen"
 
