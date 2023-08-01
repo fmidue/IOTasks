@@ -1,7 +1,7 @@
 name: Haskell CI
 
 on:
-  shedule:
+  schedule:
     - cron: '0 3 * * *' # daily at 3 am
 permissions:
   contents: read
@@ -13,10 +13,10 @@ jobs:
     - name: Check for new commits today
       id: new-commits
       uses: adriangl/check-new-commits-action@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          seconds: 86400 # One day in seconds
-          branch: ${{ github.event.repository.default_branch }}
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        seconds: 86400 # One day in seconds
+        branch: ${{ github.event.repository.default_branch }}
 
     - uses: actions/checkout@v3
       if: ${{ steps.check-new-commits.outputs.has-new-commits == 'true' }}
