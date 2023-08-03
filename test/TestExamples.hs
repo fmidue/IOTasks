@@ -68,7 +68,6 @@ testExamples = do
         it "satisfies the specification" $
           (taskCheckOutcome (head $ interpret example6) example6 <&> isSuccess) `shouldReturn` True
 
-
     context "static test generation" $ do
       describe "prog2" $ do
         it "fulfills tests generated from example2 specification" $
@@ -85,6 +84,12 @@ testExamples = do
         it "holds for example6" $
           allM (\p -> isSuccess <$> taskCheckOutcome p example6) (interpret example6) `shouldReturn` True
 
+
+    context "overflows in subterms of OutputTerm" $ do
+      describe "taskCheck hiddenOverflowP hiddenOverflowS" $ do
+        it "should output overflow warnings" $
+          (taskCheckWithOutcome stdArgs{avoidOverflows=False} hiddenOverflowP hiddenOverflowS
+            <&> (\o -> isSuccess o && overflowWarnings o > 0) ) `shouldReturn` True
 
     context "string inputs" $ do
       describe "echoProg" $ do

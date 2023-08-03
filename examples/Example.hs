@@ -5,6 +5,7 @@ import Prelude hiding
   ,until)
 
 import Test.IOTasks
+import Test.IOTasks.Terms (Opaque(..))
 --example specifications
 
 example1 :: Specification
@@ -357,6 +358,14 @@ stringP3 :: MonadTeletype m => m ()
 stringP3 = putStr "A" >> putStr "B"
 
 ---
+
+--
+hiddenOverflowS :: Specification
+hiddenOverflowS =  writeOutput [Value $ liftOpaque2 ((^),"(^)") (intLit 2) (intLit 64) .>. intLit 0 ]
+
+hiddenOverflowP :: MonadTeletype io => io ()
+hiddenOverflowP = print $ 2^64 > 0
+--
 
 addSpec :: Specification
 addSpec =
