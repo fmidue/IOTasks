@@ -5,7 +5,7 @@ module Test.IOTasks.Internal.SpecificationGenerator (specGen, shrinkSpec, loopBo
 
 import Test.IOTasks.Terms
 import Test.IOTasks.OutputTerm
-import Test.IOTasks.OutputPattern
+import Test.IOTasks.Internal.OutputPattern
 import Test.IOTasks.ValueSet
 import Test.IOTasks.ConditionTerm
 import {-# SOURCE #-} Test.IOTasks.Internal.Specification

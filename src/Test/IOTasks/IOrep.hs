@@ -13,7 +13,7 @@ import Data.Set (singleton)
 import Control.Monad (ap, (>=>))
 
 import Test.IOTasks.Trace
-import Test.IOTasks.OutputPattern
+import Test.IOTasks.Internal.OutputPattern
 import Test.IOTasks.MonadTeletype
 
 import System.IO (BufferMode(..), stdout) -- for re-exports

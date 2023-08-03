@@ -28,7 +28,7 @@ module Test.IOTasks.Trace (
   pPrintMatchResult, pPrintMatchResultSimple,
 ) where
 
-import Test.IOTasks.OutputPattern
+import Test.IOTasks.OutputPattern hiding (text)
 
 import Data.Set (Set)
 import qualified Data.Set as Set

@@ -46,6 +46,7 @@ library:
   other-modules:
     - Test.IOTasks.Internal.ConditionTerm
     - Test.IOTasks.Internal.Output
+    - Test.IOTasks.Internal.OutputPattern
     - Test.IOTasks.Internal.Overflow
     - Test.IOTasks.Internal.Specification
     - Test.IOTasks.Internal.SpecificationGenerator

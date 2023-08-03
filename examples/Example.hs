@@ -12,8 +12,8 @@ example1 =
   readInput x ints AssumeValid <>
   readInput y nats AssumeValid <>
   branch (currentValue x .>. as @Integer (currentValue y))
-    (writeOutput [Wildcard <> Value (currentValue x .+. currentValue y) <> Wildcard , Value (currentValue x .-. currentValue y) <> Wildcard] )
-    (writeOutput [Wildcard <> Text "Result: " <> Value (currentValue x .*. currentValue y)] )
+    (writeOutput [wildcard <> value (currentValue x .+. currentValue y) <> wildcard , value (currentValue x .-. currentValue y) <> wildcard] )
+    (writeOutput [wildcard <> text "Result: " <> value (currentValue x .*. currentValue y)] )
   where
     x = intVar "x"
     y = intVar "y"
@@ -22,8 +22,8 @@ example2 :: Specification
 example2 =
   readInput n nats UntilValid <>
   whileNot (length' (as @[Integer] $ allValues x) .==. currentValue n)
-    (writeOptionalOutput [Value $ currentValue n .-. length' (as @[Integer] $ allValues x)] <> readInput x ints AssumeValid) <>
-  writeOutput [Value $ sum' $ allValues x]
+    (writeOptionalOutput [value $ currentValue n .-. length' (as @[Integer] $ allValues x)] <> readInput x ints AssumeValid) <>
+  writeOutput [value $ sum' $ allValues x]
   where
     n = intVar "n"
     x = intVar "x"
@@ -33,8 +33,8 @@ example2' :: Specification
 example2' =
   readInput n nats UntilValid <>
   whileNot (length' (as @[Integer] $ allValues x) .==. currentValue n)
-    (writeOptionalOutput [Value $ currentValue n .-. length' (as @[Integer] $ allValues x)] <> readInput x ints AssumeValid) <>
-  writeOutput [Value $ product' $ allValues x]
+    (writeOptionalOutput [value $ currentValue n .-. length' (as @[Integer] $ allValues x)] <> readInput x ints AssumeValid) <>
+  writeOutput [value $ product' $ allValues x]
   where
     n = intVar "n"
     x = intVar "x"
@@ -44,7 +44,7 @@ example3 =
   readInput n nats AssumeValid <>
   whileNot (sum' (allValues x) .>. currentValue n)
     (readInput x ints AssumeValid) <>
-  writeOutput [Value $ length' $ as @[Integer] $ allValues x]
+  writeOutput [value $ length' $ as @[Integer] $ allValues x]
   where
     n = intVar "n"
     x = intVar "x"
@@ -77,7 +77,7 @@ example5 =
            readInput y ints AssumeValid)
     )
   ) <>
-  writeOutput [Wildcard <> Value (length' $ filter' predicate $ allValues [x,y]) <> Wildcard]
+  writeOutput [wildcard <> value (length' $ filter' predicate $ allValues [x,y]) <> wildcard]
   where
     predicate x = x > 0 && x `mod` 3 == 0
     x = intVar "x"
@@ -89,7 +89,7 @@ example6 =
   readInput x nats ElseAbort <>
   readInput y nats AssumeValid <>
   readInput z nats UntilValid <>
-  writeOutput [Value $ sum' $ allValues [x,y,z] ]
+  writeOutput [value $ sum' $ allValues [x,y,z] ]
   where
     x = intVar "x"
     y = intVar "y"
@@ -109,9 +109,9 @@ example7 =
     (readInput z ints AssumeValid)
     (readInput y ints AssumeValid)
     <>
-  writeOutput [Value $ as @Integer $ currentValue [x,z]] <>
-  writeOutput [Value $ length' $ as @[Integer] $ allValues [x,y,z]] <>
-  writeOutput [Value $ length' $ as @[Integer] $ allValues [x,y,a,z]]
+  writeOutput [value $ as @Integer $ currentValue [x,z]] <>
+  writeOutput [value $ length' $ as @[Integer] $ allValues [x,y,z]] <>
+  writeOutput [value $ length' $ as @[Integer] $ allValues [x,y,a,z]]
   where
     x = intVar "x"
     y = intVar "y"
@@ -128,14 +128,14 @@ example8 =
       exit
       nop
     ) <>
-  writeOutput [Value $ length' $ as @[Integer] $ allValues x]
+  writeOutput [value $ length' $ as @[Integer] $ allValues x]
   where x = intVar "x"
 
 -- string input
 echoSpec :: Specification
 echoSpec =
   readInput x str AssumeValid <>
-  writeOutput [Value $ as @String $ currentValue x]
+  writeOutput [value $ as @String $ currentValue x]
   where
     x = stringVar "x"
 
@@ -143,8 +143,8 @@ reverseSpec :: Specification
 reverseSpec =
   readInput x str AssumeValid <>
   branch (length' (as @String $ currentValue x) .>. intLit 5)
-    (writeOutput [Value $ reverse' . as @String $ currentValue x])
-    (writeOutput [Value $ as @String $ currentValue x])
+    (writeOutput [value $ reverse' . as @String $ currentValue x])
+    (writeOutput [value $ as @String $ currentValue x])
   where
     x = stringVar "x"
 
@@ -152,8 +152,8 @@ palindromeSpec :: Specification
 palindromeSpec =
   readInput x str AssumeValid <>
   branch (currentValue x .==. as @String (reverse' $ currentValue x))
-    (writeOutput [Text "Yes"])
-    (writeOutput [Text "No"])
+    (writeOutput [text "Yes"])
+    (writeOutput [text "No"])
   where
     x = stringVar "x"
 
@@ -161,9 +161,9 @@ pingPongSpec :: Specification
 pingPongSpec =
   readInput x str AssumeValid <>
   branch (as @String (currentValue x) .==. listLit "Ping")
-    (writeOutput [Text "Pong"])
+    (writeOutput [text "Pong"])
     (branch (as @String (currentValue x) .==. listLit "Pong")
-      (writeOutput [Text "Ping"])
+      (writeOutput [text "Ping"])
       nop
     )
   where
@@ -342,10 +342,10 @@ prog8 = do
 
 --
 stringS1 :: Specification
-stringS1 = writeOutput [Text "A"] <> writeOutput [Text "B"]
+stringS1 = writeOutput [text "A"] <> writeOutput [text "B"]
 
 stringS2 :: Specification
-stringS2 = writeOutput [Text "A" <> Text "B"]
+stringS2 = writeOutput [text "A" <> text "B"]
 
 stringP1 :: MonadTeletype m => m ()
 stringP1 = putStrLn "AB"
@@ -360,7 +360,7 @@ stringP3 = putStr "A" >> putStr "B"
 
 --
 hiddenOverflowS :: Specification
-hiddenOverflowS =  writeOutput [Value $ liftOpaque2 ((^),"(^)") (intLit 2) (intLit 64) .>. intLit 0 ]
+hiddenOverflowS =  writeOutput [value $ liftOpaque2 ((^),"(^)") (intLit 2) (intLit 64) .>. intLit 0 ]
 
 hiddenOverflowP :: MonadTeletype io => io ()
 hiddenOverflowP = print $ 2^64 > 0
@@ -370,7 +370,7 @@ addSpec :: Specification
 addSpec =
   readInput x nats AssumeValid <>
   readInput y nats AssumeValid <>
-  writeOutput [Value $ currentValue x .+. currentValue y]
+  writeOutput [value $ currentValue x .+. currentValue y]
   where
     x = intVar "x"
     y = intVar "y"
@@ -392,12 +392,12 @@ plus x y = reverse $ plus' (reverse $ filter (>= '0') x) (reverse $ filter (>= '
 -- hangman
 hangmanSpec :: [Integer] -> Specification
 hangmanSpec word = tillExit (
-     branch (winCond $ allValues g) (writeOutput [Text "correct!"] <> exit) mempty
-  <> writeOutput [Text "Game state:"  <> Wildcard]
+     branch (winCond $ allValues g) (writeOutput [text "correct!"] <> exit) mempty
+  <> writeOutput [text "Game state:"  <> wildcard]
   <> readInput g digits AssumeValid
   <> branch ((currentValue g `isIn` listLit word) .&&. (currentValue g `isNotIn` valuesBefore 1 g))
-    (writeOptionalOutput [Text "good guess!"])
-    (writeOptionalOutput [Text "wrong guess!"])
+    (writeOptionalOutput [text "good guess!"])
+    (writeOptionalOutput [text "wrong guess!"])
   )
   where
     winCond :: ConditionTerm [Integer] -> ConditionTerm Bool
@@ -432,8 +432,8 @@ adv = tillExit $
     exit
     ( readInput x ints AssumeValid <>
       branch (currentValue x .>. intLit 0)
-        (writeOutput [Text "1"])
-        (writeOutput [Text "0"])
+        (writeOutput [text "1"])
+        (writeOutput [text "0"])
     )
   where
     x = intVar "x"

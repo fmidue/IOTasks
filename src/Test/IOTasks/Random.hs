@@ -11,7 +11,8 @@ module Test.IOTasks.Random (
   (\\), with, without,
   complement,
   ints, nats, str,
-  OutputPattern(..),
+  OutputPattern,
+  wildcard, text, value,
   Varname, var, intVar, stringVar,
   pPrintSpecification,
   -- * Terms

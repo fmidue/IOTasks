@@ -68,7 +68,7 @@ testCheapProperties = do
 
   context "string pattern matching" $ do
     prop "wildcard >: x == True" $
-      forAll genPattern $ \p -> Wildcard >: p
+      forAll genPattern $ \p -> wildcard >: p
     prop "reflexivity of >:" $
       forAll genPattern $ \p -> p >: p
     prop "transitivity of >:" $ --improve?
@@ -78,12 +78,12 @@ testCheapProperties = do
 
     prop "adding a wildcard results in a more general pattern" $
       forAll (liftA2 (,) genPattern genPattern) $
-        \(p,q) -> (p <> Wildcard <> q) >: (p <> q)
+        \(p,q) -> (p <> wildcard <> q) >: (p <> q)
 
     prop "replacing a wildcard with a pattern yields a less general pattern" $
       forAll ((,,) <$> genPattern <*> genPattern <*> genPattern) $
-        \(p,q,x) -> counterexample (unlines [show $ p <> Wildcard <> q, show $ p <> x <> q]) $
-          (p <> Wildcard <> q) >: (p <> x <> q)
+        \(p,q,x) -> counterexample (unlines [show $ p <> wildcard <> q, show $ p <> x <> q]) $
+          (p <> wildcard <> q) >: (p <> x <> q)
 
 testEquiv :: Specification -> Specification -> Property
 testEquiv s1 s2 = p1 Test.QuickCheck..&&. p2 where
@@ -98,8 +98,8 @@ testAgainst x y = ioProperty $ do
 genPattern :: Gen (OutputPattern 'TraceP)
 genPattern = sized $ \size ->
   frequency $
-    [ (1,pure Wildcard)
-    , (1,Text <$> listOf1 (arbitraryPrintableChar `suchThat` (/= '_')))
+    [ (1,pure wildcard)
+    , (1,text <$> listOf1 (arbitraryPrintableChar `suchThat` (/= '_')))
     ] ++
     [ (4,liftA2 (<>) (resize 1 genPattern) (resize (size - 1) genPattern)) | size > 1
     ]

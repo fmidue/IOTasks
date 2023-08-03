@@ -23,7 +23,7 @@ import Test.IOTasks.ValueSet
 import Test.IOTasks.Internal.ConditionTerm
 import Test.IOTasks.Terms (Var (..), SomeVar, varname, someVar)
 import Test.IOTasks.Trace
-import Test.IOTasks.OutputPattern
+import Test.IOTasks.Internal.OutputPattern hiding (text)
 import Test.IOTasks.Overflow
 import Test.IOTasks.ValueMap
 import Test.IOTasks.Internal.SpecificationGenerator
