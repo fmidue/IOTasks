@@ -1,6 +1,7 @@
 module Test.IOTasks.Overflow (
   OverflowWarning(..),
-  OverflowType(..),
+  evalOverflow,
+  EffectEval,
   ) where
 
 import Test.IOTasks.Internal.Overflow

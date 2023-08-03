@@ -31,7 +31,7 @@ data OutputPattern (t :: PatternType) where
   Wildcard :: OutputPattern t
   Text :: String -> OutputPattern t
   Sequence :: OutputPattern t -> OutputPattern t -> OutputPattern t
-  Value :: (OverflowType a,Show a) => OutputTerm a -> OutputPattern 'SpecificationP
+  Value :: (Typeable a, Show a) => OutputTerm a -> OutputPattern 'SpecificationP
 
 data PatternType = SpecificationP | TraceP
 
@@ -81,7 +81,7 @@ evalPattern :: ValueMap -> OutputPattern t -> (OverflowWarning, OutputPattern 'T
 evalPattern _ Wildcard = (NoOverflow, Wildcard)
 evalPattern _ (Text s) = (NoOverflow, Text s)
 evalPattern e (Sequence x y) = evalPattern e x <> evalPattern e y
-evalPattern e (Value t) = second (Text . showValue) $ eval t e
+evalPattern e (Value t) = second (Text . showValue) $ oEval e t
 
 printPattern :: OutputPattern t -> String
 printPattern Wildcard = "_"

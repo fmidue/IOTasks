@@ -24,7 +24,6 @@ module Test.IOTasks.Random (
   Sets(..),
   Accessor(..),
   as,
-  OverflowType,
   -- * Programs
   MonadTeletype(..),
   IOrep, runProgram, Line,

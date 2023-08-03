@@ -4,7 +4,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -36,7 +35,6 @@ import Data.Tuple.Extra (thd3)
 import Data.List as List
 import Test.QuickCheck.Gen (Gen)
 import Type.Reflection
-import Data.Either (fromRight)
 import Type.Match
 import Data.List.Extra
 import Control.Monad.Reader
@@ -227,111 +225,158 @@ mkValueRep x (StringValue s) = do
       sym <- mkStringSymbol $ xStr ++ "_val"
       pure (eq,sym)
 
-z3Predicate :: Goal -> ConditionTerm x -> Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R AST
-z3Predicate goal (termStruct -> Binary f x y) e vars = z3PredicateBinary goal f x y e vars
-z3Predicate goal (termStruct -> Unary f x) e vars = z3PredicateUnary goal f x e vars
-z3Predicate _ (termStruct -> VariableC x n) e vars = pure $ fromMaybe (unknownVariablesError x) $ (`List.lookup` vars) . last $ weaveVariables x n e
-z3Predicate _ (termStruct -> Literal (IntLit n)) _ _ = mkIntNum n
-z3Predicate _ (termStruct -> Literal (BoolLit b)) _ _ = mkBool b
---
-z3Predicate _ (termStruct -> VariableA _x _) _e _vars = error "z3Predicate: top level list should not happen"
-z3Predicate _ (termStruct -> Literal (ListLit _)) _ _ = error "z3Predicate: top level list literal should not happen"
 
-z3PredicateUnary :: forall a b. Typeable a => Goal -> UnaryF a b -> ConditionTerm a ->  Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R AST
-z3PredicateUnary goal f x e vars = case typeRep @a of
+      -- binNoList (:&&:) = \a b -> mkAnd [a,b]
+      -- binNoList (:||:) = \a b -> mkOr [a,b]
+
+forStringElse :: forall a z3. (Typeable a, MonadZ3 z3) => (AST -> AST -> z3 AST) -> (AST -> AST -> z3 AST) -> AST -> AST -> z3 AST
+forStringElse string normal = matchType @a
+  [ inCaseOf' @String string
+  , fallbackCase' normal
+  ]
+
+z3Predicate :: Typeable x => Goal -> ConditionTerm x -> Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R AST
+z3Predicate goal (Add x y) e vars = z3PredicateBinary goal x y e vars $ binary {
+  binaryNoList = \a b -> mkAdd [a,b]
+}
+z3Predicate goal (Sub x y) e vars = z3PredicateBinary goal x y e vars $ binary {
+  binaryNoList = \a b -> mkSub [a,b]
+}
+z3Predicate goal (Mul x y) e vars = z3PredicateBinary goal x y e vars $ binary {
+  binaryNoList = \a b -> mkMul [a,b]
+}
+z3Predicate goal (Equals x y) e vars = z3PredicateBinary goal x y e vars $ binary {
+  binaryNoList = mkEq,
+  binaryListAB = compareSymbolic (Strict EQ)
+  }
+z3Predicate goal (Gt (x :: ConditionTerm a) y) e vars = z3PredicateBinary goal x y e vars $ binary {
+  binaryNoList = forStringElse @a (\a b -> mkNot =<< mkStrLe a b) mkGt,
+  binaryListAB = compareSymbolic (Strict GT)
+  }
+z3Predicate goal (Ge (x :: ConditionTerm a) y) e vars = z3PredicateBinary goal x y e vars $ binary {
+  binaryNoList = forStringElse @a (\a b -> mkNot =<< mkStrLt a b) mkGe,
+  binaryListAB = compareSymbolic (ReflexiveClosure GT)
+  }
+z3Predicate goal (Lt (x :: ConditionTerm a) y) e vars = z3PredicateBinary goal x y e vars $ binary {
+  binaryNoList = forStringElse @a mkStrLt mkLt,
+  binaryListAB = compareSymbolic (Strict LT)
+  }
+z3Predicate goal (Le (x :: ConditionTerm a) y) e vars = z3PredicateBinary goal x y e vars $ binary {
+  binaryNoList = forStringElse @a mkStrLe mkLe,
+  binaryListAB = compareSymbolic (ReflexiveClosure LT)
+  }
+z3Predicate goal (And x y) e vars = z3PredicateBinary goal x y e vars $ binary {
+  binaryNoList = \a b -> mkAnd [a,b]
+  }
+z3Predicate goal (Or x y) e vars = z3PredicateBinary goal x y e vars $ binary {
+  binaryNoList =  \a b -> mkOr [a,b]
+  }
+z3Predicate goal (IsIn x xs) e vars = z3PredicateBinary goal x xs e vars $ binary {
+  binaryListB = \x xs -> mkOr =<< mapM (mkEq x) xs
+  }
+z3Predicate goal (Not x) e vars = z3PredicateUnary goal x e vars $ unary {
+  unaryNoList = mkNot
+  }
+z3Predicate goal (Sum xs) e vars = z3PredicateUnary goal xs e vars $ unary {
+  unaryList = mkAdd
+  }
+z3Predicate goal (Product xs) e vars = z3PredicateUnary goal xs e vars $ unary {
+  unaryList = mkMul
+  }
+z3Predicate _ (Length (Current x n)) e vars = mkSeqLength . fromJust . (`List.lookup` vars) . last $ weaveVariables x n e --special case for string variables
+z3Predicate goal (Length xs) e vars = z3PredicateUnary goal xs e vars $ unary {
+  unaryList = mkIntNum . length
+  }
+z3Predicate goal (Reverse xs) e vars = z3PredicateUnary goal xs e vars $ unary {
+  unaryList = error "z3Predicate: top level reverse should not happen"
+  }
+z3Predicate _ (IntLit n) _ _ = mkIntNum n
+z3Predicate _ (ListLit _) _ _ = error "z3Predicate: top level list literal should not happen"
+z3Predicate _ (BoolLit b) _ _ = mkBool b
+z3Predicate _ (Current x n) e vars = pure $ fromMaybe (unknownVariablesError x) $ (`List.lookup` vars) . last $ weaveVariables x n e
+z3Predicate _ All{} _ _ = error "z3Predicate: top level list should not happen"
+
+data Un z3 = Un
+  { unaryNoList :: AST -> z3 AST
+  , unaryList :: [AST] -> z3 AST
+  }
+unary :: Un z3
+unary = Un err err
+  where err = error "does not happen with currently supported functions"
+
+data Bin z3 = Bin
+  { binaryNoList :: AST -> AST -> z3 AST
+  , binaryListA :: [AST] -> AST -> z3 AST
+  , binaryListB :: AST -> [AST] -> z3 AST
+  , binaryListAB :: [AST] -> [AST] ->  z3 AST
+  }
+binary :: Bin z3
+binary = Bin err err err err
+  where err = error "does not happen with currently supported functions"
+
+z3PredicateUnary :: forall a. Typeable a => Goal -> ConditionTerm a ->  Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Un Z3R -> Z3R AST
+z3PredicateUnary goal x e vars Un{..} = case typeRep @a of
   App c _ -> case eqTypeRep c (typeRep @[]) of
-    Just HRefl -> unaryListA goal f x e vars  -- a ~ [a1]
-    Nothing -> unaryNoList goal f x e vars-- a ~ f a1
-  _ -> unaryNoList goal f x e vars --
+    Just HRefl -> case1 x -- a ~ [a1]
+    Nothing -> case2 x -- a ~ f a1
+  _ -> case2 x --
+  where
+    case1 :: forall a. Typeable [a] => ConditionTerm [a] -> Z3R AST
+    case1 x = do
+      rx <- listASTs goal x e vars
+      case rx of
+        Right xs -> unaryList xs
+        Left x -> unaryNoList x
+    case2 :: forall a. Typeable a => ConditionTerm a -> Z3R AST
+    case2 x = unaryNoList =<< z3Predicate goal x e vars
 
-unaryListA :: Goal -> UnaryF [a] b -> ConditionTerm [a] -> Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R AST
-unaryListA _ Length (Current x n) e vars = mkSeqLength . fromJust . (`List.lookup` vars) . last $ weaveVariables x n e --special case for string variables
-unaryListA goal Length xs e vars = unaryListRec goal (mkIntNum . length @[]) xs e vars
-unaryListA _ Reverse _ _ _ = error "z3Predicate: top level reverse should not happen"
-unaryListA goal Sum xs e vars = unaryListRec goal mkAdd xs e vars
-unaryListA goal Product xs e vars = unaryListRec goal mkMul xs e vars
-
-unaryNoList :: Goal -> UnaryF a b -> ConditionTerm a -> Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R AST
-unaryNoList goal Not x e vars = mkNot =<< z3Predicate goal x e vars
-unaryNoList _ _ _ _ _ = error "handled by unaryListA"
-
-unaryListRec :: Typeable a => Goal -> ([AST] -> Z3R AST) -> ConditionTerm [a] -> Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R AST
-unaryListRec goal f xs e vars = f . fromRight (error "unexpected result") =<< listASTs goal xs e vars
-
-z3PredicateBinary :: forall a b c. (Typeable a, Typeable b) => Goal -> BinaryF a b c -> ConditionTerm a -> ConditionTerm b ->  Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R AST
-z3PredicateBinary goal f x y e vars = case typeRep @a of
+z3PredicateBinary :: forall a b. (Typeable a, Typeable b) => Goal -> ConditionTerm a -> ConditionTerm b ->  Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Bin Z3R -> Z3R AST
+z3PredicateBinary goal x y e vars Bin{..} = case typeRep @a of
   App ca _ -> case eqTypeRep ca (typeRep @[]) of
     Just HRefl -> case typeRep @b of
       App cb _ -> case eqTypeRep cb (typeRep @[]) of
-        Just HRefl ->  case1 f x y -- a ~ [a1], b ~ [b1]
-        Nothing -> case2 f x y -- a ~ [a1], b ~ f b1
-      _ -> case2 f x y -- a ~ [a1]
+        Just HRefl ->  case1 x y -- a ~ [a1], b ~ [b1]
+        Nothing -> case2 x y -- a ~ [a1], b ~ f b1
+      _ -> case2 x y -- a ~ [a1]
     Nothing -> case typeRep @b of
       App cb _ -> case eqTypeRep cb (typeRep @[]) of
-        Just HRefl ->  case3 f x y -- a ~ f a1, b ~ [b1]
-        Nothing -> case4 f x y -- a ~ f a1, b ~ f b1
-      _ -> case4 f x y-- a ~ f a1
+        Just HRefl ->  case3 x y -- a ~ f a1, b ~ [b1]
+        Nothing -> case4 x y -- a ~ f a1, b ~ f b1
+      _ -> case4 x y-- a ~ f a1
   _ -> case typeRep @b of
     App cb _ -> case eqTypeRep cb (typeRep @[]) of
-      Just HRefl ->  case3 f x y -- b ~ [b1]
-      Nothing -> case4 f x y -- b ~ f b1
-    _ -> case4 f x y --
+      Just HRefl ->  case3 x y -- b ~ [b1]
+      Nothing -> case4 x y -- b ~ f b1
+    _ -> case4 x y --
   where
-  case1 :: forall a b c. (Typeable [a], Typeable [b]) => BinaryF [a] [b] c -> ConditionTerm [a] -> ConditionTerm [b] -> Z3R AST
-  case1 f x y = do
+  case1 :: forall a b. (Typeable [a], Typeable [b]) => ConditionTerm [a] -> ConditionTerm [b] -> Z3R AST
+  case1 x y = do
     rx <- listASTs goal x e vars
     ry <- listASTs goal y e vars
     case (rx,ry) of
-      (Right xs,Right ys) -> binListAB f xs ys
-      (Right xs,Left y) -> binListA f xs y
-      (Left x,Right ys) -> binListB f x ys
-      (Left x,Left y) -> binNoList f x y
-  case2 :: forall a b c. Typeable [a] => BinaryF [a] b c -> ConditionTerm [a] -> ConditionTerm b -> Z3R AST
-  case2 f x y = do
+      (Right xs,Right ys) -> binaryListAB xs ys
+      (Right xs,Left y) -> binaryListA xs y
+      (Left x,Right ys) -> binaryListB x ys
+      (Left x,Left y) -> binaryNoList x y
+  case2 :: forall a b. (Typeable [a], Typeable b) => ConditionTerm [a] -> ConditionTerm b -> Z3R AST
+  case2 x y = do
     exs <- listASTs goal x e vars
     y' <- z3Predicate goal y e vars
     case exs of
-      Right xs -> binListA f xs y'
-      Left x -> binNoList f x y'
-  case3 :: forall a b c. Typeable [b] => BinaryF a [b] c -> ConditionTerm a -> ConditionTerm [b] -> Z3R AST
-  case3 f x y = do
+      Right xs -> binaryListA xs y'
+      Left x -> binaryNoList x y'
+  case3 :: forall a b. (Typeable a, Typeable [b]) => ConditionTerm a -> ConditionTerm [b] -> Z3R AST
+  case3 x y = do
     x' <- z3Predicate goal x e vars
     eys <- listASTs goal y e vars
     case eys of
-      Right ys -> binListB f x' ys
-      Left y -> binNoList f x' y
-  case4 :: forall a b c. BinaryF a b c -> ConditionTerm a -> ConditionTerm b -> Z3R AST
-  case4 f x y = do
+      Right ys -> binaryListB x' ys
+      Left y -> binaryNoList x' y
+  case4 :: forall a b. (Typeable a, Typeable b) => ConditionTerm a -> ConditionTerm b -> Z3R AST
+  case4 x y = do
     xP <- z3Predicate goal x e vars
     yP <- z3Predicate goal y e vars
-    binNoList f xP yP
-
-binNoList :: forall z3 a b c. MonadZ3 z3 => BinaryF a b c -> AST -> AST -> z3 AST
-binNoList (:+:) = \a b -> mkAdd [a,b]
-binNoList (:-:) = \a b -> mkSub [a,b]
-binNoList (:*:) = \a b -> mkMul [a,b]
-binNoList (:==:) = mkEq
-binNoList (:>:) = matchType @a [inCaseOf' @String $ (\a b -> mkNot =<< mkStrLe a b), fallbackCase' mkGt]
-binNoList (:>=:) = matchType @a [inCaseOf' @String $ (\a b -> mkNot =<< mkStrLt a b), fallbackCase' mkGe]
-binNoList (:<:) = matchType @a [inCaseOf' @String $ mkStrLt, fallbackCase' mkLt]
-binNoList (:<=:) = matchType @a [inCaseOf' @String $ mkStrLe, fallbackCase' mkLe]
-binNoList (:&&:) = \a b -> mkAnd [a,b]
-binNoList (:||:) = \a b -> mkOr [a,b]
-binNoList IsIn = error "handled by binListB"
-
-binListA :: MonadZ3 z3 => BinaryF [a] b c -> [AST] -> AST -> z3 AST
-binListA = error "does not happen with currently supported functions"
-
-binListB :: MonadZ3 z3 => BinaryF a [b] c -> AST -> [AST] -> z3 AST
-binListB IsIn x ys = mkOr =<< mapM (mkEq x) ys
-binListB _ _ _ = error "all other functions are handled by binListAB"
-
-binListAB :: MonadZ3 z3 => BinaryF [a] [b] c -> [AST] -> [AST] -> z3 AST
-binListAB (:==:) = compareSymbolic $ Strict EQ
-binListAB (:>:)  = compareSymbolic $ Strict GT
-binListAB (:>=:) = compareSymbolic $ ReflexiveClosure GT
-binListAB (:<:) = compareSymbolic $ Strict LT
-binListAB (:<=:) = compareSymbolic $ ReflexiveClosure LT
+    binaryNoList xP yP
 
 data CompareOp = Strict Ordering | ReflexiveClosure Ordering
 
@@ -371,13 +416,13 @@ mkIntermediateBoolean x = do
   mkEq b x
 
 listASTs :: forall a. Typeable [a] => Goal -> ConditionTerm [a] -> Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R (Either AST [AST])
-listASTs goal (ReverseT (ReverseT t)) e vars = listASTs goal t e vars
-listASTs goal (ReverseT t) e vars = do
+listASTs goal (Reverse (Reverse t)) e vars = listASTs goal t e vars
+listASTs goal (Reverse t) e vars = do
   r <- listASTs goal t e vars
   case r of
     Right as -> pure $ Right $ reverse as
     Left a -> Left <$> reverseSequence goal a
-listASTs _ (ListLitT xs) _ _ =
+listASTs _ (ListLit xs) _ _ =
   matchType @a
     [ inCaseOfE' @Integer $ \HRefl -> Right <$> mapM (mkIntNum . toInteger) xs
     , inCaseOfE' @Char $ \HRefl -> Left <$> mkString xs
@@ -385,6 +430,11 @@ listASTs _ (ListLitT xs) _ _ =
     ]
 listASTs _ (All x n) e vars = pure . Right $ lookupList (weaveVariables x n e) vars
 listASTs _ (Current x n) e vars = pure . Left . head $ lookupList (weaveVariables x n e) vars
+listASTs _ Add{} _ _ = error "lists should not have a Num instance"
+listASTs _ Sub{} _ _ = error "lists should not have a Num instance"
+listASTs _ Mul{} _ _ = error "lists should not have a Num instance"
+listASTs _ Sum{} _ _ = error "lists should not have a Num instance"
+listASTs _ Product{} _ _ = error "lists should not have a Num instance"
 
 reverseSequence :: Goal -> AST -> Z3R AST
 reverseSequence goal x = do

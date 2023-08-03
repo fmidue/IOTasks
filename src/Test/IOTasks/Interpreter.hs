@@ -11,7 +11,7 @@ import qualified Data.Set as Set
 
 import Test.IOTasks.Internal.Specification
 import Test.IOTasks.MonadTeletype as MTT
-import Test.IOTasks.ConditionTerm
+import Test.IOTasks.Internal.ConditionTerm
 import Test.IOTasks.Terms (someVar)
 import Test.IOTasks.ValueSet
 import Test.IOTasks.Trace
@@ -64,7 +64,7 @@ interpret s = do
       )
       (\_ cond pl pr -> do
         e <- get
-        if snd $ eval cond e
+        if snd $ oEval e cond
           then pl
           else pr
       )

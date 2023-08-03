@@ -1,27 +1,21 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
+{-# LANGUAGE TupleSections #-}
 module Test.IOTasks.Internal.ConditionTerm (
   ConditionTerm(..),
-  eval,
+  oEval,
+  evalI, evalIs,
   termVarExps, subTerms,
   printTerm, printIndexedTerm,
   SomeTerm(..),
   castTerm,
-  TermStruct(..),
-  termStruct,
-  UnaryF(..), BinaryF(..), ConstValue(..)
   ) where
 
 import Test.IOTasks.Terms
@@ -33,97 +27,58 @@ import Data.Map (Map)
 import qualified Data.Map as Map (lookup)
 import Data.List (sortBy, intercalate)
 import Data.Function (on)
-import Data.List.Extra (maximumOn, mconcatMap)
-import Data.Bifunctor (second)
+import Data.List.Extra (maximumOn)
 
 import Type.Reflection
 import GHC.TypeLits
-import Type.Match (matchType, fallbackCase', inCaseOfE', matchTypeOf, inCaseOfE)
+import Type.Match (matchType, fallbackCase', inCaseOfE')
+import Control.Applicative
 
 data ConditionTerm a where
-  Add :: ConditionTerm Integer -> ConditionTerm Integer -> ConditionTerm Integer
-  Sub :: ConditionTerm Integer -> ConditionTerm Integer -> ConditionTerm Integer
-  Mul :: ConditionTerm Integer -> ConditionTerm Integer -> ConditionTerm Integer
-  Equals :: (OverflowType a, Eq a) => ConditionTerm a -> ConditionTerm a -> ConditionTerm Bool
-  Gt :: (OverflowType a, Ord a) => ConditionTerm a -> ConditionTerm a -> ConditionTerm Bool
-  Ge :: (OverflowType a, Ord a) => ConditionTerm a -> ConditionTerm a -> ConditionTerm Bool
-  Lt :: (OverflowType a, Ord a) => ConditionTerm a -> ConditionTerm a -> ConditionTerm Bool
-  Le :: (OverflowType a, Ord a) => ConditionTerm a -> ConditionTerm a -> ConditionTerm Bool
+  Add :: Num a => ConditionTerm a -> ConditionTerm a -> ConditionTerm a
+  Sub :: Num a => ConditionTerm a -> ConditionTerm a -> ConditionTerm a
+  Mul :: Num a => ConditionTerm a -> ConditionTerm a -> ConditionTerm a
+  Equals :: (Typeable a, Eq a) => ConditionTerm a -> ConditionTerm a -> ConditionTerm Bool
+  Gt :: (Typeable a, Ord a) => ConditionTerm a -> ConditionTerm a -> ConditionTerm Bool
+  Ge :: (Typeable a, Ord a) => ConditionTerm a -> ConditionTerm a -> ConditionTerm Bool
+  Lt :: (Typeable a, Ord a) => ConditionTerm a -> ConditionTerm a -> ConditionTerm Bool
+  Le :: (Typeable a, Ord a) => ConditionTerm a -> ConditionTerm a -> ConditionTerm Bool
   And :: ConditionTerm Bool -> ConditionTerm Bool -> ConditionTerm Bool
   Or :: ConditionTerm Bool -> ConditionTerm Bool -> ConditionTerm Bool
-  IsInT :: ConditionTerm Integer -> ConditionTerm [Integer] -> ConditionTerm Bool
-  NotT :: ConditionTerm Bool -> ConditionTerm Bool
-  SumT :: ConditionTerm [Integer] -> ConditionTerm Integer
-  ProductT :: ConditionTerm [Integer] -> ConditionTerm Integer
-  LengthT :: Typeable a => ConditionTerm [a] -> ConditionTerm Integer
-  ReverseT :: OverflowType a => ConditionTerm [a] -> ConditionTerm [a]
-  IntLitT :: I -> ConditionTerm Integer
-  ListLitT :: OverflowType a => [OT a] -> ConditionTerm [a]
-  BoolLitT :: Bool -> ConditionTerm Bool
-  Current :: (OverflowType a, VarExp e) => e -> Int -> ConditionTerm a
-  All :: (OverflowType a, VarExp e) => e -> Int -> ConditionTerm [a]
+  IsIn :: ConditionTerm Integer -> ConditionTerm [Integer] -> ConditionTerm Bool
+  Not :: ConditionTerm Bool -> ConditionTerm Bool
+  Sum :: Num a => ConditionTerm [a] -> ConditionTerm a
+  Product :: Num a => ConditionTerm [a] -> ConditionTerm a
+  Length :: Typeable a => ConditionTerm [a] -> ConditionTerm Integer
+  Reverse :: Typeable a => ConditionTerm [a] -> ConditionTerm [a]
+  IntLit :: Integer -> ConditionTerm Integer
+  ListLit :: (Show a, Typeable a) => [a] -> ConditionTerm [a]
+  BoolLit :: Bool -> ConditionTerm Bool
+  Current :: VarExp e => e -> Int -> ConditionTerm a
+  All :: (Typeable a, VarExp e) => e -> Int -> ConditionTerm [a]
 
-termStruct :: ConditionTerm a -> TermStruct a
-termStruct (Add x y) = Binary (:+:) x y
-termStruct (Sub x y) = Binary (:-:) x y
-termStruct (Mul x y) = Binary (:*:) x y
-termStruct (Equals x y) = Binary (:==:) x y
-termStruct (Lt x y) = Binary (:<:) x y
-termStruct (Le x y) = Binary (:<=:) x y
-termStruct (Gt x y) = Binary (:>:) x y
-termStruct (Ge x y) = Binary (:>=:) x y
-termStruct (And x y) = Binary (:&&:) x y
-termStruct (Or x y) = Binary (:||:) x y
-termStruct (IsInT x y) = Binary IsIn x y
-termStruct (NotT x) = Unary Not x
-termStruct (SumT x) = Unary Sum x
-termStruct (ProductT x) = Unary Product x
-termStruct (LengthT x) = Unary Length x
-termStruct (ReverseT x) = Unary Reverse x
-termStruct (IntLitT x) = Literal $ IntLit x
-termStruct (ListLitT x) = Literal $ ListLit x
-termStruct (BoolLitT x) = Literal $ BoolLit x
-termStruct (Current x n) = VariableC x n
-termStruct (All x n) = VariableA x n
-
-data TermStruct a where
-  Unary :: (Typeable a, Typeable b) => UnaryF a b -> ConditionTerm a -> TermStruct b
-  Binary :: (OverflowType a, OverflowType b, OverflowType c) => BinaryF a b c -> ConditionTerm a -> ConditionTerm b -> TermStruct c
-  Literal :: Typeable a => ConstValue a -> TermStruct a
-  VariableC :: (OverflowType a, VarExp e) => e -> Int -> TermStruct a
-  VariableA :: (OverflowType a, VarExp e) => e -> Int -> TermStruct [a]
-
-data UnaryF a b where
-  Not :: UnaryF Bool Bool
-  Length :: Typeable a => UnaryF [a] Integer
-  Reverse :: Typeable a => UnaryF [a] [a]
-  Sum :: UnaryF [Integer] Integer
-  Product :: UnaryF [Integer] Integer
-
-data BinaryF a b c where
-  (:+:) :: BinaryF Integer Integer Integer
-  (:-:) :: BinaryF Integer Integer Integer
-  (:*:) :: BinaryF Integer Integer Integer
-  (:==:) :: (Typeable a, Eq a) => BinaryF a a Bool
-  (:>:) :: (OverflowType a, Ord a) => BinaryF a a Bool
-  (:>=:) :: (OverflowType a, Ord a) => BinaryF a a Bool
-  (:<:) :: (OverflowType a, Ord a) => BinaryF a a Bool
-  (:<=:) :: (OverflowType a, Ord a) => BinaryF a a Bool
-  (:&&:) :: BinaryF Bool Bool Bool
-  (:||:) :: BinaryF Bool Bool Bool
-  IsIn :: BinaryF Integer [Integer] Bool
-
-data ConstValue a where
-  BoolLit :: Bool -> ConstValue Bool
-  IntLit :: I -> ConstValue Integer
-  ListLit :: OverflowType a => [OT a] -> ConstValue [a]
-
-termVarExps :: ConditionTerm a -> [[SomeVar]]
-termVarExps (termStruct -> Binary _ x y) = termVarExps x ++ termVarExps y
-termVarExps (termStruct -> Unary _ x) = termVarExps x
-termVarExps (termStruct -> Literal _) = []
-termVarExps (termStruct -> VariableC e _) = [toVarList e]
-termVarExps (termStruct -> VariableA e _) = [toVarList e]
+termVarExps :: Typeable a => ConditionTerm a -> [[SomeVar]]
+termVarExps (Add x y) = termVarExps x ++ termVarExps y
+termVarExps (Sub x y) = termVarExps x ++ termVarExps y
+termVarExps (Mul x y) = termVarExps x ++ termVarExps y
+termVarExps (Equals x y) = termVarExps x ++ termVarExps y
+termVarExps (Gt x y) = termVarExps x ++ termVarExps y
+termVarExps (Ge x y) = termVarExps x ++ termVarExps y
+termVarExps (Lt x y) = termVarExps x ++ termVarExps y
+termVarExps (Le x y) = termVarExps x ++ termVarExps y
+termVarExps (And x y) = termVarExps x ++ termVarExps y
+termVarExps (Or x y) = termVarExps x ++ termVarExps y
+termVarExps (IsIn x y) = termVarExps x ++ termVarExps y
+termVarExps (Sum x) = termVarExps x
+termVarExps (Product x) = termVarExps x
+termVarExps (Length x) = termVarExps x
+termVarExps (Reverse x) = termVarExps x
+termVarExps (Not x) = termVarExps x
+termVarExps (IntLit _) = []
+termVarExps (ListLit _) = []
+termVarExps (BoolLit _) = []
+termVarExps (Current e _) = [toVarList e]
+termVarExps (All e _) = [toVarList e]
 
 instance Accessor ConditionTerm where
   valueBefore :: forall a e. (Typeable a, VarExp e) => Int -> e -> ConditionTerm a
@@ -143,7 +98,7 @@ instance Arithmetic ConditionTerm where
   (.+.) = Add
   (.-.) = Sub
   (.*.) = Mul
-  intLit = IntLitT . fromInteger
+  intLit = IntLit . fromInteger
 
 instance Compare ConditionTerm where
   (.==.) = Equals
@@ -153,135 +108,131 @@ instance Compare ConditionTerm where
   (.<=.) = Le
 
 instance Logic ConditionTerm where
-  not' = NotT
-  x .&&. (BoolLitT True) = x
-  BoolLitT True .&&. y  = y
+  not' = Not
+  x .&&. (BoolLit True) = x
+  BoolLit True .&&. y  = y
   x .&&. y = And x y
-  x .||. BoolLitT False = x
-  BoolLitT False .||. y  = y
+  x .||. BoolLit False = x
+  BoolLit False .||. y  = y
   x .||. y = Or x y
-  true = BoolLitT True
-  false = BoolLitT False
+  true = BoolLit True
+  false = BoolLit False
 
 instance Sets ConditionTerm where
-  isIn = IsInT
+  isIn = IsIn
 
 instance BasicLists ConditionTerm where
-  length' = LengthT
-  reverse' = ReverseT
-  sum' = SumT
-  product' = ProductT
-  listLit = ListLitT . toOT
+  length' = Length
+  reverse' = Reverse
+  sum' = Sum
+  product' = Product
+  listLit = ListLit
 
 instance TypeError (Text "complex list functions, like filter, can not be used at type " :<>: ShowType ConditionTerm)
   => ComplexLists ConditionTerm where
   filter' = error "unreachable"
 
-eval :: forall a. OverflowType a => ConditionTerm a -> ValueMap -> (OverflowWarning, a)
-eval t m =
-  let r = eval' t m
-  in matchTypeOf r
-    [ inCaseOfE' @(OverflowWarning, a) $ \HRefl -> r
-    , fallbackCase' $ matchType @a
-        [ inCaseOfE' @Integer $ \HRefl -> second toInteger r
-        , inCaseOfE' @[Integer] $ \HRefl -> second (map toInteger) r
-        , inCaseOfE' @String $ \HRefl -> r
-        , fallbackCase' $ error "eval: impossible"
-        ]
+instance EffectEval ConditionTerm where
+  type Env ConditionTerm = ValueMap
+  pureEval f _ (Add x y) = liftA2 (+) (f x) (f y)
+  pureEval f _ (Sub x y) = liftA2 (-) (f x) (f y)
+  pureEval f _ (Mul x y) = liftA2 (*) (f x) (f y)
+  pureEval f _ (Equals x y) = liftA2 (==) (f x) (f y)
+  pureEval f _ (Gt x y) = liftA2 (>) (f x) (f y)
+  pureEval f _ (Ge x y) = liftA2 (>=) (f x) (f y)
+  pureEval f _ (Lt x y) = liftA2 (<) (f x) (f y)
+  pureEval f _ (Le x y) = liftA2 (<=) (f x) (f y)
+  pureEval f _ (And x y) = liftA2 (&&) (f x) (f y)
+  pureEval f _ (Or x y) = liftA2 (||) (f x) (f y)
+  pureEval f _ (IsIn x xs) = liftA2 elem (f x) (f xs)
+  pureEval f _ (Not x) = not <$> f x
+  pureEval f _ (Sum xs) = sum <$> f xs
+  pureEval f _ (Product xs) = product <$> f xs
+  pureEval f _ (Length xs) = toInteger . length <$> f xs
+  pureEval f _ (Reverse xs) = reverse <$> f xs
+  pureEval _ _ (IntLit x) = pure x
+  pureEval _ _ (ListLit xs) = pure xs
+  pureEval _ _ (BoolLit x) = pure x
+  pureEval _ e (Current x n) = pure $ fromMaybe (error $ "empty list for {" ++ intercalate "," (map someVarname $ toVarList x) ++ "}") . safeHead $ primEvalVar x n e
+  pureEval _ e (All x n) = pure $ reverse $ primEvalVar x n e
+
+oEval :: Typeable a => ValueMap -> ConditionTerm a -> (OverflowWarning, a)
+oEval = evalOverflow (OverflowTreatment evalI (\d -> Right . evalIs d))
+
+evalI :: ValueMap -> ConditionTerm Integer -> Either (SubCheck ConditionTerm I) I
+evalI e (Add x y) = liftA2 (+) (evalI e x) (evalI e y)
+evalI e (Sub x y) = liftA2 (-) (evalI e x) (evalI e y)
+evalI e (Mul x y) = liftA2 (*) (evalI e x) (evalI e y)
+evalI e (Sum xs) = Right $ sum $ evalIs e xs
+evalI e (Product xs) = Right $ product $ evalIs e xs
+evalI e (Length (xs :: ConditionTerm [a])) =
+  matchType @a
+    [ inCaseOfE' @Integer $ \HRefl -> Right . fromInt . length $ evalIs e xs
+    , fallbackCase' $ Left $ SubCheck xs (fromInt . length)
     ]
+evalI _ (IntLit x) = Right $ fromInteger x
+evalI e (Current x n) = Right $ fromInteger $ fromMaybe (error $ "empty list for {" ++ intercalate "," (map someVarname $ toVarList x) ++ "}") . safeHead $ primEvalVar x n e
 
-evalF :: UnaryF a b -> OT a -> OT b
-evalF Not = not
-evalF Length = fromIntegral . length
-evalF Reverse = reverse
-evalF Sum = sum
-evalF Product = product
+evalIs :: ValueMap -> ConditionTerm [Integer] -> [I]
+evalIs d (Reverse xs) = reverse $ evalIs d xs
+evalIs d (All v n) = map fromInteger $ primEvalVar v n d
+evalIs _ (ListLit xs) = map fromInteger xs
+evalIs _ Current{} = error "list variables are not supported"
+evalIs _ Add{} = error "lists should not have a Num instance"
+evalIs _ Sub{} = error "lists should not have a Num instance"
+evalIs _ Mul{} = error "lists should not have a Num instance"
+evalIs _ Sum{} = error "lists should not have a Num instance"
+evalIs _ Product{} = error "lists should not have a Num instance"
 
-evalF2 :: forall a b c. OverflowType a => BinaryF a b c -> OT a -> OT b -> OT c
-evalF2 (:+:) = (+)
-evalF2 (:-:) = (-)
-evalF2 (:*:) = (*)
-evalF2 (:==:) = (==)
-evalF2 (:>:) = (>)
-evalF2 (:>=:) = (>=)
-evalF2 (:<:) = (<)
-evalF2 (:<=:) = (<=)
-evalF2 (:&&:) = (&&)
-evalF2 (:||:) = (||)
-evalF2 IsIn = elem
-
-eval' :: forall x. ConditionTerm x -> ValueMap -> (OverflowWarning,OT x)
-eval' (termStruct -> Binary (f :: BinaryF a b c) x y) e =
-  matchType @c
-    [ inCaseOfE' @Integer $ \HRefl -> let (w,r) = evalF2 f <$> eval' x e <*> eval' y e in (checkOverflow r <> w, r)
-    , fallbackCase' (evalF2 f <$> eval' x e <*> eval' y e)
-    ]
-eval' (termStruct -> Unary (f :: UnaryF a b) x) e = matchType @b
-  [ inCaseOfE' @Integer $ \HRefl -> let (w,r) = evalF f <$> eval' x e in (checkOverflow r <> w, r)
-  , fallbackCase' (evalF f <$> eval' x e)
-  ]
-eval' (termStruct -> Literal (BoolLit b)) _ = (mempty,b)
-eval' (termStruct -> Literal (IntLit n)) _ = (checkOverflow n ,n)
-eval' (termStruct -> Literal (ListLit xs)) _ = let xs' = xs in (foldMap checkOverflow xs', xs')
-eval' (termStruct -> VariableC x n) e = fromMaybe (error $ "empty list for {" ++ intercalate "," (map someVarname $ toVarList x) ++ "}") . safeHead <$> primEvalVar x n e
-eval' (termStruct -> (VariableA x n)) e = reverse <$> primEvalVar x n e
-
-primEvalVar :: forall a e. (OverflowType a, VarExp e) => e -> Int -> ValueMap -> (OverflowWarning,[OT a])
+primEvalVar :: forall a e. (Typeable a, VarExp e) => e -> Int -> ValueMap -> [a]
 primEvalVar x n e =
-  let xs = drop n . map fst . sortBy (flip compare `on` snd) . concatMap unwrapValueEntry $ mapMaybe (`ValueMap.lookup` e) (toVarList x)
-  in matchTypeOf xs
-    [ inCaseOfE @[I] $ \HRefl xs -> (mconcatMap (checkOverflow @Integer) xs,xs)
-    , fallbackCase' (mempty,xs)
-    ]
+  drop n . map fst . sortBy (flip compare `on` snd) . concatMap unwrapValueEntry $ mapMaybe (`ValueMap.lookup` e) (toVarList x)
 
 safeHead :: [a] -> Maybe a
 safeHead [] = Nothing
 safeHead (x:_) = Just x
 
-printIndexedTerm :: ConditionTerm a -> Map SomeVar (Int,[Int]) -> String
+printIndexedTerm :: Typeable a => ConditionTerm a -> Map SomeVar (Int,[Int]) -> String
 printIndexedTerm t = printTerm' t . Just
 
-printTerm :: ConditionTerm a -> String
+printTerm :: Typeable a => ConditionTerm a -> String
 printTerm t = printTerm' t Nothing
 
-printTerm' :: ConditionTerm a -> Maybe (Map SomeVar (Int,[Int])) -> String
-printTerm' (termStruct -> Binary IsIn x xs) m = printTerm' x m ++ " ∈ " ++ printTerm' xs m
-printTerm' (termStruct -> Binary f tx ty) m = concat ["(",printTerm' tx m, ") ",fSym f," (", printTerm' ty m,")"]
-  where
-    fSym :: BinaryF a b c -> String
-    fSym (:+:) = "+"
-    fSym (:-:) = "-"
-    fSym (:*:) = "*"
-    fSym (:==:) = "=="
-    fSym (:>:) = ">"
-    fSym (:>=:) = ">="
-    fSym (:<:) = "<"
-    fSym (:<=:) = "<="
-    fSym (:&&:) = "&&"
-    fSym (:||:) = "||"
-    fSym IsIn = error "handled by special case above"
-printTerm' (termStruct -> Unary Not (IsInT x xs)) m = printTerm' x m ++ " ∉ " ++ printTerm' xs m
-printTerm' (termStruct -> Unary Not t) m = concat ["not (", printTerm' t m, ")"]
-printTerm' (termStruct -> Literal (BoolLit True)) _ = "True"
-printTerm' (termStruct -> Literal (BoolLit False)) _ = "False"
-printTerm' (termStruct -> Unary f t) m = concat [fSym f ++" (", printTerm' t m, ")"]
-  where
-    fSym :: UnaryF a b -> String
-    fSym Not = "not"
-    fSym Length = "length"
-    fSym Reverse = "reverse"
-    fSym Sum = "sum"
-    fSym Product = "product"
-printTerm' (termStruct -> VariableC x n) (Just m) = (\(x,(i,_)) -> x ++ "_" ++ show i) $ maximumOn (head.snd.snd) $ (\xs -> take (length xs - n) xs) $ mapMaybe (\x -> (someVarname x,) <$> Map.lookup x m) (toVarList x)
-printTerm' (termStruct -> VariableC x n) Nothing = "{" ++ intercalate "," (map someVarname $ toVarList x) ++ "}"++":"++show n++"_C"
-printTerm' (termStruct -> VariableA x n) _ = "{" ++ intercalate "," (map someVarname $ toVarList x) ++ "}"++":"++show n++"_A"
-printTerm' (termStruct -> Literal (IntLit x)) _ = show x
-printTerm' (termStruct -> Literal (ListLit xs)) _ = showOT xs
+printTerm' :: Typeable a => ConditionTerm a -> Maybe (Map SomeVar (Int,[Int])) -> String
+printTerm' (Add x y) m = printBinary "+" x y m
+printTerm' (Sub x y) m = printBinary "-" x y m
+printTerm' (Mul x y) m = printBinary "*" x y m
+printTerm' (Equals x y) m = printBinary "==" x y m
+printTerm' (Gt x y) m = printBinary ">" x y m
+printTerm' (Ge x y) m = printBinary ">=" x y m
+printTerm' (Lt x y) m = printBinary "<" x y m
+printTerm' (Le x y) m = printBinary "<=" x y m
+printTerm' (And x y) m = printBinary "&&" x y m
+printTerm' (Or x y) m = printBinary "||" x y m
+printTerm' (IsIn x xs) m = printTerm' x m ++ " ∈ " ++ printTerm' xs m
+printTerm' (Not (IsIn x xs)) m = printTerm' x m ++ " ∉ " ++ printTerm' xs m
+printTerm' (Not t) m = concat ["not (", printTerm' t m, ")"]
+printTerm' (BoolLit b) _ = show b
+printTerm' (Length xs) m = printUnary "length" xs m
+printTerm' (Reverse xs) m = printUnary "reverse" xs m
+printTerm' (Sum xs) m = printUnary "sum" xs m
+printTerm' (Product xs) m = printUnary "product" xs m
+printTerm' (Current x n) (Just m) = (\(x,(i,_)) -> x ++ "_" ++ show i) $ maximumOn (head.snd.snd) $ (\xs -> take (length xs - n) xs) $ mapMaybe (\x -> (someVarname x,) <$> Map.lookup x m) (toVarList x)
+printTerm' (Current x n) Nothing = "{" ++ intercalate "," (map someVarname $ toVarList x) ++ "}"++":"++show n++"_C"
+printTerm' (All x n) _ = "{" ++ intercalate "," (map someVarname $ toVarList x) ++ "}"++":"++show n++"_A"
+printTerm' (IntLit x) _ = show x
+printTerm' (ListLit xs) _ = show xs
+
+printBinary :: (Typeable a, Typeable b) => String -> ConditionTerm a -> ConditionTerm b -> Maybe (Map SomeVar (Int,[Int])) -> String
+printBinary op x y m = concat ["(",printTerm' x m, ") ",op," (", printTerm' y m,")"]
+
+printUnary :: Typeable a => String -> ConditionTerm a -> Maybe (Map SomeVar (Int,[Int])) -> String
+printUnary op x m = concat [op ++" (", printTerm' x m, ")"]
 
 data SomeTerm where
-  SomeTerm :: OverflowType a => ConditionTerm a -> SomeTerm
-
-someTerm :: ConditionTerm a -> SomeTerm
+  SomeTerm :: Typeable a => ConditionTerm a -> SomeTerm
+--
+someTerm :: Typeable a => ConditionTerm a -> SomeTerm
 someTerm t@(Add _ _) = SomeTerm t
 someTerm t@(Sub _ _) = SomeTerm t
 someTerm t@(Mul _ _) = SomeTerm t
@@ -292,24 +243,40 @@ someTerm t@(Lt _ _) = SomeTerm t
 someTerm t@(Le _ _) = SomeTerm t
 someTerm t@(And _ _) = SomeTerm t
 someTerm t@(Or _ _) = SomeTerm t
-someTerm t@(IsInT _ _) = SomeTerm t
-someTerm t@(NotT _) = SomeTerm t
-someTerm t@(SumT _) = SomeTerm t
-someTerm t@(ProductT _) = SomeTerm t
-someTerm t@(LengthT _) = SomeTerm t
-someTerm t@(ReverseT _) = SomeTerm t
-someTerm t@(IntLitT _) = SomeTerm t
-someTerm t@(ListLitT _) = SomeTerm t
-someTerm t@(BoolLitT _) = SomeTerm t
+someTerm t@(IsIn _ _) = SomeTerm t
+someTerm t@(Not _) = SomeTerm t
+someTerm t@(Sum _) = SomeTerm t
+someTerm t@(Product _) = SomeTerm t
+someTerm t@(Length _) = SomeTerm t
+someTerm t@(Reverse _) = SomeTerm t
+someTerm t@(IntLit _) = SomeTerm t
+someTerm t@(ListLit _) = SomeTerm t
+someTerm t@(BoolLit _) = SomeTerm t
 someTerm t@(Current _ _) = SomeTerm t
 someTerm t@(All _ _) = SomeTerm t
-
-subTerms :: ConditionTerm a -> [SomeTerm]
-subTerms (termStruct' -> (t,Unary _ x)) = someTerm t : subTerms x
-subTerms (termStruct' -> (t,Binary _ x y)) = someTerm t : subTerms x ++ subTerms y
-subTerms (termStruct' -> (t,Literal{})) = [someTerm t]
-subTerms (termStruct' -> (t,VariableC{})) = [someTerm t]
-subTerms (termStruct' -> (t,VariableA{})) = [someTerm t]
+--
+subTerms :: Typeable a => ConditionTerm a -> [SomeTerm]
+subTerms t@(Add x y) = someTerm t : subTerms x ++ subTerms y
+subTerms t@(Sub x y) = someTerm t : subTerms x ++ subTerms y
+subTerms t@(Mul x y) = someTerm t : subTerms x ++ subTerms y
+subTerms t@(Equals x y) = someTerm t : subTerms x ++ subTerms y
+subTerms t@(Gt x y) = someTerm t : subTerms x ++ subTerms y
+subTerms t@(Ge x y) = someTerm t : subTerms x ++ subTerms y
+subTerms t@(Lt x y) = someTerm t : subTerms x ++ subTerms y
+subTerms t@(Le x y) = someTerm t : subTerms x ++ subTerms y
+subTerms t@(And x y) = someTerm t : subTerms x ++ subTerms y
+subTerms t@(Or x y) = someTerm t : subTerms x ++ subTerms y
+subTerms t@(IsIn x y) = someTerm t : subTerms x ++ subTerms y
+subTerms t@(Sum x) = someTerm t : subTerms x
+subTerms t@(Product x) = someTerm t : subTerms x
+subTerms t@(Length x) = someTerm t : subTerms x
+subTerms t@(Reverse x) = someTerm t : subTerms x
+subTerms t@(Not x) = someTerm t : subTerms x
+subTerms t@(IntLit _) = [someTerm t]
+subTerms t@(ListLit _) = [someTerm t]
+subTerms t@(BoolLit _) = [someTerm t]
+subTerms t@(Current _ _) = [someTerm t]
+subTerms t@(All _ _) = [someTerm t]
 
 castTerm :: forall a. Typeable a => SomeTerm -> Maybe (ConditionTerm a)
 castTerm (SomeTerm (t :: ConditionTerm b)) =
@@ -317,7 +284,3 @@ castTerm (SomeTerm (t :: ConditionTerm b)) =
     [ inCaseOfE' @b $ \HRefl -> Just t
     , fallbackCase' Nothing
     ]
-
--- dirty hack
-termStruct' :: ConditionTerm a -> (ConditionTerm a, TermStruct a)
-termStruct' t = (t, termStruct t)

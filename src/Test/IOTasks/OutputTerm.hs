@@ -1,36 +1,33 @@
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE TypeFamilies #-}
 module Test.IOTasks.OutputTerm (
   OutputTerm ,
   SomeOutputTerm(..), withSomeOutputTerm,
   outputTermVarExps, transparentSubterms,
-  eval,
+  Test.IOTasks.OutputTerm.oEval,
   ) where
 
 import Prelude hiding (all)
 
 import Test.IOTasks.Terms
-import Test.IOTasks.Internal.ConditionTerm hiding (eval)
-import qualified Test.IOTasks.Internal.ConditionTerm as ConditionTerm
-import Test.IOTasks.Internal.Overflow (OverflowWarning, checkOverflow, OverflowType (..))
+import Test.IOTasks.Internal.ConditionTerm
+import Test.IOTasks.Internal.Overflow
 import Test.IOTasks.ValueMap
 
 import Data.Express (Expr((:$)), var, val, value, (//-), evl, vars, isVar, showExpr)
 import Data.List (nub, intercalate)
 import Data.Function (on)
 import Data.Maybe (maybeToList)
+import Data.Bifunctor (first)
 
 import Type.Reflection
 import Data.Kind (Type)
-import Type.Match (matchType, fallbackCase', inCaseOfE')
 
 import Text.Parsec (parse, char, many1, alphaNum, sepBy1, (<|>), string, digit)
 import Text.Parsec.String (Parser)
@@ -40,11 +37,11 @@ data OutputTerm a
   = Transparent (ConditionTerm a)
   | Opaque Expr [[SomeVar]] [SomeTerm]
 
-toExpr :: OutputTerm a -> Expr
+toExpr :: Typeable a =>  OutputTerm a -> Expr
 toExpr (Transparent t) = termExpr t
 toExpr (Opaque expr _ _) = expr
 
-outputTermVarExps :: OutputTerm a -> [[SomeVar]]
+outputTermVarExps :: Typeable a => OutputTerm a -> [[SomeVar]]
 outputTermVarExps (Transparent t) = termVarExps t
 outputTermVarExps (Opaque _ vars _) = vars
 
@@ -53,13 +50,13 @@ transparentSubterms (Transparent t) = subTerms t
 transparentSubterms (Opaque _ _ ts) = ts
 
 -- simple instance lifting based on Expr's instances
-instance Show (OutputTerm a) where
+instance Typeable a => Show (OutputTerm a) where
   show = show . toExpr
 
-instance Eq (OutputTerm a) where
+instance Typeable a => Eq (OutputTerm a) where
   (==) = (==) `on` toExpr
 
-instance Ord (OutputTerm a) where
+instance Typeable a => Ord (OutputTerm a) where
   compare = compare `on` toExpr
 
 instance Accessor OutputTerm where
@@ -96,14 +93,22 @@ allE x n = case varExpType x of
       Nothing -> error $ "allE: a does not have kind Type in TypeRep a, with a = " ++ show (typeRep @a)
   Nothing -> error "allE: inconsistent VarExp type"
 
-eval :: forall a. OverflowType a => OutputTerm a -> ValueMap -> (OverflowWarning, a)
-eval (Transparent t) e = ConditionTerm.eval t e
-eval (Opaque expr vss ts) e = let r = eval' expr vss e in matchType @a
-  [ inCaseOfE' @Integer $ \HRefl -> (checkOverflow @Integer (fromInteger r),r)
-  , fallbackCase' (foldMap (\(SomeTerm t) -> fst $ ConditionTerm.eval t e) ts,r)]
-  where
-  eval' :: OverflowType a => Expr -> [[SomeVar]] -> ValueMap -> a
-  eval' expr xss e = evl . fillAVars xss e . reduceAVarsIndex e . replaceCVars e $ expr
+oEval :: forall a. Typeable a => ValueMap -> OutputTerm a -> (OverflowWarning, a)
+oEval = evalOverflow (OverflowTreatment evalSingle evalList) where
+  evalSingle :: ValueMap -> OutputTerm Integer -> Either (SubCheck OutputTerm I) I
+  evalSingle e (Transparent t) = first (modifySubCheck Transparent) $ evalI e t
+  evalSingle e (Opaque expr vss ts) = Right $ fromInteger $ eval' expr vss e
+  evalList :: ValueMap -> OutputTerm [Integer] -> Either (SubCheck OutputTerm [I]) [I]
+  evalList e (Transparent t) = Right $ evalIs e t
+  evalList e (Opaque expr vss ts) = Right $ fromInteger <$> eval' expr vss e
+
+eval' :: Typeable a => Expr -> [[SomeVar]] -> ValueMap -> a
+eval' expr xss e = evl . fillAVars xss e . reduceAVarsIndex e . replaceCVars e $ expr
+
+instance EffectEval OutputTerm where
+  type Env OutputTerm = ValueMap
+  pureEval f e (Transparent t) = pureEval (f . Transparent) e t
+  pureEval _ e (Opaque expr vss _) = pure $ eval' expr vss e
 
 -- evaluation preprocessing
 
@@ -174,18 +179,18 @@ instance Arithmetic OutputTerm where
   (.+.) = h2 (.+.) $ value "(+)" ((+) :: Integer -> Integer -> Integer)
   (.-.) = h2 (.-.) $ value "(-)" ((-) :: Integer -> Integer -> Integer)
   (.*.) = h2 (.*.) $ value "(*)" ((*) :: Integer -> Integer -> Integer)
-  intLit = Transparent . IntLitT . fromInteger
+  intLit = Transparent . IntLit . fromInteger
 
 instance BasicLists OutputTerm where
   length' :: forall a. Typeable a => OutputTerm [a] -> OutputTerm Integer
-  length' = h1 (length' @ConditionTerm @a) $ unaryF (Length @a)
+  length' = h1 (length' @ConditionTerm @a) $ value "length" (fromIntegral . length :: [a] -> Integer)
 
-  reverse' :: forall a. OverflowType a => OutputTerm [a] -> OutputTerm [a]
-  reverse' = h1 (reverse' @ConditionTerm @a) $ unaryF (Reverse @a)
+  reverse' :: forall a. Typeable a => OutputTerm [a] -> OutputTerm [a]
+  reverse' = h1 (reverse' @ConditionTerm @a) $ value "reverse" (reverse :: [a] -> [a])
 
-  sum' = h1 sum' $ unaryF Sum
-  product' = h1 product' $ unaryF Product
-  listLit = Transparent . ListLitT . toOT
+  sum' = h1 sum' $ value "sum" (sum :: [Integer] -> Integer)
+  product' = h1 product' $ value "product" (product :: [Integer] -> Integer)
+  listLit = Transparent . ListLit
 
 h1 :: (ConditionTerm a -> ConditionTerm b) -> Expr -> OutputTerm a -> OutputTerm b
 h1 f _ (Transparent t) = Transparent $ f t
@@ -197,34 +202,28 @@ h2 _ g (Opaque x vx tx) (Transparent y) = Opaque (g :$ x :$ termExpr y) (vx ++ t
 h2 _ g (Transparent x) (Opaque y vy ty) = Opaque (g :$ termExpr x :$ y) (termVarExps x ++ vy) (subTerms x ++ ty)
 h2 _ g (Opaque x vx tx) (Opaque y vy ty) = Opaque (g :$ x :$ y) (vx ++ vy) (tx ++ ty)
 
-termExpr :: ConditionTerm a -> Expr
-termExpr (termStruct -> Binary f x y) = binF f :$ termExpr x :$ termExpr y
-termExpr (termStruct -> Unary f xs) = unaryF f :$ termExpr xs
-termExpr (termStruct -> VariableC x n) = currentE x n
-termExpr (termStruct -> VariableA x n) = allE x n
-termExpr (termStruct -> Literal (BoolLit b)) = val b
-termExpr (termStruct -> Literal (IntLit x)) = val x
-termExpr (termStruct -> Literal (ListLit xs)) = val $ fromOT xs
-
-unaryF :: forall a b. UnaryF a b -> Expr
-unaryF Not = value "not" (not :: Bool -> Bool)
-unaryF Length = value "length" (fromIntegral . length :: a -> Integer)
-unaryF Reverse = value "reverse" (reverse :: a -> a)
-unaryF Sum = value "sum" (sum :: [Integer] -> Integer)
-unaryF Product = value "product" (product :: [Integer] -> Integer)
-
-binF :: forall a b c. BinaryF a b c -> Expr
-binF (:+:) = value "(+)" ((+) :: Integer -> Integer -> Integer)
-binF (:-:) = value "(-)" ((-) :: Integer -> Integer -> Integer)
-binF (:*:) = value "(*)" ((*) :: Integer -> Integer -> Integer)
-binF (:==:) = value "(==)" ((==) :: a -> a -> Bool)
-binF (:>:) = value "(>)" ((>) :: a -> a -> Bool)
-binF (:>=:) = value "(>=)" ((>=) :: a -> a -> Bool)
-binF (:<:) = value "(<)" ((<) :: a -> a -> Bool)
-binF (:<=:) = value "(<=)" ((<=) :: a -> a -> Bool)
-binF (:&&:) = value "(&&)" ((&&) :: Bool -> Bool -> Bool)
-binF (:||:) = value "(||)" ((||) :: Bool -> Bool -> Bool)
-binF IsIn = value "elem" (elem :: Integer -> [Integer] -> Bool)
+termExpr :: forall a. Typeable a => ConditionTerm a -> Expr
+termExpr (Add x y) = value "(+)" ((+) :: Integer -> Integer -> Integer) :$ termExpr x :$ termExpr y
+termExpr (Sub x y) = value "(-)" ((-) :: Integer -> Integer -> Integer) :$ termExpr x :$ termExpr y
+termExpr (Mul x y) = value "(*)" ((*) :: Integer -> Integer -> Integer) :$ termExpr x :$ termExpr y
+termExpr (Equals x y) = value "(==)" ((==) :: a -> a -> Bool) :$ termExpr x :$ termExpr y
+termExpr (Gt x y) = value "(>)" ((>) :: a -> a -> Bool) :$ termExpr x :$ termExpr y
+termExpr (Ge x y) = value "(>=)" ((>=) :: a -> a -> Bool) :$ termExpr x :$ termExpr y
+termExpr (Lt x y) = value "(<)" ((<) :: a -> a -> Bool) :$ termExpr x :$ termExpr y
+termExpr (Le x y) = value "(<=)" ((<=) :: a -> a -> Bool) :$ termExpr x :$ termExpr y
+termExpr (And x y) = value "(&&)" ((&&) :: Bool -> Bool -> Bool) :$ termExpr x :$ termExpr y
+termExpr (Or x y) = value "(||)" ((||) :: Bool -> Bool -> Bool) :$ termExpr x :$ termExpr y
+termExpr (IsIn x xs) = value "elem" (elem :: Integer -> [Integer] -> Bool) :$ termExpr x :$ termExpr xs
+termExpr (Not x) = value "not" (not :: Bool -> Bool) :$ termExpr x
+termExpr (Length (xs :: ConditionTerm [b])) = value "length" (fromIntegral . length :: [b] -> Integer) :$ termExpr xs
+termExpr (Reverse xs) = value "reverse" (reverse :: a -> a) :$ termExpr xs
+termExpr (Sum xs) = value "sum" (sum :: [Integer] -> Integer) :$ termExpr xs
+termExpr (Product xs) = value "product" (product :: [Integer] -> Integer) :$ termExpr xs
+termExpr (IntLit x) = val x
+termExpr (ListLit xs) = val xs
+termExpr (BoolLit x) = val x
+termExpr (Current x n) = currentE x n
+termExpr (All x n) = allE x n
 
 instance ComplexLists OutputTerm where
   filter' p (Transparent x) = Opaque (value "filter ?p" (filter p) :$ termExpr x) (termVarExps x) (subTerms x)

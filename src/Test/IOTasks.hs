@@ -24,7 +24,6 @@ module Test.IOTasks (
   Sets(..),
   Accessor(..),
   as,
-  OverflowType,
   -- * Programs
   MonadTeletype(..),
   IOrep, runProgram, Line,
@@ -52,4 +51,3 @@ import Test.IOTasks.OutputTerm
 import Test.IOTasks.Testing
 import Test.IOTasks.Interpreter
 import Test.IOTasks.Trace
-import Test.IOTasks.Overflow (OverflowType)

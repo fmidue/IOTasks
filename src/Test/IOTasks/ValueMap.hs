@@ -23,13 +23,11 @@ import Data.List as List (sortOn, lookup)
 import Data.Maybe (mapMaybe, isJust)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Bifunctor (first)
 
 import Data.Typeable (eqT)
 import Type.Reflection
 
 import Test.IOTasks.Terms (SomeVar, pattern SomeVar, unSomeVar, someVarname, varExpType, Varname)
-import Test.IOTasks.Internal.Overflow (I)
 import Text.Read (readMaybe)
 
 data ValueMap = ValueMap { valueMap :: Map SomeVar ValueEntry, size :: Int } deriving (Eq,Show)
@@ -85,9 +83,9 @@ unwrapValueEntry NoEntry = []
 unwrapValueEntry (IntegerEntry xs) =
   case eqT @a @Integer of
     Just Refl -> xs
-    Nothing -> case eqT @a @I of
-      Just Refl -> map (first fromInteger) xs
-      Nothing -> error $ "unwrapValue: incompatible type - Integer (or I) and " ++ show (typeRep @a)
+    -- Nothing -> case eqT @a @I of
+    --   Just Refl -> map (first fromInteger) xs
+    Nothing -> error $ "unwrapValue: incompatible type - Integer (or I) and " ++ show (typeRep @a)
 unwrapValueEntry (StringEntry xs) =
   case eqT @a @String of
     Just Refl -> xs

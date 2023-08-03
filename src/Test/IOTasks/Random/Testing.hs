@@ -125,7 +125,7 @@ genTrace spec depth sz maxNeg =
       RecBoth{} -> error "genTrace: impossible"
     )
     (\(e,_,_) o ts t' -> ProgWrite o (Set.map (snd . evalPattern e) ts) <$> t')
-    (\(e,_,_) c l r -> if snd $ eval c e then l else r)
+    (\(e,_,_) c l r -> if snd $ oEval e c then l else r)
     (const id)
     (pure Terminate)
     (emptyValueMap $ vars spec,1,0)

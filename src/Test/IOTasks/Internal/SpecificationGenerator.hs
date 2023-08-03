@@ -8,7 +8,6 @@ import Test.IOTasks.OutputTerm
 import Test.IOTasks.OutputPattern
 import Test.IOTasks.ValueSet
 import Test.IOTasks.ConditionTerm
-import Test.IOTasks.Overflow
 import {-# SOURCE #-} Test.IOTasks.Internal.Specification
 
 import Test.QuickCheck
@@ -63,13 +62,13 @@ someInputsWithHole xs nMax = do
   (is1,is2) <- splitAt p <$> vectorOf n (input xs)
   pure $ \s -> mconcat $ is1 ++ [s] ++ is2
 
-outputOneof :: OverflowType a => Gen (OutputTerm a) -> Gen Specification
+outputOneof :: (Typeable a, Show a) => Gen (OutputTerm a) -> Gen Specification
 outputOneof = outputOneof' False
 
-_optionalOutputOneof :: OverflowType a => Gen (OutputTerm a) -> Gen Specification
+_optionalOutputOneof :: (Typeable a, Show a) => Gen (OutputTerm a) -> Gen Specification
 _optionalOutputOneof = outputOneof' True
 
-outputOneof' :: OverflowType a => Bool -> Gen (OutputTerm a) -> Gen Specification
+outputOneof' :: (Typeable a, Show a) => Bool -> Gen (OutputTerm a) -> Gen Specification
 outputOneof' b ts = do
   t <- ts
   pure $ (if b then writeOptionalOutput else writeOutput) [Value t]

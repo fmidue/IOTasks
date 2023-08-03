@@ -1,19 +1,26 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeFamilyDependencies #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE RecordWildCards #-}
 module Test.IOTasks.Internal.Overflow (
   OverflowWarning(..),
-  OverflowType(..),
-  I,
+  evalOverflow,
+  OverflowTreatment(..), SubCheck(..),
+  modifySubCheck,
+  EffectEval(..),
+  effectEval,
+  I, fromInt,
+  unwrapI, unwrapIs,
   ) where
 
+import Control.Monad.Identity (runIdentity)
+import Data.Maybe (fromMaybe)
+import Data.Bifunctor (second)
 import Type.Reflection
+
+import Type.Match
 
 data OverflowWarning = OverflowOccurred | NoOverflow deriving (Eq,Show)
 
@@ -25,52 +32,55 @@ instance Semigroup OverflowWarning where
 instance Monoid OverflowWarning where
   mempty = NoOverflow
 
-class (Typeable a, Show a, Typeable (OT a), Eq (OT a), Ord (OT a)) => OverflowType a where
-  type OT a = r | r -> a
-  checkOverflow :: OT a -> OverflowWarning
+class EffectEval t where
+  type Env t
+  pureEval :: (Applicative f, Typeable a) => (forall x. Typeable x => t x -> f x) -> Env t -> t a -> f a
+  eval :: Typeable a => Env t -> t a -> a
+  eval d = runIdentity . effectEval (const Nothing) d
 
-  toOT :: a -> OT a
-  fromOT :: OT a -> a
+effectEval :: (EffectEval t, Applicative f, Typeable a) => (forall x. Typeable x => t x -> Maybe (f x)) -> Env t -> t a -> f a
+effectEval f d x = fromMaybe (pureEval (effectEval f d) d x) $ f x
 
-  showOT :: OT a -> String
-  default showOT :: Show (OT a) => OT a -> String
-  showOT = show
+evalOverflow :: forall t a. (EffectEval t, Typeable a) => OverflowTreatment t -> Env t -> t a -> (OverflowWarning, a)
+evalOverflow OverflowTreatment{..} d = effectEval (effect d) d
+  where
+    effect :: forall a. Typeable a => Env t -> t a -> Maybe (OverflowWarning, a)
+    effect d x = matchType @a
+      [ inCaseOfE' @Integer $ \HRefl ->
+        case evalITerm d x of
+          Right i -> Just $ unwrapI i
+          Left (SubCheck t f) -> do -- Maybe
+            fx <- effect d t
+            pure $ do -- (Overflow, a)
+              x <- fx
+              unwrapI $ f x
+      , inCaseOfE' @[Integer] $ \HRefl ->
+        case evalIList d x of
+          Right i ->  Just $ unwrapIs i
+          Left (SubCheck t f) -> do -- Maybe
+            fx <- effect d t
+            pure $ do -- (Overflow, a)
+              x <- fx
+              unwrapIs $ f x
+      , fallbackCase' Nothing
+      ]
 
-instance OverflowType Integer where
-  type OT Integer = I
-  checkOverflow x
-    | hasDiverged x = OverflowOccurred
-    | otherwise = NoOverflow
+data OverflowTreatment t = OverflowTreatment
+  { evalITerm :: Env t -> t Integer   -> Either (SubCheck t I) I
+  , evalIList :: Env t -> t [Integer] -> Either (SubCheck t [I]) [I]
+  }
 
-  toOT = fromInteger
-  fromOT = fromIntegral
-  showOT = show @Integer . fromIntegral
+data SubCheck t x where
+  SubCheck :: Typeable a => t a -> (a -> x) -> SubCheck t x
 
-instance OverflowType Bool where
-  type OT Bool = Bool
-  checkOverflow = const NoOverflow
-
-  toOT = id
-  fromOT = id
-  showOT = show
-
-instance OverflowType Char where
-  type OT Char = Char
-  checkOverflow = const NoOverflow
-
-  toOT = id
-  fromOT = id
-  showOT = show
-
-instance OverflowType a => OverflowType [a] where
-  type OT [a] = [OT a]
-  checkOverflow = foldMap checkOverflow
-
-  toOT = map toOT
-  fromOT = map fromOT
-  showOT = show . map showOT
+modifySubCheck :: (forall a. t a -> t' a) -> SubCheck t x -> SubCheck t' x
+modifySubCheck n (SubCheck t f) = SubCheck (n t) f
+---
 
 data I = I Integer Int deriving (Eq,Ord)
+
+fromInt :: Int -> I
+fromInt x = I (toInteger x) x
 
 instance Show I where
   show i@(I x _)
@@ -79,6 +89,12 @@ instance Show I where
 
 hasDiverged :: I -> Bool
 hasDiverged (I x x') = x /= fromIntegral x'
+
+unwrapI :: I -> (OverflowWarning, Integer)
+unwrapI i = (if hasDiverged i then OverflowOccurred else NoOverflow, toInteger i)
+
+unwrapIs :: [I] -> (OverflowWarning, [Integer])
+unwrapIs = foldMap (second pure . unwrapI)
 
 instance Num I where
   (+) = liftOp2 (+) (+)

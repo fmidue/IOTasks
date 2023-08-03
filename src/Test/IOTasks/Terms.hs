@@ -31,8 +31,6 @@ module Test.IOTasks.Terms (
   Opaque(..),
   ) where
 
-import Test.IOTasks.Overflow
-
 import Data.Function (on)
 import Data.Bifunctor (second)
 
@@ -110,13 +108,13 @@ instance Typeable a => VarExp [Var a] where
   toVarList = map someVar
 
 class Accessor t where
-  currentValue :: (OverflowType a, VarExp e) => e -> t a
+  currentValue :: (Typeable a, VarExp e) => e -> t a
   currentValue = valueBefore 0
-  valueBefore:: (OverflowType a, VarExp e) => Int -> e -> t a
+  valueBefore:: (Typeable a, VarExp e) => Int -> e -> t a
 
-  allValues :: (OverflowType a, VarExp e) => e -> t [a]
+  allValues :: (Typeable a, VarExp e) => e -> t [a]
   allValues = valuesBefore 0
-  valuesBefore :: (OverflowType a, VarExp e) => Int -> e -> t [a]
+  valuesBefore :: (Typeable a, VarExp e) => Int -> e -> t [a]
 
 as :: Typeable a => t a -> t a
 as = id
@@ -129,11 +127,11 @@ class Arithmetic t where
   intLit :: Integer -> t Integer
 
 class Compare t where
-  (.==.) :: (OverflowType a, Eq a) => t a -> t a -> t Bool
-  (.>.) :: (OverflowType a, Ord a) => t a -> t a -> t Bool
-  (.>=.) :: (OverflowType a, Ord a) => t a -> t a -> t Bool
-  (.<.) :: (OverflowType a, Ord a) => t a -> t a -> t Bool
-  (.<=.) :: (OverflowType a, Ord a) => t a -> t a -> t Bool
+  (.==.) :: (Typeable a, Eq a) => t a -> t a -> t Bool
+  (.>.) :: (Typeable a, Ord a) => t a -> t a -> t Bool
+  (.>=.) :: (Typeable a, Ord a) => t a -> t a -> t Bool
+  (.<.) :: (Typeable a, Ord a) => t a -> t a -> t Bool
+  (.<=.) :: (Typeable a, Ord a) => t a -> t a -> t Bool
 
 class Logic t where
   not' :: t Bool -> t Bool
@@ -144,10 +142,10 @@ class Logic t where
 
 class BasicLists t where
   length' :: Typeable a => t [a] -> t Integer
-  reverse' :: OverflowType a => t [a] -> t [a]
+  reverse' :: Typeable a => t [a] -> t [a]
   sum' :: t [Integer] -> t Integer
   product' :: t [Integer] -> t Integer
-  listLit :: OverflowType a => [a] -> t [a]
+  listLit :: (Show a, Typeable a) => [a] -> t [a]
 
 class Sets t where
   isIn :: t Integer -> t [Integer] -> t Bool

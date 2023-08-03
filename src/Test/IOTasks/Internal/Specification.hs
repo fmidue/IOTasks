@@ -20,7 +20,7 @@ module Test.IOTasks.Internal.Specification (
 import Prelude hiding (until)
 
 import Test.IOTasks.ValueSet
-import Test.IOTasks.ConditionTerm
+import Test.IOTasks.Internal.ConditionTerm
 import Test.IOTasks.Terms (Var (..), SomeVar, varname, someVar)
 import Test.IOTasks.Trace
 import Test.IOTasks.OutputPattern
@@ -140,7 +140,7 @@ runSpecification' addLinebreaks inputs spec =
       in (progWrite o os' <> t', warn <> ww)
     )
     (\(e,_) c (l,wl) (r,wr) ->
-      let (w,b) = eval c e
+      let (w,b) = oEval e c
       in if b then (l,wl <> w) else (r,wr <> w))
     (const id)
     (terminate,NoOverflow)
@@ -236,7 +236,7 @@ accept s_ t_ = accept' s_ k_I t_ d_I
       ProgWrite Mandatory vs t' | vs `Set.isSubsetOf` Set.map (snd . evalPattern d) os -> accept' s' k t' d
       _ -> False
     accept' (Branch c s1 s2 s') k t d
-      | snd (eval c d) = accept' (s1 <> s') k t d
+      | snd (oEval d c) = accept' (s1 <> s') k t d
       | otherwise = accept' (s2 <> s') k t d
     accept' (TillE s s') k t d = accept' s k' t d
       where

@@ -1,6 +1,6 @@
 module Test.IOTasks.ConditionTerm (
   ConditionTerm,
-  eval,
+  oEval,
   termVarExps, subTerms,
   printTerm, printIndexedTerm,
   SomeTerm(..),
