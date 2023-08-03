@@ -25,7 +25,7 @@ module Test.IOTasks.Terms (
   Arithmetic(..),
   Compare(..),
   Logic(..),
-  Sets(..),
+  Membership(..),
   BasicLists(..),
   ComplexLists(..),
   Opaque(..),
@@ -128,6 +128,7 @@ class Arithmetic t where
 
 class Compare t where
   (.==.) :: (Typeable a, Eq a) => t a -> t a -> t Bool
+  (./=.) :: (Typeable a, Eq a) => t a -> t a -> t Bool
   (.>.) :: (Typeable a, Ord a) => t a -> t a -> t Bool
   (.>=.) :: (Typeable a, Ord a) => t a -> t a -> t Bool
   (.<.) :: (Typeable a, Ord a) => t a -> t a -> t Bool
@@ -147,7 +148,7 @@ class BasicLists t where
   product' :: t [Integer] -> t Integer
   listLit :: (Show a, Typeable a) => [a] -> t [a]
 
-class Sets t where
+class Membership t where
   isIn :: t Integer -> t [Integer] -> t Bool
   isNotIn :: t Integer -> t [Integer] -> t Bool
 

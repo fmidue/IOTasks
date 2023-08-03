@@ -1,8 +1,7 @@
 {-# LANGUAGE TypeApplications #-}
 module Example where
 import Prelude hiding
-  (putChar,putStr,putStrLn,print,getChar,getLine,readLn
-  ,until)
+  (putChar,putStr,putStrLn,print,getChar,getLine,readLn)
 
 import Test.IOTasks
 import Test.IOTasks.Terms (Opaque(..))
@@ -22,7 +21,7 @@ example1 =
 example2 :: Specification
 example2 =
   readInput n nats UntilValid <>
-  until (length' (as @[Integer] $ allValues x) .==. currentValue n)
+  whileNot (length' (as @[Integer] $ allValues x) .==. currentValue n)
     (writeOptionalOutput [Value $ currentValue n .-. length' (as @[Integer] $ allValues x)] <> readInput x ints AssumeValid) <>
   writeOutput [Value $ sum' $ allValues x]
   where
@@ -33,7 +32,7 @@ example2 =
 example2' :: Specification
 example2' =
   readInput n nats UntilValid <>
-  until (length' (as @[Integer] $ allValues x) .==. currentValue n)
+  whileNot (length' (as @[Integer] $ allValues x) .==. currentValue n)
     (writeOptionalOutput [Value $ currentValue n .-. length' (as @[Integer] $ allValues x)] <> readInput x ints AssumeValid) <>
   writeOutput [Value $ product' $ allValues x]
   where
@@ -43,7 +42,7 @@ example2' =
 example3 :: Specification
 example3 =
   readInput n nats AssumeValid <>
-  until (sum' (allValues x) .>. currentValue n)
+  whileNot (sum' (allValues x) .>. currentValue n)
     (readInput x ints AssumeValid) <>
   writeOutput [Value $ length' $ as @[Integer] $ allValues x]
   where
@@ -53,7 +52,7 @@ example3 =
 example4 :: Specification
 example4 =
   readInput x nats AssumeValid <>
-  until (currentValue x .==. product' (allValues y))
+  whileNot (currentValue x .==. product' (allValues y))
     (readInput y nats AssumeValid)
   where
     x = intVar "x"
@@ -87,7 +86,7 @@ example5 =
 -- input modes
 example6 :: Specification
 example6 =
-  readInput x nats Abort <>
+  readInput x nats ElseAbort <>
   readInput y nats AssumeValid <>
   readInput z nats UntilValid <>
   writeOutput [Value $ sum' $ allValues [x,y,z] ]

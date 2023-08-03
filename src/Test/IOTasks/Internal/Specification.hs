@@ -7,7 +7,7 @@
 module Test.IOTasks.Internal.Specification (
   Specification(..),
   readInput, writeOutput, writeOptionalOutput, optionalTextOutput,
-  branch, tillExit, exit, while, until, nop,
+  branch, tillExit, exit, while, whileNot, nop,
   runSpecification,  runSpecification', AddLinebreaks,
   vars, hasIteration,
   pPrintSpecification,
@@ -47,7 +47,7 @@ data Specification where
   TillE :: Specification -> Specification -> Specification
   E :: Specification
 
-data InputMode = AssumeValid | UntilValid | Abort deriving (Eq,Show)
+data InputMode = AssumeValid | UntilValid | ElseAbort deriving (Eq,Show)
 
 instance Semigroup Specification where
   s <> Nop = s
@@ -87,8 +87,8 @@ tillExit bdy = TillE bdy nop
 exit :: Specification
 exit = E
 
-until :: ConditionTerm Bool -> Specification -> Specification
-until c bdy = TillE (branch c exit bdy) nop
+whileNot :: ConditionTerm Bool -> Specification -> Specification
+whileNot c bdy = TillE (branch c exit bdy) nop
 
 while :: ConditionTerm Bool -> Specification -> Specification
 while c bdy = TillE (branch c bdy exit) nop
@@ -126,7 +126,7 @@ runSpecification' addLinebreaks inputs spec =
           | otherwise -> case mode of
               AssumeValid -> error $ "invalid value: " ++ i ++ " is not an element of " ++ printValueSet vs
               UntilValid ->  RecSame i (first (progWrite Optional (Set.singleton Wildcard) <>)) (e,is)
-              Abort -> NoRec (foldr ((<>) . progRead) (((<>) . progRead) '\n' $ progWrite Optional (Set.singleton Wildcard)) i,NoOverflow)
+              ElseAbort -> NoRec (foldr ((<>) . progRead) (((<>) . progRead) '\n' $ progWrite Optional (Set.singleton Wildcard)) i,NoOverflow)
     )
     (\case
       NoRec r -> r
@@ -210,7 +210,7 @@ pPrintSpecification E = text "E"
 printInputMode :: InputMode -> String
 printInputMode AssumeValid = ""
 printInputMode UntilValid = "↻"
-printInputMode Abort = "↯"
+printInputMode ElseAbort = "↯"
 
 accept :: Specification -> Trace -> Bool
 accept s_ t_ = accept' s_ k_I t_ d_I
@@ -220,7 +220,7 @@ accept s_ t_ = accept' s_ k_I t_ d_I
       ProgReadString v t' | ty `containsValue` val -> accept' s' k t' (insertValue (wrapValue val) (someVar x) d)
                           where val = readValue @a v
       _ -> False
-    accept' (ReadInput x (ty :: ValueSet a) Abort s') k t d = case t of
+    accept' (ReadInput x (ty :: ValueSet a) ElseAbort s') k t d = case t of
       ProgReadString v t'| ty `containsValue` val -> accept' s' k t' (insertValue (wrapValue val) (someVar x) d)
                          where val = readValue @a v
       ProgReadString v Terminate | not (ty `containsValue` readValue v) -> True

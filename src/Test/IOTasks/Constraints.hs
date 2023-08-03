@@ -53,13 +53,13 @@ constraintTree negMax =
         e' = inc (someVar x) k e
         p = (InputConstraint(x, ix (someVar x) e') vs
             ,InputConstraint(x, ix (someVar x) e') (complement vs)
-            , mode == Abort && n < negMax)
+            , mode == ElseAbort && n < negMax)
       in case mode of
           AssumeValid -> RecSub p id (n,e',k+1)
           UntilValid
             | n < negMax -> RecBoth p id (n,e',k) (n+1,e',k+1)
             | otherwise -> RecSub p id (n,e',k+1)
-          Abort -> RecSub p id (n,e',k)
+          ElseAbort -> RecSub p id (n,e',k)
     )
     (\case
       RecSub (vsP,_, False) () s' -> Assert vsP s'

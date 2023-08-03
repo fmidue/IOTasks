@@ -102,6 +102,7 @@ instance Arithmetic ConditionTerm where
 
 instance Compare ConditionTerm where
   (.==.) = Equals
+  x ./=. y = not' $ x .==. y
   (.>.) = Gt
   (.>=.) = Ge
   (.<.) = Lt
@@ -118,7 +119,7 @@ instance Logic ConditionTerm where
   true = BoolLit True
   false = BoolLit False
 
-instance Sets ConditionTerm where
+instance Membership ConditionTerm where
   isIn = IsIn
 
 instance BasicLists ConditionTerm where

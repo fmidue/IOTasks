@@ -184,6 +184,8 @@ instance Arithmetic OutputTerm where
 instance Compare OutputTerm where
   (.==.) :: forall a. (Typeable a, Eq a) => OutputTerm a -> OutputTerm a -> OutputTerm Bool
   (.==.) = h2 (.==.) $ value "(==)" ((==) :: a -> a -> Bool)
+  (./=.) :: forall a. (Typeable a, Eq a) => OutputTerm a -> OutputTerm a -> OutputTerm Bool
+  (./=.) = h2 (./=.) $ value "(/=)" ((/=) :: a -> a -> Bool)
   (.>.) :: forall a. (Typeable a, Ord a) => OutputTerm a -> OutputTerm a -> OutputTerm Bool
   (.>.) =  h2 (.>.) $ value "(>)" ((>) :: a -> a -> Bool)
   (.>=.) :: forall a. (Typeable a, Ord a) => OutputTerm a -> OutputTerm a -> OutputTerm Bool
@@ -200,7 +202,7 @@ instance Logic OutputTerm where
   true = Transparent $ BoolLit True
   false = Transparent $ BoolLit False
 
-instance Sets OutputTerm where
+instance Membership OutputTerm where
   isIn = h2 isIn $ value "elem" (elem :: Integer -> [Integer] -> Bool)
   isNotIn = h2 isNotIn $ value "notElem" (notElem :: Integer -> [Integer] -> Bool)
 

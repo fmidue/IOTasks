@@ -35,7 +35,7 @@ interpret s = do
           v <- lift (readF <$> MTT.getLine)
           modify $ insertValue v x
           p'
-        RecSub (x,readF,vsContains,Abort) () p' -> do
+        RecSub (x,readF,vsContains,ElseAbort) () p' -> do
           v <- lift (readF <$> MTT.getLine)
           if vsContains v
             then do

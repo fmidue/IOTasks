@@ -2,7 +2,7 @@ module Test.IOTasks (
   -- * Specifications
   Specification, runSpecification, runSpecification', accept,
   readInput,
-  writeOutput, writeOptionalOutput, optionalTextOutput, branch, tillExit, exit, nop, until, while,
+  writeOutput, writeOptionalOutput, optionalTextOutput, branch, tillExit, exit, nop, while, whileNot,
   InputMode(..),
   ValueSet,
   empty, every, singleton,
@@ -12,7 +12,7 @@ module Test.IOTasks (
   complement,
   ints, nats, str,
   OutputPattern(..),
-  SomeVar, Varname, var, intVar, stringVar,
+  Varname, var, intVar, stringVar,
   pPrintSpecification,
   -- * Terms
   ConditionTerm,
@@ -21,7 +21,7 @@ module Test.IOTasks (
   Compare(..),
   Logic(..),
   BasicLists(..), ComplexLists(..),
-  Sets(..),
+  Membership(..),
   Accessor(..),
   as,
   -- * Programs

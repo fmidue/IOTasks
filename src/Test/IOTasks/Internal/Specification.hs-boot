@@ -27,7 +27,7 @@ data Specification where
   TillE :: Specification -> Specification -> Specification
   E :: Specification
 
-data InputMode = AssumeValid | UntilValid | Abort
+data InputMode = AssumeValid | UntilValid | ElseAbort
 
 instance Semigroup Specification
 instance Monoid Specification

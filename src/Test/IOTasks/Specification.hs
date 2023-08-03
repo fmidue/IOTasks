@@ -1,7 +1,7 @@
 module Test.IOTasks.Specification (
   Specification,
   readInput, writeOutput, writeOptionalOutput, optionalTextOutput,
-  branch, tillExit, exit, while, until, nop,
+  branch, tillExit, exit, while, whileNot, nop,
   runSpecification,
   runSpecification', AddLinebreaks,
   vars, hasIteration,
@@ -11,5 +11,4 @@ module Test.IOTasks.Specification (
   LoopBody(..),
   ) where
 
-import Prelude hiding (until)
 import Test.IOTasks.Internal.Specification
