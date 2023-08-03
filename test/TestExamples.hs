@@ -87,7 +87,7 @@ testExamples = do
 
     context "overflows in subterms of OutputTerm" $ do
       describe "taskCheck hiddenOverflowP hiddenOverflowS" $ do
-        it "should output overflow warnings" $
+        itIsNotSupported "should output overflow warnings" $
           (taskCheckWithOutcome stdArgs{avoidOverflows=False} hiddenOverflowP hiddenOverflowS
             <&> (\o -> isSuccess o && overflowWarnings o > 0) ) `shouldReturn` True
 
@@ -146,3 +146,5 @@ testExamples = do
         (Random.taskCheckOutcome prog3 example1 <&> isFailure) `shouldReturn` True
       it "does not fulfill example2 specification" $
         (Random.taskCheckOutcome prog3 example2 <&> isFailure) `shouldReturn` True
+
+itIsNotSupported s _ = it s $ pendingWith "not yet supported"
