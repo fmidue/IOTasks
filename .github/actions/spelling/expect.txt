@@ -1,3 +1,5 @@
+AVars
+bdy
 Bifunctor
 cmp
 concat
@@ -13,9 +15,11 @@ fst
 GHC
 HRefl
 hspec
+IList
 implicits
 ints
 IOrep
+ITerm
 len
 Line
 Linebreak
