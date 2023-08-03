@@ -162,5 +162,5 @@ class ComplexLists t where
 
 class Opaque t where
   liftOpaqueValue :: Typeable a => (a, String) -> t a
-  liftOpaque2 :: (Typeable a, Typeable b) => (a -> b, String) -> t a -> t b
-  liftOpaque3 :: (Typeable a, Typeable b, Typeable c) => (a -> b -> c, String) -> t a -> t b -> t c
+  liftOpaque :: (Typeable a, Typeable b) => (a -> b, String) -> t a -> t b
+  liftOpaque2 :: (Typeable a, Typeable b, Typeable c) => (a -> b -> c, String) -> t a -> t b -> t c

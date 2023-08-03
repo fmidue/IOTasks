@@ -181,6 +181,29 @@ instance Arithmetic OutputTerm where
   (.*.) = h2 (.*.) $ value "(*)" ((*) :: Integer -> Integer -> Integer)
   intLit = Transparent . IntLit . fromInteger
 
+instance Compare OutputTerm where
+  (.==.) :: forall a. (Typeable a, Eq a) => OutputTerm a -> OutputTerm a -> OutputTerm Bool
+  (.==.) = h2 (.==.) $ value "(==)" ((==) :: a -> a -> Bool)
+  (.>.) :: forall a. (Typeable a, Ord a) => OutputTerm a -> OutputTerm a -> OutputTerm Bool
+  (.>.) =  h2 (.>.) $ value "(>)" ((>) :: a -> a -> Bool)
+  (.>=.) :: forall a. (Typeable a, Ord a) => OutputTerm a -> OutputTerm a -> OutputTerm Bool
+  (.>=.) =  h2 (.>=.) $ value "(>=)" ((>=) :: a -> a -> Bool)
+  (.<.) :: forall a. (Typeable a, Ord a) => OutputTerm a -> OutputTerm a -> OutputTerm Bool
+  (.<.) =  h2 (.<.) $ value "(<)" ((<) :: a -> a -> Bool)
+  (.<=.) :: forall a. (Typeable a, Ord a) => OutputTerm a -> OutputTerm a -> OutputTerm Bool
+  (.<=.) =  h2 (.<=.) $ value "(<=)" ((<=) :: a -> a -> Bool)
+
+instance Logic OutputTerm where
+  not' = h1 not' $ value "not" (not :: Bool -> Bool)
+  (.&&.) = h2 (.&&.) $ value "(&&)" ((&&) :: Bool -> Bool -> Bool)
+  (.||.) = h2 (.||.) $ value "(||)" ((||) :: Bool -> Bool -> Bool)
+  true = Transparent $ BoolLit True
+  false = Transparent $ BoolLit False
+
+instance Sets OutputTerm where
+  isIn = h2 isIn $ value "elem" (elem :: Integer -> [Integer] -> Bool)
+  isNotIn = h2 isNotIn $ value "notElem" (notElem :: Integer -> [Integer] -> Bool)
+
 instance BasicLists OutputTerm where
   length' :: forall a. Typeable a => OutputTerm [a] -> OutputTerm Integer
   length' = h1 (length' @ConditionTerm @a) $ value "length" (fromIntegral . length :: [a] -> Integer)
@@ -231,5 +254,11 @@ instance ComplexLists OutputTerm where
 
 instance Opaque OutputTerm where
   liftOpaqueValue (x,str) = Opaque (value str x) [] []
-  liftOpaque2 (f,str) x = Opaque (value str f) (outputTermVarExps x) (transparentSubterms x)
-  liftOpaque3 (f,str) x y = Opaque (value str f) (outputTermVarExps x ++ outputTermVarExps y) (transparentSubterms x ++ transparentSubterms y)
+
+  liftOpaque (f,str) (Transparent x) = Opaque (value str f :$ termExpr x) (termVarExps x) (subTerms x)
+  liftOpaque (f,str) (Opaque x vs ts) = Opaque (value str f :$ x) vs ts
+
+  liftOpaque2 (f,str) (Opaque x vx tx) (Opaque y vy ty) = Opaque (value str f :$ x :$ y) (vx ++ vy) (tx ++ ty)
+  liftOpaque2 (f,str) (Opaque x vx tx) (Transparent y) = Opaque (value str f :$ x :$ termExpr y) (vx ++ termVarExps y) (tx ++ subTerms y)
+  liftOpaque2 (f,str) (Transparent x ) (Opaque y vy ty) = Opaque (value str f :$ termExpr x :$ y) (termVarExps x ++ vy) (subTerms x ++ ty)
+  liftOpaque2 (f,str) (Transparent x ) (Transparent y) = Opaque (value str f :$ termExpr x :$ termExpr y) (termVarExps x ++ termVarExps y) (subTerms x ++ subTerms y)
