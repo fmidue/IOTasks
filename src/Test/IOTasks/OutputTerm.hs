@@ -97,10 +97,10 @@ oEval :: forall a. Typeable a => ValueMap -> OutputTerm a -> (OverflowWarning, a
 oEval = evalOverflow (OverflowTreatment evalSingle evalList) where
   evalSingle :: ValueMap -> OutputTerm Integer -> Either (SubCheck OutputTerm I) I
   evalSingle e (Transparent t) = first (modifySubCheck Transparent) $ evalI e t
-  evalSingle e (Opaque expr vss ts) = Right $ fromInteger $ eval' expr vss e
+  evalSingle e (Opaque expr vss _) = Right $ fromInteger $ eval' expr vss e
   evalList :: ValueMap -> OutputTerm [Integer] -> Either (SubCheck OutputTerm [I]) [I]
   evalList e (Transparent t) = Right $ evalIs e t
-  evalList e (Opaque expr vss ts) = Right $ fromInteger <$> eval' expr vss e
+  evalList e (Opaque expr vss _) = Right $ fromInteger <$> eval' expr vss e
 
 eval' :: Typeable a => Expr -> [[SomeVar]] -> ValueMap -> a
 eval' expr xss e = evl . fillAVars xss e . reduceAVarsIndex e . replaceCVars e $ expr

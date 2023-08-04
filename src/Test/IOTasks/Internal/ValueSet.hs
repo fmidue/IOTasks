@@ -3,7 +3,7 @@
 {-# LANGUAGE TypeApplications #-}
 module Test.IOTasks.Internal.ValueSet (
   ValueSet(..),
-  empty, every, singleton,
+  empty, every, singleton, fromList,
   lessThan, greaterThan,
   union, intersection,
   (\\), with, without,
@@ -44,9 +44,6 @@ singleton = Eq
 
 fromList :: [Integer] -> ValueSet Integer
 fromList = foldr (union . singleton) empty
-
-complete :: ValueSet a
-complete = Every
 
 greaterThan :: Integer -> ValueSet Integer
 greaterThan = GreaterThan

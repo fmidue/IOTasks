@@ -5,7 +5,7 @@ module Test.IOTasks (
   writeOutput, writeOptionalOutput, optionalTextOutput, branch, tillExit, exit, nop, while, whileNot,
   InputMode(..),
   ValueSet,
-  empty, every, singleton,
+  empty, every, singleton, fromList,
   lessThan, greaterThan,
   union, intersection,
   (\\), with, without,

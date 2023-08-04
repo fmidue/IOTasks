@@ -24,12 +24,12 @@ testExpensiveProperties = do
     prop "programs built from a spec don't go wrong on (solver based) inputs generated from the same spec" $
       \s -> ioProperty $ do
         is <- generateStaticTestSuite stdArgs s
-        pure $ all (\p -> all (\i -> isTerminatingN $ runProgram p i) is) (interpret s)
+        pure $ all (\p -> all (isTerminatingN . runProgram p) is) (interpret s)
 
     prop "inputs are never optional for a fixed input prefix (traces obtained from too less inputs never terminate)" $
       \s -> ioProperty $ do
         is <- filter (not . null) <$> generateStaticTestSuite stdArgs s
-        pure $ all (\i -> not . isTerminatingN . normalizedTrace . fst $ runSpecification s i) (init <$> is)
+        pure $ not (any (isTerminatingN . normalizedTrace . fst . runSpecification s) (init <$> is))
 
     prop "tillExit s === tillExit (s <> tillExit s <> exit) " $
       \(LoopBody s i) -> testEquiv
@@ -69,6 +69,13 @@ testCheapProperties = do
     prop "reflexivity of >:" $
       forAll genPattern $ \p -> p >: p
     prop "transitivity of >:" $ --improve?
+       --improve?
+       --improve?
+       --improve?
+       --improve?
+       --improve?
+       --improve?
+       --improve?
       forAll ((,,) <$> genPattern <*> genPattern <*> genPattern) $ \(x,y,z) -> not (not (x >: z) && (x >: y) && (y >: z))
     prop "antisymmetry of >:" $
       forAll ((,) <$> genPattern <*> genPattern) $ \(x,y) -> (x==y) || not (x >: y && y >: x)

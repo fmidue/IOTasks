@@ -1,6 +1,6 @@
 module Test.IOTasks.ValueSet (
   ValueSet,
-  empty, every, singleton,
+  empty, every, singleton, fromList,
   union, intersection,
   lessThan, greaterThan,
   (\\), with, without,
