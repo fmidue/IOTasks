@@ -45,9 +45,9 @@ instance MonadTeletype IOrep where
 
 type Line = String
 
-runProgram :: [Line] -> IOrep () -> NTrace
-runProgram [] (GetChar _) = NOutOfInputs
-runProgram ("":is) (GetChar f) = NProgRead '\n' $ runProgram is (f '\n')
-runProgram ((c:cs):is) (GetChar f) = NProgRead c $ runProgram (cs:is) (f c)
-runProgram is (PutString n p') = NProgWrite Mandatory (singleton $ Text n) $ runProgram is p'
-runProgram _ (Return ()) = NTerminate
+runProgram :: IOrep () -> [Line] -> NTrace
+runProgram (GetChar _) [] = NOutOfInputs
+runProgram (GetChar f) ("":is) = NProgRead '\n' $ runProgram (f '\n') is
+runProgram (GetChar f) ((c:cs):is) = NProgRead c $ runProgram (f c) (cs:is)
+runProgram (PutString n p') is = NProgWrite Mandatory (singleton $ Text n) $ runProgram p' is
+runProgram (Return ()) _ = NTerminate

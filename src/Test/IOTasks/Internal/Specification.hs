@@ -110,13 +110,13 @@ hasIteration TillE{} = True
 hasIteration Nop = False
 hasIteration E = False
 
-runSpecification :: [String] -> Specification -> (AbstractTrace,OverflowWarning)
+runSpecification :: Specification -> [String] -> (AbstractTrace,OverflowWarning)
 runSpecification = runSpecification' True
 
 type AddLinebreaks = Bool
 
-runSpecification' :: AddLinebreaks -> [String] -> Specification -> (AbstractTrace,OverflowWarning)
-runSpecification' addLinebreaks inputs spec =
+runSpecification' :: AddLinebreaks -> Specification -> [String] -> (AbstractTrace,OverflowWarning)
+runSpecification' addLinebreaks spec inputs =
   sem
     (\(e,ins) x (vs :: ValueSet v) mode ->
       case ins of

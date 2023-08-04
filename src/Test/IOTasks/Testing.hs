@@ -151,8 +151,8 @@ taskCheckWithOutcome Args{..} prog spec = do
         SAT nextInput  -> do
           when verbose (putT output (concat ["(",show (n+nOtherTests)," tests)"]) >> oFlush output)
           let
-            (specTrace,warn) = first normalizedTrace $ runSpecification nextInput spec
-            progTrace = runProgram nextInput prog
+            (specTrace,warn) = first normalizedTrace $ runSpecification spec nextInput
+            progTrace = runProgram prog nextInput
             o' = if warn == OverflowOccurred then o+1 else o
           when (verbose && warn == OverflowOccurred) $ putLnP output "Overflow of Int range detected."
           case specTrace `covers` progTrace of
@@ -248,8 +248,8 @@ taskCheckOn i p s = uncurry Outcome (go 0 0 i p s) where
   go n o [] _ _ = (Success n, overflowHint o)
   go n o (i:is) prog spec =
     let
-      (specTrace,warn) = first normalizedTrace $ runSpecification i spec
-      progTrace = runProgram i prog
+      (specTrace,warn) = first normalizedTrace $ runSpecification spec i
+      progTrace = runProgram prog i
       o' = if warn == OverflowOccurred then o+1 else o
     in case specTrace `covers` progTrace of
       result | isSuccessfulMatch result -> go (n+1) o' is prog spec

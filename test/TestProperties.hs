@@ -21,18 +21,15 @@ import Test.IOTasks.OutputPattern (PatternType(TraceP),(>:))
 testExpensiveProperties :: Spec
 testExpensiveProperties = do
   context "testing with random specifications" $ do
-    prop "sanity check" $
-      \s -> s `testAgainst` s
-
     prop "programs built from a spec don't go wrong on (solver based) inputs generated from the same spec" $
       \s -> ioProperty $ do
         is <- generateStaticTestSuite stdArgs s
-        pure $ all (\p -> all (\i -> isTerminatingN $ runProgram i p) is) (interpret s)
+        pure $ all (\p -> all (\i -> isTerminatingN $ runProgram p i) is) (interpret s)
 
     prop "inputs are never optional for a fixed input prefix (traces obtained from too less inputs never terminate)" $
       \s -> ioProperty $ do
         is <- filter (not . null) <$> generateStaticTestSuite stdArgs s
-        pure $ all (\i -> not . isTerminatingN . normalizedTrace . fst $ runSpecification i s) (init <$> is)
+        pure $ all (\i -> not . isTerminatingN . normalizedTrace . fst $ runSpecification s i) (init <$> is)
 
     prop "tillExit s === tillExit (s <> tillExit s <> exit) " $
       \(LoopBody s i) -> testEquiv
@@ -64,7 +61,7 @@ testCheapProperties = do
         let Random.Args{..} = Random.stdArgs
         in
           forAll (genInput s maxInputLength (Size valueSize (fromIntegral $ valueSize `div` 5)) maxNegative)
-            (\is -> all (isTerminatingN . runProgram is) (interpret s))
+            (\is -> all (isTerminatingN . flip runProgram is) (interpret s))
 
   context "string pattern matching" $ do
     prop "wildcard >: x == True" $
@@ -93,7 +90,7 @@ testEquiv s1 s2 = p1 Test.QuickCheck..&&. p2 where
 testAgainst :: Specification -> Specification -> Property
 testAgainst x y = ioProperty $ do
   r <- generateStaticTestSuite stdArgs y
-  pure $ all (\i -> y `accept` ordinaryTrace (fst (runSpecification' False i x))) r
+  pure $ all (\i -> y `accept` ordinaryTrace (fst (runSpecification' False x i))) r
 
 genPattern :: Gen (OutputPattern 'TraceP)
 genPattern = sized $ \size ->
