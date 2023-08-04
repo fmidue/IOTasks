@@ -1,10 +1,11 @@
 module Test.IOTasks.ValueSet (
   ValueSet,
-  empty, every, singleton, fromList,
+  empty, complete, singleton, fromList,
   union, intersection,
   lessThan, greaterThan,
   (\\), with, without,
   complement,
+  isEmpty,
   containsValue,
   printValueSet,
   -- | = random value generation

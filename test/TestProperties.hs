@@ -1,6 +1,8 @@
 {-# LANGUAGE DataKinds #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 module TestProperties (testCheapProperties, testExpensiveProperties) where
 
 import Test.Hspec
@@ -70,12 +72,6 @@ testCheapProperties = do
       forAll genPattern $ \p -> p >: p
     prop "transitivity of >:" $ --improve?
        --improve?
-       --improve?
-       --improve?
-       --improve?
-       --improve?
-       --improve?
-       --improve?
       forAll ((,,) <$> genPattern <*> genPattern <*> genPattern) $ \(x,y,z) -> not (not (x >: z) && (x >: y) && (y >: z))
     prop "antisymmetry of >:" $
       forAll ((,) <$> genPattern <*> genPattern) $ \(x,y) -> (x==y) || not (x >: y && y >: x)
@@ -88,6 +84,32 @@ testCheapProperties = do
       forAll ((,,) <$> genPattern <*> genPattern <*> genPattern) $
         \(p,q,x) -> counterexample (unlines [show $ p <> wildcard <> q, show $ p <> x <> q]) $
           (p <> wildcard <> q) >: (p <> x <> q)
+
+  context "ValueSet operations" $ do
+    prop "no value in empty ValueSet" $
+      \x -> not ((empty :: ValueSet Integer) `containsValue` x)
+
+    prop "every value in complete ValueSet" $
+      \x -> (complete :: ValueSet Integer) `containsValue` x
+
+    prop "valueOf generates values from the set" $
+      \vs -> ioProperty $ do
+        notEmpty <- not <$> isEmpty vs
+        pure $ notEmpty ==> forAll (valueOf @Integer vs (Size 100 undefined)) $ containsValue vs
+
+    prop "a value is either in a ValueSet or in it's complement" $
+      \vs -> forAll (vectorOf 100 $ arbitrary @Integer) $ \xs -> all (\x -> (vs `containsValue` x) /= (complement vs `containsValue` x)) xs
+
+    prop "with adds an element to a ValueSet" $
+      \vs x -> (vs `with` x) `containsValue` x
+
+    prop "without removes an element from a ValueSet" $
+      \vs x -> not $ (vs `without` x) `containsValue` x
+
+    prop "vs \\ ws removes all elements of ws from vs" $
+      \vs ws -> ioProperty $ do
+        notEmpty <- not <$> isEmpty ws
+        pure $ notEmpty ==> forAll (valueOf @Integer ws (Size 100 undefined)) $ not . containsValue (vs \\ ws)
 
 testEquiv :: Specification -> Specification -> Property
 testEquiv s1 s2 = p1 Test.QuickCheck..&&. p2 where
@@ -118,3 +140,20 @@ fprop s = fit s . property
 -- disable a property for faster testing
 xPerfprop :: (HasCallStack, Testable prop) => String -> prop -> Spec
 xPerfprop s _ = it s $ pendingWith "disabled for faster testing"
+
+instance Arbitrary (ValueSet Integer) where
+  arbitrary = sized $ \size ->
+    if size <= 1
+      then oneof [pure complete, pure empty, singleton <$> arbitrary]
+      else frequency
+        [ (1,pure complete)
+        , (1,pure empty)
+        , (1,singleton <$> arbitrary)
+        , (2,lessThan <$> resize (size-1) arbitrary)
+        , (2,greaterThan <$> resize (size-1) arbitrary)
+        , (2,intersection <$> (resize (size `div` 2) arbitrary) <*> resize (size `div` 2) arbitrary)
+        , (2,union <$> (resize (size `div` 2) arbitrary) <*> resize (size `div` 2) arbitrary)
+        ]
+
+instance Show (ValueSet Integer) where
+  show = printValueSet

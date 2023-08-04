@@ -472,21 +472,6 @@ weaveVariables vs n e =
 lookupList :: Eq a => [a] -> [(a, b)] -> [b]
 lookupList vs vars = mapMaybe (`List.lookup` vars) vs
 
-z3ValueSetConstraint :: MonadZ3 z3 => ValueSet a -> AST -> z3 AST
-z3ValueSetConstraint (Union x y) xVar = do
-  cx <- z3ValueSetConstraint x xVar
-  cy <- z3ValueSetConstraint y xVar
-  mkOr [cx,cy]
-z3ValueSetConstraint (Intersection x y) xVar = do
-  cx <- z3ValueSetConstraint x xVar
-  cy <- z3ValueSetConstraint y xVar
-  mkAnd [cx,cy]
-z3ValueSetConstraint (GreaterThan n) xVar = mkIntNum n >>= mkGt xVar
-z3ValueSetConstraint (LessThan n) xVar = mkIntNum n >>= mkLt xVar
-z3ValueSetConstraint (Eq n) xVar = mkIntNum n >>= mkEq xVar
-z3ValueSetConstraint Every _ = mkTrue
-z3ValueSetConstraint None _ = mkFalse
-
 assertOverflowChecks :: Goal -> ConditionTerm Integer ->  Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R ()
 assertOverflowChecks goal t e vars = do
   ast <- z3Predicate goal t e vars
