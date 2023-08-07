@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    if: if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: read
 
