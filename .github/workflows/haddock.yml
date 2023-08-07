@@ -33,7 +33,7 @@ jobs:
     - name: Build Haddock
       shell: bash
       run: |
-        stack haddock --odir docs
+        stack haddock --haddock-arguments="--odir docs"
 
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v2
