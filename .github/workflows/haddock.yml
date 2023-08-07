@@ -1,11 +1,14 @@
 name: Haddock to GitHub pages
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Haskell CI (fast)"]
     branches: [ main ]
+    types: completed
 
 jobs:
   build:
+    if: if: ${{ github.event.workflow_run.conclusion == 'success' }}
     permissions:
       contents: read
 
@@ -30,13 +33,7 @@ jobs:
     - name: Build Haddock
       shell: bash
       run: |
-        shopt -s globstar && \
-        stack exec haddock -- ./src/**/*.hs \
-          $(for m in src/**/Internal/*.hs; do echo -n " --hide  $m" | sed -r -e 's|/|.|g' -e 's|.src.||' -e 's|.hs||'; done) \
-          --html --pretty-html --hyperlinked-source --quickjump \
-          --title="IOTasks" \
-          --prologue=haddock/prologue \
-          --odir docs
+        stack haddock --odir docs
 
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v2
