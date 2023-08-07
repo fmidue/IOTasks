@@ -83,13 +83,13 @@ varListType xs =
 same :: Eq a => [a] -> Bool
 same xs = and $ zipWith (==) xs (tail xs)
 
-var :: forall a. Typeable a => String -> Var a
+var :: forall a. Typeable a => Varname -> Var a
 var x = Var (x, typeRep)
 
-intVar :: String -> Var Integer
+intVar :: Varname -> Var Integer
 intVar = var @Integer
 
-stringVar :: String -> Var String
+stringVar :: Varname -> Var String
 stringVar = var @String
 
 class VarExp e where
