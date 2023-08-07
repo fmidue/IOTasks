@@ -10,6 +10,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE KindSignatures #-}
 module Test.IOTasks.Z3 (findPathInput, printPathScript, evalPathScript, satPaths, satPathsQ, isSatPath, SatResult(..), Timeout) where
 
 import Test.IOTasks.Constraints
@@ -38,6 +39,7 @@ import Type.Reflection
 import Type.Match
 import Data.List.Extra
 import Control.Monad.Reader
+import Data.Kind (Type)
 
 type Z3R = ReaderT ImplicitParameters Z3
 
@@ -229,7 +231,7 @@ mkValueRep x (StringValue s) = do
       -- binNoList (:&&:) = \a b -> mkAnd [a,b]
       -- binNoList (:||:) = \a b -> mkOr [a,b]
 
-forStringElse :: forall a z3. (Typeable a, MonadZ3 z3) => (AST -> AST -> z3 AST) -> (AST -> AST -> z3 AST) -> AST -> AST -> z3 AST
+forStringElse :: forall (a :: Type) z3. (Typeable a, MonadZ3 z3) => (AST -> AST -> z3 AST) -> (AST -> AST -> z3 AST) -> AST -> AST -> z3 AST
 forStringElse string normal = matchType @a
   [ inCaseOf' @String string
   , fallbackCase' normal
