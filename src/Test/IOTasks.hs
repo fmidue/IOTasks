@@ -40,8 +40,6 @@ module Test.IOTasks (
   interpret,
   ) where
 
-import Prelude hiding (until)
-
 import Test.IOTasks.Specification
 import Test.IOTasks.MonadTeletype
 import Test.IOTasks.IOrep

@@ -17,8 +17,6 @@ module Test.IOTasks.Internal.Specification (
   LoopBody(..),
   ) where
 
-import Prelude hiding (until)
-
 import Test.IOTasks.ValueSet
 import Test.IOTasks.Internal.ConditionTerm
 import Test.IOTasks.Terms (Var (..), SomeVar, varname, someVar)

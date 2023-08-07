@@ -40,7 +40,5 @@ module Test.IOTasks.Random (
   interpret,
   ) where
 
-import Prelude hiding (until)
-
 import Test.IOTasks hiding (taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs)
 import Test.IOTasks.Random.Testing
