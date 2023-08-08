@@ -7,7 +7,7 @@
 module Test.IOTasks.Internal.Specification (
   Specification(..),
   readInput, writeOutput, writeOptionalOutput, optionalTextOutput,
-  branch, tillExit, exit, while, whileNot, nop,
+  branch, tillExit, exit, while, whileNot, repeatUntil, nop,
   runSpecification,  runSpecification', AddLinebreaks,
   vars, hasIteration,
   pPrintSpecification,
@@ -115,6 +115,17 @@ whileNot c bdy = TillE (branch c exit bdy) nop
 -- The function assumes that the body specification does not contain a top-level 'exit' marker.
 while :: ConditionTerm Bool -> Specification -> Specification
 while c bdy = TillE (branch c bdy exit) nop
+
+-- | Represents a loop structure in a specification, performing the body at least once and then further while the condition does not hold.
+--
+-- The 'repeatUntil' function takes a body specification and a condition, and constructs a loop structure where:
+--
+-- * The 'Specification' argument is the body of the loop, executed at least once and then further times while the condition is 'False'.
+-- * The 'ConditionTerm Bool' argument is the condition to be evaluated at the end of each iteration. The loop continues until the condition becomes 'True'.
+--
+-- The function assumes that the body specification does not contain a top-level 'exit' marker.
+repeatUntil :: Specification -> ConditionTerm Bool -> Specification
+repeatUntil bdy c = bdy <> whileNot c bdy
 
 vars :: Specification -> [SomeVar]
 vars = nub . go where
