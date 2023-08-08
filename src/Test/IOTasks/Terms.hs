@@ -109,13 +109,20 @@ instance Typeable a => VarExp [Var a] where
 
 class Accessor t where
   currentValue :: (Typeable a, VarExp e) => e -> t a
+  -- ^ Defined as @'currentValue' = 'valueBefore' 0@, providing access to the current value.
   currentValue = valueBefore 0
+
   valueBefore:: (Typeable a, VarExp e) => Int -> e -> t a
 
   allValues :: (Typeable a, VarExp e) => e -> t [a]
+  -- ^ Defined as @'allValues' = 'valuesBefore' 0@, providing access to all values.
   allValues = valuesBefore 0
+
   valuesBefore :: (Typeable a, VarExp e) => Int -> e -> t [a]
 
+-- | 'as' is an operator for explicit type annotation.
+--
+-- Computationally, it is just identity.
 as :: Typeable a => t a -> t a
 as = id
 

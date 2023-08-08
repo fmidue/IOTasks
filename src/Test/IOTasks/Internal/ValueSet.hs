@@ -60,6 +60,8 @@ union = Union
 intersection :: ValueSet Integer -> ValueSet Integer -> ValueSet Integer
 intersection = Intersection
 
+-- | The '(\\)' operator computes set difference.
+-- It returns a 'ValueSet' containing all integers of the first set that are not present in the second set.
 (\\) :: ValueSet Integer -> ValueSet Integer -> ValueSet Integer
 (\\) xs = (xs `intersection`) . complement
 
@@ -133,6 +135,9 @@ str :: ValueSet String
 str = Every
 
 --
+-- | Check if a given 'ValueSet' of integers is empty.
+--
+-- This function uses an external SMT solver to check the constraints defined by the 'ValueSet'.
 isEmpty :: ValueSet Integer -> IO Bool
 isEmpty vs = evalZ3 $ do
   x <- mkIntVar =<< mkStringSymbol "x"

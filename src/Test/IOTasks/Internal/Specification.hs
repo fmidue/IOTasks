@@ -70,9 +70,18 @@ writeOutput ts = WriteOutput Mandatory (Set.fromList ts) nop
 writeOptionalOutput :: [OutputPattern 'SpecificationP] -> Specification
 writeOptionalOutput ts = WriteOutput Optional (Set.fromList ts) nop
 
+-- | The 'optionalTextOutput' function represents a specification for writing
+-- optional output. The output can be anything, as indicated by the use of the
+-- 'wildcard' pattern in its definition:
+--
+-- > optionalTextOutput = writeOptionalOutput [wildcard]
 optionalTextOutput :: Specification
 optionalTextOutput = writeOptionalOutput [Wildcard]
 
+-- | Represents a branching structure in a specification.
+--
+-- * The first 'Specification' argument is the "then-case".
+-- * The second 'Specification' argument is the "else-case".
 branch :: ConditionTerm Bool -> Specification -> Specification -> Specification
 branch c t e = Branch c t e nop
 
@@ -85,9 +94,25 @@ tillExit bdy = TillE bdy nop
 exit :: Specification
 exit = E
 
+-- | Represents a loop structure in a specification, performing the body while the condition does not hold.
+--
+-- The 'whileNot' function takes a condition and a body specification, and constructs a loop structure where:
+--
+-- * The 'ConditionTerm Bool' argument is the condition to be evaluated at the beginning of each iteration. The loop continues as long as the condition is 'False'.
+-- * The 'Specification' argument is the body of the loop, executed while the condition is 'False'.
+--
+-- The function assumes that the body specification does not contain a top-level 'exit' marker.
 whileNot :: ConditionTerm Bool -> Specification -> Specification
 whileNot c bdy = TillE (branch c exit bdy) nop
 
+-- | Represents a loop structure in a specification, performing the body while the condition holds.
+--
+-- The 'while' function takes a condition and a body specification, and constructs a loop structure where:
+--
+-- * The 'ConditionTerm Bool' argument is the condition to be evaluated at the beginning of each iteration.
+-- * The 'Specification' argument is the body of the loop, executed while the condition is 'True'.
+--
+-- The function assumes that the body specification does not contain a top-level 'exit' marker.
 while :: ConditionTerm Bool -> Specification -> Specification
 while c bdy = TillE (branch c bdy exit) nop
 
