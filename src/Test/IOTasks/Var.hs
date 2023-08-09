@@ -77,8 +77,20 @@ intVar = var @Integer
 stringVar :: Varname -> Var String
 stringVar = var @String
 
+-- | Abstraction over different types of variable-expressions
+--
+-- A variable-expression references one or more specification variables and
+-- can be used to access the values assigned to these specific variables.
+--
+-- If the an expression references more than one variable, the values of these
+-- variables are interleaved chronologically. I.e., |currentValue| will provide
+-- access to the current value of the the last modified variable from the list and
+-- |allValues| gives a list where values appear in the order they were given to program.
+--
+-- Additionally, all referenced variables must be of the same type.
 class VarExp e where
   toVarList :: e -> [SomeVar]
+  -- ^ Computes the list of variables referenced by the variable expression.
 
 instance VarExp SomeVar where
   toVarList = pure
