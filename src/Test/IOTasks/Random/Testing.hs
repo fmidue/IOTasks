@@ -17,8 +17,8 @@ import Data.Bifunctor (first)
 import Test.IOTasks.IOrep (IOrep, runProgram)
 import Test.IOTasks.Internal.Specification
 import Test.IOTasks.Trace
-import Test.IOTasks.ConditionTerm
-import Test.IOTasks.Terms (someVar)
+import Test.IOTasks.Term
+import Test.IOTasks.Var (someVar)
 import Test.IOTasks.OutputPattern
 import Test.IOTasks.ValueSet
 import Test.IOTasks.ValueMap

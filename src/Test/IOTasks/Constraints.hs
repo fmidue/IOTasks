@@ -15,11 +15,11 @@ module Test.IOTasks.Constraints (
   ) where
 
 import Test.IOTasks.ValueSet
-import Test.IOTasks.ConditionTerm (ConditionTerm, printIndexedTerm, castTerm, subTerms)
-import Test.IOTasks.Terms (Var, SomeVar, someVar, not', varname)
+import Test.IOTasks.Internal.Term
+import Test.IOTasks.Var (Var, SomeVar, someVar, varname)
+import Test.IOTasks.Term.Prelude (not')
 import Test.IOTasks.Internal.Specification
 import Test.IOTasks.OutputPattern (valueTerms)
-import Test.IOTasks.OutputTerm (transparentSubterms, withSomeOutputTerm)
 
 import Data.List (intersperse)
 import qualified Data.Map as Map
@@ -72,8 +72,8 @@ constraintTree negMax =
       NoRec _ -> error "constraintTree: impossible"
       RecSame{} -> error "constraintTree: impossible"
     )
-    (\(_,e,_) _ ps t -> Assert (OverflowConstraints (catMaybes $ [ castTerm @Integer t | p <- Set.toList ps, vt <- valueTerms p, t <- withSomeOutputTerm vt transparentSubterms]) e) t)
-    (\(_,e,_) c l r -> Assert (OverflowConstraints (mapMaybe (castTerm @Integer) $ subTerms c) e) $ Choice (Assert (ConditionConstraint c e) l) (Assert (ConditionConstraint (not' c) e) r))
+    (\(_,e,_) _ ps t -> Assert (OverflowConstraints (catMaybes $ [ castTerm @Integer t | p <- Set.toList ps, vt <- valueTerms p, t <- withSomeTerm vt transparentSubterms]) e) t)
+    (\(_,e,_) c l r -> Assert (OverflowConstraints (mapMaybe (castTerm @Integer) $ transparentSubterms c) e) $ Choice (Assert (ConditionConstraint c e) l) (Assert (ConditionConstraint (not' c) e) r))
     (\case {End -> Unfold ; Exit -> id})
     Empty
     (0,Map.empty,1)

@@ -19,13 +19,27 @@ module Test.IOTasks.Random (
   -- * Terms
   ConditionTerm,
   OutputTerm,
-  Arithmetic(..),
-  Compare(..),
-  Logic(..),
-  BasicLists(..), ComplexLists(..),
-  Membership(..),
-  Accessor(..),
   as,
+  -- ** Accessors
+  currentValue, allValues,
+  valueBefore, valuesBefore,
+  -- ** Arithmetic functions
+  (.+.), (.-.), (.*.),
+  intLit,
+  -- ** Comparison functions
+  (.==.), (./=.), (.>.), (.>=.), (.<.), (.<=.),
+  -- ** Boolean functions
+  not',
+  (.&&.), (.||.),
+  true, false,
+  -- ** Simple list functions
+  sum', product', length', reverse',
+  isIn, isNotIn,
+  listLit,
+  -- ** Complexer list functions
+  filter',
+  -- ** Lifting of opaque functions
+  liftOpaqueValue, liftOpaque, liftOpaque2,
   -- * Programs
   MonadTeletype(..),
   IOrep, runProgram, Line,
@@ -34,7 +48,7 @@ module Test.IOTasks.Random (
   taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs,
   Outcome(..), CoreOutcome(..), OutcomeHints(..), isSuccess, isFailure, overflowWarnings,
   pPrintOutcome, pPrintOutcomeSimple,
-  -- ** pre-computed test suites
+  -- ** Pre-computed test suites
   genInput, taskCheckOn,
   -- * Interpreter
   interpret,

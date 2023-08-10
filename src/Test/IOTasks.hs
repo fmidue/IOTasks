@@ -19,13 +19,27 @@ module Test.IOTasks (
   -- * Terms
   ConditionTerm,
   OutputTerm,
-  Arithmetic(..),
-  Compare(..),
-  Logic(..),
-  BasicLists(..), ComplexLists(..),
-  Membership(..),
-  Accessor(..),
   as,
+  -- ** Accessors
+  currentValue, allValues,
+  valueBefore, valuesBefore,
+  -- ** Arithmetic functions
+  (.+.), (.-.), (.*.),
+  intLit,
+  -- ** Comparison functions
+  (.==.), (./=.), (.>.), (.>=.), (.<.), (.<=.),
+  -- ** Boolean functions
+  not',
+  (.&&.), (.||.),
+  true, false,
+  -- ** Simple list functions
+  sum', product', length', reverse',
+  isIn, isNotIn,
+  listLit,
+  -- ** Complexer list functions
+  filter',
+  -- ** Lifting of opaque functions
+  liftOpaqueValue, liftOpaque, liftOpaque2,
   -- * Programs
   MonadTeletype(..),
   IOrep, runProgram, Line,
@@ -34,20 +48,19 @@ module Test.IOTasks (
   taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs,
   Outcome(..), CoreOutcome(..), OutcomeHints(..), isSuccess, isFailure, overflowWarnings,
   pPrintOutcome, pPrintOutcomeSimple,
-  -- ** pre-computed test suites
+  -- ** Pre-computed test suites
   generateStaticTestSuite, taskCheckOn,
   -- * Interpreter
   interpret,
   ) where
 
-import Test.IOTasks.Specification
-import Test.IOTasks.MonadTeletype
-import Test.IOTasks.IOrep
-import Test.IOTasks.ConditionTerm
-import Test.IOTasks.Terms
-import Test.IOTasks.ValueSet
-import Test.IOTasks.OutputPattern
-import Test.IOTasks.OutputTerm
-import Test.IOTasks.Testing
 import Test.IOTasks.Interpreter
+import Test.IOTasks.IOrep
+import Test.IOTasks.OutputPattern
+import Test.IOTasks.Specification
+import Test.IOTasks.Term
+import Test.IOTasks.Term.Prelude
+import Test.IOTasks.Testing
 import Test.IOTasks.Trace
+import Test.IOTasks.ValueSet
+import Test.IOTasks.Var

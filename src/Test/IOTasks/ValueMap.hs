@@ -27,7 +27,7 @@ import qualified Data.Map as Map
 import Data.Typeable (eqT)
 import Type.Reflection
 
-import Test.IOTasks.Terms (SomeVar, pattern SomeVar, unSomeVar, someVarname, varExpType, Varname)
+import Test.IOTasks.Var (SomeVar, pattern SomeVar, unSomeVar, someVarname, varExpType, Varname)
 import Text.Read (readMaybe)
 
 data ValueMap = ValueMap { valueMap :: Map SomeVar ValueEntry, size :: Int } deriving (Eq,Show)

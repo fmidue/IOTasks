@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           IOTasks
-version:        2.1.0
+version:        2.2.0
 description:    Please see the README on GitHub at <https://github.com/fmidue/IOTasks#readme>
 category:       Testing
 homepage:       https://github.com/fmidue/IOTasks#readme
@@ -27,30 +27,30 @@ source-repository head
 library
   exposed-modules:
       Test.IOTasks
-      Test.IOTasks.ConditionTerm
       Test.IOTasks.Constraints
       Test.IOTasks.Interpreter
       Test.IOTasks.IOrep
       Test.IOTasks.MonadTeletype
       Test.IOTasks.OutputPattern
-      Test.IOTasks.OutputTerm
       Test.IOTasks.Overflow
       Test.IOTasks.Random
       Test.IOTasks.Random.Testing
       Test.IOTasks.Specification
-      Test.IOTasks.Terms
+      Test.IOTasks.Term
+      Test.IOTasks.Term.Prelude
       Test.IOTasks.Testing
       Test.IOTasks.Trace
       Test.IOTasks.ValueMap
       Test.IOTasks.ValueSet
+      Test.IOTasks.Var
       Test.IOTasks.Z3
   other-modules:
-      Test.IOTasks.Internal.ConditionTerm
       Test.IOTasks.Internal.Output
       Test.IOTasks.Internal.OutputPattern
       Test.IOTasks.Internal.Overflow
       Test.IOTasks.Internal.Specification
       Test.IOTasks.Internal.SpecificationGenerator
+      Test.IOTasks.Internal.Term
       Test.IOTasks.Internal.ValueSet
   hs-source-dirs:
       src

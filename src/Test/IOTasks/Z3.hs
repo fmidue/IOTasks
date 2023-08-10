@@ -15,8 +15,8 @@ module Test.IOTasks.Z3 (findPathInput, printPathScript, evalPathScript, satPaths
 
 import Test.IOTasks.Constraints
 import Test.IOTasks.Internal.ValueSet
-import Test.IOTasks.Internal.ConditionTerm
-import Test.IOTasks.Terms (Var(..), SomeVar, pattern SomeVar, VarExp(..), someVarname)
+import Test.IOTasks.Internal.Term
+import Test.IOTasks.Var (Var(..), SomeVar, pattern SomeVar, VarExp(..), someVarname)
 import Test.IOTasks.ValueMap
 
 import Z3.Monad

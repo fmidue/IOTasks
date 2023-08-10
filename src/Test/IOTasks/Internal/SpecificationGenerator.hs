@@ -3,11 +3,11 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Test.IOTasks.Internal.SpecificationGenerator (specGen, shrinkSpec, loopBodyGen) where
 
-import Test.IOTasks.Terms
-import Test.IOTasks.OutputTerm
 import Test.IOTasks.Internal.OutputPattern
+import Test.IOTasks.Term
+import Test.IOTasks.Term.Prelude
 import Test.IOTasks.ValueSet
-import Test.IOTasks.ConditionTerm
+import Test.IOTasks.Var
 import {-# SOURCE #-} Test.IOTasks.Internal.Specification
 
 import Test.QuickCheck

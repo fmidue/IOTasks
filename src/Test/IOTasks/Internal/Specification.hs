@@ -18,8 +18,8 @@ module Test.IOTasks.Internal.Specification (
   ) where
 
 import Test.IOTasks.ValueSet
-import Test.IOTasks.Internal.ConditionTerm
-import Test.IOTasks.Terms (Var (..), SomeVar, varname, someVar)
+import Test.IOTasks.Internal.Term
+import Test.IOTasks.Var (Var (..), SomeVar, varname, someVar)
 import Test.IOTasks.Trace
 import Test.IOTasks.Internal.OutputPattern hiding (text)
 import Test.IOTasks.Overflow

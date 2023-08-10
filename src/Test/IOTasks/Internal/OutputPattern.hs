@@ -17,7 +17,7 @@ module Test.IOTasks.Internal.OutputPattern (
 import Prelude hiding (all)
 
 import Test.IOTasks.Overflow
-import Test.IOTasks.OutputTerm
+import Test.IOTasks.Internal.Term
 import Test.IOTasks.ValueMap
 
 import Data.Either (isRight)
@@ -81,11 +81,11 @@ instance Semigroup (OutputPattern t) where
 instance Monoid (OutputPattern t) where
   mempty = Text ""
 
-valueTerms :: OutputPattern t -> [SomeOutputTerm]
+valueTerms :: OutputPattern t -> [SomeTerm 'PartiallyOpaque]
 valueTerms Wildcard = []
 valueTerms Text{} = []
 valueTerms (Sequence x y) = valueTerms x ++ valueTerms y
-valueTerms (Value t) = [SomeOutputTerm t]
+valueTerms (Value t) = [SomeTerm t]
 
 evalPattern :: ValueMap -> OutputPattern t -> (OverflowWarning, OutputPattern 'TraceP)
 evalPattern _ Wildcard = (NoOverflow, Wildcard)

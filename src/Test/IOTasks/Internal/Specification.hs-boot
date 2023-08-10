@@ -9,8 +9,8 @@ module Test.IOTasks.Internal.Specification (
   ) where
 
 import Test.IOTasks.ValueSet
-import Test.IOTasks.ConditionTerm
-import Test.IOTasks.Terms (Var (..), SomeVar)
+import Test.IOTasks.Term
+import Test.IOTasks.Var (Var (..), SomeVar)
 import Test.IOTasks.Trace
 import Test.IOTasks.OutputPattern
 

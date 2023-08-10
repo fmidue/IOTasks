@@ -1,5 +1,5 @@
 name:                IOTasks
-version:             2.1.0
+version:             2.2.0
 github:              "fmidue/IOTasks"
 license:             BSD3
 author:              "Oliver Westphal"
@@ -44,12 +44,12 @@ ghc-options:
 library:
   source-dirs: src
   other-modules:
-    - Test.IOTasks.Internal.ConditionTerm
     - Test.IOTasks.Internal.Output
     - Test.IOTasks.Internal.OutputPattern
     - Test.IOTasks.Internal.Overflow
     - Test.IOTasks.Internal.Specification
     - Test.IOTasks.Internal.SpecificationGenerator
+    - Test.IOTasks.Internal.Term
     - Test.IOTasks.Internal.ValueSet
 
 tests:

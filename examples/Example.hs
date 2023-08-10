@@ -4,7 +4,6 @@ import Prelude hiding
   (putChar,putStr,putStrLn,print,getChar,getLine,readLn)
 
 import Test.IOTasks
-import Test.IOTasks.Terms (Opaque(..))
 --example specifications
 
 example1 :: Specification
