@@ -78,7 +78,23 @@ test-suite IOTasks-test
   other-modules:
       TestExamples
       TestProperties
-      Example
+      BasicExamplesSpec
+      BlowupSpec
+      EchoSpec
+      Examples
+      HangmanSpec
+      HiddenOverflowSpec
+      ModesSpec
+      NewlineSpec
+      OverflowSpec
+      PalindromSpec
+      PingPongSpec
+      ProductConditionSpec
+      ReverseSpec
+      SumToZeroSpec
+      SymbolicPlusSpec
+      VariableMerging1Spec
+      VariableMerging2Spec
       Paths_IOTasks
   hs-source-dirs:
       test
