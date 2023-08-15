@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeApplications #-}
-module PalindromSpec where
+module PalindromeSpec where
 import Prelude hiding
   (putChar,putStr,putStrLn,print,getChar,getLine,readLn)
 

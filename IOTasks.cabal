@@ -87,7 +87,7 @@ test-suite IOTasks-test
       ModesSpec
       NewlineSpec
       OverflowSpec
-      PalindromSpec
+      PalindromeSpec
       PingPongSpec
       ProductConditionSpec
       ReverseSpec

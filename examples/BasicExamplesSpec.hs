@@ -52,7 +52,7 @@ prog2 = do
         loop (s+x) (m+1)
   loop 0 0
 
--- summation with loop until first number is non-negativ
+-- summation with loop until first number is non-negative
 -- and also with optional progress output
 spec3 :: Specification
 spec3 =
