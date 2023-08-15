@@ -98,34 +98,40 @@ exit = E
 --
 -- The 'whileNot' function takes a condition and a body specification, and constructs a loop structure where:
 --
--- * The 'ConditionTerm Bool' argument is the condition to be evaluated at the beginning of each iteration. The loop continues as long as the condition is 'False'.
+-- * The 'ConditionTerm' 'Bool' argument is the condition to be evaluated at the beginning of each iteration. The loop continues as long as the condition is 'False'.
 -- * The 'Specification' argument is the body of the loop, executed while the condition is 'False'.
 --
 -- The function assumes that the body specification does not contain a top-level 'exit' marker.
+--
+-- > whileNot c bdy = tillExit (branch c exit bdy)
 whileNot :: ConditionTerm Bool -> Specification -> Specification
-whileNot c bdy = TillE (branch c exit bdy) nop
+whileNot c bdy = tillExit (branch c exit bdy)
 
 -- | Represents a loop structure in a specification, performing the body while the condition holds.
 --
 -- The 'while' function takes a condition and a body specification, and constructs a loop structure where:
 --
--- * The 'ConditionTerm Bool' argument is the condition to be evaluated at the beginning of each iteration.
+-- * The 'ConditionTerm' 'Bool' argument is the condition to be evaluated at the beginning of each iteration.
 -- * The 'Specification' argument is the body of the loop, executed while the condition is 'True'.
 --
 -- The function assumes that the body specification does not contain a top-level 'exit' marker.
+--
+-- > while c bdy = tillExit (branch c bdy exit)
 while :: ConditionTerm Bool -> Specification -> Specification
-while c bdy = TillE (branch c bdy exit) nop
+while c bdy = tillExit (branch c bdy exit)
 
 -- | Represents a loop structure in a specification, performing the body at least once and then further while the condition does not hold.
 --
 -- The 'repeatUntil' function takes a body specification and a condition, and constructs a loop structure where:
 --
 -- * The 'Specification' argument is the body of the loop, executed at least once and then further times while the condition is 'False'.
--- * The 'ConditionTerm Bool' argument is the condition to be evaluated at the end of each iteration. The loop continues until the condition becomes 'True'.
+-- * The 'ConditionTerm' 'Bool' argument is the condition to be evaluated at the end of each iteration. The loop continues until the condition becomes 'True'.
 --
 -- The function assumes that the body specification does not contain a top-level 'exit' marker.
+--
+-- > repeatUntil bdy c = bdy <> tillExit (branch c exit bdy)
 repeatUntil :: Specification -> ConditionTerm Bool -> Specification
-repeatUntil bdy c = bdy <> whileNot c bdy
+repeatUntil bdy c = bdy <> tillExit (branch c exit bdy)
 
 vars :: Specification -> [SomeVar]
 vars = nub . go where
