@@ -7,7 +7,7 @@
 module Test.IOTasks.Internal.Specification (
   Specification(..),
   readInput, writeOutput, writeOptionalOutput, optionalTextOutput,
-  branch, tillExit, exit, while, whileNot, repeatUntil, nop,
+  branch, tillExit, exit, while, whileNot, repeatUntil, doWhile, nop,
   runSpecification,  runSpecification', AddLinebreaks,
   vars, hasIteration,
   pPrintSpecification,
@@ -105,8 +105,9 @@ exit = E
 --
 -- > whileNot c bdy = tillExit (branch c exit bdy)
 whileNot :: ConditionTerm Bool -> Specification -> Specification
-whileNot c bdy = tillExit (branch c exit bdy)
-
+whileNot c bdy
+  | not $ hasTopLevelExit bdy = tillExit (branch c exit bdy)
+  | otherwise = error "whileNot: top-level exit marker in body"
 -- | Represents a loop structure in a specification, performing the body while the condition holds.
 --
 -- The 'while' function takes a condition and a body specification, and constructs a loop structure where:
@@ -118,8 +119,9 @@ whileNot c bdy = tillExit (branch c exit bdy)
 --
 -- > while c bdy = tillExit (branch c bdy exit)
 while :: ConditionTerm Bool -> Specification -> Specification
-while c bdy = tillExit (branch c bdy exit)
-
+while c bdy
+  | not $ hasTopLevelExit bdy = tillExit (branch c bdy exit)
+  | otherwise = error "while: top-level exit marker in body"
 -- | Represents a loop structure in a specification, performing the body at least once and then further while the condition does not hold.
 --
 -- The 'repeatUntil' function takes a body specification and a condition, and constructs a loop structure where:
@@ -129,9 +131,33 @@ while c bdy = tillExit (branch c bdy exit)
 --
 -- The function assumes that the body specification does not contain a top-level 'exit' marker.
 --
--- > repeatUntil bdy c = bdy <> tillExit (branch c exit bdy)
+-- > repeatUntil bdy c = tillExit (bdy <> branch c exit nop)
 repeatUntil :: Specification -> ConditionTerm Bool -> Specification
-repeatUntil bdy c = bdy <> tillExit (branch c exit bdy)
+repeatUntil bdy c
+  | not $ hasTopLevelExit bdy = tillExit (bdy <> branch c exit nop)
+  | otherwise = error "repeatUntil: top-level exit marker in body"
+-- | Represents a loop structure in a specification, performing the body at least once and then further while the condition does not hold.
+--
+-- The 'doWhile' function takes a body specification and a condition, and constructs a loop structure where:
+--
+-- * The 'Specification' argument is the body of the loop, executed at least once and then further times while the condition is 'True'.
+-- * The 'ConditionTerm' 'Bool' argument is the condition to be evaluated at the end of each iteration. The loop continues until the condition becomes 'False'.
+--
+-- The function assumes that the body specification does not contain a top-level 'exit' marker.
+--
+-- > doWhile bdy c = tillExit (bdy <> branch c nop exit)
+doWhile :: Specification -> ConditionTerm Bool -> Specification
+doWhile bdy c
+  | not $ hasTopLevelExit bdy = tillExit (bdy <> branch c nop exit)
+  | otherwise = error "doWhile: top-level exit marker in body"
+
+hasTopLevelExit :: Specification -> Bool
+hasTopLevelExit (ReadInput _ _  _ s) = hasTopLevelExit s
+hasTopLevelExit (WriteOutput _ _ s) = hasTopLevelExit s
+hasTopLevelExit (Branch _ _ _ s) = hasTopLevelExit s
+hasTopLevelExit (TillE _ s) = hasTopLevelExit s
+hasTopLevelExit Nop = False
+hasTopLevelExit E = True
 
 vars :: Specification -> [SomeVar]
 vars = nub . go where
