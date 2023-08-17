@@ -1,5 +1,5 @@
 module Test.IOTasks.Term (
-  Term(..),
+  Term,
   ConditionTerm,
   OutputTerm,
   oEval,
