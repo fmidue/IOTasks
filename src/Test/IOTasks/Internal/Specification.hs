@@ -108,6 +108,7 @@ whileNot :: ConditionTerm Bool -> Specification -> Specification
 whileNot c bdy
   | not $ hasTopLevelExit bdy = tillExit (branch c exit bdy)
   | otherwise = error "whileNot: top-level exit marker in body"
+
 -- | Represents a loop structure in a specification, performing the body while the condition holds.
 --
 -- The 'while' function takes a condition and a body specification, and constructs a loop structure where:
@@ -122,6 +123,7 @@ while :: ConditionTerm Bool -> Specification -> Specification
 while c bdy
   | not $ hasTopLevelExit bdy = tillExit (branch c bdy exit)
   | otherwise = error "while: top-level exit marker in body"
+
 -- | Represents a loop structure in a specification, performing the body at least once and then further while the condition does not hold.
 --
 -- The 'repeatUntil' function takes a body specification and a condition, and constructs a loop structure where:
@@ -136,7 +138,8 @@ repeatUntil :: Specification -> ConditionTerm Bool -> Specification
 repeatUntil bdy c
   | not $ hasTopLevelExit bdy = tillExit (bdy <> branch c exit nop)
   | otherwise = error "repeatUntil: top-level exit marker in body"
--- | Represents a loop structure in a specification, performing the body at least once and then further while the condition does not hold.
+
+-- | Represents a loop structure in a specification, performing the body at least once and then further while the condition holds.
 --
 -- The 'doWhile' function takes a body specification and a condition, and constructs a loop structure where:
 --
