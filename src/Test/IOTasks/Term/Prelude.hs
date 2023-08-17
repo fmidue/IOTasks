@@ -44,7 +44,7 @@ allValues = valuesBefore 0
 
 valueBefore :: forall a e k. (Typeable a, VarExp e) => Int -> e -> Term k a
 -- ^ If the variable-expression x is associated with the values [x_1,..,x_n],
--- @'valueBefore' i x@ provides access to x_(n-i)
+-- @'valueBefore' i x@ provides access to x_(n-i).
 valueBefore n x = checkNames x $ matchType @a
   [ inCaseOfE' @Integer $ \HRefl -> Current x n
   , inCaseOfE' @String $ \HRefl -> Current x n
@@ -52,7 +52,7 @@ valueBefore n x = checkNames x $ matchType @a
   ]
 valuesBefore :: forall a e k. (Typeable a, VarExp e) => Int -> e -> Term k [a]
 -- ^ If the variable-expression x is associated with the values [x_1,..,x_n],
--- @'valuesBefore' i x@ provides access to [x_1,..,x_(n-i)]
+-- @'valuesBefore' i x@ provides access to [x_1,..,x_(n-i)].
 valuesBefore n x = checkNames x $ matchType @a
   [ inCaseOfE' @Integer $ \HRefl -> All x n
   , inCaseOfE' @String $ \HRefl -> All x n

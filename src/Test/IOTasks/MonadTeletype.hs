@@ -33,7 +33,7 @@ class Monad m => MonadTeletype m where
   --   Defaults to
   --   @
   --   hSetBuffering _ _ = pure ()
-  --   @
+  --   @.
   hSetBuffering :: Handle -> BufferMode -> m ()
   hSetBuffering _ _ = pure ()
 
