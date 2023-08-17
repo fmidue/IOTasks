@@ -113,7 +113,7 @@ whileNot c bdy
 --
 -- The 'while' function takes a condition and a body specification, and constructs a loop structure where:
 --
--- * The 'ConditionTerm' 'Bool' argument is the condition to be evaluated at the beginning of each iteration.
+-- * The 'ConditionTerm' 'Bool' argument is the condition to be evaluated at the beginning of each iteration. The loop continues as long as the condition is 'True'.
 -- * The 'Specification' argument is the body of the loop, executed while the condition is 'True'.
 --
 -- The function assumes that the body specification does not contain a top-level 'exit' marker.
