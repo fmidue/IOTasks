@@ -41,29 +41,32 @@ class EffectEval t where
 effectEval :: (EffectEval t, Applicative f, Typeable a) => (forall x. Typeable x => t x -> Maybe (f x)) -> Env t -> t a -> f a
 effectEval f d x = fromMaybe (pureEval (effectEval f d) d x) $ f x
 
-evalOverflow :: forall t a. (EffectEval t, Typeable a) => OverflowTreatment t -> Env t -> t a -> (OverflowWarning, a)
-evalOverflow OverflowTreatment{..} d = effectEval (effect d) d
-  where
-    effect :: forall a. Typeable a => Env t -> t a -> Maybe (OverflowWarning, a)
-    effect d x = matchType @a
-      [ inCaseOfE' @Integer $ \HRefl ->
-        case evalITerm d x of
-          Right i -> Just $ unwrapI i
-          Left (SubCheck t f) -> do -- Maybe
-            fx <- effect d t
-            pure $ do -- (Overflow, a)
-              x <- fx
-              unwrapI $ f x
-      , inCaseOfE' @[Integer] $ \HRefl ->
-        case evalIList d x of
-          Right i ->  Just $ unwrapIs i
-          Left (SubCheck t f) -> do -- Maybe
-            fx <- effect d t
-            pure $ do -- (Overflow, a)
-              x <- fx
-              unwrapIs $ f x
-      , fallbackCase' Nothing
-      ]
+
+evalOverflow :: (EffectEval t, Typeable a) => OverflowTreatment t -> Env t -> t a -> (OverflowWarning, a)
+evalOverflow = evalOverflow' where
+  evalOverflow' :: forall t a. (EffectEval t, Typeable a) => OverflowTreatment t -> Env t -> t a -> (OverflowWarning, a)
+  evalOverflow' OverflowTreatment{..} d = effectEval (effect d) d
+    where
+      effect :: forall a. Typeable a => Env t -> t a -> Maybe (OverflowWarning, a)
+      effect d x = matchType @a
+        [ inCaseOfE' @Integer $ \HRefl ->
+          case evalITerm d x of
+            Right i -> Just $ unwrapI i
+            Left (SubCheck t f) -> do -- Maybe
+              fx <- effect d t
+              pure $ do -- (Overflow, a)
+                x <- fx
+                unwrapI $ f x
+        , inCaseOfE' @[Integer] $ \HRefl ->
+          case evalIList d x of
+            Right i ->  Just $ unwrapIs i
+            Left (SubCheck t f) -> do -- Maybe
+              fx <- effect d t
+              pure $ do -- (Overflow, a)
+                x <- fx
+                unwrapIs $ f x
+        , fallbackCase' Nothing
+        ]
 
 data OverflowTreatment t = OverflowTreatment
   { evalITerm :: Env t -> t Integer   -> Either (SubCheck t I) I

@@ -78,18 +78,20 @@ withValueEntry NoEntry c _ = c
 withValueEntry (IntegerEntry xs) _ f = f xs
 withValueEntry (StringEntry xs) _ f = f xs
 
-unwrapValueEntry :: forall a. Typeable a => ValueEntry -> [(a,Int)]
-unwrapValueEntry NoEntry = []
-unwrapValueEntry (IntegerEntry xs) =
-  case eqT @a @Integer of
-    Just Refl -> xs
-    -- Nothing -> case eqT @a @I of
-    --   Just Refl -> map (first fromInteger) xs
-    Nothing -> error $ "unwrapValue: incompatible type - Integer (or I) and " ++ show (typeRep @a)
-unwrapValueEntry (StringEntry xs) =
-  case eqT @a @String of
-    Just Refl -> xs
-    Nothing -> error $ "unwrapValue: incompatible type - String and " ++ show (typeRep @a)
+unwrapValueEntry :: Typeable a => ValueEntry -> [(a,Int)]
+unwrapValueEntry = unwrapValueEntry' where
+  unwrapValueEntry' :: forall a. Typeable a => ValueEntry -> [(a,Int)]
+  unwrapValueEntry' NoEntry = []
+  unwrapValueEntry' (IntegerEntry xs) =
+    case eqT @a @Integer of
+      Just Refl -> xs
+      -- Nothing -> case eqT @a @I of
+      --   Just Refl -> map (first fromInteger) xs
+      Nothing -> error $ "unwrapValue: incompatible type - Integer (or I) and " ++ show (typeRep @a)
+  unwrapValueEntry' (StringEntry xs) =
+    case eqT @a @String of
+      Just Refl -> xs
+      Nothing -> error $ "unwrapValue: incompatible type - String and " ++ show (typeRep @a)
 
 data Value = IntegerValue Integer | StringValue String deriving Show
 
@@ -97,36 +99,45 @@ printValue :: Value -> String
 printValue (IntegerValue i) = show i
 printValue (StringValue s) = s
 
-wrapValue :: forall a. Typeable a => a -> Value
-wrapValue =
-  case eqT @a @Integer of
-    Just Refl -> IntegerValue
-    Nothing -> case eqT @a @String of
-      Just Refl -> StringValue
-      Nothing -> error $ "wrapValue: unsupported type " ++ show (typeRep @a)
+wrapValue :: Typeable a => a -> Value
+wrapValue = wrapValue' where
+  wrapValue' :: forall a. Typeable a => a -> Value
+  wrapValue' =
+    case eqT @a @Integer of
+      Just Refl -> IntegerValue
+      Nothing -> case eqT @a @String of
+        Just Refl -> StringValue
+        Nothing -> error $ "wrapValue: unsupported type " ++ show (typeRep @a)
 
 withValue :: Value -> (forall a. Typeable a => a -> r) -> r
 withValue (IntegerValue i) f = f i
 withValue (StringValue s) f = f s
 
-unwrapValue :: forall a. Typeable a => Value -> a
-unwrapValue v = withValue v $ \(x :: b) ->
-  case eqT @a @b of
-    Just Refl -> x
-    Nothing -> error $ "unwrapValue: incompatible type - "++ show (typeRep @b) ++ " and " ++ show (typeRep @a)
+unwrapValue :: Typeable a => Value -> a
+unwrapValue = unwrapValue' where
+  unwrapValue' :: forall a. Typeable a => Value -> a
+  unwrapValue' v = withValue v $ \(x :: b) ->
+    case eqT @a @b of
+      Just Refl -> x
+      Nothing -> error $ "unwrapValue: incompatible type - "++ show (typeRep @b) ++ " and " ++ show (typeRep @a)
 
-readValue :: forall a. (Typeable a, Read a) => String -> a
-readValue x =
-  case eqT @a @String of
-    Just Refl -> x
-    Nothing -> case readMaybe @a x of
-      Just x -> x
-      Nothing -> error $ x ++ " - " ++ show (typeRep @a)
+readValue :: (Typeable a, Read a) => String -> a
+readValue = readValue' where
+  readValue' :: forall a. (Typeable a, Read a) => String -> a
+  readValue' x =
+    case eqT @a @String of
+      Just Refl -> x
+      Nothing -> case readMaybe @a x of
+        Just x -> x
+        Nothing -> error $ x ++ " - " ++ show (typeRep @a)
 
-showValue :: forall a. (Typeable a, Show a) => a -> String
-showValue x = case eqT @a @String of
-  Just Refl -> x
-  Nothing -> show x
+
+showValue :: (Typeable a, Show a) => a -> String
+showValue = showValue' where
+  showValue' :: forall a. (Typeable a, Show a) => a -> String
+  showValue' x = case eqT @a @String of
+    Just Refl -> x
+    Nothing -> show x
 
 insertValue :: Value -> SomeVar -> ValueMap -> ValueMap
 insertValue v k (ValueMap m sz)

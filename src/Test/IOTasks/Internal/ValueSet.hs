@@ -89,13 +89,15 @@ containsValue (Eq i) n = i == n
 containsValue Every _ = True
 containsValue None _ = False
 
-valueOf :: forall a. Typeable a => ValueSet a -> Size -> Gen a
-valueOf =
-  case eqT @a @Integer of
-    Just Refl -> valueOfInt
-    Nothing -> case eqT @a @String of
-      Just Refl -> valueOfString
-      Nothing -> error $ "unsupported ValueSet type: " ++ show (typeRep $ Proxy @a)
+valueOf :: Typeable a => ValueSet a -> Size -> Gen a
+valueOf = valueOf' where
+  valueOf' :: forall a. Typeable a => ValueSet a -> Size -> Gen a
+  valueOf' =
+    case eqT @a @Integer of
+      Just Refl -> valueOfInt
+      Nothing -> case eqT @a @String of
+        Just Refl -> valueOfString
+        Nothing -> error $ "unsupported ValueSet type: " ++ show (typeRep $ Proxy @a)
 
 valueOfInt :: ValueSet Integer -> Size -> Gen Integer
 valueOfInt vs (Size sz _) =
@@ -116,15 +118,17 @@ valueOfString :: ValueSet String -> Size -> Gen String
 valueOfString Every (Size _ len) = resize len . listOf $ elements ['a'..'z']
 valueOfString None _ = error "valueOf: empty ValueSet"
 
-printValueSet :: forall a. Typeable a => ValueSet a -> String
-printValueSet vs = concat ["{ v : ",show (typeRep $ Proxy @a), " | ", printValueSet' vs ,"}"] where
-  printValueSet' (Union vs1 vs2) = concat ["(",printValueSet' vs1,") \\/ (", printValueSet' vs2,")"]
-  printValueSet' (Intersection vs1 vs2) = concat ["(",printValueSet' vs1,") /\\ (", printValueSet' vs2,")"]
-  printValueSet' (GreaterThan n) = "v > " ++ show n
-  printValueSet' (LessThan n) = "v < " ++ show n
-  printValueSet' (Eq n) = "v == " ++ show n
-  printValueSet' Every = "true"
-  printValueSet' None = "false"
+printValueSet :: Typeable a => ValueSet a -> String
+printValueSet = go where
+  go :: forall a. Typeable a => ValueSet a -> String
+  go vs = concat ["{ v : ",show (typeRep $ Proxy @a), " | ", printValueSet' vs ,"}"] where
+    printValueSet' (Union vs1 vs2) = concat ["(",printValueSet' vs1,") \\/ (", printValueSet' vs2,")"]
+    printValueSet' (Intersection vs1 vs2) = concat ["(",printValueSet' vs1,") /\\ (", printValueSet' vs2,")"]
+    printValueSet' (GreaterThan n) = "v > " ++ show n
+    printValueSet' (LessThan n) = "v < " ++ show n
+    printValueSet' (Eq n) = "v == " ++ show n
+    printValueSet' Every = "true"
+    printValueSet' None = "false"
 
 -- basic ValueSets
 ints, nats :: ValueSet Integer
