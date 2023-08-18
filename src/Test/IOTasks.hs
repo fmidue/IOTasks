@@ -14,7 +14,7 @@ module Test.IOTasks (
   ints, nats, str,
   OutputPattern,
   wildcard, text, value,
-  Varname, var, intVar, stringVar,
+  Varname, Var, var, intVar, stringVar,
   pPrintSpecification,
   -- * Terms
   ConditionTerm,
