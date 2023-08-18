@@ -16,7 +16,7 @@ module Test.IOTasks.Internal.Term (
   evalI, evalIs,
   termVarExps, transparentSubterms,
   toExpr,
-  printTerm, printIndexedTerm,
+  showTerm, showIndexedTerm,
   SomeTerm(..), withSomeTerm,
   castTerm,
   ) where
@@ -159,43 +159,43 @@ safeHead :: [a] -> Maybe a
 safeHead [] = Nothing
 safeHead (x:_) = Just x
 
-printIndexedTerm :: Typeable a => Term k a -> Map SomeVar (Int,[Int]) -> String
-printIndexedTerm t = printTerm' t . Just
+showIndexedTerm :: Typeable a => Term k a -> Map SomeVar (Int,[Int]) -> String
+showIndexedTerm t = showTerm' t . Just
 
-printTerm :: Typeable a => Term k a -> String
-printTerm t = printTerm' t Nothing
+showTerm :: Typeable a => Term k a -> String
+showTerm t = showTerm' t Nothing
 
-printTerm' :: Typeable a => Term k a -> Maybe (Map SomeVar (Int,[Int])) -> String
-printTerm' (Add x y) m = printBinary "+" x y m
-printTerm' (Sub x y) m = printBinary "-" x y m
-printTerm' (Mul x y) m = printBinary "*" x y m
-printTerm' (Equals x y) m = printBinary "==" x y m
-printTerm' (Gt x y) m = printBinary ">" x y m
-printTerm' (Ge x y) m = printBinary ">=" x y m
-printTerm' (Lt x y) m = printBinary "<" x y m
-printTerm' (Le x y) m = printBinary "<=" x y m
-printTerm' (And x y) m = printBinary "&&" x y m
-printTerm' (Or x y) m = printBinary "||" x y m
-printTerm' (IsIn x xs) m = printTerm' x m ++ " ∈ " ++ printTerm' xs m
-printTerm' (Not (IsIn x xs)) m = printTerm' x m ++ " ∉ " ++ printTerm' xs m
-printTerm' (Not t) m = concat ["not (", printTerm' t m, ")"]
-printTerm' (BoolLit b) _ = show b
-printTerm' (Length xs) m = printUnary "length" xs m
-printTerm' (Reverse xs) m = printUnary "reverse" xs m
-printTerm' (Sum xs) m = printUnary "sum" xs m
-printTerm' (Product xs) m = printUnary "product" xs m
-printTerm' (Current x n) (Just m) = (\(x,(i,_)) -> x ++ "_" ++ show i) $ maximumOn (head.snd.snd) $ (\xs -> take (length xs - n) xs) $ mapMaybe (\x -> (someVarname x,) <$> Map.lookup x m) (toVarList x)
-printTerm' (Current x n) Nothing = "{" ++ intercalate "," (map someVarname $ toVarList x) ++ "}"++":"++show n++"_C"
-printTerm' (All x n) _ = "{" ++ intercalate "," (map someVarname $ toVarList x) ++ "}"++":"++show n++"_A"
-printTerm' (IntLit x) _ = show x
-printTerm' (ListLit xs) _ = show xs
-printTerm' t@Opaque{} _ = show t -- TODO: improve
+showTerm' :: Typeable a => Term k a -> Maybe (Map SomeVar (Int,[Int])) -> String
+showTerm' (Add x y) m = showBinary "+" x y m
+showTerm' (Sub x y) m = showBinary "-" x y m
+showTerm' (Mul x y) m = showBinary "*" x y m
+showTerm' (Equals x y) m = showBinary "==" x y m
+showTerm' (Gt x y) m = showBinary ">" x y m
+showTerm' (Ge x y) m = showBinary ">=" x y m
+showTerm' (Lt x y) m = showBinary "<" x y m
+showTerm' (Le x y) m = showBinary "<=" x y m
+showTerm' (And x y) m = showBinary "&&" x y m
+showTerm' (Or x y) m = showBinary "||" x y m
+showTerm' (IsIn x xs) m = showTerm' x m ++ " ∈ " ++ showTerm' xs m
+showTerm' (Not (IsIn x xs)) m = showTerm' x m ++ " ∉ " ++ showTerm' xs m
+showTerm' (Not t) m = concat ["not (", showTerm' t m, ")"]
+showTerm' (BoolLit b) _ = show b
+showTerm' (Length xs) m = showUnary "length" xs m
+showTerm' (Reverse xs) m = showUnary "reverse" xs m
+showTerm' (Sum xs) m = showUnary "sum" xs m
+showTerm' (Product xs) m = showUnary "product" xs m
+showTerm' (Current x n) (Just m) = (\(x,(i,_)) -> x ++ "_" ++ show i) $ maximumOn (head.snd.snd) $ (\xs -> take (length xs - n) xs) $ mapMaybe (\x -> (someVarname x,) <$> Map.lookup x m) (toVarList x)
+showTerm' (Current x n) Nothing = "{" ++ intercalate "," (map someVarname $ toVarList x) ++ "}"++":"++show n++"_C"
+showTerm' (All x n) _ = "{" ++ intercalate "," (map someVarname $ toVarList x) ++ "}"++":"++show n++"_A"
+showTerm' (IntLit x) _ = show x
+showTerm' (ListLit xs) _ = show xs
+showTerm' t@Opaque{} _ = show t -- TODO: improve
 
-printBinary :: (Typeable a, Typeable b) => String -> Term k a -> Term k b -> Maybe (Map SomeVar (Int,[Int])) -> String
-printBinary op x y m = concat ["(",printTerm' x m, ") ",op," (", printTerm' y m,")"]
+showBinary :: (Typeable a, Typeable b) => String -> Term k a -> Term k b -> Maybe (Map SomeVar (Int,[Int])) -> String
+showBinary op x y m = concat ["(",showTerm' x m, ") ",op," (", showTerm' y m,")"]
 
-printUnary :: Typeable a => String -> Term k a -> Maybe (Map SomeVar (Int,[Int])) -> String
-printUnary op x m = concat [op ++" (", printTerm' x m, ")"]
+showUnary :: Typeable a => String -> Term k a -> Maybe (Map SomeVar (Int,[Int])) -> String
+showUnary op x m = concat [op ++" (", showTerm' x m, ")"]
 
 data SomeTerm k where
   SomeTerm :: Typeable a => Term k a -> SomeTerm k

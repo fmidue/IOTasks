@@ -5,7 +5,7 @@ module Test.IOTasks.Term (
   oEval,
   termVarExps,
   transparentSubterms,
-  printTerm, printIndexedTerm,
+  showTerm, showIndexedTerm,
   SomeTerm(..), withSomeTerm,
   castTerm,
   ) where

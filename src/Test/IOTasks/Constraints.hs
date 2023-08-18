@@ -11,7 +11,7 @@ module Test.IOTasks.Constraints (
   Path, paths,
   partitionPath, pathDepth,
   numberOfPaths,
-  printPath, printConstraint, printSomeConstraint,
+  showPath, showConstraint, showSomeConstraint,
   ) where
 
 import Test.IOTasks.ValueSet
@@ -113,16 +113,16 @@ partitionPath = foldMap phi where
   phi (SomeConstraint c@ConditionConstraint{}) = (mempty,[c],mempty)
   phi (SomeConstraint c@OverflowConstraints{}) = (mempty,mempty,[c])
 
-printPath :: Path -> String
-printPath = unlines . intersperse " |" . map printSomeConstraint
+showPath :: Path -> String
+showPath = unlines . intersperse " |" . map showSomeConstraint
 
-printSomeConstraint :: SomeConstraint -> String
-printSomeConstraint (SomeConstraint c) = printConstraint c
+showSomeConstraint :: SomeConstraint -> String
+showSomeConstraint (SomeConstraint c) = showConstraint c
 
-printConstraint :: Constraint t -> String
-printConstraint (InputConstraint (x,i) vs) = concat [varname x,"_",show i," : ",printValueSet vs]
-printConstraint (ConditionConstraint t m) = printIndexedTerm t m
-printConstraint (OverflowConstraints _ _) = "**some overflow checks**"
+showConstraint :: Constraint t -> String
+showConstraint (InputConstraint (x,i) vs) = concat [varname x,"_",show i," : ",showValueSet vs]
+showConstraint (ConditionConstraint t m) = showIndexedTerm t m
+showConstraint (OverflowConstraints _ _) = "**some overflow checks**"
 
 numberOfPaths :: Integer -> Specification -> Integer
 numberOfPaths maxIterationDepth s =

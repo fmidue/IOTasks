@@ -10,7 +10,7 @@ module Test.IOTasks.Internal.ValueSet (
   complement,
   isEmpty,
   containsValue,
-  printValueSet,
+  showValueSet,
   valueOf,
   Size(..),
   ints, nats, str,
@@ -102,7 +102,7 @@ valueOf = valueOf' where
 valueOfInt :: ValueSet Integer -> Size -> Gen Integer
 valueOfInt vs (Size sz _) =
   case Set.toList $ range vs $ Set.fromAscList [-sz..sz] of
-    [] -> error $ unwords ["valueOf: no values between",show (-sz),"and",show sz,"within size bound for",printValueSet vs]
+    [] -> error $ unwords ["valueOf: no values between",show (-sz),"and",show sz,"within size bound for",showValueSet vs]
     xs -> elements xs
   where
     range :: ValueSet Integer -> Set Integer -> Set Integer
@@ -118,17 +118,17 @@ valueOfString :: ValueSet String -> Size -> Gen String
 valueOfString Every (Size _ len) = resize len . listOf $ elements ['a'..'z']
 valueOfString None _ = error "valueOf: empty ValueSet"
 
-printValueSet :: Typeable a => ValueSet a -> String
-printValueSet = go where
+showValueSet :: Typeable a => ValueSet a -> String
+showValueSet = go where
   go :: forall a. Typeable a => ValueSet a -> String
-  go vs = concat ["{ v : ",show (typeRep $ Proxy @a), " | ", printValueSet' vs ,"}"] where
-    printValueSet' (Union vs1 vs2) = concat ["(",printValueSet' vs1,") \\/ (", printValueSet' vs2,")"]
-    printValueSet' (Intersection vs1 vs2) = concat ["(",printValueSet' vs1,") /\\ (", printValueSet' vs2,")"]
-    printValueSet' (GreaterThan n) = "v > " ++ show n
-    printValueSet' (LessThan n) = "v < " ++ show n
-    printValueSet' (Eq n) = "v == " ++ show n
-    printValueSet' Every = "true"
-    printValueSet' None = "false"
+  go vs = concat ["{ v : ",show (typeRep $ Proxy @a), " | ", showValueSet' vs ,"}"] where
+    showValueSet' (Union vs1 vs2) = concat ["(",showValueSet' vs1,") \\/ (", showValueSet' vs2,")"]
+    showValueSet' (Intersection vs1 vs2) = concat ["(",showValueSet' vs1,") /\\ (", showValueSet' vs2,")"]
+    showValueSet' (GreaterThan n) = "v > " ++ show n
+    showValueSet' (LessThan n) = "v < " ++ show n
+    showValueSet' (Eq n) = "v == " ++ show n
+    showValueSet' Every = "true"
+    showValueSet' None = "false"
 
 -- basic ValueSets
 ints, nats :: ValueSet Integer

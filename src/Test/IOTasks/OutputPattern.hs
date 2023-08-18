@@ -3,7 +3,7 @@ module Test.IOTasks.OutputPattern (
   OutputPattern,
   wildcard, text, value,
   valueTerms,
-  printPattern, printPatternSimple,
+  showPattern, showPatternSimple,
   evalPattern,
   (>:),
   ) where

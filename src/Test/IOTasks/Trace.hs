@@ -20,7 +20,7 @@ module Test.IOTasks.Trace (
   pattern NProgRead, pattern NProgReadString, pattern NProgWrite,
   pattern NTerminate, pattern NOutOfInputs,
   inputSequenceN, isTerminatingN,
-  pPrintTrace, pPrintTraceSimple,
+  showTrace, showTraceSimple,
 
   covers,
   MatchResult,
@@ -190,35 +190,35 @@ pPrintMatchResult' simple (TerminationMismatch s s' t) = text "TerminationMismat
 reportMismatch :: Bool -> NTrace -> Maybe NTrace -> NTrace -> Doc
 reportMismatch simple s s' t = vcat
   [ text "Expected:"
-  , nest 2 (maybe mempty ((<+> text "or") . showTraceHead simple) s' <+> showTraceHead simple s)
+  , nest 2 (maybe mempty ((<+> text "or") . pPrintTraceHead simple) s' <+> pPrintTraceHead simple s)
   , text "Got:"
-  , nest 2 (showTraceHead simple t)
+  , nest 2 (pPrintTraceHead simple t)
   ]
 
 reportOutputMismatch :: Bool -> NTrace -> NTrace -> Doc
-reportOutputMismatch simple s t = showTraceHead simple t <+> text "is not covered by" <+> showTraceHead simple s
+reportOutputMismatch simple s t = pPrintTraceHead simple t <+> text "is not covered by" <+> pPrintTraceHead simple s
 
-showTraceHead :: Bool -> NTrace -> Doc
-showTraceHead simple = text . showTraceHead' simple (const "")
+pPrintTraceHead :: Bool -> NTrace -> Doc
+pPrintTraceHead simple = text . showTraceHead simple (const "")
 
-pPrintTrace :: NTrace -> String
-pPrintTrace = fix (showTraceHead' False)
+showTrace :: NTrace -> String
+showTrace = fix (showTraceHead False)
 
-pPrintTraceSimple :: NTrace -> String
-pPrintTraceSimple = fix (showTraceHead' True)
+showTraceSimple :: NTrace -> String
+showTraceSimple = fix (showTraceHead True)
 
-showTraceHead' :: Bool -> (NTrace -> String) -> NTrace -> String
-showTraceHead' simple f (NProgRead x (NProgRead '\n' t)) = "?"++ [x] ++ (if simple then "" else "\\n") ++ addSpace (f t)
-showTraceHead' simple f (NProgRead x (NProgRead c t)) = "?"++ x : tail (showTraceHead' simple f (NProgRead c t))
-showTraceHead' _ f (NProgRead x t') = "?"++[x] ++ addSpace (f t')
-showTraceHead' simple f (NProgWrite Optional ts t')
-  | simple = "(!"++ (head $ printPatternSimple <$> Set.toList ts) ++ ")" ++ addSpace (f t') -- omit optional outputs in simplified version
-  | otherwise  = "(!{"++ intercalate "," (printPattern <$> Set.toList ts) ++ "})" ++ addSpace (f t')
-showTraceHead' simple f (NProgWrite Mandatory ts t')
-  | simple = "!"++ (head $ printPatternSimple <$> Set.toList ts) ++ addSpace (f t')
-  | otherwise = "!{"++ intercalate "," (printPattern <$> Set.toList ts) ++ "}" ++ addSpace (f t')
-showTraceHead' _ _ NTerminate = "stop"
-showTraceHead' _ _ NOutOfInputs = "?<unknown input>"
+showTraceHead :: Bool -> (NTrace -> String) -> NTrace -> String
+showTraceHead simple f (NProgRead x (NProgRead '\n' t)) = "?"++ [x] ++ (if simple then "" else "\\n") ++ addSpace (f t)
+showTraceHead simple f (NProgRead x (NProgRead c t)) = "?"++ x : tail (showTraceHead simple f (NProgRead c t))
+showTraceHead _ f (NProgRead x t') = "?"++[x] ++ addSpace (f t')
+showTraceHead simple f (NProgWrite Optional ts t')
+  | simple = "(!"++ (head $ showPatternSimple <$> Set.toList ts) ++ ")" ++ addSpace (f t') -- omit optional outputs in simplified version
+  | otherwise  = "(!{"++ intercalate "," (showPattern <$> Set.toList ts) ++ "})" ++ addSpace (f t')
+showTraceHead simple f (NProgWrite Mandatory ts t')
+  | simple = "!"++ (head $ showPatternSimple <$> Set.toList ts) ++ addSpace (f t')
+  | otherwise = "!{"++ intercalate "," (showPattern <$> Set.toList ts) ++ "}" ++ addSpace (f t')
+showTraceHead _ _ NTerminate = "stop"
+showTraceHead _ _ NOutOfInputs = "?<unknown input>"
 
 addSpace :: String -> String
 addSpace "" = ""

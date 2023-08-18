@@ -224,19 +224,19 @@ pPrintCoreOutcome _ (Success n) = text $ unwords ["+++ OK, passed",show n,"tests
 pPrintCoreOutcome _ GaveUp = text "*** Gave up!"
 pPrintCoreOutcome simple (Failure is et at r) = vcat
   [ text "*** Failure"
-  , text ("Input sequence "++ pPrintInputs is)
-  , text ("Expected run: " ++ printTrace et)
-  , text ("Actual run: " ++ printTrace at)
+  , text ("Input sequence "++ showInputs is)
+  , text ("Expected run: " ++ showTraceHow et)
+  , text ("Actual run: " ++ showTraceHow at)
   , text "Error:"
-  , nest 2 (printResult r)
+  , nest 2 (pPrintResult r)
   ]
   where
-    (printResult, printTrace)
-      | simple = (pPrintMatchResultSimple,pPrintTraceSimple)
-      | otherwise = (pPrintMatchResult,pPrintTrace)
+    (pPrintResult, showTraceHow)
+      | simple = (pPrintMatchResultSimple,showTraceSimple)
+      | otherwise = (pPrintMatchResult,showTrace)
 
-pPrintInputs :: Inputs -> String
-pPrintInputs = unwords . map ('?':)
+showInputs :: Inputs -> String
+showInputs = unwords . map ('?':)
 
 pPrintOutcomeHints :: OutcomeHints -> Doc
 pPrintOutcomeHints NoHints = mempty

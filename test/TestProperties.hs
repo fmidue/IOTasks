@@ -156,4 +156,4 @@ instance Arbitrary (ValueSet Integer) where
         ]
 
 instance Show (ValueSet Integer) where
-  show = printValueSet
+  show = showValueSet

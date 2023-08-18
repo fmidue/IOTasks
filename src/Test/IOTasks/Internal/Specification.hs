@@ -193,7 +193,7 @@ runSpecification' addLinebreaks spec inputs =
         (i:is)
           | vs `containsValue` readValue i -> RecSub i id (insertValue (wrapValue $ readValue @v i) (someVar x) e,is)
           | otherwise -> case mode of
-              AssumeValid -> error $ "invalid value: " ++ i ++ " is not an element of " ++ printValueSet vs
+              AssumeValid -> error $ "invalid value: " ++ i ++ " is not an element of " ++ showValueSet vs
               UntilValid ->  RecSame i (first (progWrite Optional (Set.singleton Wildcard) <>)) (e,is)
               ElseAbort -> NoRec (foldr ((<>) . progRead) (((<>) . progRead) '\n' $ progWrite Optional (Set.singleton Wildcard)) i,NoOverflow)
     )
@@ -269,17 +269,17 @@ semM f f' g h i z s_I spec = sem' s_I spec k_I where
 data Action = End | Exit
 
 pPrintSpecification :: Specification -> Doc
-pPrintSpecification (ReadInput x vs m s) = text (concat ["[▷ ",varname x," ∈ ", printValueSet vs, "]",printInputMode m]) $$ pPrintSpecification s
-pPrintSpecification (WriteOutput opt ts s) = text (concat $ ["[{",if opt == Optional then "𝜀," else ""] ++ intersperse "," (map printPatternSimple (Set.toList ts)) ++ ["}▷ ]"]) $$ pPrintSpecification s
-pPrintSpecification (Branch c t e s) = text (concat ["[",printTerm c,"]⇒ ("]) <> pPrintSpecification t <> text "△ " <> pPrintSpecification e <> text ")" $$ pPrintSpecification s
+pPrintSpecification (ReadInput x vs m s) = text (concat ["[▷ ",varname x," ∈ ", showValueSet vs, "]",showInputMode m]) $$ pPrintSpecification s
+pPrintSpecification (WriteOutput opt ts s) = text (concat $ ["[{",if opt == Optional then "𝜀," else ""] ++ intersperse "," (map showPatternSimple (Set.toList ts)) ++ ["}▷ ]"]) $$ pPrintSpecification s
+pPrintSpecification (Branch c t e s) = text (concat ["[",showTerm c,"]⇒ ("]) <> pPrintSpecification t <> text "△ " <> pPrintSpecification e <> text ")" $$ pPrintSpecification s
 pPrintSpecification Nop = text "0"
 pPrintSpecification (TillE bdy s) = text "(" <> pPrintSpecification bdy <> text ")🠒ᴱ" $$ pPrintSpecification s
 pPrintSpecification E = text "E"
 
-printInputMode :: InputMode -> String
-printInputMode AssumeValid = ""
-printInputMode UntilValid = "↻"
-printInputMode ElseAbort = "↯"
+showInputMode :: InputMode -> String
+showInputMode AssumeValid = ""
+showInputMode UntilValid = "↻"
+showInputMode ElseAbort = "↯"
 
 accept :: Specification -> Trace -> Bool
 accept s_ t_ = accept' s_ k_I t_ d_I

@@ -12,7 +12,7 @@ module Test.IOTasks.ValueMap (
   varnameTypeRep, varnameVarList,
   Value(..),
   wrapValue, unwrapValue,
-  readValue, printValue, showValue,
+  readValue, showValue, showAsValue,
   ValueEntry(..),
   withValueEntry,
   unwrapValueEntry,
@@ -95,9 +95,12 @@ unwrapValueEntry = unwrapValueEntry' where
 
 data Value = IntegerValue Integer | StringValue String deriving Show
 
-printValue :: Value -> String
-printValue (IntegerValue i) = show i
-printValue (StringValue s) = s
+showValue :: Value -> String
+showValue (IntegerValue i) = show i
+showValue (StringValue s) = s
+
+showAsValue :: (Typeable a, Show a) => a -> String
+showAsValue = showValue . wrapValue
 
 wrapValue :: Typeable a => a -> Value
 wrapValue = wrapValue' where
@@ -130,14 +133,6 @@ readValue = readValue' where
       Nothing -> case readMaybe @a x of
         Just x -> x
         Nothing -> error $ x ++ " - " ++ show (typeRep @a)
-
-
-showValue :: (Typeable a, Show a) => a -> String
-showValue = showValue' where
-  showValue' :: forall a. (Typeable a, Show a) => a -> String
-  showValue' x = case eqT @a @String of
-    Just Refl -> x
-    Nothing -> show x
 
 insertValue :: Value -> SomeVar -> ValueMap -> ValueMap
 insertValue v k (ValueMap m sz)

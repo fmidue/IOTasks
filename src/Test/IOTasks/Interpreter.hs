@@ -57,7 +57,7 @@ interpret s = do
           if Set.size ts == 1
             then do
               e <- get
-              lift $ putStrLn $ printPattern $ snd $ evalPattern e (Set.elemAt 0 ts)
+              lift $ putStrLn $ showPattern $ snd $ evalPattern e (Set.elemAt 0 ts)
               p'
             else error "interpret: impossible (due to collapseChoice)"
         Optional -> error "interpret: impossible (due to collapseChoice)"

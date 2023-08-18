@@ -119,9 +119,9 @@ genTrace spec depth sz maxNeg =
     (pure . \case
       NoRec r -> r
       RecSub i () t' -> do
-        foldr ProgRead t' (printValue i ++ "\n")
+        foldr ProgRead t' (showValue i ++ "\n")
       RecSame i () t' -> do
-        foldr ProgRead t' (printValue i ++ "\n")
+        foldr ProgRead t' (showValue i ++ "\n")
       RecBoth{} -> error "genTrace: impossible"
     )
     (\(e,_,_) o ts t' -> ProgWrite o (Set.map (snd . evalPattern e) ts) <$> t')

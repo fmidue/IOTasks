@@ -7,7 +7,7 @@ module Test.IOTasks.ValueSet (
   complement,
   isEmpty,
   containsValue,
-  printValueSet,
+  showValueSet,
   -- | = random value generation
   valueOf,
   Size(..),

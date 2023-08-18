@@ -9,7 +9,7 @@ module Test.IOTasks.Internal.OutputPattern (
   OutputPattern(..),
   wildcard, text, value,
   valueTerms,
-  printPattern, printPatternSimple,
+  showPattern, showPatternSimple,
   evalPattern,
   (>:),
   ) where
@@ -91,23 +91,23 @@ evalPattern :: ValueMap -> OutputPattern t -> (OverflowWarning, OutputPattern 'T
 evalPattern _ Wildcard = (NoOverflow, Wildcard)
 evalPattern _ (Text s) = (NoOverflow, Text s)
 evalPattern e (Sequence x y) = evalPattern e x <> evalPattern e y
-evalPattern e (Value t) = second (Text . showValue) $ oEval e t
+evalPattern e (Value t) = second (Text . showAsValue) $ oEval e t
 
-printPattern :: OutputPattern t -> String
-printPattern Wildcard = "_"
-printPattern (Text s) = foldr showLitChar "" s
-printPattern (Sequence x y) = printPattern x ++ printPattern y
-printPattern (Value t) = show t
+showPattern :: OutputPattern t -> String
+showPattern Wildcard = "_"
+showPattern (Text s) = foldr showLitChar "" s
+showPattern (Sequence x y) = showPattern x ++ showPattern y
+showPattern (Value t) = show t
 
-printPatternSimple :: OutputPattern t -> String
-printPatternSimple p =
-  case reverse $ printPattern p of
+showPatternSimple :: OutputPattern t -> String
+showPatternSimple p =
+  case reverse $ showPattern p of
   ('n':'\\':s) -> reverse s
   s -> reverse s
 
 -- | coverage relation on patterns
 (>:) :: OutputPattern 'TraceP -> OutputPattern 'TraceP -> Bool
-p >: q = isRight $ parse (patternParser p <> eof) "" $ printPattern q
+p >: q = isRight $ parse (patternParser p <> eof) "" $ showPattern q
 
 patternParser :: OutputPattern 'TraceP -> Parsec String () ()
 patternParser Wildcard = void $ many (satisfy isPrint)
