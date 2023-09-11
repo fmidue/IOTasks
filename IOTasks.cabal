@@ -91,6 +91,7 @@ test-suite IOTasks-test
       PingPongSpec
       ProductConditionSpec
       ReverseSpec
+      SanityChecksSpec
       SumToZeroSpec
       SymbolicPlusSpec
       VariableMerging1Spec
