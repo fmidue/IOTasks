@@ -89,7 +89,9 @@ nop :: Specification
 nop = Nop
 
 tillExit :: Specification -> Specification
-tillExit bdy = TillE bdy nop
+tillExit bdy
+  | hasTopLevelExit bdy = TillE bdy nop
+  | otherwise = error "tillExit: no top-level exit marker in body"
 
 exit :: Specification
 exit = E
@@ -157,7 +159,7 @@ doWhile bdy c
 hasTopLevelExit :: Specification -> Bool
 hasTopLevelExit (ReadInput _ _  _ s) = hasTopLevelExit s
 hasTopLevelExit (WriteOutput _ _ s) = hasTopLevelExit s
-hasTopLevelExit (Branch _ _ _ s) = hasTopLevelExit s
+hasTopLevelExit (Branch _ l r s) = hasTopLevelExit l || hasTopLevelExit r || hasTopLevelExit s
 hasTopLevelExit (TillE _ s) = hasTopLevelExit s
 hasTopLevelExit Nop = False
 hasTopLevelExit E = True
