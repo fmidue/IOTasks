@@ -28,7 +28,7 @@ wrongWhileNot2 = whileNot true nop
 wrongWhileNot3 :: Specification
 wrongWhileNot3 = whileNot (currentValue (intVar "x") .==. intLit 0) (readInput (intVar "y") undefined undefined)
 
--- reapeatUntil
+-- repeatUntil
 wrongRepeat1 :: Specification
 wrongRepeat1 = repeatUntil (branch undefined nop exit) false
 
