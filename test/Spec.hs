@@ -9,7 +9,6 @@ import System.Environment (getArgs, withArgs)
 main :: IO ()
 main = do
   args <- getArgs
-  print args
   case args of
     "--cheap":xs -> withArgs xs testCheap
     "--all":xs -> withArgs xs testAll
