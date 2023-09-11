@@ -128,7 +128,7 @@ genTrace spec depth sz maxNeg =
     (\(e,_,_) c l r -> if snd $ oEval e c then l else r)
     (const id)
     (pure Terminate)
-    (emptyValueMap $ vars spec,1,0)
+    (emptyValueMap $ readVars spec,1,0)
     spec
 
 runTest :: IOrep () -> Specification -> Inputs -> Outcome

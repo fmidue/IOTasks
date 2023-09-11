@@ -9,7 +9,7 @@ module Test.IOTasks.Internal.Specification (
   readInput, writeOutput, writeOptionalOutput, optionalTextOutput,
   branch, tillExit, exit, while, whileNot, repeatUntil, doWhile, nop,
   runSpecification,  runSpecification', AddLinebreaks,
-  vars, hasIteration,
+  readVars, hasIteration,
   pPrintSpecification,
   InputMode(..),
   sem, semM, RecStruct(..),
@@ -28,7 +28,7 @@ import Test.IOTasks.Internal.SpecificationGenerator
 
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.List (nub,intersperse)
+import Data.List (nub,intersperse, intersect)
 import Data.Functor.Identity (runIdentity,Identity(..))
 import Data.Bifunctor (first)
 
@@ -107,9 +107,7 @@ exit = E
 --
 -- > whileNot c bdy = tillExit (branch c exit bdy)
 whileNot :: ConditionTerm Bool -> Specification -> Specification
-whileNot c bdy
-  | not $ hasTopLevelExit bdy = tillExit (branch c exit bdy)
-  | otherwise = error "whileNot: top-level exit marker in body"
+whileNot c bdy = loopChecks "whileNot" c bdy $ tillExit (branch c exit bdy)
 
 -- | Represents a loop structure in a specification, performing the body while the condition holds.
 --
@@ -122,9 +120,7 @@ whileNot c bdy
 --
 -- > while c bdy = tillExit (branch c bdy exit)
 while :: ConditionTerm Bool -> Specification -> Specification
-while c bdy
-  | not $ hasTopLevelExit bdy = tillExit (branch c bdy exit)
-  | otherwise = error "while: top-level exit marker in body"
+while c bdy = loopChecks "while" c bdy $ tillExit (branch c bdy exit)
 
 -- | Represents a loop structure in a specification, performing the body at least once and then further while the condition does not hold.
 --
@@ -137,9 +133,7 @@ while c bdy
 --
 -- > repeatUntil bdy c = tillExit (bdy <> branch c exit nop)
 repeatUntil :: Specification -> ConditionTerm Bool -> Specification
-repeatUntil bdy c
-  | not $ hasTopLevelExit bdy = tillExit (bdy <> branch c exit nop)
-  | otherwise = error "repeatUntil: top-level exit marker in body"
+repeatUntil bdy c = loopChecks "repeatUntil" c bdy $ tillExit (bdy <> branch c exit nop)
 
 -- | Represents a loop structure in a specification, performing the body at least once and then further while the condition holds.
 --
@@ -152,9 +146,15 @@ repeatUntil bdy c
 --
 -- > doWhile bdy c = tillExit (bdy <> branch c nop exit)
 doWhile :: Specification -> ConditionTerm Bool -> Specification
-doWhile bdy c
-  | not $ hasTopLevelExit bdy = tillExit (bdy <> branch c nop exit)
-  | otherwise = error "doWhile: top-level exit marker in body"
+doWhile bdy c = loopChecks "doWhile" c bdy $ tillExit (bdy <> branch c nop exit)
+
+loopChecks :: String -> ConditionTerm Bool -> Specification -> a -> a
+loopChecks f c bdy x
+  | hasTopLevelExit bdy = error $ f ++ ": top-level exit marker in body"
+  | null condVars = error $ f ++ ": constant loop condition"
+  | null $ concat condVars `intersect` readVars bdy = error $ f ++ ": body does not change the evaluation of the condition"
+  | otherwise = x
+  where condVars = termVarExps c
 
 hasTopLevelExit :: Specification -> Bool
 hasTopLevelExit (ReadInput _ _  _ s) = hasTopLevelExit s
@@ -164,8 +164,8 @@ hasTopLevelExit (TillE _ s) = hasTopLevelExit s
 hasTopLevelExit Nop = False
 hasTopLevelExit E = True
 
-vars :: Specification -> [SomeVar]
-vars = nub . go where
+readVars :: Specification -> [SomeVar]
+readVars = nub . go where
   go (ReadInput x _ _ s') = someVar x : go s'
   go (WriteOutput _ _ s') = go s'
   go (Branch _ l r s') = go l ++ go r ++ go s'
@@ -215,7 +215,7 @@ runSpecification' addLinebreaks spec inputs =
       in if b then (l,wl <> w) else (r,wr <> w))
     (const id)
     (terminate,NoOverflow)
-    (emptyValueMap $ vars spec,inputs)
+    (emptyValueMap $ readVars spec,inputs)
     spec
 
 data RecStruct p x a r = NoRec r | RecSub p x a | RecSame p x a | RecBoth p x a a
@@ -321,7 +321,7 @@ accept s_ t_ = accept' s_ k_I t_ d_I
     k_I End _ _ = False
     k_I Exit _ _ = error "ill-formed specification: exit marker at top-level"
     d_I :: ValueMap
-    d_I = emptyValueMap $ vars s_
+    d_I = emptyValueMap $ readVars s_
 
 -- generators
 instance Arbitrary Specification where

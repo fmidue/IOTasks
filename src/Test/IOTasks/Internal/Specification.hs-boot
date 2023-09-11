@@ -3,7 +3,7 @@
 module Test.IOTasks.Internal.Specification (
   Specification(..),
   readInput,writeOutput,writeOptionalOutput,optionalTextOutput,branch,tillExit,exit, nop,
-  vars,
+  readVars,
   pPrintSpecification,
   InputMode(..),
   ) where
@@ -41,6 +41,6 @@ nop :: Specification
 tillExit :: Specification -> Specification
 exit :: Specification
 
-vars :: Specification -> [SomeVar]
+readVars :: Specification -> [SomeVar]
 
 pPrintSpecification :: Specification -> Doc

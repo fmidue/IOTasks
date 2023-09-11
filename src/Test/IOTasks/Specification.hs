@@ -4,7 +4,7 @@ module Test.IOTasks.Specification (
   branch, tillExit, exit, while, whileNot, repeatUntil, doWhile, nop,
   runSpecification,
   runSpecification', AddLinebreaks,
-  vars, hasIteration,
+  readVars, hasIteration,
   pPrintSpecification,
   InputMode(..),
   accept,

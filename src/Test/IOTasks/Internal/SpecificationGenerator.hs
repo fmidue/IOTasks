@@ -77,10 +77,10 @@ outputOneof' b ts = do
 _linearSpec :: (Typeable a, Read a, Show a) => [(Var a,ValueSet a,InputMode)] -> [(Var a,ValueSet a,InputMode)] -> Gen (Specification, [SomeVar])
 _linearSpec lists xs = sized $ \n -> do
   is <- ($ nop) <$> someInputsWithHole (lists ++ xs) (n `div` 2)
-  let vs = vars is
+  let vs = readVars is
   os <- resize (n `div` 2) $ listOf1 $ outputOneof (intTerm vs vs)
   let spec = is <> mconcat os
-  return (spec,vars spec)
+  return (spec,readVars spec)
 
 -- simple loop
 loop :: (Typeable a,Read a, Show a) => [(Var a,ValueSet a,InputMode)] -> Gen Condition -> Gen Specification
