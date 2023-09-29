@@ -102,7 +102,7 @@ taskCheckWithOutcome Args{..} prog spec = do
   --
   when verbose $ do
     putLnP output $ unwords
-      ["generated", show nInputs,"inputs covering", show satPaths, "satisfiable paths"]
+      ["generated", show nInputs,"input sequences covering", show satPaths, "satisfiable paths"]
     when (timeouts > 0) $
       putLnP output $ unwords ["---",show timeouts, "paths timed out"]
   --
