@@ -31,6 +31,7 @@ import qualified Data.Set as Set
 import Data.List (nub,intersperse, intersect)
 import Data.Functor.Identity (runIdentity,Identity(..))
 import Data.Bifunctor (first)
+import Data.Either (isLeft, isRight, lefts)
 
 import Type.Reflection (Typeable)
 
@@ -90,8 +91,14 @@ nop = Nop
 
 tillExit :: Specification -> Specification
 tillExit bdy
-  | hasTopLevelExit bdy = TillE bdy nop
-  | otherwise = error "tillExit: no top-level exit marker in body"
+  | topLevelExitMarkerMissing = error "tillExit: no top-level exit marker in body"
+  | hasDormantPath = error "tillExit: body has dormant symbolic path (no input and not ending in 'exit')"
+  | otherwise = TillE bdy nop
+  where
+    loopPaths = pathProgress bdy
+    hasDormantPath = [] `elem` loopPaths
+    topLevelExitMarkerMissing = all (all isLeft) loopPaths
+
 
 exit :: Specification
 exit = E
@@ -107,7 +114,8 @@ exit = E
 --
 -- > whileNot c bdy = tillExit (branch c exit bdy)
 whileNot :: ConditionTerm Bool -> Specification -> Specification
-whileNot c bdy = loopChecks "whileNot" c bdy $ tillExit (branch c exit bdy)
+whileNot c bdy =
+  tillExit (branch c exit bdy) `orErrorFrom` loopChecks "whileNot" c bdy
 
 -- | Represents a loop structure in a specification, performing the body while the condition holds.
 --
@@ -120,7 +128,7 @@ whileNot c bdy = loopChecks "whileNot" c bdy $ tillExit (branch c exit bdy)
 --
 -- > while c bdy = tillExit (branch c bdy exit)
 while :: ConditionTerm Bool -> Specification -> Specification
-while c bdy = loopChecks "while" c bdy $ tillExit (branch c bdy exit)
+while c bdy = tillExit (branch c bdy exit) `orErrorFrom` loopChecks "while" c bdy
 
 -- | Represents a loop structure in a specification, performing the body at least once and then further while the condition does not hold.
 --
@@ -133,7 +141,7 @@ while c bdy = loopChecks "while" c bdy $ tillExit (branch c bdy exit)
 --
 -- > repeatUntil bdy c = tillExit (bdy <> branch c exit nop)
 repeatUntil :: Specification -> ConditionTerm Bool -> Specification
-repeatUntil bdy c = loopChecks "repeatUntil" c bdy $ tillExit (bdy <> branch c exit nop)
+repeatUntil bdy c = tillExit (bdy <> branch c exit nop) `orErrorFrom` loopChecks "repeatUntil" c bdy
 
 -- | Represents a loop structure in a specification, performing the body at least once and then further while the condition holds.
 --
@@ -146,16 +154,28 @@ repeatUntil bdy c = loopChecks "repeatUntil" c bdy $ tillExit (bdy <> branch c e
 --
 -- > doWhile bdy c = tillExit (bdy <> branch c nop exit)
 doWhile :: Specification -> ConditionTerm Bool -> Specification
-doWhile bdy c = loopChecks "doWhile" c bdy $ tillExit (bdy <> branch c nop exit)
+doWhile bdy c = tillExit (bdy <> branch c nop exit) `orErrorFrom` loopChecks "doWhile" c bdy
 
-loopChecks :: String -> ConditionTerm Bool -> Specification -> a -> a
-loopChecks f c bdy x
-  | hasTopLevelExit bdy = error $ f ++ ": top-level exit marker in body"
-  | null condVars = error $ f ++ ": constant loop condition"
-  | null $ concat condVars `intersect` readVars bdy = error $ f ++ ": body does not change the evaluation of the condition"
-  | otherwise = x
-  where condVars = termVarExps c
+orErrorFrom :: a -> Maybe String -> a
+orErrorFrom = (`maybe` error )
 
+loopChecks :: String -> ConditionTerm Bool -> Specification -> Maybe String
+loopChecks caller c bdy
+  | caller `notElem` expactedCallers = unexpectedCallerError
+  | hasTopLevelExit bdy = Just $ caller ++ ": top-level exit marker in body"
+  | null condVars = Just $ caller ++ ": constant loop condition"
+  | any (\p -> null $ concat condVars `intersect` lefts p) $ pathProgress bdy = Just $ caller ++ ": body has dormant symbolic path (no input changes loop condition and it does end in 'exit')"
+  | otherwise = Nothing
+  where
+    condVars = termVarExps c
+    expactedCallers = ["while", "whileNot", "repeatUntil", "doWhile"]
+    unexpectedCallerError = error $
+      unlines
+        [ "checks involving 'pathProgress' assume the caller of 'loopChecks' to be one of " ++ unwords expactedCallers
+        , "(if you see this message while using the public API, please contact the library authors)"
+        ]
+
+  -- the next case works without context information for the four loop constructors currently defined ()
 hasTopLevelExit :: Specification -> Bool
 hasTopLevelExit (ReadInput _ _  _ s) = hasTopLevelExit s
 hasTopLevelExit (WriteOutput _ _ s) = hasTopLevelExit s
@@ -163,6 +183,17 @@ hasTopLevelExit (Branch _ l r s) = hasTopLevelExit l || hasTopLevelExit r || has
 hasTopLevelExit (TillE _ s) = hasTopLevelExit s
 hasTopLevelExit Nop = False
 hasTopLevelExit E = True
+
+-- using () as a stand-in for E
+pathProgress :: Specification -> [[Either SomeVar ()]]
+pathProgress (ReadInput x _ _ s') = ((Left $ someVar x):) <$> pathProgress s'
+pathProgress (WriteOutput _ _ s') = pathProgress s'
+pathProgress (Branch _ s1 s2 s') = pathProgress (s1 <> s') ++ pathProgress (s2 <> s')
+pathProgress (TillE s s') =
+  let directlyTerminatingPaths = fmap init . filter (any isRight) $ pathProgress s
+  in (++) <$> directlyTerminatingPaths <*> pathProgress s'
+pathProgress Nop = [[]]
+pathProgress E = [[Right ()]]
 
 readVars :: Specification -> [SomeVar]
 readVars = nub . go where
