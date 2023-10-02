@@ -161,17 +161,17 @@ orErrorFrom = (`maybe` error )
 
 loopChecks :: String -> ConditionTerm Bool -> Specification -> Maybe String
 loopChecks caller c bdy
-  | caller `notElem` expactedCallers = unexpectedCallerError
+  | caller `notElem` expectedCallers = unexpectedCallerError
   | hasTopLevelExit bdy = Just $ caller ++ ": top-level exit marker in body"
   | null condVars = Just $ caller ++ ": constant loop condition"
   | any (\p -> null $ concat condVars `intersect` lefts p) $ pathProgress bdy = Just $ caller ++ ": body has dormant symbolic path (no input changes loop condition and it does end in 'exit')"
   | otherwise = Nothing
   where
     condVars = termVarExps c
-    expactedCallers = ["while", "whileNot", "repeatUntil", "doWhile"]
+    expectedCallers = ["while", "whileNot", "repeatUntil", "doWhile"]
     unexpectedCallerError = error $
       unlines
-        [ "checks involving 'pathProgress' assume the caller of 'loopChecks' to be one of " ++ unwords expactedCallers
+        [ "checks involving 'pathProgress' assume the caller of 'loopChecks' to be one of " ++ unwords expectedCallers
         , "(if you see this message while using the public API, please contact the library authors)"
         ]
 
