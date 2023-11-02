@@ -1,6 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DataKinds #-}
 module Test.IOTasks.Term.Prelude (
   as,
   -- * Accessors
@@ -28,7 +29,7 @@ module Test.IOTasks.Term.Prelude (
 import Data.Char (isAlphaNum)
 import Data.Express (Expr((:$)), value)
 
-import Test.IOTasks.Internal.Term (Term(..), OutputTerm, toExpr, transparentSubterms, termVarExps)
+import Test.IOTasks.Internal.Term (Term(..), TermKind(..), toExpr, transparentSubterms, termVarExps)
 import Test.IOTasks.Var (VarExp(..), someVarname)
 
 import Type.Match (matchType, inCaseOfE', fallbackCase')
@@ -150,18 +151,18 @@ listLit :: (Show a, Typeable a) => [a] -> Term k [a]
 listLit = ListLit
 
 -- TODO: improve signature?
-filter' :: (Integer -> Bool) -> OutputTerm [Integer] -> OutputTerm [Integer]
+filter' :: (Integer -> Bool) -> Term k [Integer] -> Term 'PartiallyOpaque [Integer]
 filter' p (Opaque x vs ts) = Opaque (value "filter ?p" (filter p) :$ x) vs ts
 filter' p x = Opaque (value "filter ?p" (filter p) :$ toExpr x) (termVarExps x) (transparentSubterms x)
 
-liftOpaqueValue :: Typeable a => (a, String) -> OutputTerm a
+liftOpaqueValue :: Typeable a => (a, String) -> Term 'PartiallyOpaque a
 liftOpaqueValue (x,str) = Opaque (value str x) [] []
 
-liftOpaque :: (Typeable a, Typeable b) => (a -> b, String) -> OutputTerm a -> OutputTerm b
+liftOpaque :: (Typeable a, Typeable b) => (a -> b, String) -> Term k a -> Term 'PartiallyOpaque b
 liftOpaque (f,str) (Opaque x vs ts) = Opaque (value str f :$ x) vs ts
 liftOpaque (f,str) x = Opaque (value str f :$ toExpr x) (termVarExps x) (transparentSubterms x)
 
-liftOpaque2 :: (Typeable a, Typeable b, Typeable c) => (a -> b -> c, String) -> OutputTerm a -> OutputTerm b -> OutputTerm c
+liftOpaque2 :: (Typeable a, Typeable b, Typeable c) => (a -> b -> c, String) -> Term k a -> Term k b -> Term 'PartiallyOpaque c
 liftOpaque2 (f,str) (Opaque x vx tx) (Opaque y vy ty) = Opaque (value str f :$ x :$ y) (vx ++ vy) (tx ++ ty)
 liftOpaque2 (f,str) (Opaque x vx tx) y = Opaque (value str f :$ x :$ toExpr y) (vx ++ termVarExps y) (tx ++ transparentSubterms y)
 liftOpaque2 (f,str) x (Opaque y vy ty) = Opaque (value str f :$ toExpr x :$ y) (termVarExps x ++ vy) (transparentSubterms x ++ ty)

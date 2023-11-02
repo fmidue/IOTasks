@@ -31,8 +31,8 @@ import Data.Typeable
 
 data Constraint (t :: ConstraintType) where
   InputConstraint :: Typeable v => (Var v, Int) -> ValueSet v -> Constraint 'Input
-  ConditionConstraint :: ConditionTerm Bool -> Map SomeVar (Int, [Int]) -> Constraint 'Condition
-  OverflowConstraints :: [ConditionTerm Integer] -> Map SomeVar (Int, [Int]) -> Constraint 'Overflow
+  ConditionConstraint :: Term 'Transparent Bool -> Map SomeVar (Int, [Int]) -> Constraint 'Condition
+  OverflowConstraints :: [Term 'Transparent Integer] -> Map SomeVar (Int, [Int]) -> Constraint 'Overflow
 
 data ConstraintType = Input | Condition | Overflow
 
@@ -72,7 +72,7 @@ constraintTree negMax =
       NoRec _ -> error "constraintTree: impossible"
       RecSame{} -> error "constraintTree: impossible"
     )
-    (\(_,e,_) _ ps t -> Assert (OverflowConstraints (catMaybes $ [ castTerm @Integer t | p <- Set.toList ps, vt <- valueTerms p, t <- withSomeTerm vt transparentSubterms]) e) t)
+    (\(_,e,_) _ ps t -> Assert (OverflowConstraints (catMaybes $ [ castTerm @Integer t | p <- Set.toList ps, vt <- valueTerms p, t <- withSomeTermK vt transparentSubterms]) e) t)
     (\(_,e,_) c l r -> Assert (OverflowConstraints (mapMaybe (castTerm @Integer) $ transparentSubterms c) e) $ Choice (Assert (ConditionConstraint c e) l) (Assert (ConditionConstraint (not' c) e) r))
     (\case {End -> Unfold ; Exit -> id})
     Empty

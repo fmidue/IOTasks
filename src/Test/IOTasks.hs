@@ -17,8 +17,8 @@ module Test.IOTasks (
   Varname, Var, var, intVar, stringVar,
   pPrintSpecification,
   -- * Terms
-  ConditionTerm,
-  OutputTerm,
+  Term,
+  TermKind(..),
   as,
   -- ** Accessors
   currentValue, allValues,

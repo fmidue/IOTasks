@@ -41,7 +41,7 @@ import Text.PrettyPrint hiding ((<>))
 data Specification where
   ReadInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification -> Specification
   WriteOutput :: OptFlag -> Set (OutputPattern 'SpecificationP) -> Specification -> Specification
-  Branch :: ConditionTerm Bool -> Specification -> Specification -> Specification -> Specification
+  Branch :: Term 'Transparent Bool -> Specification -> Specification -> Specification -> Specification
   Nop :: Specification
   TillE :: Specification -> Specification -> Specification
   E :: Specification
@@ -83,7 +83,7 @@ optionalTextOutput = writeOptionalOutput [Wildcard]
 --
 -- * The first 'Specification' argument is the "then-case".
 -- * The second 'Specification' argument is the "else-case".
-branch :: ConditionTerm Bool -> Specification -> Specification -> Specification
+branch :: Term 'Transparent Bool -> Specification -> Specification -> Specification
 branch c t e = Branch c t e nop
 
 nop :: Specification
@@ -107,13 +107,13 @@ exit = E
 --
 -- The 'whileNot' function takes a condition and a body specification, and constructs a loop structure where:
 --
--- * The 'ConditionTerm' 'Bool' argument is the condition to be evaluated at the beginning of each iteration. The loop continues as long as the condition is 'False'.
+-- * The 'Term' 'Transparent' 'Bool' argument is the condition to be evaluated at the beginning of each iteration. The loop continues as long as the condition is 'False'.
 -- * The 'Specification' argument is the body of the loop, executed while the condition is 'False'.
 --
 -- The function assumes that the body specification does not contain a top-level 'exit' marker.
 --
 -- > whileNot c bdy = tillExit (branch c exit bdy)
-whileNot :: ConditionTerm Bool -> Specification -> Specification
+whileNot :: Term 'Transparent Bool -> Specification -> Specification
 whileNot c bdy =
   tillExit (branch c exit bdy) `orErrorFrom` loopChecks "whileNot" c bdy
 
@@ -121,13 +121,13 @@ whileNot c bdy =
 --
 -- The 'while' function takes a condition and a body specification, and constructs a loop structure where:
 --
--- * The 'ConditionTerm' 'Bool' argument is the condition to be evaluated at the beginning of each iteration. The loop continues as long as the condition is 'True'.
+-- * The 'Term' 'Transparent' 'Bool' argument is the condition to be evaluated at the beginning of each iteration. The loop continues as long as the condition is 'True'.
 -- * The 'Specification' argument is the body of the loop, executed while the condition is 'True'.
 --
 -- The function assumes that the body specification does not contain a top-level 'exit' marker.
 --
 -- > while c bdy = tillExit (branch c bdy exit)
-while :: ConditionTerm Bool -> Specification -> Specification
+while :: Term 'Transparent Bool -> Specification -> Specification
 while c bdy = tillExit (branch c bdy exit) `orErrorFrom` loopChecks "while" c bdy
 
 -- | Represents a loop structure in a specification, performing the body at least once and then further while the condition does not hold.
@@ -135,12 +135,12 @@ while c bdy = tillExit (branch c bdy exit) `orErrorFrom` loopChecks "while" c bd
 -- The 'repeatUntil' function takes a body specification and a condition, and constructs a loop structure where:
 --
 -- * The 'Specification' argument is the body of the loop, executed at least once and then further times while the condition is 'False'.
--- * The 'ConditionTerm' 'Bool' argument is the condition to be evaluated at the end of each iteration. The loop continues until the condition becomes 'True'.
+-- * The 'Term' 'Transparent' 'Bool' argument is the condition to be evaluated at the end of each iteration. The loop continues until the condition becomes 'True'.
 --
 -- The function assumes that the body specification does not contain a top-level 'exit' marker.
 --
 -- > repeatUntil bdy c = tillExit (bdy <> branch c exit nop)
-repeatUntil :: Specification -> ConditionTerm Bool -> Specification
+repeatUntil :: Specification -> Term 'Transparent Bool -> Specification
 repeatUntil bdy c = tillExit (bdy <> branch c exit nop) `orErrorFrom` loopChecks "repeatUntil" c bdy
 
 -- | Represents a loop structure in a specification, performing the body at least once and then further while the condition holds.
@@ -148,18 +148,18 @@ repeatUntil bdy c = tillExit (bdy <> branch c exit nop) `orErrorFrom` loopChecks
 -- The 'doWhile' function takes a body specification and a condition, and constructs a loop structure where:
 --
 -- * The 'Specification' argument is the body of the loop, executed at least once and then further times while the condition is 'True'.
--- * The 'ConditionTerm' 'Bool' argument is the condition to be evaluated at the end of each iteration. The loop continues until the condition becomes 'False'.
+-- * The 'Term' 'Transparent' 'Bool' argument is the condition to be evaluated at the end of each iteration. The loop continues until the condition becomes 'False'.
 --
 -- The function assumes that the body specification does not contain a top-level 'exit' marker.
 --
 -- > doWhile bdy c = tillExit (bdy <> branch c nop exit)
-doWhile :: Specification -> ConditionTerm Bool -> Specification
+doWhile :: Specification -> Term 'Transparent Bool -> Specification
 doWhile bdy c = tillExit (bdy <> branch c nop exit) `orErrorFrom` loopChecks "doWhile" c bdy
 
 orErrorFrom :: a -> Maybe String -> a
 orErrorFrom = (`maybe` error )
 
-loopChecks :: String -> ConditionTerm Bool -> Specification -> Maybe String
+loopChecks :: String -> Term k Bool -> Specification -> Maybe String
 loopChecks caller c bdy
   | caller `notElem` expectedCallers = unexpectedCallerError
   | hasTopLevelExit bdy = Just $ caller ++ ": top-level exit marker in body"
@@ -254,7 +254,7 @@ data RecStruct p x a r = NoRec r | RecSub p x a | RecSame p x a | RecBoth p x a 
 sem :: forall st p a.
   (forall v. (Typeable v,Read v,Show v) => st -> Var v -> ValueSet v -> InputMode -> RecStruct p (a->a) st a) -> (RecStruct p () a a -> a) ->
   (st -> OptFlag -> Set (OutputPattern 'SpecificationP) -> a -> a) ->
-  (st -> ConditionTerm Bool -> a -> a -> a) ->
+  (st -> Term 'Transparent Bool -> a -> a -> a) ->
   (Action -> a -> a) ->
   a ->
   st -> Specification -> a
@@ -271,7 +271,7 @@ sem f f' g h i z st s = runIdentity $ semM
 semM :: forall m st p a. Monad m =>
   (forall v. (Typeable v,Read v,Show v) => st -> Var v -> ValueSet v -> InputMode -> m (RecStruct p (a->a) st a)) -> (RecStruct p () a a -> m a) ->
   (st -> OptFlag -> Set (OutputPattern 'SpecificationP) -> m a -> m a) ->
-  (st -> ConditionTerm Bool -> m a -> m a -> m a) ->
+  (st -> Term 'Transparent Bool -> m a -> m a -> m a) ->
   (Action -> m a -> m a) ->
   m a ->
   st -> Specification -> m a

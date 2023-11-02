@@ -1,7 +1,6 @@
 module Test.IOTasks.Term (
   Term,
-  ConditionTerm,
-  OutputTerm,
+  TermKind(..),
   oEval,
   termVarExps,
   transparentSubterms,

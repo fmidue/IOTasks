@@ -9,8 +9,6 @@
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 module Test.IOTasks.Internal.Term (
   Term(..),
-  ConditionTerm,
-  OutputTerm,
   TermKind(..),
   oEval,
   evalI, evalIs,
@@ -18,7 +16,9 @@ module Test.IOTasks.Internal.Term (
   toExpr,
   showTerm, showIndexedTerm,
   SomeTerm(..), withSomeTerm,
+  SomeTermK(..), withSomeTermK,
   castTerm,
+  compareK,
   ) where
 
 import Control.Applicative ( liftA2 )
@@ -43,9 +43,6 @@ import Type.Match (matchType, fallbackCase', inCaseOfE')
 import Type.Reflection
 
 data TermKind = Transparent | PartiallyOpaque
-
-type ConditionTerm = Term 'Transparent
-type OutputTerm = Term 'PartiallyOpaque
 
 data Term (k :: TermKind) a where
   Add :: Num a => Term k a -> Term k a -> Term k a
@@ -199,11 +196,20 @@ showUnary op x m = concat [op ++" (", showTerm' x m, ")"]
 
 data SomeTerm k where
   SomeTerm :: Typeable a => Term k a -> SomeTerm k
+
+withSomeTerm :: SomeTerm k -> (forall a. Typeable a => Term k a -> r) -> r
+withSomeTerm (SomeTerm t) f = f t
+
+data SomeTermK where
+  SomeTermK :: SomeTerm k -> SomeTermK
+
+withSomeTermK :: SomeTermK -> (forall (k :: TermKind) a. Typeable a => Term k a -> r) -> r
+withSomeTermK (SomeTermK t) = withSomeTerm t
 --
 someTerm :: Typeable a => Term k a -> SomeTerm k
 someTerm = SomeTerm
 
-transparentSubterms :: (Typeable k, Typeable a) => Term k a -> [SomeTerm 'Transparent]
+transparentSubterms :: (Typeable a) => Term k a -> [SomeTerm 'Transparent]
 transparentSubterms t@(Add x y) = maybeToList (someTerm <$> maybeTransparentTerm t) ++ transparentSubterms x ++ transparentSubterms y
 transparentSubterms t@(Sub x y) = maybeToList (someTerm <$> maybeTransparentTerm t) ++ transparentSubterms x ++ transparentSubterms y
 transparentSubterms t@(Mul x y) = maybeToList (someTerm <$> maybeTransparentTerm t) ++ transparentSubterms x ++ transparentSubterms y
@@ -227,34 +233,29 @@ transparentSubterms t@(Current _ _) =  maybeToList (someTerm <$> maybeTransparen
 transparentSubterms t@(All _ _) =  maybeToList (someTerm <$> maybeTransparentTerm t)
 transparentSubterms (Opaque _ _ ts) = ts
 
-maybeTransparentTerm :: forall k a. (Typeable k, Typeable a) => Term k a -> Maybe (Term 'Transparent a)
-maybeTransparentTerm t = matchType @k
-  [ inCaseOfE' @Transparent $ \HRefl -> Just t
-  , inCaseOfE' @PartiallyOpaque $ \HRefl ->
-      case t of
-        Opaque{} -> Nothing
-        (Add x y) -> Add <$> maybeTransparentTerm x <*> maybeTransparentTerm y
-        (Sub x y) -> Sub <$> maybeTransparentTerm x <*> maybeTransparentTerm y
-        (Mul x y) -> Mul <$> maybeTransparentTerm x <*> maybeTransparentTerm y
-        (Equals x y) -> Equals <$> maybeTransparentTerm x <*> maybeTransparentTerm y
-        (Gt x y) -> Gt <$> maybeTransparentTerm x <*> maybeTransparentTerm y
-        (Ge x y) -> Ge <$> maybeTransparentTerm x <*> maybeTransparentTerm y
-        (Lt x y) -> Lt <$> maybeTransparentTerm x <*> maybeTransparentTerm y
-        (Le x y) -> Le <$> maybeTransparentTerm x <*> maybeTransparentTerm y
-        (And x y) -> And <$> maybeTransparentTerm x <*> maybeTransparentTerm y
-        (Or x y) -> Or <$> maybeTransparentTerm x <*> maybeTransparentTerm y
-        (IsIn x y) -> IsIn <$> maybeTransparentTerm x <*> maybeTransparentTerm y
-        (Sum x) -> Sum <$> maybeTransparentTerm x
-        (Product x) -> Product <$> maybeTransparentTerm x
-        (Length x) -> Length <$> maybeTransparentTerm x
-        (Reverse x) -> Reverse <$> maybeTransparentTerm x
-        (Not x) -> Not <$> maybeTransparentTerm x
-        (IntLit x) -> Just $ IntLit x
-        (ListLit xs) -> Just $ ListLit xs
-        (BoolLit x) -> Just $ BoolLit x
-        (Current x n) -> Just $ Current x n
-        (All x n) -> Just $ All x n
-  ]
+maybeTransparentTerm :: forall (k :: TermKind) a. (Typeable a) => Term k a -> Maybe (Term 'Transparent a)
+maybeTransparentTerm Opaque{} = Nothing
+maybeTransparentTerm (Add x y) = Add <$> maybeTransparentTerm x <*> maybeTransparentTerm y
+maybeTransparentTerm (Sub x y) = Sub <$> maybeTransparentTerm x <*> maybeTransparentTerm y
+maybeTransparentTerm (Mul x y) = Mul <$> maybeTransparentTerm x <*> maybeTransparentTerm y
+maybeTransparentTerm (Equals x y) = Equals <$> maybeTransparentTerm x <*> maybeTransparentTerm y
+maybeTransparentTerm (Gt x y) = Gt <$> maybeTransparentTerm x <*> maybeTransparentTerm y
+maybeTransparentTerm (Ge x y) = Ge <$> maybeTransparentTerm x <*> maybeTransparentTerm y
+maybeTransparentTerm (Lt x y) = Lt <$> maybeTransparentTerm x <*> maybeTransparentTerm y
+maybeTransparentTerm (Le x y) = Le <$> maybeTransparentTerm x <*> maybeTransparentTerm y
+maybeTransparentTerm (And x y) = And <$> maybeTransparentTerm x <*> maybeTransparentTerm y
+maybeTransparentTerm (Or x y) = Or <$> maybeTransparentTerm x <*> maybeTransparentTerm y
+maybeTransparentTerm (IsIn x y) = IsIn <$> maybeTransparentTerm x <*> maybeTransparentTerm y
+maybeTransparentTerm (Sum x) = Sum <$> maybeTransparentTerm x
+maybeTransparentTerm (Product x) = Product <$> maybeTransparentTerm x
+maybeTransparentTerm (Length x) = Length <$> maybeTransparentTerm x
+maybeTransparentTerm (Reverse x) = Reverse <$> maybeTransparentTerm x
+maybeTransparentTerm (Not x) = Not <$> maybeTransparentTerm x
+maybeTransparentTerm (IntLit x) = Just $ IntLit x
+maybeTransparentTerm (ListLit xs) = Just $ ListLit xs
+maybeTransparentTerm (BoolLit x) = Just $ BoolLit x
+maybeTransparentTerm (Current x n) = Just $ Current x n
+maybeTransparentTerm (All x n) = Just $ All x n
 
 castTerm :: forall {k} a. Typeable a => SomeTerm k -> Maybe (Term k a)
 castTerm (SomeTerm (t :: Term k b)) =
@@ -273,8 +274,8 @@ instance Typeable a => Eq (Term k a) where
 instance Typeable a => Ord (Term k a) where
   compare = compare `on` toExpr
 
-withSomeTerm :: SomeTerm k -> (forall a. Typeable a => Term k a -> r) -> r
-withSomeTerm (SomeTerm t) f = f t
+compareK :: Typeable a => Term k1 a -> Term k2 a -> Ordering
+compareK x y = compare (toExpr x) (toExpr y)
 
 currentE :: VarExp e => e -> Int -> Expr
 currentE x n = case varExpType x of

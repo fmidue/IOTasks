@@ -32,7 +32,7 @@ data OutputPattern (t :: PatternType) where
   Wildcard :: OutputPattern t
   Text :: String -> OutputPattern t
   Sequence :: OutputPattern t -> OutputPattern t -> OutputPattern t
-  Value :: (Typeable a, Show a) => OutputTerm a -> OutputPattern 'SpecificationP
+  Value :: forall (k :: TermKind) a. (Typeable a, Show a) => Term k a -> OutputPattern 'SpecificationP
 
 data PatternType = SpecificationP | TraceP
 
@@ -42,7 +42,7 @@ wildcard = Wildcard
 text :: String -> OutputPattern t
 text = Text
 
-value :: (Typeable a, Show a) => OutputTerm a -> OutputPattern 'SpecificationP
+value :: (Typeable a, Show a) => Term k a -> OutputPattern 'SpecificationP
 value = Value
 
 instance Eq (OutputPattern t) where
@@ -60,9 +60,9 @@ instance Ord (OutputPattern t) where
     case compare x1 y1 of
       EQ -> compare x2 y2
       r -> r
-  compare (Value (t :: OutputTerm a)) (Value (u :: OutputTerm b)) =
+  compare (Value (t :: Term k1 a)) (Value (u :: Term k2 b)) =
     case eqT @a @b of
-      Just Refl -> compare t u
+      Just Refl -> compareK t u
       Nothing -> compare (typeRep (Proxy @a)) (typeRep (Proxy @b))
   compare Value{} _ = GT
   compare _ Value{} = LT
@@ -81,11 +81,11 @@ instance Semigroup (OutputPattern t) where
 instance Monoid (OutputPattern t) where
   mempty = Text ""
 
-valueTerms :: OutputPattern t -> [SomeTerm 'PartiallyOpaque]
+valueTerms :: OutputPattern t -> [SomeTermK]
 valueTerms Wildcard = []
 valueTerms Text{} = []
 valueTerms (Sequence x y) = valueTerms x ++ valueTerms y
-valueTerms (Value t) = [SomeTerm t]
+valueTerms (Value t) = [SomeTermK $ SomeTerm t]
 
 evalPattern :: ValueMap -> OutputPattern t -> (OverflowWarning, OutputPattern 'TraceP)
 evalPattern _ Wildcard = (NoOverflow, Wildcard)

@@ -22,7 +22,7 @@ import Text.PrettyPrint (Doc)
 data Specification where
   ReadInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification -> Specification
   WriteOutput :: OptFlag -> Set (OutputPattern 'SpecificationP) -> Specification -> Specification
-  Branch :: ConditionTerm Bool -> Specification -> Specification -> Specification -> Specification
+  Branch :: Term 'Transparent Bool -> Specification -> Specification -> Specification -> Specification
   Nop :: Specification
   TillE :: Specification -> Specification -> Specification
   E :: Specification
@@ -36,7 +36,7 @@ readInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> S
 writeOutput :: [OutputPattern 'SpecificationP] -> Specification
 writeOptionalOutput :: [OutputPattern 'SpecificationP] -> Specification
 optionalTextOutput :: Specification
-branch :: ConditionTerm Bool -> Specification -> Specification -> Specification
+branch :: Term 'Transparent Bool -> Specification -> Specification -> Specification
 nop :: Specification
 tillExit :: Specification -> Specification
 exit :: Specification

@@ -17,8 +17,6 @@ module Test.IOTasks.Random (
   Varname, Var, var, intVar, stringVar,
   pPrintSpecification,
   -- * Terms
-  ConditionTerm,
-  OutputTerm,
   as,
   -- ** Accessors
   currentValue, allValues,

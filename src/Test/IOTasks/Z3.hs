@@ -237,7 +237,7 @@ forStringElse string normal = matchType @a
   , fallbackCase' normal
   ]
 
-z3Predicate :: Typeable x => Goal -> ConditionTerm x -> Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R AST
+z3Predicate :: Typeable x => Goal -> Term 'Transparent x -> Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R AST
 z3Predicate goal (Add x y) e vars = z3PredicateBinary goal x y e vars $ binary {
   binaryNoList = \a b -> mkAdd [a,b]
 }
@@ -251,19 +251,19 @@ z3Predicate goal (Equals x y) e vars = z3PredicateBinary goal x y e vars $ binar
   binaryNoList = mkEq,
   binaryListAB = compareSymbolic (Strict EQ)
   }
-z3Predicate goal (Gt (x :: ConditionTerm a) y) e vars = z3PredicateBinary goal x y e vars $ binary {
+z3Predicate goal (Gt (x :: Term k a) y) e vars = z3PredicateBinary goal x y e vars $ binary {
   binaryNoList = forStringElse @a (\a b -> mkNot =<< mkStrLe a b) mkGt,
   binaryListAB = compareSymbolic (Strict GT)
   }
-z3Predicate goal (Ge (x :: ConditionTerm a) y) e vars = z3PredicateBinary goal x y e vars $ binary {
+z3Predicate goal (Ge (x :: Term k a) y) e vars = z3PredicateBinary goal x y e vars $ binary {
   binaryNoList = forStringElse @a (\a b -> mkNot =<< mkStrLt a b) mkGe,
   binaryListAB = compareSymbolic (ReflexiveClosure GT)
   }
-z3Predicate goal (Lt (x :: ConditionTerm a) y) e vars = z3PredicateBinary goal x y e vars $ binary {
+z3Predicate goal (Lt (x :: Term k a) y) e vars = z3PredicateBinary goal x y e vars $ binary {
   binaryNoList = forStringElse @a mkStrLt mkLt,
   binaryListAB = compareSymbolic (Strict LT)
   }
-z3Predicate goal (Le (x :: ConditionTerm a) y) e vars = z3PredicateBinary goal x y e vars $ binary {
+z3Predicate goal (Le (x :: Term k a) y) e vars = z3PredicateBinary goal x y e vars $ binary {
   binaryNoList = forStringElse @a mkStrLe mkLe,
   binaryListAB = compareSymbolic (ReflexiveClosure LT)
   }
@@ -316,23 +316,23 @@ binary :: Bin z3
 binary = Bin err err err err
   where err = error "does not happen with currently supported functions"
 
-z3PredicateUnary :: forall a. Typeable a => Goal -> ConditionTerm a ->  Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Un Z3R -> Z3R AST
+z3PredicateUnary :: forall a. Typeable a => Goal -> Term 'Transparent a ->  Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Un Z3R -> Z3R AST
 z3PredicateUnary goal x e vars Un{..} = case typeRep @a of
   App c _ -> case eqTypeRep c (typeRep @[]) of
     Just HRefl -> case1 x -- a ~ [a1]
     Nothing -> case2 x -- a ~ f a1
   _ -> case2 x --
   where
-    case1 :: forall a. Typeable [a] => ConditionTerm [a] -> Z3R AST
+    case1 :: forall a. Typeable [a] => Term 'Transparent [a] -> Z3R AST
     case1 x = do
       rx <- listASTs goal x e vars
       case rx of
         Right xs -> unaryList xs
         Left x -> unaryNoList x
-    case2 :: forall a. Typeable a => ConditionTerm a -> Z3R AST
+    case2 :: forall a. Typeable a => Term 'Transparent a -> Z3R AST
     case2 x = unaryNoList =<< z3Predicate goal x e vars
 
-z3PredicateBinary :: forall a b. (Typeable a, Typeable b) => Goal -> ConditionTerm a -> ConditionTerm b ->  Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Bin Z3R -> Z3R AST
+z3PredicateBinary :: forall a b. (Typeable a, Typeable b) => Goal -> Term 'Transparent a -> Term 'Transparent b ->  Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Bin Z3R -> Z3R AST
 z3PredicateBinary goal x y e vars Bin{..} = case typeRep @a of
   App ca _ -> case eqTypeRep ca (typeRep @[]) of
     Just HRefl -> case typeRep @b of
@@ -351,7 +351,7 @@ z3PredicateBinary goal x y e vars Bin{..} = case typeRep @a of
       Nothing -> case4 x y -- b ~ f b1
     _ -> case4 x y --
   where
-  case1 :: forall a b. (Typeable [a], Typeable [b]) => ConditionTerm [a] -> ConditionTerm [b] -> Z3R AST
+  case1 :: forall a b. (Typeable [a], Typeable [b]) => Term 'Transparent [a] -> Term 'Transparent [b] -> Z3R AST
   case1 x y = do
     rx <- listASTs goal x e vars
     ry <- listASTs goal y e vars
@@ -360,21 +360,21 @@ z3PredicateBinary goal x y e vars Bin{..} = case typeRep @a of
       (Right xs,Left y) -> binaryListA xs y
       (Left x,Right ys) -> binaryListB x ys
       (Left x,Left y) -> binaryNoList x y
-  case2 :: forall a b. (Typeable [a], Typeable b) => ConditionTerm [a] -> ConditionTerm b -> Z3R AST
+  case2 :: forall a b. (Typeable [a], Typeable b) => Term 'Transparent [a] -> Term 'Transparent b -> Z3R AST
   case2 x y = do
     exs <- listASTs goal x e vars
     y' <- z3Predicate goal y e vars
     case exs of
       Right xs -> binaryListA xs y'
       Left x -> binaryNoList x y'
-  case3 :: forall a b. (Typeable a, Typeable [b]) => ConditionTerm a -> ConditionTerm [b] -> Z3R AST
+  case3 :: forall a b. (Typeable a, Typeable [b]) => Term 'Transparent a -> Term 'Transparent [b] -> Z3R AST
   case3 x y = do
     x' <- z3Predicate goal x e vars
     eys <- listASTs goal y e vars
     case eys of
       Right ys -> binaryListB x' ys
       Left y -> binaryNoList x' y
-  case4 :: forall a b. (Typeable a, Typeable b) => ConditionTerm a -> ConditionTerm b -> Z3R AST
+  case4 :: forall a b. (Typeable a, Typeable b) => Term 'Transparent a -> Term 'Transparent b -> Z3R AST
   case4 x y = do
     xP <- z3Predicate goal x e vars
     yP <- z3Predicate goal y e vars
@@ -417,7 +417,7 @@ mkIntermediateBoolean x = do
   b <- mkFreshBoolVar "b"
   mkEq b x
 
-listASTs :: forall a. Typeable [a] => Goal -> ConditionTerm [a] -> Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R (Either AST [AST])
+listASTs :: forall a. Typeable [a] => Goal -> Term 'Transparent [a] -> Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R (Either AST [AST])
 listASTs goal (Reverse (Reverse t)) e vars = listASTs goal t e vars
 listASTs goal (Reverse t) e vars = do
   r <- listASTs goal t e vars
@@ -474,7 +474,7 @@ weaveVariables vs n e =
 lookupList :: Eq a => [a] -> [(a, b)] -> [b]
 lookupList vs vars = mapMaybe (`List.lookup` vars) vs
 
-assertOverflowChecks :: Goal -> ConditionTerm Integer ->  Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R ()
+assertOverflowChecks :: Goal -> Term 'Transparent Integer ->  Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R ()
 assertOverflowChecks goal t e vars = do
   ast <- z3Predicate goal t e vars
   overflowConstraints goal ast

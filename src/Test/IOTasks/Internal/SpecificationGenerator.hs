@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE DataKinds #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Test.IOTasks.Internal.SpecificationGenerator (specGen, shrinkSpec, loopBodyGen) where
 
@@ -62,13 +63,13 @@ someInputsWithHole xs nMax = do
   (is1,is2) <- splitAt p <$> vectorOf n (input xs)
   pure $ \s -> mconcat $ is1 ++ [s] ++ is2
 
-outputOneof :: (Typeable a, Show a) => Gen (OutputTerm a) -> Gen Specification
+outputOneof :: (Typeable a, Show a) => Gen (Term k a) -> Gen Specification
 outputOneof = outputOneof' False
 
-_optionalOutputOneof :: (Typeable a, Show a) => Gen (OutputTerm a) -> Gen Specification
+_optionalOutputOneof :: (Typeable a, Show a) => Gen (Term k a) -> Gen Specification
 _optionalOutputOneof = outputOneof' True
 
-outputOneof' :: (Typeable a, Show a) => Bool -> Gen (OutputTerm a) -> Gen Specification
+outputOneof' :: (Typeable a, Show a) => Bool -> Gen (Term k a) -> Gen Specification
 outputOneof' b ts = do
   t <- ts
   pure $ (if b then writeOptionalOutput else writeOutput) [Value t]
@@ -97,7 +98,7 @@ loopBody xs loopCondition = do
     , pure $ branch (not' $ condTerm cond) s1' exit
     ]
 
-data Condition = forall a. (Typeable a, Read a, Show a) => Condition { condTerm :: ConditionTerm Bool, _progressInfo :: (Var a,ValueSet a) }
+data Condition = forall a. (Typeable a, Read a, Show a) => Condition { condTerm :: Term 'Transparent Bool, _progressInfo :: (Var a,ValueSet a) }
 
 -- generates a numeric condition of the form
 -- f xs `comp` n
@@ -111,7 +112,7 @@ progressCondition lists nums = do
   return $ Condition (f (as @[Integer] $ allValues xs) `comp` n) (xs,vs)
 
 -- simple terms
-intTerm :: [SomeVar] -> [SomeVar] -> Gen (OutputTerm Integer)
+intTerm :: [SomeVar] -> [SomeVar] -> Gen (Term k Integer)
 intTerm lists xs =
   oneof $ concat
     [ [ unary  | not $ null lists ]
