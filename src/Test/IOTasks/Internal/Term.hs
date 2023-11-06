@@ -188,7 +188,7 @@ showTerm' (IntLit x) _ = show x
 showTerm' (ListLit xs) _ = show xs
 showTerm' t@Opaque{} _ = show t -- TODO: improve
 
-showBinary :: (Typeable a, Typeable b) => String -> Term k a -> Term k b -> Maybe (Map SomeVar (Int,[Int])) -> String
+showBinary :: (Typeable a, Typeable b) => String -> Term k1 a -> Term k2 b -> Maybe (Map SomeVar (Int,[Int])) -> String
 showBinary op x y m = concat ["(",showTerm' x m, ") ",op," (", showTerm' y m,")"]
 
 showUnary :: Typeable a => String -> Term k a -> Maybe (Map SomeVar (Int,[Int])) -> String
@@ -209,7 +209,7 @@ withSomeTermK (SomeTermK t) = withSomeTerm t
 someTerm :: Typeable a => Term k a -> SomeTerm k
 someTerm = SomeTerm
 
-transparentSubterms :: (Typeable a) => Term k a -> [SomeTerm 'Transparent]
+transparentSubterms :: Typeable a => Term k a -> [SomeTerm 'Transparent]
 transparentSubterms t@(Add x y) = maybeToList (someTerm <$> maybeTransparentTerm t) ++ transparentSubterms x ++ transparentSubterms y
 transparentSubterms t@(Sub x y) = maybeToList (someTerm <$> maybeTransparentTerm t) ++ transparentSubterms x ++ transparentSubterms y
 transparentSubterms t@(Mul x y) = maybeToList (someTerm <$> maybeTransparentTerm t) ++ transparentSubterms x ++ transparentSubterms y
@@ -233,7 +233,7 @@ transparentSubterms t@(Current _ _) =  maybeToList (someTerm <$> maybeTransparen
 transparentSubterms t@(All _ _) =  maybeToList (someTerm <$> maybeTransparentTerm t)
 transparentSubterms (Opaque _ _ ts) = ts
 
-maybeTransparentTerm :: forall (k :: TermKind) a. (Typeable a) => Term k a -> Maybe (Term 'Transparent a)
+maybeTransparentTerm :: forall (k :: TermKind) a. Typeable a => Term k a -> Maybe (Term 'Transparent a)
 maybeTransparentTerm Opaque{} = Nothing
 maybeTransparentTerm (Add x y) = Add <$> maybeTransparentTerm x <*> maybeTransparentTerm y
 maybeTransparentTerm (Sub x y) = Sub <$> maybeTransparentTerm x <*> maybeTransparentTerm y
