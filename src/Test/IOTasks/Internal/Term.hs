@@ -6,7 +6,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
-{-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 module Test.IOTasks.Internal.Term (
   Term(..),
   TermKind(..),
@@ -203,8 +202,10 @@ withSomeTerm (SomeTerm t) f = f t
 data SomeTermK where
   SomeTermK :: SomeTerm k -> SomeTermK
 
+{- HLINT ignore withSomeTermK "Eta reduce" -}
+-- eta-reduced version causes type error in Haddock workflow
 withSomeTermK :: SomeTermK -> (forall (k :: TermKind) a. Typeable a => Term k a -> r) -> r
-withSomeTermK (SomeTermK t) = withSomeTerm t
+withSomeTermK (SomeTermK t) f = withSomeTerm t f
 --
 someTerm :: Typeable a => Term k a -> SomeTerm k
 someTerm = SomeTerm
