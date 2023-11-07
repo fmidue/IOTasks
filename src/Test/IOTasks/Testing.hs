@@ -102,9 +102,9 @@ taskCheckWithOutcome Args{..} prog spec = do
   --
   when verbose $ do
     putLnP output $ unwords
-      ["generated", show nInputs,"input sequences covering", show satPaths, "satisfiable paths"]
+      ["generated", show nInputs,"input", useSingularIf (nInputs == 1) "sequence" "sequences", "covering", show satPaths, "satisfiable", useSingularIf (nInputs == 1) "path" "paths"]
     when (timeouts > 0) $
-      putLnP output $ unwords ["---",show timeouts, "paths timed out"]
+      putLnP output $ unwords ["---",show timeouts, useSingularIf (timeouts == 1) "path" "paths", "timed out"]
   --
   printP output $ (if simplifyFeedback then pPrintOutcomeSimple else pPrintOutcome) out
   pure out
@@ -220,7 +220,7 @@ pPrintOutcomeSimple :: Outcome -> Doc
 pPrintOutcomeSimple (Outcome core hints) = pPrintOutcomeHints hints $+$ pPrintCoreOutcome True core
 
 pPrintCoreOutcome :: Bool -> CoreOutcome -> Doc
-pPrintCoreOutcome _ (Success n) = text $ unwords ["+++ OK, passed",show n,"tests."]
+pPrintCoreOutcome _ (Success n) = text $ unwords ["+++ OK, passed",show n,useSingularIf (n==1) "test." "tests."]
 pPrintCoreOutcome _ GaveUp = text "*** Gave up!"
 pPrintCoreOutcome simple (Failure is et at r) = vcat
   [ text "*** Failure"
@@ -267,3 +267,8 @@ catSATs :: [SatResult a] -> [a]
 catSATs [] = []
 catSATs (SAT x : xs) = x : catSATs xs
 catSATs (_:xs) = catSATs xs
+
+useSingularIf :: Bool -> String -> String -> String
+useSingularIf p singular plural
+  | p = singular
+  | otherwise = plural
