@@ -164,7 +164,7 @@ loopChecks caller c bdy
   | caller `notElem` expectedCallers = unexpectedCallerError
   | hasTopLevelExit bdy = Just $ caller ++ ": top-level exit marker in body"
   | null condVars = Just $ caller ++ ": constant loop condition"
-  | any (\p -> null $ concat condVars `intersect` lefts p) $ pathProgress bdy = Just $ caller ++ ": body has dormant symbolic path (no input changes loop condition and it does end in 'exit')"
+  | any (\p -> null $ concat condVars `intersect` lefts p) $ pathProgress bdy = Just $ caller ++ ": body has dormant symbolic path (no input changes loop condition and it does not end in 'exit')"
   | otherwise = Nothing
   where
     condVars = termVarExps c
