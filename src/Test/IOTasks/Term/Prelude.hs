@@ -162,7 +162,7 @@ liftOpaque :: (Typeable a, Typeable b) => (a -> b, String) -> Term k a -> Term '
 liftOpaque (f,str) (Opaque x vs ts) = Opaque (value str f :$ x) vs ts
 liftOpaque (f,str) x = Opaque (value str f :$ toExpr x) (termVarExps x) (transparentSubterms x)
 
-liftOpaque2 :: (Typeable a, Typeable b, Typeable c) => (a -> b -> c, String) -> Term k a -> Term k' b -> Term 'PartiallyOpaque c
+liftOpaque2 :: (Typeable a, Typeable b, Typeable c) => (a -> b -> c, String) -> Term k a -> Term k b -> Term 'PartiallyOpaque c
 liftOpaque2 (f,str) (Opaque x vx tx) (Opaque y vy ty) = Opaque (value str f :$ x :$ y) (vx ++ vy) (tx ++ ty)
 liftOpaque2 (f,str) (Opaque x vx tx) y = Opaque (value str f :$ x :$ toExpr y) (vx ++ termVarExps y) (tx ++ transparentSubterms y)
 liftOpaque2 (f,str) x (Opaque y vy ty) = Opaque (value str f :$ toExpr x :$ y) (termVarExps x ++ vy) (transparentSubterms x ++ ty)
