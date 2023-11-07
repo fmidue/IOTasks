@@ -226,7 +226,7 @@ pPrintCoreOutcome simple (Failure is et at r) = vcat
   [ text "*** Failure"
   , text ("Input sequence "++ showInputs is)
   , text ("Expected run: " ++ showTraceHow et)
-  , text ("Actual run: " ++ showTraceHow at)
+  , text ("Actual run: " ++ showTraceSimple at)
   , text "Error:"
   , nest 2 (pPrintResult r)
   ]
