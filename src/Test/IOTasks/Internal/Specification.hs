@@ -107,7 +107,7 @@ exit = E
 --
 -- The 'whileNot' function takes a condition and a body specification, and constructs a loop structure where:
 --
--- * The 'Term' 'Transparent' 'Bool' argument is the condition to be evaluated at the beginning of each iteration. The loop continues as long as the condition is 'False'.
+-- * The 'Term' @'@'Transparent' 'Bool' argument is the condition to be evaluated at the beginning of each iteration. The loop continues as long as the condition is 'False'.
 -- * The 'Specification' argument is the body of the loop, executed while the condition is 'False'.
 --
 -- The function assumes that the body specification does not contain a top-level 'exit' marker.
@@ -121,7 +121,7 @@ whileNot c bdy =
 --
 -- The 'while' function takes a condition and a body specification, and constructs a loop structure where:
 --
--- * The 'Term' 'Transparent' 'Bool' argument is the condition to be evaluated at the beginning of each iteration. The loop continues as long as the condition is 'True'.
+-- * The 'Term' @'@'Transparent' 'Bool' argument is the condition to be evaluated at the beginning of each iteration. The loop continues as long as the condition is 'True'.
 -- * The 'Specification' argument is the body of the loop, executed while the condition is 'True'.
 --
 -- The function assumes that the body specification does not contain a top-level 'exit' marker.
@@ -135,7 +135,7 @@ while c bdy = tillExit (branch c bdy exit) `orErrorFrom` loopChecks "while" c bd
 -- The 'repeatUntil' function takes a body specification and a condition, and constructs a loop structure where:
 --
 -- * The 'Specification' argument is the body of the loop, executed at least once and then further times while the condition is 'False'.
--- * The 'Term' 'Transparent' 'Bool' argument is the condition to be evaluated at the end of each iteration. The loop continues until the condition becomes 'True'.
+-- * The 'Term' @'@'Transparent' 'Bool' argument is the condition to be evaluated at the end of each iteration. The loop continues until the condition becomes 'True'.
 --
 -- The function assumes that the body specification does not contain a top-level 'exit' marker.
 --
@@ -148,7 +148,7 @@ repeatUntil bdy c = tillExit (bdy <> branch c exit nop) `orErrorFrom` loopChecks
 -- The 'doWhile' function takes a body specification and a condition, and constructs a loop structure where:
 --
 -- * The 'Specification' argument is the body of the loop, executed at least once and then further times while the condition is 'True'.
--- * The 'Term' 'Transparent' 'Bool' argument is the condition to be evaluated at the end of each iteration. The loop continues until the condition becomes 'False'.
+-- * The 'Term' @'@'Transparent' 'Bool' argument is the condition to be evaluated at the end of each iteration. The loop continues until the condition becomes 'False'.
 --
 -- The function assumes that the body specification does not contain a top-level 'exit' marker.
 --
