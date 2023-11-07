@@ -6,6 +6,7 @@ module Test.IOTasks.Term (
   transparentSubterms,
   showTerm, showIndexedTerm,
   SomeTerm(..), withSomeTerm,
+  SomeTermK(..), withSomeTermK,
   castTerm,
   ) where
 
