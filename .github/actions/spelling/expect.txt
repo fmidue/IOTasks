@@ -13,6 +13,7 @@ foldr
 fprop
 fst
 GHC
+HLINT
 HRefl
 hspec
 IList
