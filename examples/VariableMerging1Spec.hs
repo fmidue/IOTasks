@@ -11,18 +11,18 @@ import Data.Functor ((<&>))
 -- variable merging and multiple exits
 specification :: Specification
 specification =
-  optionalTextOutput <>
+  anyOptionalOutput <>
   readInput x ints AssumeValid <>
-  optionalTextOutput <>
+  anyOptionalOutput <>
   readInput y ints AssumeValid <>
   tillExit (
     branch (currentValue x .+. currentValue y .==. intLit 0 )
       exit
-      (optionalTextOutput <>
+      (anyOptionalOutput <>
        readInput x ints AssumeValid <>
         branch (currentValue x .+. currentValue y .==. intLit 0 )
           exit
-          (optionalTextOutput <>
+          (anyOptionalOutput <>
            readInput y ints AssumeValid)
     )
   ) <>

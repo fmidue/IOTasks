@@ -1,6 +1,6 @@
 module Test.IOTasks.Specification (
   Specification,
-  readInput, writeOutput, writeOptionalOutput, optionalTextOutput,
+  readInput, writeOutput, writeOptionalOutput, anyOptionalOutput,
   branch, tillExit, exit, while, whileNot, repeatUntil, doWhile, nop,
   runSpecification,
   runSpecification', AddLinebreaks,

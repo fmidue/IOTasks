@@ -2,7 +2,7 @@ module Test.IOTasks.Random (
   -- * Specifications
   Specification, runSpecification, runSpecification', accept,
   readInput,
-  writeOutput, writeOptionalOutput, optionalTextOutput, branch, tillExit, exit, nop, while, whileNot, repeatUntil, doWhile,
+  writeOutput, writeOptionalOutput, anyOptionalOutput, branch, tillExit, exit, nop, while, whileNot, repeatUntil, doWhile,
   InputMode(..),
   ValueSet,
   empty, complete, singleton, fromList,

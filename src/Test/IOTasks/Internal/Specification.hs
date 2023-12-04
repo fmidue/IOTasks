@@ -6,7 +6,7 @@
 {-# LANGUAGE TypeApplications #-}
 module Test.IOTasks.Internal.Specification (
   Specification(..),
-  readInput, writeOutput, writeOptionalOutput, optionalTextOutput,
+  readInput, writeOutput, writeOptionalOutput, anyOptionalOutput,
   branch, tillExit, exit, while, whileNot, repeatUntil, doWhile, nop,
   runSpecification,  runSpecification', AddLinebreaks,
   readVars, hasIteration,
@@ -71,13 +71,13 @@ writeOutput ts = WriteOutput Mandatory (Set.fromList ts) nop
 writeOptionalOutput :: [OutputPattern k] -> Specification
 writeOptionalOutput ts = WriteOutput Optional (Set.fromList ts) nop
 
--- | The 'optionalTextOutput' function represents a specification for writing
--- optional output. The output can be anything, as indicated by the use of the
--- 'wildcard' pattern in its definition:
+-- | The 'anyOptionalOutput' function represents a specification for writing
+-- arbitrary optional output. The output can be anything, as indicated by the
+-- use of the 'wildcard' pattern in its definition:
 --
--- > optionalTextOutput = writeOptionalOutput [wildcard]
-optionalTextOutput :: Specification
-optionalTextOutput = writeOptionalOutput [Wildcard]
+-- > anyOptionalOutput = writeOptionalOutput [wildcard]
+anyOptionalOutput :: Specification
+anyOptionalOutput = writeOptionalOutput [Wildcard]
 
 -- | Represents a branching structure in a specification.
 --

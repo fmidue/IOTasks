@@ -2,7 +2,7 @@
 {-# LANGUAGE DataKinds #-}
 module Test.IOTasks.Internal.Specification (
   Specification(..),
-  readInput,writeOutput,writeOptionalOutput,optionalTextOutput,branch,tillExit,exit, nop,
+  readInput,writeOutput,writeOptionalOutput,anyOptionalOutput,branch,tillExit,exit, nop,
   readVars,
   pPrintSpecification,
   InputMode(..),
@@ -35,7 +35,7 @@ instance Monoid Specification
 readInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification
 writeOutput :: [OutputPattern k] -> Specification
 writeOptionalOutput :: [OutputPattern k] -> Specification
-optionalTextOutput :: Specification
+anyOptionalOutput :: Specification
 branch :: Term 'Transparent Bool -> Specification -> Specification -> Specification
 nop :: Specification
 tillExit :: Specification -> Specification
