@@ -40,7 +40,7 @@ import Text.PrettyPrint hiding ((<>))
 
 data Specification where
   ReadInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification -> Specification
-  WriteOutput :: OptFlag -> Set (OutputPattern 'SpecificationP) -> Specification -> Specification
+  WriteOutput :: OptFlag -> Set (OutputPattern k) -> Specification -> Specification
   Branch :: Term 'Transparent Bool -> Specification -> Specification -> Specification -> Specification
   Nop :: Specification
   TillE :: Specification -> Specification -> Specification
@@ -65,10 +65,10 @@ readInput = readInput' where
   readInput' :: forall a. (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification
   readInput' x vs m = ReadInput x vs m nop
 
-writeOutput :: [OutputPattern 'SpecificationP] -> Specification
+writeOutput :: [OutputPattern k] -> Specification
 writeOutput ts = WriteOutput Mandatory (Set.fromList ts) nop
 
-writeOptionalOutput :: [OutputPattern 'SpecificationP] -> Specification
+writeOptionalOutput :: [OutputPattern k] -> Specification
 writeOptionalOutput ts = WriteOutput Optional (Set.fromList ts) nop
 
 -- | The 'optionalTextOutput' function represents a specification for writing
@@ -253,7 +253,7 @@ data RecStruct p x a r = NoRec r | RecSub p x a | RecSame p x a | RecBoth p x a 
 
 sem :: forall st p a.
   (forall v. (Typeable v,Read v,Show v) => st -> Var v -> ValueSet v -> InputMode -> RecStruct p (a->a) st a) -> (RecStruct p () a a -> a) ->
-  (st -> OptFlag -> Set (OutputPattern 'SpecificationP) -> a -> a) ->
+  (forall k. st -> OptFlag -> Set (OutputPattern k) -> a -> a) ->
   (st -> Term 'Transparent Bool -> a -> a -> a) ->
   (Action -> a -> a) ->
   a ->
@@ -270,7 +270,7 @@ sem f f' g h i z st s = runIdentity $ semM
 
 semM :: forall m st p a. Monad m =>
   (forall v. (Typeable v,Read v,Show v) => st -> Var v -> ValueSet v -> InputMode -> m (RecStruct p (a->a) st a)) -> (RecStruct p () a a -> m a) ->
-  (st -> OptFlag -> Set (OutputPattern 'SpecificationP) -> m a -> m a) ->
+  (forall k. st -> OptFlag -> Set (OutputPattern k) -> m a -> m a) ->
   (st -> Term 'Transparent Bool -> m a -> m a -> m a) ->
   (Action -> m a -> m a) ->
   m a ->

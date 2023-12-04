@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Test.IOTasks.Internal.OutputPattern (
-  PatternType (..),
+  PatternKind (..),
   OutputPattern(..),
   wildcard, text, value,
   valueTerms,
@@ -28,28 +28,28 @@ import Text.Parsec
 import Data.Char (isPrint, showLitChar)
 import Control.Monad (void)
 
-data OutputPattern (t :: PatternType) where
-  Wildcard :: OutputPattern t
-  Text :: String -> OutputPattern t
-  Sequence :: OutputPattern t -> OutputPattern t -> OutputPattern t
-  Value :: forall (k :: TermKind) a. (Typeable a, Show a) => Term k a -> OutputPattern 'SpecificationP
+data OutputPattern (k :: PatternKind) where
+  Wildcard :: OutputPattern k
+  Text :: String -> OutputPattern k
+  Sequence :: OutputPattern k -> OutputPattern k -> OutputPattern k
+  Value :: forall (tk :: TermKind) a. (Typeable a, Show a) => Term tk a -> OutputPattern 'SpecificationP
 
-data PatternType = SpecificationP | TraceP
+data PatternKind = SpecificationP | TraceP
 
-wildcard :: OutputPattern t
+wildcard :: OutputPattern k
 wildcard = Wildcard
 
-text :: String -> OutputPattern t
+text :: String -> OutputPattern k
 text = Text
 
-value :: (Typeable a, Show a) => Term k a -> OutputPattern 'SpecificationP
+value :: (Typeable a, Show a) => Term tk a -> OutputPattern 'SpecificationP
 value = Value
 
-instance Eq (OutputPattern t) where
+instance Eq (OutputPattern k) where
   x == y = compare x y == EQ
 
 -- syntactic ordering (to put OutputPatterns in Sets)
-instance Ord (OutputPattern t) where
+instance Ord (OutputPattern k) where
   compare Wildcard Wildcard = EQ
   compare Wildcard _ = LT
   compare _ Wildcard = GT
@@ -67,9 +67,9 @@ instance Ord (OutputPattern t) where
   compare Value{} _ = GT
   compare _ Value{} = LT
 
-deriving instance Show (OutputPattern t)
+deriving instance Show (OutputPattern k)
 
-instance Semigroup (OutputPattern t) where
+instance Semigroup (OutputPattern k) where
   Wildcard <> Wildcard = Wildcard
   Wildcard <> Sequence Wildcard y = Sequence Wildcard y
   Text "" <> y = y
@@ -78,28 +78,28 @@ instance Semigroup (OutputPattern t) where
   Sequence x y <> z = Sequence x $ y <> z
   x <> y = Sequence x y
 
-instance Monoid (OutputPattern t) where
+instance Monoid (OutputPattern k) where
   mempty = Text ""
 
-valueTerms :: OutputPattern t -> [SomeTermK]
+valueTerms :: OutputPattern k -> [SomeTermK]
 valueTerms Wildcard = []
 valueTerms Text{} = []
 valueTerms (Sequence x y) = valueTerms x ++ valueTerms y
 valueTerms (Value t) = [SomeTermK $ SomeTerm t]
 
-evalPattern :: ValueMap -> OutputPattern t -> (OverflowWarning, OutputPattern 'TraceP)
+evalPattern :: ValueMap -> OutputPattern k -> (OverflowWarning, OutputPattern 'TraceP)
 evalPattern _ Wildcard = (NoOverflow, Wildcard)
 evalPattern _ (Text s) = (NoOverflow, Text s)
 evalPattern e (Sequence x y) = evalPattern e x <> evalPattern e y
 evalPattern e (Value t) = second (Text . showAsValue) $ oEval e t
 
-showPattern :: OutputPattern t -> String
+showPattern :: OutputPattern k -> String
 showPattern Wildcard = "_"
 showPattern (Text s) = foldr showLitChar "" s
 showPattern (Sequence x y) = showPattern x ++ showPattern y
 showPattern (Value t) = show t
 
-showPatternSimple :: OutputPattern t -> String
+showPatternSimple :: OutputPattern k -> String
 showPatternSimple p =
   case reverse $ showPattern p of
   ('n':'\\':s) -> reverse s

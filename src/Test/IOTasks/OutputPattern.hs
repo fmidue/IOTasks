@@ -1,5 +1,5 @@
 module Test.IOTasks.OutputPattern (
-  PatternType (..),
+  PatternKind (..),
   OutputPattern,
   wildcard, text, value,
   valueTerms,

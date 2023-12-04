@@ -18,7 +18,7 @@ import Test.IOTasks.Random (genInput)
 import qualified Test.IOTasks.Random as Random (stdArgs, Args(..))
 import Test.IOTasks.ValueSet
 import Test.IOTasks.Trace (ordinaryTrace, isTerminatingN, normalizedTrace)
-import Test.IOTasks.OutputPattern (PatternType(TraceP),(>:))
+import Test.IOTasks.OutputPattern (PatternKind(TraceP),(>:))
 
 testExpensiveProperties :: Spec
 testExpensiveProperties = do

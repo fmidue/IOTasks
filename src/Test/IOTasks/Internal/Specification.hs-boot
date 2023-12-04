@@ -21,7 +21,7 @@ import Text.PrettyPrint (Doc)
 
 data Specification where
   ReadInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification -> Specification
-  WriteOutput :: OptFlag -> Set (OutputPattern 'SpecificationP) -> Specification -> Specification
+  WriteOutput :: OptFlag -> Set (OutputPattern k) -> Specification -> Specification
   Branch :: Term 'Transparent Bool -> Specification -> Specification -> Specification -> Specification
   Nop :: Specification
   TillE :: Specification -> Specification -> Specification
@@ -33,8 +33,8 @@ instance Semigroup Specification
 instance Monoid Specification
 
 readInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification
-writeOutput :: [OutputPattern 'SpecificationP] -> Specification
-writeOptionalOutput :: [OutputPattern 'SpecificationP] -> Specification
+writeOutput :: [OutputPattern k] -> Specification
+writeOptionalOutput :: [OutputPattern k] -> Specification
 optionalTextOutput :: Specification
 branch :: Term 'Transparent Bool -> Specification -> Specification -> Specification
 nop :: Specification
