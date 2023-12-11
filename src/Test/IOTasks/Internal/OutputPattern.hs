@@ -11,6 +11,7 @@ module Test.IOTasks.Internal.OutputPattern (
   valueTerms,
   showPattern, showPatternSimple,
   evalPattern,
+  AddLinebreaks, evalPatternSet, evalPatternSet',
   (>:),
   ) where
 
@@ -23,6 +24,8 @@ import Test.IOTasks.ValueMap
 import Data.Either (isRight)
 import Data.Bifunctor (second)
 import Data.Typeable
+import Data.Set as Set (Set)
+import qualified Data.Set as Set
 
 import Text.Parsec
 import Data.Char (isPrint, showLitChar)
@@ -92,6 +95,19 @@ evalPattern _ Wildcard = (NoOverflow, Wildcard)
 evalPattern _ (Text s) = (NoOverflow, Text s)
 evalPattern e (Sequence x y) = evalPattern e x <> evalPattern e y
 evalPattern e (Value t) = second (Text . showAsValue) $ oEval e t
+
+type AddLinebreaks = Bool
+
+evalPatternSet :: ValueMap -> Set (OutputPattern k) -> (OverflowWarning, Set (OutputPattern 'TraceP))
+evalPatternSet = evalPatternSet' True
+
+evalPatternSet' :: AddLinebreaks -> ValueMap -> Set (OutputPattern k) -> (OverflowWarning, Set (OutputPattern 'TraceP))
+evalPatternSet' addLinebreaks e = Set.foldr phi (mempty, Set.empty)
+  where
+    phi :: OutputPattern k -> (OverflowWarning, Set (OutputPattern 'TraceP)) -> (OverflowWarning, Set (OutputPattern 'TraceP))
+    phi p (w,set) =
+      let (w', p') = evalPattern e p
+      in (w' <> w, Set.fromList (p' : [p'<>text "\n" | addLinebreaks]) `Set.union` set)
 
 showPattern :: OutputPattern k -> String
 showPattern Wildcard = "_"

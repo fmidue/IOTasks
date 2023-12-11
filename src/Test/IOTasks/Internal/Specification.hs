@@ -215,8 +215,6 @@ hasIteration E = False
 runSpecification :: Specification -> [String] -> (AbstractTrace,OverflowWarning)
 runSpecification = runSpecification' True
 
-type AddLinebreaks = Bool
-
 runSpecification' :: AddLinebreaks -> Specification -> [String] -> (AbstractTrace,OverflowWarning)
 runSpecification' addLinebreaks spec inputs =
   sem
@@ -237,9 +235,8 @@ runSpecification' addLinebreaks spec inputs =
       RecBoth{} -> error "runSpecification: impossible"
     )
     (\(e,_) o ts (t',ww) ->
-      let (warn,os) = Set.foldr (\t (w,s) -> let (w',p) = evalPattern e t in (w <> w', Set.insert p s)) (NoOverflow, mempty) ts
-          os' = if addLinebreaks then os `Set.union` Set.map (<> Text "\n") os else os
-      in (progWrite o os' <> t', warn <> ww)
+      let (warn,os) = evalPatternSet' addLinebreaks e ts
+      in (progWrite o os <> t', warn <> ww)
     )
     (\(e,_) c (l,wl) (r,wr) ->
       let (w,b) = oEval e c
@@ -335,7 +332,7 @@ accept s_ t_ = accept' s_ k_I t_ d_I
       _ -> False
     accept' (WriteOutput Optional os s') k t d = accept' (WriteOutput Mandatory os s') k t d || accept' s' k t d
     accept' (WriteOutput Mandatory os s') k t d =  case t of
-      ProgWrite Mandatory vs t' | vs `Set.isSubsetOf` Set.map (snd . evalPattern d) os -> accept' s' k t' d
+      ProgWrite Mandatory vs t' | vs `Set.isSubsetOf` snd (evalPatternSet d os) -> accept' s' k t' d
       _ -> False
     accept' (Branch c s1 s2 s') k t d
       | snd (oEval d c) = accept' (s1 <> s') k t d
