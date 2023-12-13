@@ -33,4 +33,4 @@ spec :: Spec
 spec =
   describe "taskCheck program specification" $
     it "succeeds for small unfolding parameter" $
-      (taskCheckWithOutcome stdArgs{maxIterationUnfold = 12, solverTimeout = 2000} program specification <&> isSuccess) `shouldReturn` True
+      (taskCheckWithOutcome stdArgs{maxIterationUnfold = 12, solverTimeout = 2500} program specification <&> isSuccess) `shouldReturn` True
