@@ -7,6 +7,8 @@ import Test.Hspec
 import Test.IOTasks
 
 import Data.Functor ((<&>))
+import Data.Function (on)
+import Data.List (sortBy)
 
 addSpec :: Specification
 addSpec =
@@ -22,7 +24,8 @@ program = do
   putStrLn =<< plus <$> getLine <*> getLine
 
 plus :: String -> String -> String
-plus x y = reverse $ plus' (reverse $ filter (>= '0') x) (reverse $ filter (>= '0') y) where
+plus x y = reverse $ plus' (reverse $ filter (>= '0') x') (reverse $ filter (>= '0') y') where
+  ~[x',y'] = sortBy (compare `on` length) [x,y]
   plus' xs [] = xs
   plus' [] ys = ys
   plus' ('0':xs) (y:ys) = y : plus' xs ys
@@ -34,4 +37,4 @@ spec :: Spec
 spec =
   describe "taskCheck program addSpec" $
     it "succeeds" $
-      (taskCheckOutcome program addSpec <&> isSuccess) `shouldReturn` True
+      (taskCheckWithOutcome stdArgs{maxSuccessPerPath = 100, valueSize = 1000} program addSpec <&> isSuccess) `shouldReturn` True
