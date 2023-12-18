@@ -15,7 +15,7 @@ specification =
   readInput x nats ElseAbort <>
   readInput y nats AssumeValid <>
   readInput z nats UntilValid <>
-  writeOutput [value $ sum' $ allValues [x,y,z] ]
+  writeOutput [resultOf $ sum' $ allValues [x,y,z] ]
   where
     x = intVar "x"
     y = intVar "y"

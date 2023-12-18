@@ -13,7 +13,7 @@ module Test.IOTasks (
   isEmpty,
   ints, nats, str,
   OutputPattern,
-  wildcard, text, value,
+  wildcard, text, resultOf,
   Varname, Var, var, intVar, stringVar,
   pPrintSpecification,
   -- * Terms

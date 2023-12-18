@@ -1,7 +1,7 @@
 module Test.IOTasks.OutputPattern (
   PatternKind (..),
   OutputPattern,
-  wildcard, text, value,
+  wildcard, text, resultOf,
   valueTerms,
   showPattern, showPatternSimple,
   evalPattern,

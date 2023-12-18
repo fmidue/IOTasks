@@ -7,7 +7,7 @@
 module Test.IOTasks.Internal.OutputPattern (
   PatternKind (..),
   OutputPattern(..),
-  wildcard, text, value,
+  wildcard, text, resultOf,
   valueTerms,
   showPattern, showPatternSimple,
   evalPattern,
@@ -35,7 +35,7 @@ data OutputPattern (k :: PatternKind) where
   Wildcard :: OutputPattern k
   Text :: String -> OutputPattern k
   Sequence :: OutputPattern k -> OutputPattern k -> OutputPattern k
-  Value :: forall (tk :: TermKind) a. (Typeable a, Show a) => Term tk a -> OutputPattern 'SpecificationP
+  ResultOf :: forall (tk :: TermKind) a. (Typeable a, Show a) => Term tk a -> OutputPattern 'SpecificationP
 
 data PatternKind = SpecificationP | TraceP
 
@@ -45,8 +45,8 @@ wildcard = Wildcard
 text :: String -> OutputPattern k
 text = Text
 
-value :: (Typeable a, Show a) => Term tk a -> OutputPattern 'SpecificationP
-value = Value
+resultOf :: (Typeable a, Show a) => Term tk a -> OutputPattern 'SpecificationP
+resultOf = ResultOf
 
 instance Eq (OutputPattern k) where
   x == y = compare x y == EQ
@@ -63,12 +63,12 @@ instance Ord (OutputPattern k) where
     case compare x1 y1 of
       EQ -> compare x2 y2
       r -> r
-  compare (Value (t :: Term k1 a)) (Value (u :: Term k2 b)) =
+  compare (ResultOf (t :: Term k1 a)) (ResultOf (u :: Term k2 b)) =
     case eqT @a @b of
       Just Refl -> compareK t u
       Nothing -> compare (typeRep (Proxy @a)) (typeRep (Proxy @b))
-  compare Value{} _ = GT
-  compare _ Value{} = LT
+  compare ResultOf{} _ = GT
+  compare _ ResultOf{} = LT
 
 deriving instance Show (OutputPattern k)
 
@@ -88,13 +88,13 @@ valueTerms :: OutputPattern k -> [SomeTermK]
 valueTerms Wildcard = []
 valueTerms Text{} = []
 valueTerms (Sequence x y) = valueTerms x ++ valueTerms y
-valueTerms (Value t) = [SomeTermK $ SomeTerm t]
+valueTerms (ResultOf t) = [SomeTermK $ SomeTerm t]
 
 evalPattern :: ValueMap -> OutputPattern k -> (OverflowWarning, OutputPattern 'TraceP)
 evalPattern _ Wildcard = (NoOverflow, Wildcard)
 evalPattern _ (Text s) = (NoOverflow, Text s)
 evalPattern e (Sequence x y) = evalPattern e x <> evalPattern e y
-evalPattern e (Value t) = second (Text . showAsValue) $ oEval e t
+evalPattern e (ResultOf t) = second (Text . showAsValue) $ oEval e t
 
 type AddLinebreaks = Bool
 
@@ -113,7 +113,7 @@ showPattern :: OutputPattern k -> String
 showPattern Wildcard = "_"
 showPattern (Text s) = foldr showLitChar "" s
 showPattern (Sequence x y) = showPattern x ++ showPattern y
-showPattern (Value t) = show t
+showPattern (ResultOf t) = show t
 
 showPatternSimple :: OutputPattern k -> String
 showPatternSimple p =

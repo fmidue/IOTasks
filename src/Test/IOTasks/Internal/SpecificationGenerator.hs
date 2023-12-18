@@ -72,7 +72,7 @@ _optionalOutputOneof = outputOneof' True
 outputOneof' :: (Typeable a, Show a) => Bool -> Gen (Term k a) -> Gen Specification
 outputOneof' b ts = do
   t <- ts
-  pure $ (if b then writeOptionalOutput else writeOutput) [Value t]
+  pure $ (if b then writeOptionalOutput else writeOutput) [resultOf t]
 
 -- branch free sequence of inputs and outputs
 _linearSpec :: (Typeable a, Read a, Show a) => [(Var a,ValueSet a,InputMode)] -> [(Var a,ValueSet a,InputMode)] -> Gen (Specification, [SomeVar])

@@ -12,8 +12,8 @@ reverseSpec :: Specification
 reverseSpec =
   readInput x str AssumeValid <>
   branch (length' (as @String $ currentValue x) .>. intLit 5)
-    (writeOutput [value $ reverse' . as @String $ currentValue x])
-    (writeOutput [value $ as @String $ currentValue x])
+    (writeOutput [resultOf $ reverse' . as @String $ currentValue x])
+    (writeOutput [resultOf $ as @String $ currentValue x])
   where
     x = stringVar "x"
 

@@ -22,9 +22,9 @@ specification =
     (readInput z ints AssumeValid)
     (readInput y ints AssumeValid)
     <>
-  writeOutput [value $ as @Integer $ currentValue [x,z]] <>
-  writeOutput [value $ length' $ as @[Integer] $ allValues [x,y,z]] <>
-  writeOutput [value $ length' $ as @[Integer] $ allValues [x,y,a,z]]
+  writeOutput [resultOf $ as @Integer $ currentValue [x,z]] <>
+  writeOutput [resultOf $ length' $ as @[Integer] $ allValues [x,y,z]] <>
+  writeOutput [resultOf $ length' $ as @[Integer] $ allValues [x,y,a,z]]
   where
     x = intVar "x"
     y = intVar "y"

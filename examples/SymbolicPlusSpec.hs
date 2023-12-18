@@ -14,7 +14,7 @@ addSpec :: Specification
 addSpec =
   readInput x nats AssumeValid <>
   readInput y nats AssumeValid <>
-  writeOutput [value $ currentValue x .+. currentValue y]
+  writeOutput [resultOf $ currentValue x .+. currentValue y]
   where
     x = intVar "x"
     y = intVar "y"
