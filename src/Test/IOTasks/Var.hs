@@ -20,10 +20,11 @@ import Data.Bifunctor ( second )
 import Data.Function ( on )
 
 import Type.Reflection
+import Data.GADT.Compare
 
 type Varname = String
 
-newtype Var (a :: k) = Var { unVar :: (Varname, TypeRep a) } deriving (Eq,Ord, Show)
+newtype Var (a :: k) = Var { unVar :: (Varname, TypeRep a) } deriving Show
 
 data SomeVar where
   SomeVarC :: Typeable a => Var a -> SomeVar
@@ -40,6 +41,23 @@ someVar = SomeVarC
 unSomeVar :: SomeVar -> (Varname, SomeTypeRep)
 unSomeVar (SomeVar x) = x
 
+instance Eq (Var a) where
+  (==) = defaultEq
+
+instance Ord (Var a) where
+  compare = defaultCompare
+
+instance GEq Var where
+  geq x y = case gcompare x y of
+    GEQ -> Just Refl
+    _ -> Nothing
+
+instance GCompare Var where
+  gcompare (Var (x,tx)) (Var (y,ty)) =
+    case compare x y of
+      LT -> GLT
+      EQ -> gcompare tx ty
+      GT -> GGT
 
 instance Eq SomeVar where
   (==) = (==) `on` unSomeVar

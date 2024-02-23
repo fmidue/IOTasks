@@ -23,9 +23,9 @@ data Specification where
   ReadInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification -> Specification
   WriteOutput :: OptFlag -> Set (OutputPattern k) -> Specification -> Specification
   Branch :: Term 'Transparent Bool -> Specification -> Specification -> Specification -> Specification
-  Nop :: Specification
   TillE :: Specification -> Specification -> Specification
   E :: Specification
+  Nop :: Specification
 
 data InputMode = AssumeValid | UntilValid | ElseAbort
 

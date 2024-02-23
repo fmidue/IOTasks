@@ -4,6 +4,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE StandaloneDeriving #-}
 module Test.IOTasks.Internal.Specification (
   Specification(..),
   readInput, writeOutput, writeOptionalOutput, anyOptionalOutput,
@@ -37,16 +38,52 @@ import Type.Reflection (Typeable)
 
 import Test.QuickCheck (Arbitrary(..))
 import Text.PrettyPrint hiding ((<>))
+import Data.GADT.Compare
+import Data.Functor.Classes (Ord1(liftCompare))
 
 data Specification where
   ReadInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification -> Specification
   WriteOutput :: OptFlag -> Set (OutputPattern k) -> Specification -> Specification
   Branch :: Term 'Transparent Bool -> Specification -> Specification -> Specification -> Specification
-  Nop :: Specification
   TillE :: Specification -> Specification -> Specification
   E :: Specification
+  Nop :: Specification
 
-data InputMode = AssumeValid | UntilValid | ElseAbort deriving (Eq,Show)
+data InputMode = AssumeValid | UntilValid | ElseAbort deriving (Eq,Ord,Show)
+
+instance Eq Specification where
+  x == y = compare x y == EQ
+
+instance Ord Specification where
+  compare Nop Nop = EQ
+  compare Nop _ = LT
+  compare _ Nop = GT
+
+  compare E E = EQ
+  compare E _ = LT
+  compare _ E = GT
+
+  compare (TillE bx x) (TillE by y) = compare (bx,x) (by,y)
+  compare TillE{} _ = LT
+  compare _ TillE{} = GT
+
+  compare (Branch cx tx ex sx) (Branch cy ty ey sy) = compare (cx,tx,ex,sx) (cy,ty,ey,sy)
+  compare Branch{} _ = LT
+  compare _ Branch{} = GT
+
+  compare (WriteOutput ox px sx) (WriteOutput oy py sy) =
+    case liftCompare (\x y -> convert x `compare` convert y) px py of
+      LT -> LT
+      EQ -> compare (ox,sx) (oy,sy)
+      GT -> GT
+  compare WriteOutput{} _ = LT
+  compare _ WriteOutput{} = GT
+
+  compare (ReadInput x xs mx sx) (ReadInput y ys my sy) =
+    case gcompare x y of
+      GLT -> LT
+      GEQ -> compare (xs,mx,sx) (ys,my,sy)
+      GGT -> GT
 
 instance Semigroup Specification where
   s <> Nop = s

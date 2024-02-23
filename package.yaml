@@ -31,6 +31,7 @@ dependencies:
 - parsec
 - pretty
 - QuickCheck
+- some
 - stm
 - type-match
 - z3

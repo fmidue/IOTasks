@@ -7,6 +7,7 @@
 module Test.IOTasks.Internal.OutputPattern (
   PatternKind (..),
   OutputPattern(..),
+  convert,
   wildcard, text, resultOf,
   valueTerms,
   showPattern, showPatternSimple,
@@ -23,13 +24,14 @@ import Test.IOTasks.ValueMap
 
 import Data.Either (isRight)
 import Data.Bifunctor (second)
-import Data.Typeable
+import Type.Reflection
 import Data.Set as Set (Set)
 import qualified Data.Set as Set
 
 import Text.Parsec
 import Data.Char (isPrint, showLitChar)
 import Control.Monad (void)
+import Data.GADT.Compare
 
 data OutputPattern (k :: PatternKind) where
   Wildcard :: OutputPattern k
@@ -38,6 +40,13 @@ data OutputPattern (k :: PatternKind) where
   ResultOf :: forall (tk :: TermKind) a. (Typeable a, Show a) => Term tk a -> OutputPattern 'SpecificationP
 
 data PatternKind = SpecificationP | TraceP
+
+-- k ~ 'SpecificationP is the biggest possible version of OutputPattern
+convert :: OutputPattern k -> OutputPattern 'SpecificationP
+convert Wildcard = Wildcard
+convert (Text s) = Text s
+convert (Sequence x y) = Sequence (convert x) (convert y)
+convert (ResultOf t) = ResultOf t
 
 wildcard :: OutputPattern k
 wildcard = Wildcard
@@ -64,9 +73,10 @@ instance Ord (OutputPattern k) where
       EQ -> compare x2 y2
       r -> r
   compare (ResultOf (t :: Term k1 a)) (ResultOf (u :: Term k2 b)) =
-    case eqT @a @b of
-      Just Refl -> compareK t u
-      Nothing -> compare (typeRep (Proxy @a)) (typeRep (Proxy @b))
+    case gcompare (typeRep @a) (typeRep @b) of
+      GLT -> LT
+      GEQ -> compareK t u
+      GGT -> GT
   compare ResultOf{} _ = GT
   compare _ ResultOf{} = LT
 

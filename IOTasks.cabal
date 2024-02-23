@@ -67,6 +67,7 @@ library
     , mtl
     , parsec
     , pretty
+    , some
     , stm
     , type-match
     , z3
@@ -116,6 +117,7 @@ test-suite IOTasks-test
     , mtl
     , parsec
     , pretty
+    , some
     , stm
     , type-match
     , z3

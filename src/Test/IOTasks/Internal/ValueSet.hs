@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE StandaloneDeriving #-}
 module Test.IOTasks.Internal.ValueSet (
   ValueSet(..),
   empty, complete, singleton, fromList,
@@ -33,6 +34,9 @@ data ValueSet a where
   Eq :: Integer -> ValueSet Integer
   Every :: ValueSet a
   None :: ValueSet a
+
+deriving instance Eq (ValueSet a)
+deriving instance Ord (ValueSet a)
 
 data Size = Size { intAbs :: Integer, strLen :: Int }
 
