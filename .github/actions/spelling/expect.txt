@@ -12,6 +12,9 @@ fmap
 foldr
 fprop
 fst
+GADT
+gcompare
+GGT
 GHC
 HLINT
 HRefl
