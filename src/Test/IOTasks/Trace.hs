@@ -3,8 +3,10 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Move brackets to avoid $" #-}
+{-# LANGUAGE TypeApplications #-}
 module Test.IOTasks.Trace (
   AbstractTrace,
   OptFlag(..),
@@ -21,6 +23,7 @@ module Test.IOTasks.Trace (
   pattern NTerminate, pattern NOutOfInputs,
   inputSequenceN, isTerminatingN,
   showTrace, showTraceSimple,
+  showTraceN, showTraceNSimple,
 
   covers,
   MatchResult,
@@ -32,7 +35,6 @@ import Test.IOTasks.OutputPattern hiding (text)
 
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.List (intercalate)
 import Data.Function (fix)
 
 import Text.PrettyPrint hiding ((<>))
@@ -41,6 +43,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 import Data.Functor.Classes (Show1, showsPrec1, Eq1, eq1)
 import Text.Show.Deriving (deriveShow1)
 import Data.Eq.Deriving (deriveEq1)
+import Text.PrettyPrint.HughesPJClass (Pretty (..))
 
 data OptFlag = Optional | Mandatory deriving (Eq, Ord, Show)
 
@@ -173,6 +176,15 @@ covers NOutOfInputs NOutOfInputs = MatchSuccessful
 
 covers s t = AlignmentMismatch s Nothing t
 
+instance Pretty MatchResult where
+  pPrint = pPrintMatchResult
+
+instance Pretty NTrace where
+  pPrint = showTraceN
+
+instance Pretty Trace where
+  pPrint = showTrace
+
 pPrintMatchResult :: MatchResult -> Doc
 pPrintMatchResult = pPrintMatchResult' False
 
@@ -186,43 +198,51 @@ pPrintMatchResult' simple (OutputMismatch s t) = text "OutputMismatch:" $$ nest 
 pPrintMatchResult' simple (AlignmentMismatch s s' t) = text "AlignmentMismatch:" $$ nest 2 (reportMismatch simple s s' t)
 pPrintMatchResult' simple (TerminationMismatch s s' t) = text "TerminationMismatch:" $$ nest 2 (reportMismatch simple s s' t)
 
-
 reportMismatch :: Bool -> NTrace -> Maybe NTrace -> NTrace -> Doc
 reportMismatch simple s s' t = vcat
   [ text "Expected:"
-  , nest 2 (maybe mempty ((<+> text "or") . pPrintTraceHead simple) s' <+> pPrintTraceHead simple s)
+  , nest 2 (maybe mempty ((<+> text "or") . pPrintTraceNHead simple) s' <+> pPrintTraceNHead simple s)
   , text "Got:"
-  , nest 2 (pPrintTraceHead simple t)
+  , nest 2 (pPrintTraceNHead simple t)
   ]
 
 reportOutputMismatch :: Bool -> NTrace -> NTrace -> Doc
-reportOutputMismatch simple s t = pPrintTraceHead simple t <+> text "is not covered by" <+> pPrintTraceHead simple s
+reportOutputMismatch simple s t = pPrintTraceNHead simple t <+> text "is not covered by" <+> pPrintTraceNHead simple s
 
-pPrintTraceHead :: Bool -> NTrace -> Doc
-pPrintTraceHead simple = text . showTraceHead simple (const "")
+pPrintTraceNHead :: Bool -> NTrace -> Doc
+pPrintTraceNHead simple (NTrace t) = showConcreteTraceHead simple (const $ text "") t
 
-showTrace :: NTrace -> String
-showTrace = fix (showTraceHead False)
+showTraceN :: NTrace -> Doc
+showTraceN (NTrace t) = showDeep False t
 
-showTraceSimple :: NTrace -> String
-showTraceSimple = fix (showTraceHead True)
+showTraceNSimple :: NTrace -> Doc
+showTraceNSimple (NTrace t) = showDeep True t
 
-showTraceHead :: Bool -> (NTrace -> String) -> NTrace -> String
-showTraceHead simple f (NProgRead x (NProgRead '\n' t)) = "?"++ [x] ++ (if simple then "" else "\\n") ++ addSpace (f t)
-showTraceHead simple f (NProgRead x (NProgRead c t)) = "?"++ x : tail (showTraceHead simple f (NProgRead c t))
-showTraceHead _ f (NProgRead x t') = "?"++[x] ++ addSpace (f t')
-showTraceHead simple f (NProgWrite Optional ts t')
-  | simple = "(!"++ (head $ showPatternSimple <$> Set.toList ts) ++ ")" ++ addSpace (f t') -- omit optional outputs in simplified version
-  | otherwise  = "(!{"++ intercalate "," (showPattern <$> Set.toList ts) ++ "})" ++ addSpace (f t')
-showTraceHead simple f (NProgWrite Mandatory ts t')
-  | simple = "!"++ (head $ showPatternSimple <$> Set.toList ts) ++ addSpace (f t')
-  | otherwise = "!{"++ intercalate "," (showPattern <$> Set.toList ts) ++ "}" ++ addSpace (f t')
-showTraceHead _ _ NTerminate = "stop"
-showTraceHead _ _ NOutOfInputs = "?<unknown input>"
+showTrace :: Trace -> Doc
+showTrace (Trace t) = showDeep False t
 
-addSpace :: String -> String
-addSpace "" = ""
-addSpace s = ' ':s
+showTraceSimple :: Trace -> Doc
+showTraceSimple (Trace t) = showDeep True t
+
+showDeep :: Bool -> Trace' I -> Doc
+showDeep simple = fix (showConcreteTraceHead simple)
+
+showConcreteTraceHead :: Bool -> (Trace' I -> Doc) -> Trace' I -> Doc
+showConcreteTraceHead simple f (ProgWriteC Optional ts (I t'))
+  | simple = f t' -- omit optional outputs in simplified version
+  | otherwise  = ("(!{"<> hcat (punctuate "," (text . showPattern <$> Set.toList ts)) <> "})") <+> f t'
+showConcreteTraceHead simple f (ProgWriteC Mandatory ts (I t'))
+  | simple = ("!"<> (head $ text . showPatternSimple <$> Set.toList ts)) <+> f t'
+  | otherwise = ("!{"<> hcat (punctuate "," (text . showPattern <$> Set.toList ts)) <> "}" )<+> f t'
+showConcreteTraceHead _ _ TerminateC = "stop"
+showConcreteTraceHead _ _ OutOfInputsC = "?<unknown input>"
+showConcreteTraceHead simple f (ProgReadC x t') = showConcreteTraceRead simple f (ProgReadC x t') ""
+  where
+    showConcreteTraceRead :: Bool -> (Trace' I -> Doc) -> Trace' I -> String -> Doc
+    showConcreteTraceRead simple f (ProgReadC '\n' (I t)) s = ("?" <> text (reverse s) <> (if simple then "" else "\\n")) <+> f t
+    showConcreteTraceRead simple f (ProgReadC x (I t)) s = showConcreteTraceRead simple f t (x:s)
+    showConcreteTraceRead simple f t "" = showConcreteTraceHead simple f t
+    showConcreteTraceRead _ f t s = ("?" <> text s) <+> f t
 
 isTerminating :: Trace -> Bool
 isTerminating (ProgRead _ t) = isTerminating t

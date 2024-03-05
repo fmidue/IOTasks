@@ -225,15 +225,15 @@ pPrintCoreOutcome _ GaveUp = text "*** Gave up!"
 pPrintCoreOutcome simple (Failure is et at r) = vcat
   [ text "*** Failure"
   , text ("Input sequence "++ showInputs is)
-  , text ("Expected run: " ++ showTraceHow et)
-  , text ("Actual run: " ++ showTraceSimple at)
+  , text "Expected run:" <+> showTraceHow et
+  , text "Actual run:" <+> showTraceNSimple at
   , text "Error:"
   , nest 2 (pPrintResult r)
   ]
   where
     (pPrintResult, showTraceHow)
-      | simple = (pPrintMatchResultSimple,showTraceSimple)
-      | otherwise = (pPrintMatchResult,showTrace)
+      | simple = (pPrintMatchResultSimple,showTraceNSimple)
+      | otherwise = (pPrintMatchResult,showTraceN)
 
 showInputs :: Inputs -> String
 showInputs = unwords . map ('?':)
