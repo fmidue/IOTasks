@@ -2,12 +2,19 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Move brackets to avoid $" #-}
 {-# LANGUAGE TypeApplications #-}
 module Test.IOTasks.Trace (
+  I, U,
+
   AbstractTrace,
   OptFlag(..),
   progRead, progWrite,
@@ -40,9 +47,8 @@ import Data.Function (fix)
 import Text.PrettyPrint hiding ((<>))
 
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.Functor.Classes (Show1, showsPrec1, Eq1, eq1)
+import Data.Functor.Classes (Show1, showsPrec1, Eq1 (liftEq), eq1)
 import Text.Show.Deriving (deriveShow1)
-import Data.Eq.Deriving (deriveEq1)
 import Text.PrettyPrint.HughesPJClass (Pretty (..))
 
 data OptFlag = Optional | Mandatory deriving (Eq, Ord, Show)
@@ -54,8 +60,11 @@ newtype I a = I a deriving Show
 deriveShow1 ''U
 deriveShow1 ''I
 
-deriveEq1 ''U
-deriveEq1 ''I
+instance (forall a. Eq a => Eq (U a)) => Eq1 U where
+  liftEq _ U {} U {} = True
+
+instance (forall a. Eq a => Eq (I a)) => Eq1 I where
+  liftEq eq (I x) (I y) = eq x y
 
 -- free semigroup over single trace actions
 newtype AbstractTrace = AbstractTrace (NonEmpty (Trace' U))
@@ -101,8 +110,11 @@ instance Semigroup NTrace where
   NOutOfInputs <> _ = NOutOfInputs
 
 
-newtype Trace = Trace (Trace' I) deriving (Eq, Show)
-newtype NTrace = NTrace (Trace' I) deriving (Eq, Show)
+newtype Trace = Trace (Trace' I) deriving Show
+newtype NTrace = NTrace (Trace' I) deriving Show
+
+deriving instance (forall a . Eq (I a)) => Eq Trace
+deriving instance (forall a . Eq (I a)) => Eq NTrace
 
 data Trace' f
   = ProgReadC Char (f (Trace' f))
@@ -141,7 +153,9 @@ data MatchResult
   | OutputMismatch NTrace NTrace
   | AlignmentMismatch NTrace (Maybe NTrace) NTrace
   | TerminationMismatch NTrace (Maybe NTrace) NTrace
-  deriving (Eq,Show)
+  deriving Show
+
+deriving instance (forall a . Eq (I a)) => Eq MatchResult
 
 isSuccessfulMatch :: MatchResult -> Bool
 isSuccessfulMatch MatchSuccessful = True

@@ -1,5 +1,10 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Test.IOTasks.Testing (
   taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome,
   Args(..), stdArgs,
@@ -167,13 +172,16 @@ type ExpectedRun = NTrace
 type ActualRun = NTrace
 
 data Outcome = Outcome CoreOutcome OutcomeHints
-  deriving (Eq, Show)
+  deriving Show
 
 data CoreOutcome = Success Int | Failure Inputs ExpectedRun ActualRun MatchResult | GaveUp
-  deriving (Eq, Show)
+  deriving Show
 
 data OutcomeHints = NoHints | OverflowHint Int
   deriving (Eq, Show)
+
+deriving instance (forall a . Eq (I a)) => Eq Outcome
+deriving instance (forall a . Eq (I a)) => Eq CoreOutcome
 
 instance Semigroup Outcome where
   (Outcome f@Failure{} h) <> _ = Outcome f h
@@ -211,7 +219,9 @@ overflowWarnings (Outcome _ NoHints) = 0
 overflowWarnings (Outcome _ (OverflowHint n)) = n
 
 data PathOutcome = PathSuccess | PathTimeout | PathFailure Inputs ExpectedRun ActualRun MatchResult
-  deriving (Eq,Show)
+  deriving Show
+
+deriving instance (forall a . Eq (I a)) => Eq PathOutcome
 
 pPrintOutcome :: Outcome -> Doc
 pPrintOutcome (Outcome core hints) = pPrintOutcomeHints hints $+$ pPrintCoreOutcome False core
