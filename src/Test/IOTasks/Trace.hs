@@ -48,8 +48,8 @@ import Text.PrettyPrint.HughesPJClass (Pretty (..))
 data OptFlag = Optional | Mandatory deriving (Eq, Ord, Show)
 
 -- "polymorphic" unit type
-data U a = U deriving Show
-newtype I a = I a deriving Show
+data U a = U deriving (Eq,Show)
+newtype I a = I a deriving (Eq, Show)
 
 deriveShow1 ''U
 deriveShow1 ''I

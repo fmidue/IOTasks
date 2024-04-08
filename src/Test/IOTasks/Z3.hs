@@ -26,6 +26,7 @@ import Test.QuickCheck (generate)
 
 import Control.Concurrent.STM
 
+import Control.Monad
 import Control.Monad.State
 
 import Data.Maybe (catMaybes, fromMaybe, mapMaybe, fromJust)
