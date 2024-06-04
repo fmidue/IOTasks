@@ -45,6 +45,7 @@ library
       Test.IOTasks.Var
       Test.IOTasks.Z3
   other-modules:
+      Test.IOTasks.FeedbackStyle
       Test.IOTasks.Internal.Output
       Test.IOTasks.Internal.OutputPattern
       Test.IOTasks.Internal.Overflow

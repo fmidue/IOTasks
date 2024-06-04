@@ -47,7 +47,8 @@ module Test.IOTasks (
   -- * Testing
   taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs,
   Outcome(..), CoreOutcome(..), OutcomeHints(..), isSuccess, isFailure, overflowWarnings,
-  pPrintOutcome, pPrintOutcomeSimple,
+  FeedbackStyle(..), TraceStyle(..), defaultFeedback,
+  printOutcomeWith,
   -- ** Pre-computed test suites
   generateStaticTestSuite, taskCheckOn,
   -- * Interpreter

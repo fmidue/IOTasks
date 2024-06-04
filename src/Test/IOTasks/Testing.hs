@@ -3,11 +3,12 @@
 module Test.IOTasks.Testing (
   taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome,
   Args(..), stdArgs,
+  FeedbackStyle(..), TraceStyle(..), defaultFeedback,
   Outcome(..), CoreOutcome(..), OutcomeHints(..),
   ExpectedRun, ActualRun,
   isSuccess, isFailure,
   overflowWarnings,
-  pPrintOutcome, pPrintOutcomeSimple, pPrintOutcomeHints,
+  printOutcomeWith, pPrintOutcomeHints,
   -- | = pre-computed test suites
   taskCheckOn, generateStaticTestSuite,
   Inputs,
@@ -20,6 +21,7 @@ import Test.IOTasks.Trace
 import Test.IOTasks.Z3
 import Test.IOTasks.Overflow
 import Test.IOTasks.Internal.Output
+import Test.IOTasks.FeedbackStyle
 
 import Control.Concurrent.STM
 import Control.Monad (when, forM, replicateM)
@@ -52,8 +54,8 @@ data Args
   , maxNegative :: Int
     -- | print extra information
   , verbose :: Bool
-    -- | cleanup feedback for educational use
-  , simplifyFeedback :: Bool
+    -- | feedback formating
+  , feedbackStyle :: FeedbackStyle
     -- | check that intermediate results do not cause Int overflows,
     --   including parts of 'OutputTerms' when possible (best-effort, no guarantees on completeness)
   , avoidOverflows :: Bool
@@ -71,7 +73,7 @@ stdArgs = Args
   , maxSuccessPerPath = 5
   , maxNegative = 5
   , verbose = True
-  , simplifyFeedback = False
+  , feedbackStyle = defaultFeedback
   , avoidOverflows = True
   , solverMaxSeqLength = 25
   }
@@ -106,7 +108,7 @@ taskCheckWithOutcome Args{..} prog spec = do
     when (timeouts > 0) $
       putLnP output $ unwords ["---",show timeouts, useSingularIf (timeouts == 1) "path" "paths", "timed out"]
   --
-  printP output $ (if simplifyFeedback then pPrintOutcomeSimple else pPrintOutcome) out
+  printP output $ printOutcomeWith feedbackStyle out
   pure out
 
   where
@@ -213,27 +215,36 @@ overflowWarnings (Outcome _ (OverflowHint n)) = n
 data PathOutcome = PathSuccess | PathTimeout | PathFailure Inputs ExpectedRun ActualRun MatchResult
   deriving (Eq,Show)
 
-pPrintOutcome :: Outcome -> Doc
-pPrintOutcome (Outcome core hints) = pPrintOutcomeHints hints $+$ pPrintCoreOutcome False core
+printOutcomeWith :: FeedbackStyle -> Outcome -> Doc
+printOutcomeWith FeedbackStyle{..}
+  | simplifyFeedback = pPrintOutcomeSimple layoutHow
+  | otherwise = pPrintOutcome layoutHow
+  where
+    layoutHow = case traceStyle of
+      HorizontalTrace -> (<+>)
+      VerticalTrace -> ($+$)
 
-pPrintOutcomeSimple :: Outcome -> Doc
-pPrintOutcomeSimple (Outcome core hints) = pPrintOutcomeHints hints $+$ pPrintCoreOutcome True core
+pPrintOutcome :: (Doc -> Doc -> Doc) -> Outcome -> Doc
+pPrintOutcome f (Outcome core hints) = pPrintOutcomeHints hints $+$ pPrintCoreOutcome False f core
 
-pPrintCoreOutcome :: Bool -> CoreOutcome -> Doc
-pPrintCoreOutcome _ (Success n) = text $ unwords ["+++ OK, passed",show n,useSingularIf (n==1) "test." "tests."]
-pPrintCoreOutcome _ GaveUp = text "*** Gave up!"
-pPrintCoreOutcome simple (Failure is et at r) = vcat
+pPrintOutcomeSimple :: (Doc -> Doc -> Doc) -> Outcome -> Doc
+pPrintOutcomeSimple f (Outcome core hints) = pPrintOutcomeHints hints $+$ pPrintCoreOutcome True f core
+
+pPrintCoreOutcome :: Bool -> (Doc -> Doc -> Doc) -> CoreOutcome -> Doc
+pPrintCoreOutcome _ _ (Success n) = text $ unwords ["+++ OK, passed",show n,useSingularIf (n==1) "test." "tests."]
+pPrintCoreOutcome _ _ GaveUp = text "*** Gave up!"
+pPrintCoreOutcome simple f (Failure is et at r) = vcat
   [ text "*** Failure"
   , text ("Input sequence "++ showInputs is)
   , text "Expected run:" <+> showTraceHow et
-  , text "Actual run:" <+> showTraceNSimple at
+  , text "Actual run:" <+> showTraceNSimple' f at
   , text "Error:"
   , nest 2 (pPrintResult r)
   ]
   where
     (pPrintResult, showTraceHow)
-      | simple = (pPrintMatchResultSimple,showTraceNSimple)
-      | otherwise = (pPrintMatchResult,showTraceN)
+      | simple = (pPrintMatchResultSimple,showTraceNSimple' f)
+      | otherwise = (pPrintMatchResult,showTraceN' f)
 
 showInputs :: Inputs -> String
 showInputs = unwords . map ('?':)

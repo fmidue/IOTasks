@@ -25,6 +25,9 @@ module Test.IOTasks.Trace (
   showTrace, showTraceSimple,
   showTraceN, showTraceNSimple,
 
+  showTrace', showTraceSimple',
+  showTraceN', showTraceNSimple',
+
   covers,
   MatchResult,
   isSuccessfulMatch,
@@ -209,40 +212,56 @@ reportMismatch simple s s' t = vcat
 reportOutputMismatch :: Bool -> NTrace -> NTrace -> Doc
 reportOutputMismatch simple s t = pPrintTraceNHead simple t <+> text "is not covered by" <+> pPrintTraceNHead simple s
 
-pPrintTraceNHead :: Bool -> NTrace -> Doc
-pPrintTraceNHead simple (NTrace t) = showConcreteTraceHead simple (const $ text "") t
+pPrintTraceNHead :: Bool ->  NTrace -> Doc
+pPrintTraceNHead simple (NTrace t) = showConcreteTraceHead simple (<+>) (const $ text "") t
 
 showTraceN :: NTrace -> Doc
-showTraceN (NTrace t) = showDeep False t
+showTraceN = showTraceN' (<+>)
+
+-- | like 'showTraceN' but trace steps are combined with the user supplied function
+showTraceN' :: (Doc -> Doc -> Doc) -> NTrace -> Doc
+showTraceN' op (NTrace t) = showDeep False op t
 
 showTraceNSimple :: NTrace -> Doc
-showTraceNSimple (NTrace t) = showDeep True t
+showTraceNSimple = showTraceNSimple' (<+>)
+
+-- | like 'showTraceNSimple' but trace steps are combined with the user supplied function
+showTraceNSimple' :: (Doc -> Doc -> Doc) -> NTrace -> Doc
+showTraceNSimple' op (NTrace t) = showDeep True op t
 
 showTrace :: Trace -> Doc
-showTrace (Trace t) = showDeep False t
+showTrace = showTrace' (<+>)
+
+-- | like 'showTrace' but trace steps are combined with the user supplied function
+showTrace' :: (Doc -> Doc -> Doc) -> Trace -> Doc
+showTrace' op (Trace t) = showDeep False op t
 
 showTraceSimple :: Trace -> Doc
-showTraceSimple (Trace t) = showDeep True t
+showTraceSimple = showTraceSimple' (<+>)
 
-showDeep :: Bool -> Trace' I -> Doc
-showDeep simple = fix (showConcreteTraceHead simple)
+-- | like 'showTraceSimple' but trace steps are combined with the user supplied function
+showTraceSimple' :: (Doc -> Doc -> Doc) -> Trace -> Doc
+showTraceSimple' op (Trace t) = showDeep True op t
 
-showConcreteTraceHead :: Bool -> (Trace' I -> Doc) -> Trace' I -> Doc
-showConcreteTraceHead simple f (ProgWriteC Optional ts (I t'))
+showDeep :: Bool -> (Doc -> Doc -> Doc) -> Trace' I -> Doc
+showDeep simple f = fix (showConcreteTraceHead simple f)
+
+showConcreteTraceHead :: Bool -> (Doc -> Doc -> Doc) -> (Trace' I -> Doc) -> Trace' I -> Doc
+showConcreteTraceHead simple op f (ProgWriteC Optional ts (I t'))
   | simple = f t' -- omit optional outputs in simplified version
-  | otherwise  = ("(!{"<> hcat (punctuate "," (text . showPattern <$> Set.toList ts)) <> "})") <+> f t'
-showConcreteTraceHead simple f (ProgWriteC Mandatory ts (I t'))
-  | simple = ("!"<> (head $ text . showPatternSimple <$> Set.toList ts)) <+> f t'
-  | otherwise = ("!{"<> hcat (punctuate "," (text . showPattern <$> Set.toList ts)) <> "}" )<+> f t'
-showConcreteTraceHead _ _ TerminateC = "stop"
-showConcreteTraceHead _ _ OutOfInputsC = "?<unknown input>"
-showConcreteTraceHead simple f (ProgReadC x t') = showConcreteTraceRead simple f (ProgReadC x t') ""
+  | otherwise  = ("(!{"<> hcat (punctuate "," (text . showPattern <$> Set.toList ts)) <> "})") `op` f t'
+showConcreteTraceHead simple op f (ProgWriteC Mandatory ts (I t'))
+  | simple = ("!"<> (head $ text . showPatternSimple <$> Set.toList ts)) `op` f t'
+  | otherwise = ("!{"<> hcat (punctuate "," (text . showPattern <$> Set.toList ts)) <> "}" ) `op` f t'
+showConcreteTraceHead _ _ _ TerminateC = "stop"
+showConcreteTraceHead _ _ _ OutOfInputsC = "?<unknown input>"
+showConcreteTraceHead simple op f (ProgReadC x t') = showConcreteTraceRead simple f (ProgReadC x t') ""
   where
     showConcreteTraceRead :: Bool -> (Trace' I -> Doc) -> Trace' I -> String -> Doc
-    showConcreteTraceRead simple f (ProgReadC '\n' (I t)) s = ("?" <> text (reverse s) <> (if simple then "" else "\\n")) <+> f t
+    showConcreteTraceRead simple f (ProgReadC '\n' (I t)) s = ("?" <> text (reverse s) <> (if simple then "" else "\\n")) `op` f t
     showConcreteTraceRead simple f (ProgReadC x (I t)) s = showConcreteTraceRead simple f t (x:s)
-    showConcreteTraceRead simple f t "" = showConcreteTraceHead simple f t
-    showConcreteTraceRead _ f t s = ("?" <> text s) <+> f t
+    showConcreteTraceRead simple f t "" = showConcreteTraceHead simple op f t
+    showConcreteTraceRead _ f t s = ("?" <> text s) `op` f t
 
 isTerminating :: Trace -> Bool
 isTerminating (ProgRead _ t) = isTerminating t

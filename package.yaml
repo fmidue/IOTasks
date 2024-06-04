@@ -45,6 +45,7 @@ ghc-options:
 library:
   source-dirs: src
   other-modules:
+    - Test.IOTasks.FeedbackStyle
     - Test.IOTasks.Internal.Output
     - Test.IOTasks.Internal.OutputPattern
     - Test.IOTasks.Internal.Overflow

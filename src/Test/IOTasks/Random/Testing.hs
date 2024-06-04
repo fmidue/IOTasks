@@ -47,7 +47,7 @@ data Args
   -- | print extra information
   , verbose :: Bool
   -- | cleanup feedback for educational use
-  , simplifyFeedback :: Bool
+  , feedbackStyle :: FeedbackStyle
   -- | timeout for restarting input search, in milliseconds
   , searchTimeout :: Int
   -- | maximum number timeouts before giving up
@@ -61,7 +61,7 @@ stdArgs = Args
   , maxSuccess = 100
   , maxNegative = 5
   , verbose = True
-  , simplifyFeedback = False
+  , feedbackStyle = defaultFeedback
   , searchTimeout = 3000 -- 3 sec
   , maxSearchTimeouts = 5
   }
@@ -76,7 +76,7 @@ taskCheckWithOutcome :: Args -> IOrep () -> Specification -> IO Outcome
 taskCheckWithOutcome Args{..} prog spec  = do
   output <- newOutput stdout
   (outcome, _to) <- foldM (\(o',to) n -> first (o' <>) <$> test output n to) (mempty,0) [0..maxSuccess-1]
-  printP output $ (if simplifyFeedback then pPrintOutcomeSimple else pPrintOutcome) outcome
+  printP output $ printOutcomeWith feedbackStyle outcome
   pure outcome
 
   where
