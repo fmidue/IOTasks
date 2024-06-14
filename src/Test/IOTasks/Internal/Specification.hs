@@ -31,7 +31,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.List (nub,intersperse, intersect)
 import Data.Functor.Identity (runIdentity,Identity(..))
-import Data.Bifunctor (first)
+import Data.Bifunctor (first, second)
 import Data.Either (isLeft, isRight, lefts)
 
 import Type.Reflection (Typeable)
@@ -275,9 +275,12 @@ runSpecification' addLinebreaks spec inputs =
       let (warn,os) = evalPatternSet' addLinebreaks e ts
       in (progWrite o os <> t', warn <> ww)
     )
-    (\(e,_) c (l,wl) (r,wr) ->
+    (\(e,_) c l r ->
       let (w,b) = oEval e c
-      in if b then (l,wl <> w) else (r,wr <> w))
+      in if b
+        then second (<> w) l
+        else second (<> w) r
+    )
     (const id)
     (terminate,NoOverflow)
     (emptyValueMap $ readVars spec,inputs)
