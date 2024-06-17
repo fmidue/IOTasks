@@ -16,6 +16,7 @@ GADT
 gcompare
 GGT
 GHC
+hcat
 HLINT
 HRefl
 hspec
@@ -33,9 +34,11 @@ mempty
 MTT
 Mul
 nats
+NHead
 nop
 NOut
 NProg
+NSimple
 NTerminate
 NTrace
 nums
