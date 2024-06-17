@@ -235,7 +235,7 @@ pPrintCoreOutcome _ _ (Success n) = text $ unwords ["+++ OK, passed",show n,useS
 pPrintCoreOutcome _ _ GaveUp = text "*** Gave up!"
 pPrintCoreOutcome simple f (Failure is et at r) = vcat
   [ text "*** Failure"
-  , text ("Input sequence "++ showInputs is)
+  , text ("Input sequence: "++ showInputs is)
   , text "Expected run:" <+> showTraceHow et
   , text "Actual run:" <+> showTraceNSimple' f at
   , text "Error:"
