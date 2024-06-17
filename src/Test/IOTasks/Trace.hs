@@ -251,7 +251,7 @@ showConcreteTraceHead simple op f (ProgWriteC Optional ts (I t'))
   | simple = f t' -- omit optional outputs in simplified version
   | otherwise  = ("(!{"<> hcat (punctuate "," (text . showPattern <$> Set.toList ts)) <> "})") `op` f t'
 showConcreteTraceHead simple op f (ProgWriteC Mandatory ts (I t'))
-  | simple = ("!\""<> (head $ text . showPatternSimple <$> Set.toList ts)) <> "\"" `op` f t'
+  | simple = ("!\""<> (head $ text . showPatternSimple <$> Set.toList ts) <> "\"") `op` f t'
   | otherwise = ("!{"<> hcat (punctuate "," (text . showPattern <$> Set.toList ts)) <> "}" ) `op` f t'
 showConcreteTraceHead _ _ _ TerminateC = "stop"
 showConcreteTraceHead _ _ _ OutOfInputsC = "?<unknown input>"
