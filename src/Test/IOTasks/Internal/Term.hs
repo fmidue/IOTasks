@@ -361,21 +361,21 @@ fillAVars xss e expr = expr //- [ (allE xs 0,xs') | xs <- nub xss, let xs' = com
       Just x -> withValueEntry x (error "fillAVars: something went wrong") (val . map fst)
       Nothing -> error "fillAVars: inconsistent type"
 
-toExpr :: forall k a. Typeable a => Term k a -> Expr
+toExpr :: Typeable a => Term k a -> Expr
 toExpr (Add x y) = value "(+)" ((+) :: Integer -> Integer -> Integer) :$ toExpr x :$ toExpr y
 toExpr (Sub x y) = value "(-)" ((-) :: Integer -> Integer -> Integer) :$ toExpr x :$ toExpr y
 toExpr (Mul x y) = value "(*)" ((*) :: Integer -> Integer -> Integer) :$ toExpr x :$ toExpr y
-toExpr (Equals x y) = value "(==)" ((==) :: a -> a -> Bool) :$ toExpr x :$ toExpr y
-toExpr (Gt x y) = value "(>)" ((>) :: a -> a -> Bool) :$ toExpr x :$ toExpr y
-toExpr (Ge x y) = value "(>=)" ((>=) :: a -> a -> Bool) :$ toExpr x :$ toExpr y
-toExpr (Lt x y) = value "(<)" ((<) :: a -> a -> Bool) :$ toExpr x :$ toExpr y
-toExpr (Le x y) = value "(<=)" ((<=) :: a -> a -> Bool) :$ toExpr x :$ toExpr y
+toExpr (Equals (x :: Term k x) y) = value "(==)" ((==) :: x -> x -> Bool) :$ toExpr x :$ toExpr y
+toExpr (Gt (x :: Term k x) y) = value "(>)" ((>) :: x -> x -> Bool) :$ toExpr x :$ toExpr y
+toExpr (Ge (x :: Term k x) y) = value "(>=)" ((>=) :: x -> x -> Bool) :$ toExpr x :$ toExpr y
+toExpr (Lt (x :: Term k x) y) = value "(<)" ((<) :: x -> x -> Bool) :$ toExpr x :$ toExpr y
+toExpr (Le (x :: Term k x) y) = value "(<=)" ((<=) :: x -> x -> Bool) :$ toExpr x :$ toExpr y
 toExpr (And x y) = value "(&&)" ((&&) :: Bool -> Bool -> Bool) :$ toExpr x :$ toExpr y
 toExpr (Or x y) = value "(||)" ((||) :: Bool -> Bool -> Bool) :$ toExpr x :$ toExpr y
 toExpr (IsIn x xs) = value "elem" (elem :: Integer -> [Integer] -> Bool) :$ toExpr x :$ toExpr xs
 toExpr (Not x) = value "not" (not :: Bool -> Bool) :$ toExpr x
 toExpr (Length (xs :: Term k [b])) = value "length" (fromIntegral . length :: [b] -> Integer) :$ toExpr xs
-toExpr (Reverse xs) = value "reverse" (reverse :: a -> a) :$ toExpr xs
+toExpr (Reverse (xs :: Term k [x])) = value "reverse" (reverse :: [x] -> [x]) :$ toExpr xs
 toExpr (Sum xs) = value "sum" (sum :: [Integer] -> Integer) :$ toExpr xs
 toExpr (Product xs) = value "product" (product :: [Integer] -> Integer) :$ toExpr xs
 toExpr (IntLit x) = val x
