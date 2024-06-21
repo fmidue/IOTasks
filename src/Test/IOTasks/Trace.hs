@@ -7,6 +7,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Move brackets to avoid $" #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TupleSections #-}
 module Test.IOTasks.Trace (
   AbstractTrace,
   OptFlag(..),
@@ -30,7 +31,7 @@ module Test.IOTasks.Trace (
 
   covers,
   MatchResult,
-  isSuccessfulMatch,
+  isSuccessfulMatch, isInputMismatch, isOutputMismatch, isAlignmentMismatch, isTerminationMismatch,
   pPrintMatchResult, pPrintMatchResultSimple,
 ) where
 
@@ -39,6 +40,7 @@ import Test.IOTasks.OutputPattern hiding (text)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.Function (fix)
+import Data.Bifunctor (second)
 
 import Text.PrettyPrint hiding ((<>))
 
@@ -150,34 +152,74 @@ isSuccessfulMatch :: MatchResult -> Bool
 isSuccessfulMatch MatchSuccessful = True
 isSuccessfulMatch _ = False
 
-instance Semigroup MatchResult where
-  MatchSuccessful <> _ = MatchSuccessful
-  _ <> MatchSuccessful = MatchSuccessful
-  r <> _ = r
+isInputMismatch :: MatchResult -> Bool
+isInputMismatch InputMismatch{} = True
+isInputMismatch _ = False
 
-addExpect :: NTrace -> MatchResult -> MatchResult
-addExpect s' (AlignmentMismatch t _ s) = AlignmentMismatch t (Just s') s
-addExpect s' (TerminationMismatch t _ s) = TerminationMismatch t (Just s') s
+isOutputMismatch :: MatchResult -> Bool
+isOutputMismatch OutputMismatch{} = True
+isOutputMismatch _ = False
+
+isAlignmentMismatch :: MatchResult -> Bool
+isAlignmentMismatch AlignmentMismatch{} = True
+isAlignmentMismatch _ = False
+
+isTerminationMismatch :: MatchResult -> Bool
+isTerminationMismatch TerminationMismatch{} = True
+isTerminationMismatch _ = False
+
+instance Semigroup MatchResult where
+  a <> b = case choose a b of
+    Left x -> x
+    Right x -> x
+
+choose :: MatchResult -> MatchResult -> Either MatchResult MatchResult
+choose MatchSuccessful _ = Left MatchSuccessful
+choose _ MatchSuccessful = Right MatchSuccessful
+choose r _ = Left r
+
+addExpect :: NTrace -> (MatchResult,HasConsumed) -> (MatchResult,HasConsumed)
+addExpect s' (AlignmentMismatch t Nothing s,False) = (AlignmentMismatch t (Just s') s,False)
+addExpect s' (TerminationMismatch t Nothing s,False) = (TerminationMismatch t (Just s') s,False)
 addExpect _ r = r
 
+type HasConsumed = Bool
+
 covers :: NTrace -> NTrace -> MatchResult
-covers s@(NProgRead i t1) t@(NProgRead j t2)
-  | i == j = t1 `covers` t2
-  | otherwise = InputMismatch s t
+covers s t = fst $ covers' s t
+  where
+    -- HasConsume tracks if the result has consumed at least one step from t
+    covers' :: NTrace -> NTrace -> (MatchResult, HasConsumed)
+    covers' s@(NProgRead i t1) t@(NProgRead j t2)
+      | i == j = hasConsumed $ t1 `covers'` t2
+      | otherwise = noConsume $ InputMismatch s t
 
-covers s@(NProgWrite Mandatory is t1) t@(NProgWrite Mandatory js t2)
-  | all (\j -> any (>: j) is) js = t1 `covers` t2
-  | otherwise = OutputMismatch s t
+    covers' s@(NProgWrite Mandatory is t1) t@(NProgWrite Mandatory js t2)
+      | all (\j -> any (>: j) is) js = hasConsumed $ t1 `covers'` t2
+      | otherwise = noConsume $ OutputMismatch s t
 
-covers s@(NProgWrite Optional is t1) t = (NProgWrite Mandatory is t1 `covers` t) <> addExpect s (t1 `covers` t)
-covers s t@(NProgWrite Optional _ _) = OutputMismatch s t
+    covers' s@(NProgWrite Optional is t1) t =
+      let
+        (r1,c1) = addExpect s (t1 `covers'` t)
+        (r2,c2) = (NProgWrite Mandatory is t1 `covers'` t)
+      in case choose r1 r2 of -- This is r1 <> r2 + bookkeeping for the consumption status
+        Left _ -> (r1,c1)
+        Right _ -> (r2,c2)
 
-covers NTerminate NTerminate = MatchSuccessful
-covers s@NTerminate t = TerminationMismatch s Nothing t
+    covers' s t@(NProgWrite Optional _ _) = noConsume $ OutputMismatch s t
 
-covers NOutOfInputs NOutOfInputs = MatchSuccessful
+    covers' NTerminate NTerminate = (MatchSuccessful,True)
+    covers' s@NTerminate t = noConsume $ TerminationMismatch s Nothing t
 
-covers s t = AlignmentMismatch s Nothing t
+    covers' NOutOfInputs NOutOfInputs = (MatchSuccessful,True)
+
+    covers' s t = noConsume $ AlignmentMismatch s Nothing t
+
+noConsume :: MatchResult -> (MatchResult,HasConsumed)
+noConsume = (,False)
+
+hasConsumed :: (MatchResult,HasConsumed) -> (MatchResult,HasConsumed)
+hasConsumed = second (const True)
 
 instance Pretty MatchResult where
   pPrint = pPrintMatchResult
