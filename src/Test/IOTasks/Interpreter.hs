@@ -29,7 +29,8 @@ interpret s = do
   collapsed <- collapseChoice s
   pure $ flip evalStateT (emptyValueMap [] :: ValueMap) $
     sem
-      (\() x (vs :: ValueSet v) m -> RecSub (someVar x,wrapValue . readValue @v ,containsValue vs . unwrapValue,m) id ())
+      -- (\() x (vs :: ValueSet v) m -> RecSub (someVar x,wrapValue . readValue @v, \var m -> (containsValue var m vs . unwrapValue),m) id ())
+      (\() x (vs :: ValueSet v) m -> RecSub (someVar x,wrapValue . readValue @v, \vMap -> containsValue x vMap vs . unwrapValue,m) id ())
       (\case
         RecSub (x,readF,_,AssumeValid) () p' -> do
           v <- lift (readF <$> MTT.getLine)
@@ -37,7 +38,8 @@ interpret s = do
           p'
         RecSub (x,readF,vsContains,ElseAbort) () p' -> do
           v <- lift (readF <$> MTT.getLine)
-          if vsContains v
+          vMap <- get
+          if vsContains vMap v
             then do
               modify $ insertValue v x
               p'
@@ -45,7 +47,8 @@ interpret s = do
         RecSub (x,readF,vsContains,UntilValid) () p' -> do
           let readLoop = do
                 v <- lift (readF <$> MTT.getLine)
-                if vsContains v then pure v else lift (putStrLn "invalid value, try again") >> readLoop
+                vMap <- get
+                if vsContains vMap v then pure v else lift (putStrLn "invalid value, try again") >> readLoop
           v <- readLoop
           modify $ insertValue v x
           p'

@@ -16,7 +16,7 @@ module Test.IOTasks.Z3 (findPathInput, printPathScript, evalPathScript, satPaths
 import Test.IOTasks.Constraints
 import Test.IOTasks.Internal.ValueSet
 import Test.IOTasks.Internal.Term
-import Test.IOTasks.Var (Var(..), SomeVar, pattern SomeVar, VarExp(..), someVarname)
+import Test.IOTasks.Var (Var(..), SomeVar, pattern SomeVar, VarExp(..), someVarname, someVar)
 import Test.IOTasks.ValueMap
 
 import Z3.Monad
@@ -32,7 +32,7 @@ import Control.Monad.State
 import Data.Maybe (catMaybes, fromMaybe, mapMaybe, fromJust)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Tuple.Extra (thd3)
+import Data.Tuple.Extra (fst3, thd3)
 
 import Data.List as List
 import Test.QuickCheck.Gen (Gen)
@@ -129,10 +129,10 @@ satPathsQ nVar to t maxUnfolds maxSeqLength checkOverflows q = do
       | otherwise = pure ()
 
 data ValueGenerator where
-  ValueGenerator :: Typeable v => (Size -> Gen v) -> ValueGenerator
+  ValueGenerator :: Typeable v => (ValueMap -> Size -> Gen v) -> ValueGenerator
 
-withGeneratedValue :: (forall v. Typeable v => v -> r) -> ValueGenerator -> Size -> IO r
-withGeneratedValue f (ValueGenerator g) sz = f <$> generate (g sz)
+withGeneratedValue :: (forall v. Typeable v => v -> r) -> ValueGenerator -> ValueMap -> Size -> IO r
+withGeneratedValue f (ValueGenerator g) m sz = f <$> generate (g m sz)
 
 pathScript :: Path -> ScriptMode -> Bool -> Z3R (SatResult [String], String)
 pathScript path mode checkOverflows = do
@@ -140,19 +140,25 @@ pathScript path mode checkOverflows = do
 
   goal <- mkGoal True False False
   vars <- forM tyConstr $
-    \(InputConstraint (Var (x,ty),i) (vs :: ValueSet v)) -> do
+    \(InputConstraint (iVar@(Var (x,ty)),i) (vs :: ValueSet v) e) -> do
       var <- mkFreshVar (x ++ show i) =<< mkSort @v
-      constraint <- z3ValueSetConstraint vs var
+      let r = maybe 0 (maximum . snd) $ Map.lookup (someVar iVar) e
+      pure (((SomeVar (x,SomeTypeRep ty),i),var,r),ValueGenerator $ \m -> valueOf iVar m vs)
+
+  forM_ tyConstr $
+    \(InputConstraint (iVar@(Var (x,ty)),i) (vs :: ValueSet v) e) -> do
+      let varASTs = Map.fromListWith (++) $ concatMap (\(((var,j),ast,_),_) -> [ (var,[ast]) | j <= ix var e]) vars
+      let var = fromMaybe (error "impossible") $ List.lookup (someVar iVar, i) $ map (dropThd . fst) vars
+      constraint <- z3ValueSetConstraint iVar varASTs vs var
       goalAssert goal constraint
-      pure (((SomeVar (x,SomeTypeRep ty),i),var),ValueGenerator $ valueOf vs)
   forM_ predConstr $
     \(ConditionConstraint t e) ->
-        goalAssert goal =<< z3Predicate goal t e (map fst vars)
+        goalAssert goal =<< z3Predicate goal t e (map (dropThd . fst) vars)
 
   when checkOverflows $
     forM_ overflowConstr $
       \(OverflowConstraints ts e) ->
-        forM_ ts (\t -> assertOverflowChecks goal t e (map fst vars))
+        forM_ ts (\t -> assertOverflowChecks goal t e (map (dropThd . fst) vars))
 
   -- simplify and assert goal
   simplifyTactic <- mkTactic "simplify"
@@ -163,8 +169,7 @@ pathScript path mode checkOverflows = do
 
   case mode of
     WithSoft -> do
-      ImplicitParameter {..} <- ask
-      vs <- liftIO $ forM vars $ \((_,ast),gen) -> withGeneratedValue (\v -> (ast,wrapValue v)) gen (Size valueSizeParameter (maxSeqLengthParameter `div` 2))
+      vs <- generateSuggestions vars
       forM_ vs $ \(ast,v) -> do
         cs <- mkValueRep ast v
         forM cs $ \(c,l) -> lift $ optimizeAssertSoft c "1" l -- soft assert with weight 1 and id "default"
@@ -174,11 +179,28 @@ pathScript path mode checkOverflows = do
   mRes <- case result of
     Sat -> do
       model <- lift optimizeGetModel
-      SAT . catMaybes <$> mapM ((evalAST model . snd) . fst) vars
+      SAT . catMaybes <$> mapM ((evalAST model . snd) . dropThd . fst) vars
     Unsat -> do
       pure NotSAT
     Undef -> pure Timeout
   pure (mRes,str)
+
+dropThd :: (a,b,c) -> (a,b)
+dropThd (x,y,_) = (x,y)
+
+generateSuggestions :: [(((SomeVar, Int), AST, Int), ValueGenerator)] -> Z3R [(AST, Value)]
+generateSuggestions vars = do
+  -- make sure variables are ordered correctly, otherwise we construct the wrong ValueMap
+  let
+    sortedVars = sortOn (thd3 . fst) vars
+    baseVars = map (fst . fst3 . fst) sortedVars
+  ImplicitParameter {..} <- ask
+  flip evalStateT (emptyValueMap baseVars) $
+    forM vars $ \(((var,_),ast,_),gen) -> do
+      vMap <- get
+      (ast,val) <- liftIO $ withGeneratedValue (\v -> (ast,wrapValue v)) gen vMap (Size valueSizeParameter (maxSeqLengthParameter `div` 2))
+      modify (insertValue val var)
+      pure (ast,val)
 
 evalAST :: MonadZ3 z3 => Model -> AST -> z3 (Maybe String)
 evalAST m x = do

@@ -12,6 +12,7 @@ module Test.IOTasks.Constraints (
   partitionPath, pathDepth,
   numberOfPaths,
   showPath, showConstraint, showSomeConstraint,
+  ix
   ) where
 
 import Test.IOTasks.ValueSet
@@ -30,7 +31,7 @@ import Data.Tuple.Extra (fst3)
 import Data.Typeable
 
 data Constraint (t :: ConstraintType) where
-  InputConstraint :: Typeable v => (Var v, Int) -> ValueSet v -> Constraint 'Input
+  InputConstraint :: Typeable v => (Var v, Int) -> ValueSet v -> Map SomeVar (Int, [Int]) -> Constraint 'Input
   ConditionConstraint :: Term 'Transparent Bool -> Map SomeVar (Int, [Int]) -> Constraint 'Condition
   OverflowConstraints :: [Term 'Transparent Integer] -> Map SomeVar (Int, [Int]) -> Constraint 'Overflow
 
@@ -51,8 +52,8 @@ constraintTree negMax =
     (\(n,e,k) x vs mode ->
       let
         e' = inc (someVar x) k e
-        p = (InputConstraint(x, ix (someVar x) e') vs
-            ,InputConstraint(x, ix (someVar x) e') (complement vs)
+        p = (InputConstraint(x, ix (someVar x) e') vs e'
+            ,InputConstraint(x, ix (someVar x) e') (complement vs) e'
             , mode == ElseAbort && n < negMax)
       in case mode of
           AssumeValid -> RecSub p id (n,e',k+1)
@@ -120,7 +121,7 @@ showSomeConstraint :: SomeConstraint -> String
 showSomeConstraint (SomeConstraint c) = showConstraint c
 
 showConstraint :: Constraint t -> String
-showConstraint (InputConstraint (x,i) vs) = concat [varname x,"_",show i," : ",showValueSet vs]
+showConstraint (InputConstraint (x,i) vs _) = concat [varname x,"_",show i," : ",showValueSet vs]
 showConstraint (ConditionConstraint t m) = showIndexedTerm t m
 showConstraint (OverflowConstraints _ _) = "**some overflow checks**"
 

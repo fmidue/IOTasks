@@ -87,29 +87,29 @@ testCheapProperties = do
 
   context "ValueSet operations" $ do
     prop "no value in empty ValueSet" $
-      \x -> not ((empty :: ValueSet Integer) `containsValue` x)
+      \x -> not ((empty :: ValueSet Integer) `initiallyContainsValue` x)
 
     prop "every value in complete ValueSet" $
-      \x -> (complete :: ValueSet Integer) `containsValue` x
+      \x -> (complete :: ValueSet Integer) `initiallyContainsValue` x
 
     prop "valueOf generates values from the set" $
       \vs -> ioProperty $ do
-        notEmpty <- not <$> isEmpty vs
-        pure $ notEmpty ==> forAll (valueOf @Integer vs (Size 100 undefined)) $ containsValue vs
+        notEmpty <- not <$> isEmpty undefined undefined vs
+        pure $ notEmpty ==> forAll (valueOf @Integer undefined undefined vs (Size 100 undefined)) $ initiallyContainsValue vs
 
     prop "a value is either in a ValueSet or in it's complement" $
-      \vs -> forAll (vectorOf 100 $ arbitrary @Integer) $ \xs -> all (\x -> (vs `containsValue` x) /= (complement vs `containsValue` x)) xs
+      \vs -> forAll (vectorOf 100 $ arbitrary @Integer) $ \xs -> all (\x -> (vs `initiallyContainsValue` x) /= (complement vs `initiallyContainsValue` x)) xs
 
     prop "with adds an element to a ValueSet" $
-      \vs x -> (vs `with` x) `containsValue` x
+      \vs x -> (vs `with` x) `initiallyContainsValue` x
 
     prop "without removes an element from a ValueSet" $
-      \vs x -> not $ (vs `without` x) `containsValue` x
+      \vs x -> not $ (vs `without` x) `initiallyContainsValue` x
 
     prop "vs \\ ws removes all elements of ws from vs" $
       \vs ws -> ioProperty $ do
-        notEmpty <- not <$> isEmpty ws
-        pure $ notEmpty ==> forAll (valueOf @Integer ws (Size 100 undefined)) $ not . containsValue (vs \\ ws)
+        notEmpty <- not <$> isEmpty undefined undefined ws
+        pure $ notEmpty ==> forAll (valueOf @Integer undefined undefined ws (Size 100 undefined)) $ not . initiallyContainsValue (vs \\ ws)
 
 testEquiv :: Specification -> Specification -> Property
 testEquiv s1 s2 = p1 Test.QuickCheck..&&. p2 where
@@ -141,6 +141,7 @@ fprop s = fit s . property
 xPerfprop :: HasCallStack => String -> prop -> Spec
 xPerfprop s _ = it s $ pendingWith "disabled for faster testing"
 
+-- TODO: add dependent value sets
 instance Arbitrary (ValueSet Integer) where
   arbitrary = sized $ \size ->
     if size <= 1

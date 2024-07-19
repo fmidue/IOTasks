@@ -10,6 +10,7 @@ module Test.IOTasks.Random (
   union, intersection,
   (\\), with, without,
   complement,
+  unique, notInVar,
   isEmpty,
   ints, nats, str,
   OutputPattern,

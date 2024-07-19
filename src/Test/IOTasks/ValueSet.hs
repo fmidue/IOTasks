@@ -5,8 +5,9 @@ module Test.IOTasks.ValueSet (
   lessThan, greaterThan,
   (\\), with, without,
   complement,
+  unique, notInVar,
   isEmpty,
-  containsValue,
+  containsValue, initiallyContainsValue,
   showValueSet,
   -- | = random value generation
   valueOf,

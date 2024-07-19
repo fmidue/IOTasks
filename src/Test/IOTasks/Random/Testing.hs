@@ -112,9 +112,9 @@ genTrace spec depth sz maxNeg =
       (if maybe False (d >) depth then pure $ NoRec OutOfInputs
       else do
         frequency $
-            (5, valueOf vs sz >>= (\i -> pure $ RecSub (wrapValue i) id (insertValue (wrapValue i) (someVar x) e,d+1,n)))
-          : [(1, valueOf (complement vs) sz >>= (\i -> pure $ RecSame (wrapValue i) id (e,d+1,n+1))) | mode == UntilValid && n < maxNeg]
-          ++ [(1, valueOf (complement vs) sz >>= (\i -> pure $ NoRec $ foldr ProgRead Terminate (show i ++ "\n"))) | mode == ElseAbort && n < maxNeg]
+            (5, valueOf x e vs sz >>= (\i -> pure $ RecSub (wrapValue i) id (insertValue (wrapValue i) (someVar x) e,d+1,n)))
+          : [(1, valueOf x e (complement vs) sz >>= (\i -> pure $ RecSame (wrapValue i) id (e,d+1,n+1))) | mode == UntilValid && n < maxNeg]
+          ++ [(1, valueOf x e (complement vs) sz >>= (\i -> pure $ NoRec $ foldr ProgRead Terminate (show i ++ "\n"))) | mode == ElseAbort && n < maxNeg]
     ))
     (pure . \case
       NoRec r -> r
