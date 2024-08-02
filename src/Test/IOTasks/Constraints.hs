@@ -76,6 +76,7 @@ constraintTree negMax =
     (\(_,e,_) _ ps t -> Assert (OverflowConstraints (catMaybes $ [ castTerm @Integer t | p <- Set.toList ps, vt <- valueTerms p, t <- withSomeTermK vt transparentSubterms]) e) t)
     (\(_,e,_) c l r -> Assert (OverflowConstraints (mapMaybe (castTerm @Integer) $ transparentSubterms c) e) $ Choice (Assert (ConditionConstraint c e) l) (Assert (ConditionConstraint (not' c) e) r))
     (\case {End -> Unfold ; Exit -> id})
+    Unfold
     Empty
     (0,Map.empty,1)
 

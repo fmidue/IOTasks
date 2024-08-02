@@ -72,6 +72,7 @@ interpret s = do
           else pr
       )
       (const id)
+      id
       (pure ())
       ()
       collapsed

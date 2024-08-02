@@ -127,6 +127,7 @@ genTrace spec depth sz maxNeg =
     (\(e,_,_) o ts t' -> ProgWrite o (Set.map (snd . evalPattern e) ts) <$> t')
     (\(e,_,_) c l r -> if snd $ oEval e c then l else r)
     (const id)
+    id
     (pure Terminate)
     (emptyValueMap $ readVars spec,1,0)
     spec

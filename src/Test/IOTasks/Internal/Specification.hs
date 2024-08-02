@@ -282,6 +282,7 @@ runSpecification' addLinebreaks spec inputs =
         else second (<> w) r
     )
     (const id)
+    id
     (terminate,NoOverflow)
     (emptyValueMap $ readVars spec,inputs)
     spec
@@ -293,14 +294,16 @@ sem :: forall st p a.
   (forall k. st -> OptFlag -> Set (OutputPattern k) -> a -> a) ->
   (st -> Term 'Transparent Bool -> a -> a -> a) ->
   (Action -> a -> a) ->
+  (a -> a) ->
   a ->
   st -> Specification -> a
-sem f f' g h i z st s = runIdentity $ semM
+sem f f' g h i j z st s = runIdentity $ semM
   (\a b c d -> Identity $ f a b c d)
   (Identity . f')
   (\a b c -> Identity . g a b c . runIdentity)
   (\a b c d -> Identity $ h a b (runIdentity c) (runIdentity d))
   (\a b -> Identity $ i a (runIdentity b))
+  (Identity . j . runIdentity)
   (pure z)
   st
   s
@@ -310,9 +313,10 @@ semM :: forall m st p a. Monad m =>
   (forall k. st -> OptFlag -> Set (OutputPattern k) -> m a -> m a) ->
   (st -> Term 'Transparent Bool -> m a -> m a -> m a) ->
   (Action -> m a -> m a) ->
+  (m a -> m a) ->
   m a ->
   st -> Specification -> m a
-semM f f' g h i z s_I spec = sem' s_I spec k_I where
+semM f f' g h i j z s_I spec = sem' s_I spec k_I where
   sem' :: st -> Specification -> (Action ->  st -> m a) -> m a
   sem' st s@(ReadInput x vs mode s') k =
     do
@@ -325,7 +329,7 @@ semM f f' g h i z s_I spec = sem' s_I spec k_I where
         RecBoth p r st' st'' -> RecBoth p () . r <$> sem' st' s' k <*> sem' st'' s k
   sem' st (WriteOutput o ts s') k = g st o ts $ sem' st s' k
   sem' st (Branch c l r s') k = h st c (sem' st (l <> s') k) (sem' st (r <> s') k)
-  sem' st (TillE s s') k = sem' st s k'
+  sem' st (TillE s s') k = j $ sem' st s k'
     where
       k' End st = i End $ sem' st s k'
       k' Exit st = i Exit $ sem' st s' k
