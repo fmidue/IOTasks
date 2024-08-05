@@ -294,6 +294,7 @@ allE x n = case varExpType x of
       Nothing -> error $ "allE: a does not have kind Type in TypeRep a, with a = " ++ show (typeRep @a)
   Nothing -> error "allE: inconsistent VarExp type"
 
+-- Assumption: each list in xss contains variables in ascending order
 eval' :: Typeable a => Expr -> [[SomeVar]] -> ValueMap -> a
 eval' expr xss e = evl . fillAVars xss e . reduceAVarsIndex e . replaceCVars e $ expr
 
@@ -340,17 +341,17 @@ data AccessType = C | A deriving Show
 
 varStruct :: AccessType -> Expr -> Maybe (Expr,(Int,[Varname]))
 varStruct acc x
-  | isVar x = either (const Nothing) (Just . (x,)) $ parse (varParser acc) "" (reverse $ showExpr x)
+  | isVar x = either (const Nothing) (Just . (x,)) $ parse (varParser acc) "" (showExpr x)
   | otherwise = Nothing
   where
-    varParser :: AccessType -> Parser (Int,[Varname]) -- parses a variable's string representation in reverse
+    varParser :: AccessType -> Parser (Int,[Varname]) -- parses a variable's string representation
     varParser acc = do
-      n <- many1 digit
-      _ <- string ("^"++show acc++"_")
-      _ <- char ']'
-      x <- sepBy1 (many1 (alphaNum <|> char '_' <|> char '\'')) (char ',')
       _ <- char '['
-      pure (read n,reverse x)
+      xs <- sepBy1 (many1 (alphaNum <|> char '_' <|> char '\'')) (char ',')
+      _ <- char ']'
+      _ <- string ("_"++show acc++"^")
+      n <- many1 digit
+      pure (read n,xs)
 
 -- replace <var>_A^0 with values from variable environment
 fillAVars :: [[SomeVar]] -> ValueMap -> Expr -> Expr

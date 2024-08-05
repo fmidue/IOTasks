@@ -100,6 +100,7 @@ test-suite IOTasks-test
       SymbolicPlusSpec
       VariableMerging1Spec
       VariableMerging2Spec
+      VariableNamesSpec
       Paths_IOTasks
   hs-source-dirs:
       test

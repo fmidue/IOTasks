@@ -67,10 +67,11 @@ valuesBefore = valuesBefore' where
 checkNames :: VarExp e => e -> a -> a
 checkNames = foldr (f . someVarname) id . toVarList
   where
-    f x c = if legalVar x then c else error $ "illegal variable name: " ++ x ++ "\variable names can only contain letters, digits, _ and '"
+    f x c = if legalVar x then c else error $ "illegal variable name: " ++ x ++ "\variable names must start with a letter and can only contain letters, digits, _ and '"
 
 legalVar :: String -> Bool
-legalVar = any (\c -> isAlphaNum c || c == '_' || c == '\'')
+legalVar [] = False
+legalVar (x:xs) = isAlphaNum x && all (\c -> isAlphaNum c || c == '_' || c == '\'') xs
 
 -- | 'as' is an operator for explicit type annotation.
 --

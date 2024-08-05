@@ -21,6 +21,7 @@ import Data.Function ( on )
 
 import Type.Reflection
 import Data.GADT.Compare
+import Data.List (sort, nub)
 
 type Varname = String
 
@@ -106,6 +107,8 @@ stringVar = var @String
 -- 'allValues' gives a list where values appear in the order they were given to the program.
 --
 -- Additionally, all referenced variables must be of the same type.
+--
+-- Instances need to make sure that the resulting list is sorted!
 class VarExp e where
   toVarList :: e -> [SomeVar]
   -- ^ Computes the list of variables referenced by the variable expression.
@@ -114,10 +117,10 @@ instance VarExp SomeVar where
   toVarList = pure
 
 instance Typeable a => VarExp (Var a) where
-  toVarList = pure . someVar
+  toVarList = toVarList . someVar
 
 instance VarExp [SomeVar] where
-  toVarList = id
+  toVarList = sort . nub
 
 instance Typeable a => VarExp [Var a] where
-  toVarList = map someVar
+  toVarList = toVarList . map someVar
