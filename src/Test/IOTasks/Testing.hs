@@ -53,7 +53,7 @@ data Args
     -- | maximum number of negative inputs per path (for 'InputMode' 'UntilValid')
   , maxNegative :: Int
     -- | print extra information
-  , verbose :: Bool
+  , terminalOutput :: Bool
     -- | feedback formating
   , feedbackStyle :: FeedbackStyle
     -- | check that intermediate results do not cause Int overflows,
@@ -72,7 +72,7 @@ stdArgs = Args
   , maxTimeouts = 3
   , maxSuccessPerPath = 5
   , maxNegative = 5
-  , verbose = True
+  , terminalOutput = True
   , feedbackStyle = defaultFeedback
   , avoidOverflows = True
   , solverMaxSeqLength = 25
@@ -102,7 +102,7 @@ taskCheckWithOutcome Args{..} prog spec = do
 
   let out = Outcome coreOut (if overflows == 0 then NoHints else OverflowHint overflows)
   --
-  when verbose $ do
+  when terminalOutput $ do
     putLnP output $ unwords
       ["generated", show nInputs,"input", useSingularIf (nInputs == 1) "sequence" "sequences", "covering", show satPaths, "satisfiable", useSingularIf (nInputs == 1) "path" "paths"]
     when (timeouts > 0) $
@@ -151,16 +151,16 @@ taskCheckWithOutcome Args{..} prog spec = do
       case mNextInput of
         Timeout -> pure (PathTimeout,n,o)
         SAT nextInput  -> do
-          when verbose (putT output (concat ["(",show (n+nOtherTests)," tests)"]) >> oFlush output)
+          when terminalOutput (putT output (concat ["(",show (n+nOtherTests)," tests)"]) >> oFlush output)
           let
             (specTrace,warn) = first normalizedTrace $ runSpecification spec nextInput
             progTrace = runProgram prog nextInput
             o' = if warn == OverflowOccurred then o+1 else o
-          when (verbose && warn == OverflowOccurred) $ putLnP output "Overflow of Int range detected."
+          when (terminalOutput && warn == OverflowOccurred) $ putLnP output "Overflow of Int range detected."
           case specTrace `covers` progTrace of
             result | isSuccessfulMatch result -> testPath output p (n+1) nOtherTests o'
             failure -> do
-              when verbose $ putLnP output $ unwords ["found counterexample of length",show $ length nextInput]
+              when terminalOutput $ putLnP output $ unwords ["found counterexample of length",show $ length nextInput]
               pure (PathFailure nextInput specTrace progTrace failure,n+1,o')
         NotSAT -> error "impossible"
 
@@ -236,12 +236,13 @@ pPrintCoreOutcome _ _ GaveUp = text "*** Gave up!"
 pPrintCoreOutcome simple f (Failure is et at r) = vcat
   [ text "*** Failure"
   , text ("Input sequence: "++ showInputs is)
-  , text "Expected run:" <+> showTraceHow et
+  , text ("Expected run " ++ when simple "(simplified)" ++ ":") <+> showTraceHow et
   , text "Actual run:" <+> showTraceNSimple' f at
   , text "Error:"
-  , nest 2 (pPrintResult r)
+  , nest 2 (pPrintResult f r)
   ]
   where
+    when b str = if b then str else ""
     (pPrintResult, showTraceHow)
       | simple = (pPrintMatchResultSimple,showTraceNSimple' f)
       | otherwise = (pPrintMatchResult,showTraceN' f)

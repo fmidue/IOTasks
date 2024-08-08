@@ -45,7 +45,7 @@ data Args
   -- | maximum number of negative inputs per path (for 'InputMode' 'UntilValid')
   , maxNegative :: Int
   -- | print extra information
-  , verbose :: Bool
+  , terminalOutput :: Bool
   -- | cleanup feedback for educational use
   , feedbackStyle :: FeedbackStyle
   -- | timeout for restarting input search, in milliseconds
@@ -60,7 +60,7 @@ stdArgs = Args
   , valueSize = 100
   , maxSuccess = 100
   , maxNegative = 5
-  , verbose = True
+  , terminalOutput = True
   , feedbackStyle = defaultFeedback
   , searchTimeout = 3000 -- 3 sec
   , maxSearchTimeouts = 5
@@ -90,12 +90,12 @@ taskCheckWithOutcome Args{..} prog spec  = do
           seq (isSuccess outcome) $ pure outcome -- force outcome
         case mOutcome of
           Just outcome -> do
-            when verbose $ do
+            when terminalOutput $ do
               putT o (concat ["(",show n," tests)"]) >> oFlush o
               when (overflowWarnings outcome > 0) $ putLnP o "Overflow of Int range detected."
             pure (outcome,to)
           Nothing -> do
-            when verbose $ putLnP o "input search: timeout"
+            when terminalOutput $ putLnP o "input search: timeout"
             test o n (to+1)
 
 genInput :: Specification -> Maybe Int -> Size -> Int -> Gen Inputs

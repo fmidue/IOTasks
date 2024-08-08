@@ -49,6 +49,7 @@ import Data.Functor.Classes (Show1, showsPrec1, Eq1, eq1)
 import Text.Show.Deriving (deriveShow1)
 import Data.Eq.Deriving (deriveEq1)
 import Text.PrettyPrint.HughesPJClass (Pretty (..))
+import Debug.Trace (traceShowId)
 
 data OptFlag = Optional | Mandatory deriving (Eq, Ord, Show)
 
@@ -222,7 +223,7 @@ hasConsumed :: (MatchResult,HasConsumed) -> (MatchResult,HasConsumed)
 hasConsumed = second (const True)
 
 instance Pretty MatchResult where
-  pPrint = pPrintMatchResult
+  pPrint = pPrintMatchResult (<+>)
 
 instance Pretty NTrace where
   pPrint = showTraceN
@@ -230,29 +231,29 @@ instance Pretty NTrace where
 instance Pretty Trace where
   pPrint = showTrace
 
-pPrintMatchResult :: MatchResult -> Doc
+pPrintMatchResult :: (Doc -> Doc -> Doc) -> MatchResult -> Doc
 pPrintMatchResult = pPrintMatchResult' False
 
-pPrintMatchResultSimple :: MatchResult -> Doc
+pPrintMatchResultSimple :: (Doc -> Doc -> Doc) -> MatchResult -> Doc
 pPrintMatchResultSimple = pPrintMatchResult' True
 
-pPrintMatchResult' :: Bool -> MatchResult -> Doc
-pPrintMatchResult' _ MatchSuccessful = text "MatchSuccessful"
-pPrintMatchResult' simple (InputMismatch s t) = text "InputMismatch:" $$ nest 2 (reportMismatch simple s Nothing t)
-pPrintMatchResult' simple (OutputMismatch s t) = text "OutputMismatch:" $$ nest 2 (reportOutputMismatch simple s t)
-pPrintMatchResult' simple (AlignmentMismatch s s' t) = text "AlignmentMismatch:" $$ nest 2 (reportMismatch simple s s' t)
-pPrintMatchResult' simple (TerminationMismatch s s' t) = text "TerminationMismatch:" $$ nest 2 (reportMismatch simple s s' t)
+pPrintMatchResult' :: Bool -> (Doc -> Doc -> Doc) -> MatchResult -> Doc
+pPrintMatchResult' _ _ MatchSuccessful = text "MatchSuccessful"
+pPrintMatchResult' simple f (InputMismatch s t) = text "InputMismatch:" $$ nest 2 (reportMismatch simple f s Nothing t)
+pPrintMatchResult' simple f (OutputMismatch s t) = text "OutputMismatch:" $$ nest 2 (reportOutputMismatch simple f s t)
+pPrintMatchResult' simple f (AlignmentMismatch s s' t) = text "AlignmentMismatch:" $$ nest 2 (reportMismatch simple f s s' t)
+pPrintMatchResult' simple f (TerminationMismatch s s' t) = text "TerminationMismatch:" $$ nest 2 (reportMismatch simple f s s' t)
 
-reportMismatch :: Bool -> NTrace -> Maybe NTrace -> NTrace -> Doc
-reportMismatch simple s s' t = vcat
+reportMismatch :: Bool -> (Doc -> Doc -> Doc) -> NTrace -> Maybe NTrace -> NTrace -> Doc
+reportMismatch simple f s s' t = vcat
   [ text "Expected:"
-  , nest 2 (maybe mempty ((<+> text "or") . pPrintTraceNHead simple) s' <+> pPrintTraceNHead simple s)
+  , nest 2 (maybe mempty ((`f` text "or") . pPrintTraceNHead simple) s' <+> pPrintTraceNHead simple s)
   , text "Got:"
   , nest 2 (pPrintTraceNHead simple t)
   ]
 
-reportOutputMismatch :: Bool -> NTrace -> NTrace -> Doc
-reportOutputMismatch simple s t = pPrintTraceNHead simple t <+> text "is not covered by" <+> pPrintTraceNHead simple s
+reportOutputMismatch :: Bool -> (Doc -> Doc -> Doc) -> NTrace -> NTrace -> Doc
+reportOutputMismatch simple f s t = pPrintTraceNHead simple t `f` text "is not covered by" `f` pPrintTraceNHead simple s
 
 pPrintTraceNHead :: Bool ->  NTrace -> Doc
 pPrintTraceNHead simple (NTrace t) = showConcreteTraceHead simple (<+>) (const $ text "") t
