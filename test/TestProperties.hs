@@ -7,7 +7,7 @@ module TestProperties (testCheapProperties, testExpensiveProperties) where
 
 import Test.Hspec
 import Test.Hspec.QuickCheck (prop)
-import Test.QuickCheck hiding (isSuccess, stdArgs,verbose, Args)
+import Test.QuickCheck hiding (isSuccess, stdArgs, Args)
 
 import Control.Applicative (liftA2)
 import Control.Monad.Loops (allM)
@@ -53,7 +53,7 @@ testCheapProperties :: Spec
 testCheapProperties = do
   context "testing with random specifications" $ do
     prop "programs built from a spec satisfy that spec" $
-      \s -> allM (\p -> isSuccess <$> taskCheckWithOutcome stdArgs{verbose=False,maxIterationUnfold=15,maxSuccessPerPath=5} p s) (interpret s) `shouldReturn` True
+      \s -> allM (\p -> isSuccess <$> taskCheckWithOutcome stdArgs{terminalOutput=False,maxIterationUnfold=15,maxSuccessPerPath=5} p s) (interpret s) `shouldReturn` True
 
     prop "relate runSpecification based semantics to accept (cf FLOPS 2020)" $
       \s -> testAgainst s s
