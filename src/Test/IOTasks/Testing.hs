@@ -236,7 +236,7 @@ pPrintCoreOutcome _ _ GaveUp = text "*** Gave up!"
 pPrintCoreOutcome simple f (Failure is et at r) = vcat
   [ text "*** Failure"
   , text ("Input sequence: "++ showInputs is)
-  , text ("Expected run " ++ when simple "(simplified)" ++ ":") <+> showTraceHow et
+  , text ("Expected run" ++ when simple " (simplified)" ++ ":") <+> showTraceHow et
   , text "Actual run:" <+> showTraceNSimple' f at
   , text "Error:"
   , nest 2 (pPrintResult f r)
