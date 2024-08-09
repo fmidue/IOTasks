@@ -215,7 +215,7 @@ taskCheckWithOutcome Args{..} prog spec = do
         reportOverflow = when terminalOutput $ putLnP output "Overflow of Int range detected."
 
         reportUnsat :: IO ()
-        reportUnsat = when verbose $ putLnP output "unexpected unsat result in test case generation, maybe some value set is (conditionally) uninhabited"
+        reportUnsat = when terminalOutput $ putLnP output "unexpected unsat result in test case generation, maybe some value set is (conditionally) uninhabited"
 
 type Inputs = [Line]
 type ExpectedRun = NTrace
