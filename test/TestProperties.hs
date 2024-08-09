@@ -53,7 +53,7 @@ testCheapProperties :: Spec
 testCheapProperties = do
   context "testing with random specifications" $ do
     prop "programs built from a spec satisfy that spec" $
-      \s -> allM (\p -> isSuccess <$> taskCheckWithOutcome stdArgs{terminalOutput=False,maxIterationUnfold=15,maxSuccessPerPath=5} p s) (interpret s) `shouldReturn` True
+      \s -> allM (\p -> isSuccess <$> taskCheckWithOutcome stdArgs{terminalOutput=False,maxIterationUnfold=15,testsPerPath=5} p s) (interpret s) `shouldReturn` True
 
     prop "relate runSpecification based semantics to accept (cf FLOPS 2020)" $
       \s -> testAgainst s s

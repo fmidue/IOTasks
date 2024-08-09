@@ -41,6 +41,7 @@ import Type.Match
 import Data.List.Extra
 import Control.Monad.Reader
 import Data.Kind (Type)
+import Data.Some (Some(Some))
 
 type Z3R = ReaderT ImplicitParameters Z3
 
@@ -79,54 +80,56 @@ updateContext NotSAT d NoContext = LastNotSAT d
 updateContext NotSAT _ (LastNotSAT _) = RequirePruningCheck
 updateContext _ _ RequirePruningCheck = error "updateContext: should not happen"
 
-type PrefixPath = Path
-satPaths :: Int -> Int -> ConstraintTree -> Int -> Bool -> IO [Path]
+type PrefixPath = [Some SimpleConstraint]
+satPaths :: Int -> Int -> ConstraintTree -> Int -> Bool -> IO [SimplePath]
 satPaths maxUnfolds to t maxSeqLength checkOverflows = do
   q <- atomically newTQueue
   nVar <- newTVarIO Nothing
   satPathsQ nVar to t maxUnfolds maxSeqLength checkOverflows q
   map fromJust . init <$> atomically (flushTQueue q)
 
-satPathsQ :: TVar (Maybe Int) -> Int -> ConstraintTree -> Int -> Int -> Bool -> TQueue (Maybe Path) -> IO ()
+satPathsQ :: TVar (Maybe Int) -> Int -> ConstraintTree -> Int -> Int -> Bool -> TQueue (Maybe SimplePath) -> IO ()
 satPathsQ nVar to t maxUnfolds maxSeqLength checkOverflows q = do
-  evalStateT (satPaths' 0 0 to t ([],0) q) NoContext
+  evalStateT (satPaths' 0 0 to t ([],ClosedPath [],0) q) NoContext
   atomically $ writeTQueue q Nothing
   where
     -- nUnfolds: number of Unfolds on current path
     -- nInputs: number of inputs on current path (path length)
     -- to: solver timeout
-    -- (s,d): current prefix path + depth of current position in the tree (d =/= path length)
-    satPaths' :: Int -> Int -> Int -> ConstraintTree -> (PrefixPath,Int) -> TQueue (Maybe Path) -> StateT SearchContext IO ()
-    satPaths' _ _ to Empty (s,d) q = do
-      let path = reverse s -- constraints are stored reversed
-      res <- lift $ isSatPath to path maxSeqLength checkOverflows
+    -- (s,d,e): current prefix path, depth of current position in the tree (d =/= path length), current symbolic environment
+    satPaths' :: Int -> Int -> Int -> ConstraintTree -> (PrefixPath,SimplePath,Int) -> TQueue (Maybe SimplePath) -> StateT SearchContext IO ()
+    satPaths' _ _ to Empty (_,p,d) q = do
+      let basePath = completePath [] p
+      res <- lift $ isSatPath to basePath maxSeqLength checkOverflows
       modify $ updateContext res d
-      when (res == SAT ()) $ lift $ atomically $ writeTQueue q $ Just path
-    satPaths' nUnfolds nInputs to (Choice l r) (s,d) q = do
-      satPaths' nUnfolds nInputs to l (s,d+1) q
+      when (res == SAT ()) $ lift $ atomically $ writeTQueue q $ Just p
+    satPaths' nUnfolds nInputs to (Choice l r) (s,p,d) q = do
+      satPaths' nUnfolds nInputs to l (s,p,d+1) q
       ctx <- get
       case ctx of
         RequirePruningCheck -> do
-          res <- lift $ isSatPath to s maxSeqLength checkOverflows
+          let prefix = addEnvToPath $ reverse s
+          res <- lift $ isSatPath to prefix maxSeqLength checkOverflows
           case res of
             NotSAT -> pure ()
             Timeout -> do
               put NoContext
-              satPaths' nUnfolds nInputs to r (s,d+1) q
+              satPaths' nUnfolds nInputs to r (s,p,d+1) q
             SAT () -> do
               put NoContext
-              satPaths' nUnfolds nInputs to r (s,d+1) q
+              satPaths' nUnfolds nInputs to r (s,p,d+1) q
         _ -> do
-          satPaths' nUnfolds nInputs to r (s,d+1) q
-    satPaths' nUnfolds nInputs to (Assert c@InputConstraint{} t) (s,d) q = do
+          satPaths' nUnfolds nInputs to r (s,p,d+1) q
+    satPaths' nUnfolds nInputs to (Assert c@SimpleInput{} t) (s,p,d) q = do
       currentMaxPathLength <- lift $ readTVarIO nVar
       case currentMaxPathLength of
         Just len | nInputs >= len -> pure ()
-        _ -> satPaths' nUnfolds (nInputs+1) to t (SomeConstraint c:s,d+1) q -- stores constraints in reversed order
-    satPaths' nUnfolds nInputs to (Assert c t) (s,d) q = satPaths' nUnfolds nInputs to t (SomeConstraint c:s,d+1) q -- stores constraints in reversed order
-    satPaths' nUnfolds nInputs to (Unfold t) (s,d) q
-      | nUnfolds < maxUnfolds = satPaths' (nUnfolds+1) nInputs to t (s,d) q
+        _ -> satPaths' nUnfolds (nInputs+1) to t (Some c:s,p `appendPath` ClosedPath [Some c],d+1) q -- stores constraints in reversed order
+    satPaths' nUnfolds nInputs to (Assert c t) (s,p,d) q = satPaths' nUnfolds nInputs to t (Some c:s,p `appendPath` ClosedPath [Some c],d+1) q -- stores constraints in reversed order
+    satPaths' nUnfolds nInputs to (Unfold t) (s,p,d) q
+      | nUnfolds < maxUnfolds = satPaths' (nUnfolds+1) nInputs to t (s,p,d) q
       | otherwise = pure ()
+    satPaths' nUnfolds nInputs to (InjectionPoint c t) (s,p,d) q = satPaths' nUnfolds nInputs to t (s,p `appendPath` OpenPath [] c (ClosedPath []),d) q
 
 data ValueGenerator where
   ValueGenerator :: Typeable v => (ValueMap -> Size -> Gen v) -> ValueGenerator
@@ -142,7 +145,7 @@ pathScript path mode checkOverflows = do
   vars <- forM tyConstr $
     \(InputConstraint (iVar@(Var (x,ty)),i) (vs :: ValueSet v) e) -> do
       var <- mkFreshVar (x ++ show i) =<< mkSort @v
-      let r = maybe 0 (maximum . snd) $ Map.lookup (someVar iVar) e
+      let r = maybe 0 (maximum . chronology) $ Map.lookup (someVar iVar) e
       pure (((SomeVar (x,SomeTypeRep ty),i),var,r),ValueGenerator $ \m -> valueOf iVar m vs)
 
   forM_ tyConstr $
@@ -260,7 +263,7 @@ forStringElse string normal = matchType @a
   , fallbackCase' normal
   ]
 
-z3Predicate :: Typeable x => Goal -> Term 'Transparent x -> Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R AST
+z3Predicate :: Typeable x => Goal -> Term 'Transparent x -> Map SomeVar SymbolicInfo -> [((SomeVar, Int), AST)] -> Z3R AST
 z3Predicate goal (Add x y) e vars = z3PredicateBinary goal x y e vars $ binary {
   binaryNoList = \a b -> mkAdd [a,b]
 }
@@ -339,7 +342,7 @@ binary :: Bin z3
 binary = Bin err err err err
   where err = error "does not happen with currently supported functions"
 
-z3PredicateUnary :: forall a. Typeable a => Goal -> Term 'Transparent a ->  Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Un Z3R -> Z3R AST
+z3PredicateUnary :: forall a. Typeable a => Goal -> Term 'Transparent a ->  Map SomeVar SymbolicInfo -> [((SomeVar, Int), AST)] -> Un Z3R -> Z3R AST
 z3PredicateUnary goal x e vars Un{..} = case typeRep @a of
   App c _ -> case eqTypeRep c (typeRep @[]) of
     Just HRefl -> case1 x -- a ~ [a1]
@@ -355,7 +358,7 @@ z3PredicateUnary goal x e vars Un{..} = case typeRep @a of
     case2 :: forall a. Typeable a => Term 'Transparent a -> Z3R AST
     case2 x = unaryNoList =<< z3Predicate goal x e vars
 
-z3PredicateBinary :: forall a b. (Typeable a, Typeable b) => Goal -> Term 'Transparent a -> Term 'Transparent b ->  Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Bin Z3R -> Z3R AST
+z3PredicateBinary :: forall a b. (Typeable a, Typeable b) => Goal -> Term 'Transparent a -> Term 'Transparent b ->  Map SomeVar SymbolicInfo -> [((SomeVar, Int), AST)] -> Bin Z3R -> Z3R AST
 z3PredicateBinary goal x y e vars Bin{..} = case typeRep @a of
   App ca _ -> case eqTypeRep ca (typeRep @[]) of
     Just HRefl -> case typeRep @b of
@@ -440,7 +443,7 @@ mkIntermediateBoolean x = do
   b <- mkFreshBoolVar "b"
   mkEq b x
 
-listASTs :: forall a. Typeable [a] => Goal -> Term 'Transparent [a] -> Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R (Either AST [AST])
+listASTs :: forall a. Typeable [a] => Goal -> Term 'Transparent [a] -> Map SomeVar SymbolicInfo -> [((SomeVar, Int), AST)] -> Z3R (Either AST [AST])
 listASTs goal (Reverse (Reverse t)) e vars = listASTs goal t e vars
 listASTs goal (Reverse t) e vars = do
   r <- listASTs goal t e vars
@@ -485,19 +488,19 @@ reverseSequence goal x = do
 unknownVariablesError :: VarExp a => a -> b
 unknownVariablesError x = error $ "unknown variable(s) {" ++ intercalate "," (map someVarname $ toVarList x) ++ "}"
 
-weaveVariables :: VarExp a => a -> Int -> Map SomeVar (Int,[Int]) -> [(SomeVar,Int)]
+weaveVariables :: VarExp a => a -> Int -> Map SomeVar SymbolicInfo -> [(SomeVar,Int)]
 weaveVariables vs n e =
-    reverse . drop n . reverse -- drop last n variables
+  reverse . drop n . reverse -- drop last n variables
   . map (\(x,y,_) -> (x,y))
   . sortOn thd3
-  . concatMap (\(x,(i,ks)) -> [(x,j,k) | (j,k) <- zip [i,i-1..1] ks ])
-  . mapMaybe (\v -> (v,) <$> Map.lookup v e)
+  . concatMap (\(x,jks) -> map (\(j,k) -> (x,j,k)) jks)
+  . mapMaybe (\v -> ((v,) . storedValues) <$> Map.lookup v e)
   $ toVarList vs
 
 lookupList :: Eq a => [a] -> [(a, b)] -> [b]
 lookupList vs vars = mapMaybe (`List.lookup` vars) vs
 
-assertOverflowChecks :: Goal -> Term 'Transparent Integer ->  Map SomeVar (Int,[Int]) -> [((SomeVar, Int), AST)] -> Z3R ()
+assertOverflowChecks :: Goal -> Term 'Transparent Integer ->  Map SomeVar SymbolicInfo -> [((SomeVar, Int), AST)] -> Z3R ()
 assertOverflowChecks goal t e vars = do
   ast <- z3Predicate goal t e vars
   overflowConstraints goal ast

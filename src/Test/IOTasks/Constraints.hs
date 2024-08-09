@@ -3,14 +3,22 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE StandaloneDeriving #-}
 module Test.IOTasks.Constraints (
-  Constraint(..), SomeConstraint(..),
+  SimpleConstraint(..),
+  Constraint(..),
   ConstraintType(..),
   ConstraintTree(..),
   constraintTree,
-  Path, paths,
-  partitionPath, pathDepth,
+  SimplePath(..), simplePaths,
+  appendPath, addEnvToPath, canBeInjected,
+  Path, SymbolicInfo(..),
+  storedValues,
+  injectNegatives, completePath, partitionPath,
+  pathDepth,
   numberOfPaths,
+  showSimplePath, showSimpleConstraint, showSomeSimpleConstraint,
   showPath, showConstraint, showSomeConstraint,
   ix
   ) where
@@ -22,108 +30,189 @@ import Test.IOTasks.Term.Prelude (not')
 import Test.IOTasks.Internal.Specification
 import Test.IOTasks.OutputPattern (valueTerms)
 
-import Data.List (intersperse)
+import Data.List (intersperse, sort)
 import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified Data.Set as Set (toList)
 import Data.Maybe (catMaybes, mapMaybe)
 import Data.Tuple.Extra (fst3)
 import Data.Typeable
+import Data.Some
+import Test.QuickCheck
+
+data SimpleConstraint (t :: ConstraintType) where
+  SimpleInput :: Typeable v => StorageType -> Var v -> ValueSet v -> SimpleConstraint 'Input
+  SimpleCondition :: Term 'Transparent Bool -> SimpleConstraint 'Condition
+  SimpleOverflow :: [Term 'Transparent Integer] -> SimpleConstraint 'Overflow
+
+data StorageType = KeepInput | DropInput
+  deriving Show
 
 data Constraint (t :: ConstraintType) where
-  InputConstraint :: Typeable v => (Var v, Int) -> ValueSet v -> Map SomeVar (Int, [Int]) -> Constraint 'Input
-  ConditionConstraint :: Term 'Transparent Bool -> Map SomeVar (Int, [Int]) -> Constraint 'Condition
-  OverflowConstraints :: [Term 'Transparent Integer] -> Map SomeVar (Int, [Int]) -> Constraint 'Overflow
+  InputConstraint :: Typeable v => (Var v, Int) -> ValueSet v -> Map SomeVar SymbolicInfo -> Constraint 'Input
+  ConditionConstraint :: Term 'Transparent Bool -> Map SomeVar SymbolicInfo -> Constraint 'Condition
+  OverflowConstraints :: [Term 'Transparent Integer] -> Map SomeVar SymbolicInfo -> Constraint 'Overflow
 
 data ConstraintType = Input | Condition | Overflow
 
-data SomeConstraint where
-  SomeConstraint :: Constraint t -> SomeConstraint
-
 data ConstraintTree where
   Choice :: ConstraintTree -> ConstraintTree -> ConstraintTree
-  Assert :: (Constraint t) -> ConstraintTree -> ConstraintTree
+  Assert :: (SimpleConstraint t) -> ConstraintTree -> ConstraintTree
   Unfold :: ConstraintTree -> ConstraintTree -- marker for counting path lengths
+  InjectionPoint :: (SimpleConstraint 'Input) -> ConstraintTree -> ConstraintTree  -- position for injecting the the given constraint 0 to n many times
   Empty :: ConstraintTree
 
-constraintTree :: Int -> Specification -> ConstraintTree
-constraintTree negMax =
+constraintTree :: Specification -> ConstraintTree
+constraintTree =
   sem
-    (\(n,e,k) x vs mode ->
+    (\() x vs mode ->
       let
-        e' = inc (someVar x) k e
-        p = (InputConstraint(x, ix (someVar x) e') vs e'
-            ,InputConstraint(x, ix (someVar x) e') (complement vs) e'
-            , mode == ElseAbort && n < negMax)
-      in case mode of
-          AssumeValid -> RecSub p id (n,e',k+1)
-          UntilValid
-            | n < negMax -> RecBoth p id (n,e',k) (n+1,e',k+1)
-            | otherwise -> RecSub p id (n,e',k+1)
-          ElseAbort -> RecSub p id (n,e',k)
+        p = (SimpleInput KeepInput x vs
+            ,SimpleInput DropInput x (complement vs)
+            , mode)
+      in RecSub p id ()
     )
     (\case
-      RecSub (vsP,_, False) () s' -> Assert vsP s'
-      RecSub (vsP,vsN, True) () s' -> Choice
+      RecSub (vsP,_, AssumeValid) () s' -> Assert vsP s'
+      RecSub (vsP,vsN, UntilValid) () s' -> InjectionPoint vsN $ Assert vsP s'
+      RecSub (vsP,vsN, ElseAbort) () s' -> Choice
         (Assert vsN Empty)
         (Assert vsP s')
-      RecBoth (vsP,vsN,_) () s' s -> Choice
-        (Assert vsN s)
-        (Assert vsP s')
+      RecBoth{} -> error "constraintTree: impossible"
       NoRec _ -> error "constraintTree: impossible"
       RecSame{} -> error "constraintTree: impossible"
     )
-    (\(_,e,_) _ ps t -> Assert (OverflowConstraints (catMaybes $ [ castTerm @Integer t | p <- Set.toList ps, vt <- valueTerms p, t <- withSomeTermK vt transparentSubterms]) e) t)
-    (\(_,e,_) c l r -> Assert (OverflowConstraints (mapMaybe (castTerm @Integer) $ transparentSubterms c) e) $ Choice (Assert (ConditionConstraint c e) l) (Assert (ConditionConstraint (not' c) e) r))
+    (\() _ ps t -> Assert (SimpleOverflow (catMaybes $ [ castTerm @Integer t | p <- Set.toList ps, vt <- valueTerms p, t <- withSomeTermK vt transparentSubterms])) t)
+    (\() c l r -> Assert (SimpleOverflow (mapMaybe (castTerm @Integer) $ transparentSubterms c)) $ Choice (Assert (SimpleCondition c) l) (Assert (SimpleCondition (not' c)) r))
     (\case {End -> Unfold ; Exit -> id})
     Unfold
     Empty
-    (0,Map.empty,1)
+    ()
 
-ix :: SomeVar -> Map SomeVar (Int,a) -> Int
-ix x m = maybe 0 fst (Map.lookup x m)
+data SimplePath where
+  ClosedPath :: [Some SimpleConstraint] -> SimplePath
+  OpenPath :: [Some SimpleConstraint] -> (SimpleConstraint t) -> SimplePath -> SimplePath
 
-inc :: SomeVar -> Int -> Map SomeVar (Int,[Int]) -> Map SomeVar (Int,[Int])
-inc x k m
-  | x `elem` Map.keys m = Map.update (\(c,ks) -> Just (c + 1,k:ks)) x m
-  | otherwise = Map.insert x (1,[k]) m
+prependPath :: Some SimpleConstraint -> SimplePath -> SimplePath
+prependPath c (ClosedPath cs) = ClosedPath (c:cs)
+prependPath c (OpenPath cs ic t) = OpenPath (c:cs) ic t
 
-type Path = [SomeConstraint]
+appendPath :: SimplePath -> SimplePath -> SimplePath
+appendPath (ClosedPath xs) (ClosedPath ys) = ClosedPath $ xs ++ ys
+appendPath (ClosedPath xs) (OpenPath ys cy y) = OpenPath (xs ++ ys) cy y
+appendPath (OpenPath xs cx x) y = OpenPath xs cx $ appendPath x y
+
+canBeInjected :: SimplePath -> Bool
+canBeInjected ClosedPath{} = False
+canBeInjected OpenPath{} = True
 
 -- paths n t returns all terminating paths in t that use at most n unfoldings of iterations
-paths :: Int -> ConstraintTree -> [Path]
-paths _ Empty = [[]]
-paths n _ | n < 0 = []
-paths n (Choice lt rt) = mergePaths (paths n lt) (paths n rt)
-paths n (Assert c t) = (SomeConstraint c:) <$> paths n t
-paths n (Unfold t)
-  | n > 0 = paths (n-1) t
+simplePaths :: Int -> ConstraintTree -> [SimplePath]
+simplePaths _ Empty = [ClosedPath []]
+simplePaths n _ | n < 0 = []
+simplePaths n (Choice lt rt) = mergePaths (simplePaths n lt) (simplePaths n rt)
+simplePaths n (Assert c t) = prependPath (Some c) <$> simplePaths n t
+simplePaths n (InjectionPoint c t) = OpenPath [] c <$> simplePaths n t
+simplePaths n (Unfold t)
+  | n > 0 = simplePaths (n-1) t
   | otherwise = []
 
-mergePaths :: [Path] -> [Path] -> [Path]
+mergePaths :: [SimplePath] -> [SimplePath] -> [SimplePath]
 mergePaths xs [] = xs
 mergePaths [] ys = ys
 mergePaths (x:xs) (y:ys) = x:y:mergePaths xs ys
+
+type Path = [Some Constraint]
+
+injectNegatives :: Int -> SimplePath -> Gen Path
+injectNegatives _ (ClosedPath cs) = pure $ addEnvToPath cs
+injectNegatives maxNeg p@OpenPath{} = do
+  is <- sort <$> vectorOf maxNeg (chooseInt (1,injectionPoints p))
+  pure $ completePath is p
+
+completePath :: [Int] -> SimplePath -> Path
+completePath = addEnvToPath .: go 1 where
+  go _ _ (ClosedPath cs) = cs
+  go n [] (OpenPath cs _ p) = cs ++ go (n+1) [] p
+  go n (i:is) (OpenPath cs c p)
+    | n == i = cs ++ (Some c: go n is (OpenPath [] c p))
+    | otherwise = cs ++ go (n+1) (i:is) p
+
+(.:) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
+(.:) = (.) . (.)
+
+injectionPoints :: SimplePath -> Int
+injectionPoints (ClosedPath _) = 0
+injectionPoints (OpenPath _ _ p) = 1 + injectionPoints p
+
+addEnvToPath :: [Some SimpleConstraint] -> Path
+addEnvToPath = snd . foldl (\((e,k),p) (Some c) -> let (e',c') = addEnvToConstraint e k c in ((e',k+1), p ++ [Some c']) ) ((Map.empty,1),[])
+
+addEnvToConstraint :: Map SomeVar SymbolicInfo -> Int -> SimpleConstraint t -> (Map SomeVar SymbolicInfo, Constraint t)
+addEnvToConstraint e k (SimpleInput ty x vs) = (e', InputConstraint (x,ix (someVar x) e') vs e')
+  where
+    e' = inc ty (someVar x) k e
+addEnvToConstraint e _ (SimpleCondition c) = (e, ConditionConstraint c e)
+addEnvToConstraint e _ (SimpleOverflow ts) = (e, OverflowConstraints ts e)
+
+data SymbolicInfo = SymbolicInfo
+  { currentIndex :: Int
+  , negativeIndices :: [Int]
+  , chronology :: [Int]
+  }
+
+ix :: SomeVar -> Map SomeVar SymbolicInfo -> Int
+ix x m = maybe 0 currentIndex (Map.lookup x m)
+
+inc :: StorageType -> SomeVar -> Int -> Map SomeVar SymbolicInfo -> Map SomeVar SymbolicInfo
+inc ty x k m
+  | x `elem` Map.keys m = Map.update (\(SymbolicInfo c ns ks) -> Just (SymbolicInfo (c + 1) (updateNegs (c+1) ns) (k:ks))) x m
+  | otherwise = Map.insert x (SymbolicInfo 1 (updateNegs 1 []) [k]) m
+  where
+    updateNegs c = case ty of
+      KeepInput -> id
+      DropInput -> (c:)
+
+-- indices of symbolic values stored and their chronological position
+storedValues :: SymbolicInfo -> [(Int,Int)]
+storedValues SymbolicInfo{..} = filter ((`notElem` negativeIndices).fst) $ zip [currentIndex,currentIndex-1..1] chronology
 
 pathDepth :: Path -> Int
 pathDepth =  length . fst3 . partitionPath
 
 partitionPath :: Path -> ([Constraint 'Input],[Constraint 'Condition],[Constraint 'Overflow])
 partitionPath = foldMap phi where
-  phi :: SomeConstraint -> ([Constraint 'Input],[Constraint 'Condition],[Constraint 'Overflow])
-  phi (SomeConstraint c@InputConstraint{}) = ([c],mempty,mempty)
-  phi (SomeConstraint c@ConditionConstraint{}) = (mempty,[c],mempty)
-  phi (SomeConstraint c@OverflowConstraints{}) = (mempty,mempty,[c])
+  phi :: Some Constraint -> ([Constraint 'Input],[Constraint 'Condition],[Constraint 'Overflow])
+  phi (Some c@InputConstraint{}) = ([c],mempty,mempty)
+  phi (Some c@ConditionConstraint{}) = (mempty,[c],mempty)
+  phi (Some c@OverflowConstraints{}) = (mempty,mempty,[c])
+
+
+showSimplePath :: SimplePath -> String
+showSimplePath (ClosedPath cs) = unlines $ intersperse " |" $ map showSomeSimpleConstraint cs
+showSimplePath (OpenPath cs c p) =
+  (unlines $ intersperse " |" $ map showSomeSimpleConstraint cs)
+  ++ (if null cs then "" else " |\n") ++ showSimpleConstraint c ++ "\n |\n"
+  ++ showSimplePath p
+
+showSomeSimpleConstraint :: Some SimpleConstraint -> String
+showSomeSimpleConstraint (Some c) = showSimpleConstraint c
+
+showSimpleConstraint :: SimpleConstraint t -> String
+showSimpleConstraint (SimpleInput KeepInput x vs) = unwords [varname x,":",showValueSet vs, "(kept)"]
+showSimpleConstraint (SimpleInput DropInput x vs) = unwords [varname x,":",showValueSet vs, "(dropped)"]
+showSimpleConstraint (SimpleCondition c) = showTerm c
+showSimpleConstraint (SimpleOverflow _) = "**some overflow checks**"
 
 showPath :: Path -> String
 showPath = unlines . intersperse " |" . map showSomeConstraint
 
-showSomeConstraint :: SomeConstraint -> String
-showSomeConstraint (SomeConstraint c) = showConstraint c
+showSomeConstraint :: Some Constraint -> String
+showSomeConstraint (Some c) = showConstraint c
 
 showConstraint :: Constraint t -> String
 showConstraint (InputConstraint (x,i) vs _) = concat [varname x,"_",show i," : ",showValueSet vs]
-showConstraint (ConditionConstraint t m) = showIndexedTerm t m
+showConstraint (ConditionConstraint t _) = showTerm t
 showConstraint (OverflowConstraints _ _) = "**some overflow checks**"
 
 numberOfPaths :: Integer -> Specification -> Integer
@@ -163,7 +252,7 @@ numberOfPaths maxIterationDepth s =
   p :: Integer -> Integer -> Integer -> Integer
   p 0 k _ = k
   p 1 k n = k * (n + 1)
-  p i k n = (k * (i ^ (n+1) - 1)) `div` (i - 1)
+  p i k n = k * (i ^ (n+1) - 1) `div` (i - 1)
   -- path with length (=n) in an iteration with i paths to Nop and k paths to E under the iteration
   p' :: Integer -> Integer -> Integer -> Integer
-  p' i k n = k * (i ^ n)
+  p' i k n = k * i ^ n

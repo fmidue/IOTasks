@@ -86,7 +86,7 @@ prog3Wrong = do
       | m >= n = print @_ @Integer x
       | otherwise = do
         i <- readLn
-        loop (m+1) (x+1+i)
+        loop (m+1) (x+i)
   loop 1 0
 
 spec :: Spec

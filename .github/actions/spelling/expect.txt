@@ -9,6 +9,7 @@ evl
 exs
 eys
 fmap
+foldl
 foldr
 fprop
 fst
@@ -25,6 +26,7 @@ implicits
 ints
 IOrep
 ITerm
+jks
 len
 Line
 Linebreak
@@ -34,6 +36,7 @@ mempty
 MTT
 Mul
 nats
+Negs
 NHead
 nop
 NOut
@@ -52,6 +55,7 @@ TQueue
 TVar
 uncurry
 unlines
+unsat
 Unsat
 unwords
 vals
