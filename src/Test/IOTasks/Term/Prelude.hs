@@ -3,7 +3,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds #-}
 module Test.IOTasks.Term.Prelude (
-  as,
   -- * Accessors
   currentValue, allValues,
   valueBefore, valuesBefore,
@@ -16,6 +15,8 @@ module Test.IOTasks.Term.Prelude (
   not',
   (.&&.), (.||.),
   true, false,
+  -- * embedded values
+  embeddedLit,
   -- * Simple list functions
   sum', product', length', reverse',
   isIn, isNotIn,
@@ -30,54 +31,49 @@ import Data.Char (isAlphaNum)
 import Data.Express (Expr((:$)), value)
 
 import Test.IOTasks.Internal.Term (Term(..), TermKind(..), toExpr, transparentSubterms, termVarExps)
-import Test.IOTasks.Var (VarExp(..), someVarname)
+import Test.IOTasks.Var (VarExp(..), Embedded, varname, Embeddable)
 
-import Type.Match (matchType, inCaseOfE', fallbackCase')
+import Type.Match (matchType, inCaseOfE', inCaseOfApp', fallbackCase')
 import Type.Reflection (Typeable, typeRep, (:~~:)(HRefl))
 
-currentValue :: (Typeable a, VarExp e) => e -> Term k a
+currentValue :: (Typeable a, VarExp e) => e a -> Term k a
 -- ^ Defined as @'currentValue' = 'valueBefore' 0@, providing access to the current value.
 currentValue = valueBefore 0
 
-allValues :: (Typeable a, VarExp e) => e -> Term k [a]
+allValues :: (Typeable a, VarExp e) => e a -> Term k [a]
 -- ^ Defined as @'allValues' = 'valuesBefore' 0@, providing access to all values.
 allValues = valuesBefore 0
 
-valueBefore :: (Typeable a, VarExp e) => Int -> e -> Term k a
+valueBefore :: (Typeable a, VarExp e) => Int -> e a -> Term k a
 -- ^ If the variable-expression x is associated with the values [x_1,..,x_n],
 -- @'valueBefore' i x@ provides access to x_(n-i).
 valueBefore = valueBefore' where
-  valueBefore' :: forall a e k. (Typeable a, VarExp e) => Int -> e -> Term k a
+  valueBefore' :: forall a e k. (Typeable a, VarExp e) => Int -> e a -> Term k a
   valueBefore' n x = checkNames x $ matchType @a
     [ inCaseOfE' @Integer $ \HRefl -> Current x n
     , inCaseOfE' @String $ \HRefl -> Current x n
+    , inCaseOfApp' @Embedded $ \HRefl -> Current x n
     , fallbackCase' $ error $ "variable type not supported for Terms: " ++ show (typeRep @a)
     ]
-valuesBefore :: (Typeable a, VarExp e) => Int -> e -> Term k [a]
+valuesBefore :: (Typeable a, VarExp e) => Int -> e a -> Term k [a]
 -- ^ If the variable-expression x is associated with the values [x_1,..,x_n],
 -- @'valuesBefore' i x@ provides access to [x_1,..,x_(n-i)].
 valuesBefore = valuesBefore' where
-  valuesBefore' :: forall a e k. (Typeable a, VarExp e) => Int -> e -> Term k [a]
+  valuesBefore' :: forall a e k. (Typeable a, VarExp e) => Int -> e a -> Term k [a]
   valuesBefore' n x = checkNames x $ matchType @a
     [ inCaseOfE' @Integer $ \HRefl -> All x n
     , inCaseOfE' @String $ \HRefl -> All x n
     , fallbackCase' $ error $ "variable type not supported for Terms: " ++ show (typeRep @a)
     ]
 
-checkNames :: VarExp e => e -> a -> a
-checkNames = foldr (f . someVarname) id . toVarList
+checkNames :: VarExp e => e a -> x -> x
+checkNames = foldr (f . varname) id . toVarList
   where
     f x c = if legalVar x then c else error $ "illegal variable name: " ++ x ++ "\variable names must start with a letter and can only contain letters, digits, _ and '"
 
 legalVar :: String -> Bool
 legalVar [] = False
 legalVar (x:xs) = isAlphaNum x && all (\c -> isAlphaNum c || c == '_' || c == '\'') xs
-
--- | 'as' is an operator for explicit type annotation.
---
--- Computationally, it is just identity.
-as :: Typeable a => Term k a -> Term k a
-as = id
 
 (.+.) :: Term k Integer -> Term k Integer -> Term k Integer
 (.+.) = Add
@@ -150,6 +146,9 @@ product' = Product
 
 listLit :: (Show a, Typeable a) => [a] -> Term k [a]
 listLit = ListLit
+
+embeddedLit :: (Embeddable a, Typeable a, Show a) => a -> Term k (Embedded a)
+embeddedLit = EmbeddedLit
 
 -- TODO: improve signature?
 filter' :: (Integer -> Bool) -> Term k [Integer] -> Term 'PartiallyOpaque [Integer]

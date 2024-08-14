@@ -2,6 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 module Test.IOTasks.Internal.ValueSet (
   ValueSet(..),
   empty, complete, singleton, fromList,
@@ -10,6 +11,7 @@ module Test.IOTasks.Internal.ValueSet (
   (\\), with, without,
   complement,
   unique, notInVar,
+  embed, embedFromList,
   isEmpty,
   containsValue, initiallyContainsValue,
   showValueSet,
@@ -21,13 +23,13 @@ module Test.IOTasks.Internal.ValueSet (
 
 import Data.Set (Set)
 import qualified Data.Set as Set (union,intersection,filter,toList,fromAscList, empty)
-import Data.Typeable
+import Type.Reflection
 
 import Test.QuickCheck
 
 import Z3.Monad
 import Test.IOTasks.ValueMap (ValueMap, lookupInteger, emptyValueMap)
-import Test.IOTasks.Var (Var, someVar, SomeVar, intVar)
+import Test.IOTasks.Var (Var (..), SomeVar (..), someVar, intVar, Embedded (Embedded), Embeddable (..))
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
@@ -42,6 +44,7 @@ data ValueSet a where
   CurrentlyNotIn :: VarRef -> ValueSet Integer
   Every :: ValueSet a
   None :: ValueSet a
+  Embed :: Embeddable a => ValueSet Integer -> ValueSet (Embedded a)
 
 deriving instance Eq (ValueSet a)
 deriving instance Ord (ValueSet a)
@@ -92,6 +95,12 @@ without vs = (vs \\) . singleton
 with :: ValueSet Integer -> Integer -> ValueSet Integer
 with vs = (vs `union`) . singleton
 
+embed ::  Embeddable a => ValueSet Integer -> ValueSet (Embedded a)
+embed = Embed
+
+embedFromList :: Embeddable a => [a] -> ValueSet (Embedded a)
+embedFromList = embed . fromList . map asInteger
+
 complement :: ValueSet a -> ValueSet a
 complement (GreaterThan n) = LessThan n `union` Eq n
 complement (LessThan n) =  GreaterThan n `union` Eq n
@@ -102,6 +111,12 @@ complement (CurrentlyIn x) = CurrentlyNotIn x
 complement (CurrentlyNotIn x) = CurrentlyIn x
 complement Every = None
 complement None = Every
+complement (Embed vs) = embedComplement (Embed vs)
+
+embedComplement :: forall a. Embeddable a => ValueSet (Embedded a) -> ValueSet (Embedded a)
+embedComplement Every = None
+embedComplement None = Every
+embedComplement (Embed vs) = Embed (fromList (embeddingRange @a) \\ vs)
 
 containsValue :: Var a -> ValueMap -> ValueSet a -> a -> Bool
 containsValue x m (Union vs1 vs2) n = containsValue x m vs1  n || containsValue x m vs2 n
@@ -115,6 +130,7 @@ containsValue x m (CurrentlyNotIn Self) n = n `notElem` valuesIn x m
 containsValue _ m (CurrentlyNotIn (Other y)) n = n `notElem` valuesIn y m
 containsValue _ _ Every _ = True
 containsValue _ _ None _ = False
+containsValue (EmbeddedVar _ x) m (Embed vs) (Embedded i) = containsValue (intVar x) m vs i
 
 valuesIn :: Var Integer -> ValueMap -> [Integer]
 valuesIn x env =
@@ -125,15 +141,12 @@ valuesIn x env =
 initiallyContainsValue ::  ValueSet Integer -> Integer -> Bool
 initiallyContainsValue = containsValue (intVar "x") $ emptyValueMap [someVar $ intVar "x"]
 
-valueOf :: Typeable a => Var a -> ValueMap -> ValueSet a -> Size -> Gen a
-valueOf = valueOf' where
-  valueOf' :: forall a. Typeable a => Var a -> ValueMap -> ValueSet a -> Size -> Gen a
-  valueOf' x m =
-    case eqT @a @Integer of
-      Just Refl -> valueOfInt x m
-      Nothing -> case eqT @a @String of
-        Just Refl -> valueOfString
-        Nothing -> error $ "unsupported ValueSet type: " ++ show (typeRep $ Proxy @a)
+valueOf :: Var a -> ValueMap -> ValueSet a -> Size -> Gen a
+valueOf _ _ None = error "valueOf: cannot draw value from empty value set"
+valueOf x@IntVar{} m vs = valueOfInt x m vs
+valueOf StringVar{} _ vs = valueOfString vs
+valueOf (EmbeddedVar _ x) m (Embed vs) = fmap Embedded . valueOfInt (intVar x) m vs
+valueOf x@(EmbeddedVar (_ :: TypeRep x) _) m Every = valueOf x m (embed $ fromList (embeddingRange @x))
 
 valueOfInt :: Var Integer -> ValueMap -> ValueSet Integer -> Size -> Gen Integer
 valueOfInt x m vs (Size sz _) =
@@ -161,18 +174,22 @@ valueOfString None _ = error "valueOf: empty ValueSet"
 showValueSet :: Typeable a => ValueSet a -> String
 showValueSet = go where
   go :: forall a. Typeable a => ValueSet a -> String
-  go vs = concat ["{ v : ",show (typeRep $ Proxy @a), " | ", showValueSet' vs ,"}"] where
-    showValueSet' (Union vs1 vs2) = concat ["(",showValueSet' vs1,") \\/ (", showValueSet' vs2,")"]
-    showValueSet' (Intersection vs1 vs2) = concat ["(",showValueSet' vs1,") /\\ (", showValueSet' vs2,")"]
-    showValueSet' (GreaterThan n) = "v > " ++ show n
-    showValueSet' (LessThan n) = "v < " ++ show n
-    showValueSet' (Eq n) = "v == " ++ show n
-    showValueSet' (CurrentlyIn ref) = "currentlyIn " ++ showVarRef ref
-    showValueSet' (CurrentlyNotIn ref) = "currentlyNotIn " ++ showVarRef ref
-    showValueSet' Every = "true"
-    showValueSet' None = "false"
-    showVarRef Self = "self"
-    showVarRef (Other y) = show y
+  go vs = concat ["{ v : ",show (typeRep @a), " | ", showValueSet' vs ,"}"]
+
+  showValueSet' :: ValueSet a -> String
+  showValueSet' (Union vs1 vs2) = concat ["(",showValueSet' vs1,") \\/ (", showValueSet' vs2,")"]
+  showValueSet' (Intersection vs1 vs2) = concat ["(",showValueSet' vs1,") /\\ (", showValueSet' vs2,")"]
+  showValueSet' (GreaterThan n) = "v > " ++ show n
+  showValueSet' (LessThan n) = "v < " ++ show n
+  showValueSet' (Eq n) = "v == " ++ show n
+  showValueSet' (CurrentlyIn ref) = "currentlyIn " ++ showVarRef ref
+  showValueSet' (CurrentlyNotIn ref) = "currentlyNotIn " ++ showVarRef ref
+  showValueSet' Every = "true"
+  showValueSet' None = "false"
+  showValueSet' (Embed vs) = "Embed " ++ showValueSet' vs
+
+  showVarRef Self = "self"
+  showVarRef (Other y) = show y
 
 -- basic ValueSets
 ints, nats :: ValueSet Integer
@@ -220,5 +237,7 @@ z3ValueSetConstraint var m (CurrentlyNotIn Self) xVar = do
 z3ValueSetConstraint _ m (CurrentlyNotIn (Other y)) xVar = do
   let xs = fromMaybe [] $ Map.lookup (someVar y) m
   mkAnd =<< sequence [ mkNot =<< mkEq xVar x | x <- xs, x /= xVar]
+z3ValueSetConstraint x@(EmbeddedVar (_ :: TypeRep x) _) m Every xVar = z3ValueSetConstraint x m (Embed $ fromList (embeddingRange @x)) xVar
 z3ValueSetConstraint _ _ Every _ = mkTrue
 z3ValueSetConstraint _ _ None _ = mkFalse
+z3ValueSetConstraint (EmbeddedVar _ x) m (Embed vs) xVar = z3ValueSetConstraint (intVar x) m vs xVar

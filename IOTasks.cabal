@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.36.0.
+-- This file has been generated from package.yaml by hpack version 0.37.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -55,7 +55,7 @@ library
       Test.IOTasks.Internal.ValueSet
   hs-source-dirs:
       src
-  ghc-options: -Wall -Wmissing-export-lists -Wno-name-shadowing -fdefer-typed-holes
+  ghc-options: -Wall -Wmissing-export-lists -Wno-name-shadowing -Werror=incomplete-patterns -fdefer-typed-holes
   build-depends:
       QuickCheck
     , ansi-terminal
@@ -84,6 +84,7 @@ test-suite IOTasks-test
       BlowupSpec
       BranchingStrictnessSpec
       EchoSpec
+      EmbeddedTypesSpec
       ExactErrorSourceSpec
       Examples
       HangmanSpec
@@ -105,7 +106,7 @@ test-suite IOTasks-test
   hs-source-dirs:
       test
       examples
-  ghc-options: -Wall -Wmissing-export-lists -Wno-name-shadowing -fdefer-typed-holes -threaded -rtsopts -with-rtsopts=-N -O2
+  ghc-options: -Wall -Wmissing-export-lists -Wno-name-shadowing -Werror=incomplete-patterns -fdefer-typed-holes -threaded -rtsopts -with-rtsopts=-N -O2
   build-depends:
       IOTasks
     , QuickCheck

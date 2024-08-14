@@ -9,7 +9,6 @@ import Test.Hspec
 import Test.Hspec.QuickCheck (prop)
 import Test.QuickCheck hiding (isSuccess, stdArgs, Args)
 
-import Control.Applicative (liftA2)
 import Control.Monad.Loops (allM)
 
 import Test.IOTasks
@@ -94,8 +93,8 @@ testCheapProperties = do
 
     prop "valueOf generates values from the set" $
       \vs -> ioProperty $ do
-        notEmpty <- not <$> isEmpty undefined undefined vs
-        pure $ notEmpty ==> forAll (valueOf @Integer undefined undefined vs (Size 100 undefined)) $ initiallyContainsValue vs
+        notEmpty <- not <$> isEmpty (intVar undefined) undefined vs
+        pure $ notEmpty ==> forAll (valueOf @Integer (intVar undefined) undefined vs (Size 100 undefined)) $ initiallyContainsValue vs
 
     prop "a value is either in a ValueSet or in it's complement" $
       \vs -> forAll (vectorOf 100 $ arbitrary @Integer) $ \xs -> all (\x -> (vs `initiallyContainsValue` x) /= (complement vs `initiallyContainsValue` x)) xs
@@ -108,8 +107,8 @@ testCheapProperties = do
 
     prop "vs \\ ws removes all elements of ws from vs" $
       \vs ws -> ioProperty $ do
-        notEmpty <- not <$> isEmpty undefined undefined ws
-        pure $ notEmpty ==> forAll (valueOf @Integer undefined undefined ws (Size 100 undefined)) $ not . initiallyContainsValue (vs \\ ws)
+        notEmpty <- not <$> isEmpty (intVar undefined) undefined ws
+        pure $ notEmpty ==> forAll (valueOf @Integer (intVar undefined) undefined ws (Size 100 undefined)) $ not . initiallyContainsValue (vs \\ ws)
 
 testEquiv :: Specification -> Specification -> Property
 testEquiv s1 s2 = p1 Test.QuickCheck..&&. p2 where

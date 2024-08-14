@@ -5,7 +5,7 @@ import Prelude hiding
 
 import Test.Hspec
 import Test.IOTasks
-import Test.QuickCheck (arbitrary,elements,forAll,listOf1,maxSize,maxSuccess,quickCheckWith,stdArgs,suchThat)
+import Test.QuickCheck (elements,forAll,listOf1,maxSize,maxSuccess,quickCheckWith,stdArgs)
 
 -- hangman
 hangmanSpec :: [Integer] -> Specification

@@ -6,6 +6,7 @@ module Test.IOTasks.ValueSet (
   (\\), with, without,
   complement,
   unique, notInVar,
+  embed, embedFromList,
   isEmpty,
   containsValue, initiallyContainsValue,
   showValueSet,

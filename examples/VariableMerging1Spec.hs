@@ -26,7 +26,7 @@ specification =
            readInput y ints AssumeValid)
     )
   ) <>
-  writeOutput [wildcard <> resultOf (length' $ filter' predicate $ allValues [x,y]) <> wildcard]
+  writeOutput [wildcard <> resultOf (length' $ filter' predicate $ allValues $ merge [x,y]) <> wildcard]
   where
     predicate x = x > 0 && x `mod` 3 == 0
     x = intVar "x"

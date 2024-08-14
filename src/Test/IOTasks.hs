@@ -15,15 +15,20 @@ module Test.IOTasks (
   ints, nats, str,
   OutputPattern,
   wildcard, text, resultOf,
-  Varname, Var, var, intVar, stringVar,
+  Varname, Var, intVar, stringVar,
   pPrintSpecification,
+  -- ** Embedding non-integer values
+  Embeddable(..),
+  embed, embedFromList,
+  embeddedVar,
+  Embedded,
   -- * Terms
   Term,
   TermKind(..),
-  as,
   -- ** Accessors
   currentValue, allValues,
   valueBefore, valuesBefore,
+  MergedVars, merge,
   -- ** Arithmetic functions
   (.+.), (.-.), (.*.),
   intLit,
@@ -33,6 +38,8 @@ module Test.IOTasks (
   not',
   (.&&.), (.||.),
   true, false,
+  -- ** Embedded literals
+  embeddedLit,
   -- ** Simple list functions
   sum', product', length', reverse',
   isIn, isNotIn,

@@ -197,11 +197,11 @@ taskCheckWithOutcome Args{..} prog spec = do
                 PathTimeout -> error "does not happen"
 
         testInput :: Inputs -> (PathOutcome,OverflowWarning)
-        testInput input = do
+        testInput input =
           let
             (specTrace,warn) = first normalizedTrace $ runSpecification spec input
             progTrace = runProgram prog input
-          case specTrace `covers` progTrace of
+          in case specTrace `covers` progTrace of
             result | isSuccessfulMatch result -> (PathSuccess,warn)
             failure -> (PathFailure input specTrace progTrace failure, warn)
 

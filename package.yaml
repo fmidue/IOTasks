@@ -40,6 +40,7 @@ ghc-options:
 - -Wall
 - -Wmissing-export-lists
 - -Wno-name-shadowing
+- -Werror=incomplete-patterns
 - -fdefer-typed-holes
 
 library:

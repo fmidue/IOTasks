@@ -11,7 +11,7 @@ import Data.Functor ((<&>))
 palindromeSpec :: Specification
 palindromeSpec =
   readInput x str AssumeValid <>
-  branch (currentValue x .==. as @String (reverse' $ currentValue x))
+  branch (currentValue x .==. reverse' (currentValue x))
     (writeOutput [text "Yes"])
     (writeOutput [text "No"])
   where

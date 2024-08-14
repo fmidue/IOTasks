@@ -5,6 +5,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeOperators #-}
 module Test.IOTasks.Internal.Specification (
   Specification(..),
   readInput, writeOutput, writeOptionalOutput, anyOptionalOutput,
@@ -259,7 +260,7 @@ runSpecification' addLinebreaks spec inputs =
       case ins of
         [] -> NoRec (outOfInputs,NoOverflow)
         (i:is)
-          | containsValue x e vs (readValue i) -> RecSub i id (insertValue (wrapValue $ readValue @v i) (someVar x) e,is)
+          | containsValue x e vs (readValue x i) -> RecSub i id (insertValue (wrapValue $ readValue x i) (someVar x) e,is)
           | otherwise -> case mode of
               AssumeValid -> error $ "invalid value: " ++ i ++ " is not an element of " ++ showValueSet vs
               UntilValid ->  RecSame i (first (progWrite Optional (Set.singleton Wildcard) <>)) (e,is)
@@ -361,18 +362,18 @@ accept s_ t_ = accept' s_ k_I t_ d_I
     accept' :: Specification -> (Action -> Trace -> ValueMap -> Bool) -> Trace -> ValueMap -> Bool
     accept' (ReadInput x (ty :: ValueSet a) AssumeValid s') k t d = case t of
       ProgReadString v t' | containsValue x d ty val -> accept' s' k t' (insertValue (wrapValue val) (someVar x) d)
-                          where val = readValue @a v
+                          where val = readValue x v
       _ -> False
     accept' (ReadInput x (ty :: ValueSet a) ElseAbort s') k t d = case t of
       ProgReadString v t'| containsValue x d ty val -> accept' s' k t' (insertValue (wrapValue val) (someVar x) d)
-                         where val = readValue @a v
-      ProgReadString v Terminate | not (containsValue x d ty (readValue v)) -> True
+                         where val = readValue x v
+      ProgReadString v Terminate | not (containsValue x d ty (readValue x v)) -> True
       _ -> False
     accept' s@(ReadInput x (ty :: ValueSet a) UntilValid s') k t d = case t of
       ProgReadString v t'
         | containsValue x d ty val -> accept' s' k t' (insertValue (wrapValue val) (someVar x) d)
         | not (containsValue x d ty val) -> accept' s k t d
-        where val = readValue @a v
+        where val = readValue x v
       _ -> False
     accept' (WriteOutput Optional os s') k t d = accept' (WriteOutput Mandatory os s') k t d || accept' s' k t d
     accept' (WriteOutput Mandatory os s') k t d =  case t of

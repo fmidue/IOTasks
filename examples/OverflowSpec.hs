@@ -12,8 +12,8 @@ import Data.Functor((<&>))
 overflowSpec :: Specification
 overflowSpec =
   readInput n nats UntilValid <>
-  whileNot (length' (as @[Integer] $ allValues x) .==. currentValue n)
-    (writeOptionalOutput [resultOf $ currentValue n .-. length' (as @[Integer] $ allValues x)] <> readInput x ints AssumeValid) <>
+  whileNot (length' (allValues x) .==. currentValue n)
+    (writeOptionalOutput [resultOf $ currentValue n .-. length' (allValues x)] <> readInput x ints AssumeValid) <>
   writeOutput [resultOf $ product' $ allValues x]
   where
     n = intVar "n"

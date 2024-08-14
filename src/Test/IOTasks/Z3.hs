@@ -16,7 +16,7 @@ module Test.IOTasks.Z3 (findPathInput, printPathScript, evalPathScript, satPaths
 import Test.IOTasks.Constraints
 import Test.IOTasks.Internal.ValueSet
 import Test.IOTasks.Internal.Term
-import Test.IOTasks.Var (Var(..), SomeVar, pattern SomeVar, VarExp(..), someVarname, someVar)
+import Test.IOTasks.Var (Var(..), SomeVar, pattern SomeVar, pattern Var, VarExp(..), someVar, Embeddable (..), varname)
 import Test.IOTasks.ValueMap
 
 import Z3.Monad
@@ -143,13 +143,13 @@ pathScript path mode checkOverflows = do
 
   goal <- mkGoal True False False
   vars <- forM tyConstr $
-    \(InputConstraint (iVar@(Var (x,ty)),i) (vs :: ValueSet v) e) -> do
-      var <- mkFreshVar (x ++ show i) =<< mkSort @v
+    \(InputConstraint (iVar@(Var (x,_)),i) (vs :: ValueSet v) e) -> do
+      var <- mkFreshVar (x ++ show i) =<< mkSortFor iVar
       let r = maybe 0 (maximum . chronology) $ Map.lookup (someVar iVar) e
-      pure (((SomeVar (x,SomeTypeRep ty),i),var,r),ValueGenerator $ \m -> valueOf iVar m vs)
+      pure (((someVar iVar,i),var,r),ValueGenerator $ \m -> valueOf iVar m vs)
 
   forM_ tyConstr $
-    \(InputConstraint (iVar@(Var (x,ty)),i) (vs :: ValueSet v) e) -> do
+    \(InputConstraint (iVar,i) (vs :: ValueSet v) e) -> do
       let varASTs = Map.fromListWith (++) $ concatMap (\(((var,j),ast,_),_) -> [ (var,[ast]) | j <= ix var e]) vars
       let var = fromMaybe (error "impossible") $ List.lookup (someVar iVar, i) $ map (dropThd . fst) vars
       constraint <- z3ValueSetConstraint iVar varASTs vs var
@@ -182,7 +182,7 @@ pathScript path mode checkOverflows = do
   mRes <- case result of
     Sat -> do
       model <- lift optimizeGetModel
-      SAT . catMaybes <$> mapM ((evalAST model . snd) . dropThd . fst) vars
+      SAT . catMaybes <$> mapM (\(((var,_),ast,_),_) -> evalAST model (var,ast)) vars
     Unsat -> do
       pure NotSAT
     Undef -> pure Timeout
@@ -205,8 +205,8 @@ generateSuggestions vars = do
       modify (insertValue val var)
       pure (ast,val)
 
-evalAST :: MonadZ3 z3 => Model -> AST -> z3 (Maybe String)
-evalAST m x = do
+evalAST :: MonadZ3 z3 => Model -> (SomeVar, AST) -> z3 (Maybe String)
+evalAST m (SomeVar StringVar{},x) = do
   isS <- isStringSort =<< getSort x
   if isS
     then do
@@ -214,15 +214,14 @@ evalAST m x = do
       case mR of
         Just r -> Just <$> getString r
         Nothing -> pure Nothing
-    else fmap show <$> evalInt m x
+    else pure Nothing
+evalAST m (SomeVar IntVar{},x) = fmap show <$> evalInt m x
+evalAST m (SomeVar (EmbeddedVar (_ :: TypeRep a) _),x) = fmap (show . asOriginal @a) <$> evalInt m x
 
-mkSort :: forall a z3. (Typeable a, MonadZ3 z3) => z3 Sort
-mkSort =
-  case eqTypeRep (typeRep @a) (typeRep @Integer) of
-    Just HRefl -> mkIntSort
-    Nothing -> case eqTypeRep (typeRep @a) (typeRep @String) of
-      Just HRefl -> mkStringSort
-      Nothing -> error "mkSort: unsupported type"
+mkSortFor :: MonadZ3 z3 => Var a -> z3 Sort
+mkSortFor IntVar{} = mkIntSort
+mkSortFor StringVar{} = mkStringSort
+mkSortFor EmbeddedVar{} = mkIntSort
 
 mkValueRep :: MonadZ3 z3 => AST -> Value -> z3 [(AST,Symbol)]
 mkValueRep x (IntegerValue n) = do
@@ -320,6 +319,7 @@ z3Predicate goal (Reverse xs) e vars = z3PredicateUnary goal xs e vars $ unary {
   }
 z3Predicate _ (IntLit n) _ _ = mkIntNum n
 z3Predicate _ (ListLit _) _ _ = error "z3Predicate: top level list literal should not happen"
+z3Predicate _ (EmbeddedLit x) _ _ = mkIntNum $ asInteger x
 z3Predicate _ (BoolLit b) _ _ = mkBool b
 z3Predicate _ (Current x n) e vars = pure $ fromMaybe (unknownVariablesError x) $ (`List.lookup` vars) . last $ weaveVariables x n e
 z3Predicate _ All{} _ _ = error "z3Predicate: top level list should not happen"
@@ -485,16 +485,16 @@ reverseSequence goal x = do
       con <- mkEq xi yj
       mkImplies pre con
 
-unknownVariablesError :: VarExp a => a -> b
-unknownVariablesError x = error $ "unknown variable(s) {" ++ intercalate "," (map someVarname $ toVarList x) ++ "}"
+unknownVariablesError :: VarExp e => e a -> b
+unknownVariablesError x = error $ "unknown variable(s) {" ++ intercalate "," (map varname $ toVarList x) ++ "}"
 
-weaveVariables :: VarExp a => a -> Int -> Map SomeVar SymbolicInfo -> [(SomeVar,Int)]
+weaveVariables :: (VarExp e, Typeable a) => e a -> Int -> Map SomeVar SymbolicInfo -> [(SomeVar,Int)]
 weaveVariables vs n e =
   reverse . drop n . reverse -- drop last n variables
   . map (\(x,y,_) -> (x,y))
   . sortOn thd3
   . concatMap (\(x,jks) -> map (\(j,k) -> (x,j,k)) jks)
-  . mapMaybe (\v -> ((v,) . storedValues) <$> Map.lookup v e)
+  . mapMaybe ((\v -> ((v,) . storedValues) <$> Map.lookup v e) . someVar)
   $ toVarList vs
 
 lookupList :: Eq a => [a] -> [(a, b)] -> [b]

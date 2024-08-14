@@ -41,7 +41,7 @@ simpleSpec :: Gen Specification
 simpleSpec = do
   i <- input [(intVar "n",ints,AssumeValid)]
   l <- loop [(intVar "xs",ints,AssumeValid)] (progressCondition [(intVar "xs",ints)] [intVar "n"])
-  p <- outputOneof (intTerm [someVar $ intVar "xs", someVar $ intVar "y"] [someVar $ intVar "n"])
+  p <- outputOneof (intTerm [intVar "xs", intVar "y"] [intVar "n"])
   pure $ i <> l <> p
 
 -- generator for standalone loop bodies
@@ -75,10 +75,10 @@ outputOneof' b ts = do
   pure $ (if b then writeOptionalOutput else writeOutput) [resultOf t]
 
 -- branch free sequence of inputs and outputs
-_linearSpec :: (Typeable a, Read a, Show a) => [(Var a,ValueSet a,InputMode)] -> [(Var a,ValueSet a,InputMode)] -> Gen (Specification, [SomeVar])
+_linearSpec ::[(Var Integer,ValueSet Integer,InputMode)] -> [(Var Integer,ValueSet Integer,InputMode)] -> Gen (Specification, [SomeVar])
 _linearSpec lists xs = sized $ \n -> do
   is <- ($ nop) <$> someInputsWithHole (lists ++ xs) (n `div` 2)
-  let vs = readVars is
+  let vs = filterType @Integer $ readVars is
   os <- resize (n `div` 2) $ listOf1 $ outputOneof (intTerm vs vs)
   let spec = is <> mconcat os
   return (spec,readVars spec)
@@ -103,16 +103,16 @@ data Condition = forall a. (Typeable a, Read a, Show a) => Condition { condTerm 
 -- generates a numeric condition of the form
 -- f xs `comp` n
 -- that contains every variable at most once
-progressCondition :: (Typeable a, Read a, Show a) => [(Var a,ValueSet a)] -> [Var Integer] -> Gen Condition
+progressCondition :: [(Var Integer,ValueSet Integer)] -> [Var Integer] -> Gen Condition
 progressCondition lists nums = do
   let comp = (.>.)
-  n <- oneof [as @Integer . currentValue <$> elements nums, intLit <$> choose (0,10)]
+  n <- oneof [currentValue <$> elements nums, intLit <$> choose (0,10)]
   (xs,vs) <- elements lists
   let f = length'
-  return $ Condition (f (as @[Integer] $ allValues xs) `comp` n) (xs,vs)
+  return $ Condition (f (allValues xs) `comp` n) (xs,vs)
 
 -- simple terms
-intTerm :: [SomeVar] -> [SomeVar] -> Gen (Term k Integer)
+intTerm :: [Var Integer] -> [Var Integer] -> Gen (Term k Integer)
 intTerm lists xs =
   oneof $ concat
     [ [ unary  | not $ null lists ]

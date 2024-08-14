@@ -11,7 +11,7 @@ import Data.Functor ((<&>))
 echoSpec :: Specification
 echoSpec =
   readInput x str AssumeValid <>
-  writeOutput [resultOf $ as @String $ currentValue x]
+  writeOutput [resultOf $ currentValue x]
   where
     x = stringVar "x"
 

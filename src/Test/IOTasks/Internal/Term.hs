@@ -11,6 +11,7 @@ module Test.IOTasks.Internal.Term (
   TermKind(..),
   oEval,
   evalI, evalIs,
+  showResult,
   termVarExps, transparentSubterms,
   toExpr,
   showTerm, showIndexedTerm,
@@ -19,8 +20,6 @@ module Test.IOTasks.Internal.Term (
   castTerm,
   compareK,
   ) where
-
-import Control.Applicative ( liftA2 )
 
 import Data.Express (Expr((:$)), var, val, value, (//-), evl, vars, isVar, showExpr)
 import Data.Function (on)
@@ -38,7 +37,7 @@ import Test.IOTasks.Var
 import Text.Parsec (parse, char, many1, alphaNum, sepBy1, (<|>), string, digit)
 import Text.Parsec.String (Parser)
 
-import Type.Match (matchType, fallbackCase', inCaseOfE')
+import Type.Match
 import Type.Reflection
 
 data TermKind = Transparent | PartiallyOpaque
@@ -62,9 +61,10 @@ data Term (k :: TermKind) a where
   Reverse :: Typeable a => Term k [a] -> Term k [a]
   IntLit :: Integer -> Term k Integer
   ListLit :: (Show a, Typeable a) => [a] -> Term k [a]
+  EmbeddedLit :: (Embeddable a, Typeable a, Show a) => a -> Term k (Embedded a)
   BoolLit :: Bool -> Term k Bool
-  Current :: VarExp e => e -> Int -> Term k a
-  All :: (Typeable a, VarExp e) => e -> Int -> Term k [a]
+  Current :: VarExp e => e a -> Int -> Term k a
+  All :: (Typeable a, VarExp e) => e a -> Int -> Term k [a]
 
   Opaque :: Expr -> [[SomeVar]] -> [SomeTerm 'Transparent] -> Term 'PartiallyOpaque a
 
@@ -87,9 +87,10 @@ termVarExps (Reverse x) = termVarExps x
 termVarExps (Not x) = termVarExps x
 termVarExps (IntLit _) = []
 termVarExps (ListLit _) = []
+termVarExps (EmbeddedLit _) = []
 termVarExps (BoolLit _) = []
-termVarExps (Current e _) = [toVarList e]
-termVarExps (All e _) = [toVarList e]
+termVarExps (Current e _) = [map someVar $ toVarList e]
+termVarExps (All e _) = [map someVar $ toVarList e]
 termVarExps (Opaque _ vars _) = vars
 
 instance EffectEval (Term k) where
@@ -112,8 +113,9 @@ instance EffectEval (Term k) where
   pureEval f _ (Reverse xs) = reverse <$> f xs
   pureEval _ _ (IntLit x) = pure x
   pureEval _ _ (ListLit xs) = pure xs
+  pureEval _ _ (EmbeddedLit x) = pure (Embedded $ asInteger x)
   pureEval _ _ (BoolLit x) = pure x
-  pureEval _ e (Current x n) = pure $ fromMaybe (error $ "empty list for {" ++ intercalate "," (map someVarname $ toVarList x) ++ "}") . safeHead $ primEvalVar x n e
+  pureEval _ e (Current x n) = pure $ fromMaybe (error $ "empty list for {" ++ intercalate "," (map varname $ toVarList x) ++ "}") . safeHead $ primEvalVar x n e
   pureEval _ e (All x n) = pure $ reverse $ primEvalVar x n e
   pureEval _ e (Opaque expr vss _) = pure $ eval' expr vss e
 
@@ -132,7 +134,7 @@ evalI e (Length (xs :: Term k [a])) =
     , fallbackCase' $ Left $ SubCheck xs (fromInt . length)
     ]
 evalI _ (IntLit x) = Right $ fromInteger x
-evalI e (Current x n) = Right $ fromInteger $ fromMaybe (error $ "empty list for {" ++ intercalate "," (map someVarname $ toVarList x) ++ "}") . safeHead $ primEvalVar x n e
+evalI e (Current x n) = Right $ fromInteger $ fromMaybe (error $ "empty list for {" ++ intercalate "," (map varname $ toVarList x) ++ "}") . safeHead $ primEvalVar x n e
 evalI e (Opaque expr vss _) = Right $ fromInteger $ eval' expr vss e
 
 evalIs :: ValueMap -> Term k [Integer] -> [I]
@@ -147,13 +149,24 @@ evalIs _ Sum{} = error "lists should not have a Num instance"
 evalIs _ Product{} = error "lists should not have a Num instance"
 evalIs e (Opaque expr vss _ ) = fromInteger <$> eval' expr vss e
 
-primEvalVar :: forall a e. (Typeable a, VarExp e) => e -> Int -> ValueMap -> [a]
+primEvalVar :: forall a e. (Typeable a, VarExp e) => e a -> Int -> ValueMap -> [a]
 primEvalVar x n e =
-  drop n . map fst . sortBy (flip compare `on` snd) . concatMap unwrapValueEntry $ mapMaybe (`ValueMap.lookup` e) (toVarList x)
+  drop n . map fst . sortBy (flip compare `on` snd) . concatMap (unwrapValueEntry (head varList)) $ mapMaybe ((`ValueMap.lookup` e) . someVar) varList
+  where
+    varList :: [Var a]
+    varList = toVarList x
 
 safeHead :: [a] -> Maybe a
 safeHead [] = Nothing
 safeHead (x:_) = Just x
+
+showResult :: (Show a, Typeable a) => a -> String
+showResult x = matchTypeOf x
+  [ inCaseOf @String id
+  , inCaseOf @Integer show
+  , inCaseOfApp @Embedded $ \HRefl (Embedded i :: Embedded a) -> show @a $ asOriginal i
+  , fallbackCase' $ show x
+  ]
 
 showIndexedTerm :: Typeable a => Term k a -> Map SomeVar (Int,[Int]) -> String
 showIndexedTerm t = showTerm' t . Just
@@ -180,11 +193,12 @@ showTerm' (Length xs) m = showUnary "length" xs m
 showTerm' (Reverse xs) m = showUnary "reverse" xs m
 showTerm' (Sum xs) m = showUnary "sum" xs m
 showTerm' (Product xs) m = showUnary "product" xs m
-showTerm' (Current x n) (Just m) = (\(x,(i,_)) -> x ++ "_" ++ show i) $ maximumOn (head.snd.snd) $ (\xs -> take (length xs - n) xs) $ mapMaybe (\x -> (someVarname x,) <$> Map.lookup x m) (toVarList x)
-showTerm' (Current x n) Nothing = "{" ++ intercalate "," (map someVarname $ toVarList x) ++ "}"++":"++show n++"_C"
-showTerm' (All x n) _ = "{" ++ intercalate "," (map someVarname $ toVarList x) ++ "}"++":"++show n++"_A"
+showTerm' (Current x n) (Just m) = (\(x,(i,_)) -> x ++ "_" ++ show i) $ maximumOn (head.snd.snd) $ (\xs -> take (length xs - n) xs) $ mapMaybe (\x -> (varname x,) <$> Map.lookup (someVar x) m) (toVarList x)
+showTerm' (Current x n) Nothing = "{" ++ intercalate "," (map varname $ toVarList x) ++ "}"++":"++show n++"_C"
+showTerm' (All x n) _ = "{" ++ intercalate "," (map varname $ toVarList x) ++ "}"++":"++show n++"_A"
 showTerm' (IntLit x) _ = show x
 showTerm' (ListLit xs) _ = show xs
+showTerm' (EmbeddedLit x) _ = show x
 showTerm' t@Opaque{} _ = show t -- TODO: improve
 
 showBinary :: (Typeable a, Typeable b) => String -> Term k1 a -> Term k2 b -> Maybe (Map SomeVar (Int,[Int])) -> String
@@ -229,6 +243,7 @@ transparentSubterms t@(Reverse x) = maybeToList (someTerm <$> maybeTransparentTe
 transparentSubterms t@(Not x) = maybeToList (someTerm <$> maybeTransparentTerm t) ++ transparentSubterms x
 transparentSubterms t@(IntLit _) =  maybeToList (someTerm <$> maybeTransparentTerm t)
 transparentSubterms t@(ListLit _) =  maybeToList (someTerm <$> maybeTransparentTerm t)
+transparentSubterms t@(EmbeddedLit _) =  maybeToList (someTerm <$> maybeTransparentTerm t)
 transparentSubterms t@(BoolLit _) =  maybeToList (someTerm <$> maybeTransparentTerm t)
 transparentSubterms t@(Current _ _) =  maybeToList (someTerm <$> maybeTransparentTerm t)
 transparentSubterms t@(All _ _) =  maybeToList (someTerm <$> maybeTransparentTerm t)
@@ -254,6 +269,7 @@ maybeTransparentTerm (Reverse x) = Reverse <$> maybeTransparentTerm x
 maybeTransparentTerm (Not x) = Not <$> maybeTransparentTerm x
 maybeTransparentTerm (IntLit x) = Just $ IntLit x
 maybeTransparentTerm (ListLit xs) = Just $ ListLit xs
+maybeTransparentTerm (EmbeddedLit x) = Just $ EmbeddedLit x
 maybeTransparentTerm (BoolLit x) = Just $ BoolLit x
 maybeTransparentTerm (Current x n) = Just $ Current x n
 maybeTransparentTerm (All x n) = Just $ All x n
@@ -278,21 +294,17 @@ instance Typeable a => Ord (Term k a) where
 compareK :: Typeable a => Term k1 a -> Term k2 a -> Ordering
 compareK x y = compare (toExpr x) (toExpr y)
 
-currentE :: VarExp e => e -> Int -> Expr
-currentE x n = case varExpType x of
-  Just (SomeTypeRep (ty :: TypeRep (a :: k))) -> withTypeable ty $ withTypeable (typeRepKind ty) $
-    case eqTypeRep (typeRep @k) (typeRep @Type) of
-      Just HRefl -> Data.Express.var ("[" ++ intercalate "," (map someVarname $ toVarList x) ++ "]_C^" ++ show n) (undefined :: a)
-      Nothing -> error $ "currentE: a does not have kind Type in TypeRep a, with a = " ++ show (typeRep @a)
-  Nothing -> error "currentE: inconsistent VarExp type"
+currentE ::  forall e a. (VarExp e, Typeable a) => e a -> Int -> Expr
+currentE x n =
+  Data.Express.var
+    ("[" ++ intercalate "," (map varname $ toVarList x) ++ "]_C^" ++ show n)
+    (undefined :: a)
 
-allE :: VarExp e => e -> Int -> Expr
-allE x n = case varExpType x of
-  Just (SomeTypeRep (ty :: TypeRep (a :: k))) -> withTypeable ty $ withTypeable (typeRepKind ty) $
-    case eqTypeRep (typeRep @k) (typeRep @Type) of
-      Just HRefl -> Data.Express.var ("[" ++ intercalate "," (map someVarname $ toVarList x) ++ "]_A^" ++ show n) (undefined :: [a])
-      Nothing -> error $ "allE: a does not have kind Type in TypeRep a, with a = " ++ show (typeRep @a)
-  Nothing -> error "allE: inconsistent VarExp type"
+allE :: forall e a. (VarExp e, Typeable a) => e a -> Int -> Expr
+allE x n =
+  Data.Express.var
+    ("[" ++ intercalate "," (map varname $ toVarList x) ++ "]_A^" ++ show n)
+    (undefined :: [a])
 
 -- Assumption: each list in xss contains variables in ascending order
 eval' :: Typeable a => Expr -> [[SomeVar]] -> ValueMap -> a
@@ -303,9 +315,10 @@ eval' expr xss e = evl . fillAVars xss e . reduceAVarsIndex e . replaceCVars e $
 -- replace <var>_C^n with head(<var>_A^n)
 replaceCVars :: ValueMap -> Expr -> Expr
 replaceCVars m expr = expr //-
-  [ (oldExpr, headF ty :$ allE (varnameVarList x m) n)
+  [ (oldExpr, headF ty :$ withSomeConsistentVars xs ((`allE` n) . merge))
   | Just (oldExpr, (n,x)) <- map (varStruct C) (vars expr)
   , ty <- maybeToList $ varnameTypeRep x m
+  , xs <- maybeToList $ varnameVarList x m
   ]
 
 -- given SomeTypeRep of a build Expr for head :: [a] -> a
@@ -320,9 +333,10 @@ headF (SomeTypeRep (ta :: TypeRep (a :: k))) =
 -- replace <var>_A^n with reverse(tail^n(<var>_A^0))
 reduceAVarsIndex :: ValueMap -> Expr -> Expr
 reduceAVarsIndex m expr = expr //-
-  [ (expr, tailF ty n :$ allE (varnameVarList x m) 0)
+  [ (expr, tailF ty n :$ withSomeConsistentVars xs ((`allE` 0) . merge))
   | Just (expr, (n,x)) <- map (varStruct A) (vars expr)
   , ty <- maybeToList $ varnameTypeRep x m
+  , xs <- maybeToList $ varnameVarList x m
   ]
 
 -- given SomeTypeRep of a build Expr for reverse . replicateF tail n :: [a] -> [a]
@@ -355,12 +369,19 @@ varStruct acc x
 
 -- replace <var>_A^0 with values from variable environment
 fillAVars :: [[SomeVar]] -> ValueMap -> Expr -> Expr
-fillAVars xss e expr = expr //- [ (allE xs 0,xs') | xs <- nub xss, let xs' = combinedVarsExpr xs ]
+fillAVars xss e expr =
+  expr //-
+    [ (allExpr,xs')
+    | someXs <- nub xss
+    , xs <- maybeToList $ someConsistentVars someXs
+    , let xs' = withSomeConsistentVars xs combinedVarsExpr
+    , let allExpr = withSomeConsistentVars xs ((`allE` 0) . merge)
+    ]
   where
-    combinedVarsExpr :: [SomeVar] -> Expr
-    combinedVarsExpr xs = case sortedEntries xs e of
-      Just x -> withValueEntry x (error "fillAVars: something went wrong") (val . map fst)
-      Nothing -> error "fillAVars: inconsistent type"
+    combinedVarsExpr :: Typeable a => [Var a] -> Expr
+    combinedVarsExpr xs =
+      let x = sortedEntries xs e
+      in withValueEntry x (error "fillAVars: something went wrong") (val . map fst)
 
 toExpr :: Typeable a => Term k a -> Expr
 toExpr (Add x y) = value "(+)" ((+) :: Integer -> Integer -> Integer) :$ toExpr x :$ toExpr y
@@ -381,6 +402,7 @@ toExpr (Sum xs) = value "sum" (sum :: [Integer] -> Integer) :$ toExpr xs
 toExpr (Product xs) = value "product" (product :: [Integer] -> Integer) :$ toExpr xs
 toExpr (IntLit x) = val x
 toExpr (ListLit xs) = val xs
+toExpr (EmbeddedLit (x :: x)) = val @(Embedded x) (Embedded $ asInteger x)
 toExpr (BoolLit x) = val x
 toExpr (Current x n) = currentE x n
 toExpr (All x n) = allE x n

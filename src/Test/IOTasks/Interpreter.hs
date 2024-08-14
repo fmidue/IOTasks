@@ -30,7 +30,7 @@ interpret s = do
   pure $ flip evalStateT (emptyValueMap [] :: ValueMap) $
     sem
       -- (\() x (vs :: ValueSet v) m -> RecSub (someVar x,wrapValue . readValue @v, \var m -> (containsValue var m vs . unwrapValue),m) id ())
-      (\() x (vs :: ValueSet v) m -> RecSub (someVar x,wrapValue . readValue @v, \vMap -> containsValue x vMap vs . unwrapValue,m) id ())
+      (\() x (vs :: ValueSet v) m -> RecSub (someVar x,wrapValue . readValue x, \vMap -> containsValue x vMap vs . unwrapValue x,m) id ())
       (\case
         RecSub (x,readF,_,AssumeValid) () p' -> do
           v <- lift (readF <$> MTT.getLine)

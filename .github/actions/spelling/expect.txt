@@ -35,6 +35,7 @@ mconcat
 mempty
 MTT
 Mul
+mys
 nats
 Negs
 NHead
@@ -62,5 +63,6 @@ vals
 varname
 vcat
 xit
+XPos
 xprop
 xss

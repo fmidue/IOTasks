@@ -30,6 +30,8 @@ import Test.QuickCheck (Gen, generate, frequency)
 import System.IO (stdout)
 import System.Timeout (timeout)
 import Control.Monad (when, foldM)
+import Debug.Trace (traceShowId)
+import Test.IOTasks.Internal.Term (showResult)
 
 taskCheck :: IOrep () -> Specification -> IO ()
 taskCheck = taskCheckWith stdArgs
@@ -112,16 +114,16 @@ genTrace spec depth sz maxNeg =
       (if maybe False (d >) depth then pure $ NoRec OutOfInputs
       else do
         frequency $
-            (5, valueOf x e vs sz >>= (\i -> pure $ RecSub (wrapValue i) id (insertValue (wrapValue i) (someVar x) e,d+1,n)))
-          : [(1, valueOf x e (complement vs) sz >>= (\i -> pure $ RecSame (wrapValue i) id (e,d+1,n+1))) | mode == UntilValid && n < maxNeg]
+            (5, valueOf x e vs sz >>= (\i -> pure $ RecSub (showResult i) id (insertValue (wrapValue i) (someVar x) e,d+1,n)))
+          : [(1, valueOf x e (complement vs) sz >>= (\i -> pure $ RecSame (showResult i) id (e,d+1,n+1))) | mode == UntilValid && n < maxNeg]
           ++ [(1, valueOf x e (complement vs) sz >>= (\i -> pure $ NoRec $ foldr ProgRead Terminate (show i ++ "\n"))) | mode == ElseAbort && n < maxNeg]
     ))
     (pure . \case
       NoRec r -> r
       RecSub i () t' -> do
-        foldr ProgRead t' (showValue i ++ "\n")
+        foldr ProgRead t' (i ++ "\n")
       RecSame i () t' -> do
-        foldr ProgRead t' (showValue i ++ "\n")
+        foldr ProgRead t' (i ++ "\n")
       RecBoth{} -> error "genTrace: impossible"
     )
     (\(e,_,_) o ts t' -> ProgWrite o (Set.map (snd . evalPattern e) ts) <$> t')

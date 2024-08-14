@@ -11,9 +11,9 @@ import Data.Functor ((<&>))
 reverseSpec :: Specification
 reverseSpec =
   readInput x str AssumeValid <>
-  branch (length' (as @String $ currentValue x) .>. intLit 5)
-    (writeOutput [resultOf $ reverse' . as @String $ currentValue x])
-    (writeOutput [resultOf $ as @String $ currentValue x])
+  branch (length' (currentValue x) .>. intLit 5)
+    (writeOutput [resultOf $ reverse' $ currentValue x])
+    (writeOutput [resultOf $ currentValue x])
   where
     x = stringVar "x"
 

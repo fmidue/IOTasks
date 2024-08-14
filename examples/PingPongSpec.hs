@@ -11,9 +11,9 @@ import Data.Functor ((<&>))
 pingPongSpec :: Specification
 pingPongSpec =
   readInput x str AssumeValid <>
-  branch (as @String (currentValue x) .==. listLit "Ping")
+  branch (currentValue x .==. listLit "Ping")
     (writeOutput [text "Pong"])
-    (branch (as @String (currentValue x) .==. listLit "Pong")
+    (branch (currentValue x .==. listLit "Pong")
       (writeOutput [text "Ping"])
       nop
     )

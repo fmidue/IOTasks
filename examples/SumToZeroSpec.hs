@@ -18,7 +18,7 @@ sumToZeroSpec =
       exit
       nop
     ) <>
-  writeOutput [resultOf $ length' $ as @[Integer] $ allValues x]
+  writeOutput [resultOf $ length' $ allValues x]
   where x = intVar "x"
 
 sumToZeroProg :: MonadTeletype m => m ()

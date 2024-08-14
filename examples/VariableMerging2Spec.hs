@@ -18,13 +18,13 @@ specification =
     readInput x ints AssumeValid)
     (readInput y ints AssumeValid)
     <>
-  branch (currentValue [x,y] .>. intLit 5)
+  branch (currentValue (merge [x,y]) .>. intLit 5)
     (readInput z ints AssumeValid)
     (readInput y ints AssumeValid)
     <>
-  writeOutput [resultOf $ as @Integer $ currentValue [x,z]] <>
-  writeOutput [resultOf $ length' $ as @[Integer] $ allValues [x,y,z]] <>
-  writeOutput [resultOf $ length' $ as @[Integer] $ allValues [x,y,a,z]]
+  writeOutput [resultOf $ currentValue $ merge [x,z]] <>
+  writeOutput [resultOf $ length' $ allValues $ merge [x,y,z]] <>
+  writeOutput [resultOf $ length' $ allValues $ merge [x,y,a,z]]
   where
     x = intVar "x"
     y = intVar "y"

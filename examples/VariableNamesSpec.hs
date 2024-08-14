@@ -54,21 +54,21 @@ spec =
           var2 = intVar str2
         in (\(_,v) -> v == 2) $ oEval @Integer
             (insertValue (wrapValue (1 :: Integer)) (someVar var2) $ insertValue (wrapValue (0 :: Integer)) (someVar var1) $ emptyValueMap [someVar var1,someVar var2])
-            (liftOpaque ((+1),"+1") $ currentValue [var1, var2])
+            (liftOpaque ((+1),"+1") $ currentValue $ merge [var1, var2])
       prop "should all evaluate to a value (merge-all)" $ forAll (liftA2 (,) varnameGen varnameGen) $ \(str1,str2) ->
         let
           var1 = intVar str1
           var2 = intVar str2
         in (\(_,v) -> v == 3) $ oEval @Integer
             (insertValue (wrapValue (1 :: Integer)) (someVar var2) $ insertValue (wrapValue (0 :: Integer)) (someVar var1) $ emptyValueMap [someVar var1,someVar var2])
-            (liftOpaque ((+1),"+1") $ length' $ as @[Integer] $ allValues [var1, var2])
+            (liftOpaque ((+1),"+1") $ length' $ allValues $ merge [var1, var2])
       prop "order in VarExpr should not matter" $ forAll (liftA2 (,) varnameGen varnameGen) $ \(str1,str2) ->
         let
           var1 = intVar str1
           var2 = intVar str2
           evalExample (x,y) = oEval @Integer
             (insertValue (wrapValue (1 :: Integer)) (someVar x) $ insertValue (wrapValue (0 :: Integer)) (someVar y) $ emptyValueMap [someVar x,someVar y])
-            (liftOpaque ((+1),"+1") $ currentValue [x, y])
+            (liftOpaque ((+1),"+1") $ currentValue $ merge [x, y])
         in evalExample (var1,var2) == evalExample (var2,var1)
       it "satisfies specification" $
         (taskCheckOutcome program specification <&> isSuccess) `shouldReturn` True

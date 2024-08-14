@@ -7,4 +7,4 @@ extra-deps:
 - git: https://github.com/IagoAbal/haskell-z3
   commit: 6368e451e45359563106da7e917f6594453c5161
 - git: https://github.com/owestphal/type-match
-  commit: 744797d33f85daa1d78181e2c512052903352dcc
+  commit: e1afab43d2e8bfa5e2006492ed34060036e7be51

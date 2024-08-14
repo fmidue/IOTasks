@@ -15,7 +15,7 @@ spec1 :: Specification
 spec1 =
   readInput x ints AssumeValid <>
   readInput y nats AssumeValid <>
-  branch (currentValue x .>. as @Integer (currentValue y))
+  branch (currentValue x .>. currentValue y)
     (writeOutput [wildcard <> resultOf (currentValue x .+. currentValue y) <> wildcard , resultOf (currentValue x .-. currentValue y) <> wildcard] )
     (writeOutput [wildcard <> text "Result: " <> resultOf (currentValue x .*. currentValue y)] )
   where
@@ -36,7 +36,7 @@ spec2 =
   readInput n nats AssumeValid <>
   whileNot (sum' (allValues x) .>. currentValue n)
   (readInput x ints AssumeValid) <>
-  writeOutput [resultOf $ length' $ as @[Integer] $ allValues x]
+  writeOutput [resultOf $ length' $ allValues x]
   where
     n = intVar "n"
     x = intVar "x"
@@ -57,8 +57,8 @@ prog2 = do
 spec3 :: Specification
 spec3 =
   readInput n nats UntilValid <>
-  whileNot (length' (as @[Integer] $ allValues x) .==. currentValue n)
-    (writeOptionalOutput [resultOf $ currentValue n .-. length' (as @[Integer] $ allValues x)] <> readInput x ints AssumeValid) <>
+  whileNot (length' (allValues x) .==. currentValue n)
+    (writeOptionalOutput [resultOf $ currentValue n .-. length' (allValues x)] <> readInput x ints AssumeValid) <>
   writeOutput [resultOf $ sum' $ allValues x]
   where
     n = intVar "n"

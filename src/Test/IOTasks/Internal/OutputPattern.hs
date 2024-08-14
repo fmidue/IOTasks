@@ -104,7 +104,7 @@ evalPattern :: ValueMap -> OutputPattern k -> (OverflowWarning, OutputPattern 'T
 evalPattern _ Wildcard = (NoOverflow, Wildcard)
 evalPattern _ (Text s) = (NoOverflow, Text s)
 evalPattern e (Sequence x y) = evalPattern e x <> evalPattern e y
-evalPattern e (ResultOf t) = second (Text . showAsValue) $ oEval e t
+evalPattern e (ResultOf t) = second (Text . showResult) $ oEval e t
 
 type AddLinebreaks = Bool
 

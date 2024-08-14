@@ -16,7 +16,7 @@ specification =
   readInput x nats ElseAbort <>
   readInput y nats AssumeValid <>
   readInput z nats UntilValid <>
-  writeOutput [resultOf $ sum' $ allValues [x,y,z] ]
+  writeOutput [resultOf $ sum' $ allValues $ merge [x,y,z] ]
   where
     x = intVar "x"
     y = intVar "y"
@@ -42,7 +42,7 @@ program = do
 --
 spec2 :: InputMode -> Specification
 spec2 mode =
-  readInput x nats mode `repeatUntil` (length' (as @[Integer] $ allValues x) .==. intLit 5)
+  readInput x nats mode `repeatUntil` (length' (allValues x) .==. intLit 5)
   where
     x = intVar "x"
 
