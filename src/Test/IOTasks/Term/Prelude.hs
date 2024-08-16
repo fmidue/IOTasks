@@ -51,6 +51,7 @@ valueBefore = valueBefore' where
   valueBefore' :: forall a e k. (Typeable a, VarExp e) => Int -> e a -> Term k a
   valueBefore' n x = checkNames x $ matchType @a
     [ inCaseOfE' @Integer $ \HRefl -> Current x n
+    , inCaseOfE' @Bool $ \HRefl -> Current x n
     , inCaseOfE' @String $ \HRefl -> Current x n
     , inCaseOfApp' @Embedded $ \HRefl -> Current x n
     , fallbackCase' $ error $ "variable type not supported for Terms: " ++ show (typeRep @a)
@@ -62,7 +63,9 @@ valuesBefore = valuesBefore' where
   valuesBefore' :: forall a e k. (Typeable a, VarExp e) => Int -> e a -> Term k [a]
   valuesBefore' n x = checkNames x $ matchType @a
     [ inCaseOfE' @Integer $ \HRefl -> All x n
+    , inCaseOfE' @Bool $ \HRefl -> All x n
     , inCaseOfE' @String $ \HRefl -> All x n
+    , inCaseOfApp' @Embedded $ \HRefl -> All x n
     , fallbackCase' $ error $ "variable type not supported for Terms: " ++ show (typeRep @a)
     ]
 

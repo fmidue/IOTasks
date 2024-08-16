@@ -16,7 +16,7 @@ module Test.IOTasks.Var (
   SomeConsistentVars(..), someConsistentVars, withSomeConsistentVars,
   withConsistentList,
   filterType,
-  intVar, stringVar, embeddedVar,
+  intVar, stringVar, boolVar, embeddedVar,
   varname, varTypeRep,
   VarExp(..),
   MergedVars, merge,
@@ -33,6 +33,7 @@ type Varname = String
 
 data Var a where
   IntVar :: Varname -> Var Integer
+  BoolVar :: Varname -> Var Bool
   StringVar :: Varname -> Var String
   EmbeddedVar :: (Embeddable a, Show a, Read a) => TypeRep a -> Varname -> Var (Embedded a)
 
@@ -131,11 +132,13 @@ deriving instance Show SomeVar
 
 varname :: Var a -> Varname
 varname (IntVar x) = x
+varname (BoolVar x) = x
 varname (StringVar x) = x
 varname (EmbeddedVar _ x) = x
 
 varTypeRep :: Var a -> TypeRep a
 varTypeRep IntVar{} = typeRep
+varTypeRep BoolVar{} = typeRep
 varTypeRep StringVar{} = typeRep
 varTypeRep (EmbeddedVar ty _) = App (typeRep @Embedded) ty
 
@@ -144,6 +147,9 @@ someVarname (SomeVar x) = varname x
 
 intVar :: Varname -> Var Integer
 intVar = IntVar
+
+boolVar :: Varname -> Var Bool
+boolVar = BoolVar
 
 stringVar :: Varname -> Var String
 stringVar = StringVar

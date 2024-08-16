@@ -12,10 +12,10 @@ module Test.IOTasks.Random (
   complement,
   unique, notInVar,
   isEmpty,
-  ints, nats, str,
+  ints, nats, bools, str,
   OutputPattern,
   wildcard, text, resultOf,
-  Varname, Var, intVar, stringVar,
+  Varname, Var, intVar, boolVar, stringVar,
   pPrintSpecification,
   -- ** Embedding non-integer values
   Embeddable(..),

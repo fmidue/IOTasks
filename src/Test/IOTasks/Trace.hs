@@ -49,7 +49,6 @@ import Data.Functor.Classes (Show1, showsPrec1, Eq1, eq1)
 import Text.Show.Deriving (deriveShow1)
 import Data.Eq.Deriving (deriveEq1)
 import Text.PrettyPrint.HughesPJClass (Pretty (..))
-import Debug.Trace (traceShowId)
 
 data OptFlag = Optional | Mandatory deriving (Eq, Ord, Show)
 

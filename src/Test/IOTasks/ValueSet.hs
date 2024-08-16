@@ -14,7 +14,7 @@ module Test.IOTasks.ValueSet (
   valueOf,
   Size(..),
   -- | = standard value sets
-  ints, nats, str,
+  ints, nats, bools, str,
   ) where
 
 import Test.IOTasks.Internal.ValueSet

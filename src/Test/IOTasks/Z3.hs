@@ -216,10 +216,12 @@ evalAST m (SomeVar StringVar{},x) = do
         Nothing -> pure Nothing
     else pure Nothing
 evalAST m (SomeVar IntVar{},x) = fmap show <$> evalInt m x
+evalAST m (SomeVar BoolVar{},x) = fmap show <$> evalBool m x
 evalAST m (SomeVar (EmbeddedVar (_ :: TypeRep a) _),x) = fmap (show . asOriginal @a) <$> evalInt m x
 
 mkSortFor :: MonadZ3 z3 => Var a -> z3 Sort
 mkSortFor IntVar{} = mkIntSort
+mkSortFor BoolVar{} = mkBoolSort
 mkSortFor StringVar{} = mkStringSort
 mkSortFor EmbeddedVar{} = mkIntSort
 
@@ -227,6 +229,9 @@ mkValueRep :: MonadZ3 z3 => AST -> Value -> z3 [(AST,Symbol)]
 mkValueRep x (IntegerValue n) = do
   def <- mkStringSymbol "default"
   pure . (,def) <$> (mkEq x =<< mkInteger n)
+mkValueRep x (BoolValue b) = do
+  def <- mkStringSymbol "default"
+  pure . (,def) <$> (mkEq x =<< mkBool b)
 mkValueRep x (StringValue s) = do
   xStr <- astToString x
   -- length constraint

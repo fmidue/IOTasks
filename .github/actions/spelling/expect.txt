@@ -1,6 +1,7 @@
 AVars
 bdy
 Bifunctor
+bools
 cmp
 concat
 ctx

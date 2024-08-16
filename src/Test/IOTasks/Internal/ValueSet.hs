@@ -17,7 +17,7 @@ module Test.IOTasks.Internal.ValueSet (
   showValueSet,
   valueOf,
   Size(..),
-  ints, nats, str,
+  ints, nats, bools, str,
   z3ValueSetConstraint,
   ) where
 
@@ -144,6 +144,7 @@ initiallyContainsValue = containsValue (intVar "x") $ emptyValueMap [someVar $ i
 valueOf :: Var a -> ValueMap -> ValueSet a -> Size -> Gen a
 valueOf _ _ None = error "valueOf: cannot draw value from empty value set"
 valueOf x@IntVar{} m vs = valueOfInt x m vs
+valueOf BoolVar{} _ Every = const $ elements [True,False]
 valueOf StringVar{} _ vs = valueOfString vs
 valueOf (EmbeddedVar _ x) m (Embed vs) = fmap Embedded . valueOfInt (intVar x) m vs
 valueOf x@(EmbeddedVar (_ :: TypeRep x) _) m Every = valueOf x m (embed $ fromList (embeddingRange @x))
@@ -195,6 +196,9 @@ showValueSet = go where
 ints, nats :: ValueSet Integer
 ints = Every
 nats = Eq 0 `Union` GreaterThan 0
+
+bools :: ValueSet Bool
+bools = complete
 
 str :: ValueSet String
 str = Every

@@ -15,7 +15,7 @@ module Test.IOTasks.ValueMap (
   ValueEntry(..),
   withValueEntry,
   unwrapValueEntry,
-  lookupInteger, lookupString,
+  lookupInteger, lookupBool, lookupString,
   ) where
 
 import Data.List as List (sortOn, lookup)
@@ -32,7 +32,7 @@ import Data.Bifunctor (first)
 
 data ValueMap = ValueMap { valueMap :: Map SomeVar ValueEntry, size :: Int } deriving (Eq,Show)
 
-data ValueEntry = NoEntry | IntegerEntry [(Integer,Int)] | StringEntry [(String,Int)] deriving (Eq,Show)
+data ValueEntry = NoEntry | IntegerEntry [(Integer,Int)] | BoolEntry [(Bool,Int)] | StringEntry [(String,Int)] deriving (Eq,Show)
 
 emptyValueMap :: [SomeVar] -> ValueMap
 emptyValueMap xs = ValueMap (Map.fromList ((,NoEntry) <$> xs)) 0
@@ -46,6 +46,7 @@ varnameTypeRep xs m = uniqueResult $ map (`List.lookup` map varInfo (Map.keys $ 
   where
     varInfo :: SomeVar -> (Varname, SomeTypeRep)
     varInfo (SomeVar (IntVar x)) = (x,SomeTypeRep $ typeRep @Integer)
+    varInfo (SomeVar (BoolVar x)) = (x,SomeTypeRep $ typeRep @Bool)
     varInfo (SomeVar (StringVar x)) = (x, SomeTypeRep $ typeRep @String)
     varInfo (SomeVar (EmbeddedVar ty x)) = (x, SomeTypeRep $ App (typeRep @Embedded) ty)
 
@@ -74,28 +75,38 @@ sortedEntries x m = sortEntry $ combinedEntries x m
 sortEntry :: ValueEntry -> ValueEntry
 sortEntry NoEntry = NoEntry
 sortEntry (IntegerEntry xs) = IntegerEntry $ sortOn snd xs
+sortEntry (BoolEntry xs) = BoolEntry $ sortOn snd xs
 sortEntry (StringEntry xs) = StringEntry $ sortOn snd xs
 
 withValueEntry :: ValueEntry -> r -> (forall a. (Typeable a, Show a) => [(a,Int)] -> r) -> r
 withValueEntry NoEntry c _ = c
 withValueEntry (IntegerEntry xs) _ f = f xs
+withValueEntry (BoolEntry xs) _ f = f xs
 withValueEntry (StringEntry xs) _ f = f xs
 
 unwrapValueEntry :: Var a -> ValueEntry -> [(a,Int)]
 unwrapValueEntry _ NoEntry = []
 
 unwrapValueEntry IntVar{} (IntegerEntry xs) = xs
+unwrapValueEntry BoolVar{} (IntegerEntry _) = error "unwrapValue: incompatible type - Integer (or I) and Bool"
 unwrapValueEntry StringVar{} (IntegerEntry _) = error "unwrapValue: incompatible type - Integer (or I) and String"
 unwrapValueEntry EmbeddedVar{} (IntegerEntry xs) = map (first Embedded) xs
 
+unwrapValueEntry IntVar{} (BoolEntry _) = error "unwrapValue: incompatible type - Bool and Integer (or I)"
+unwrapValueEntry BoolVar{} (BoolEntry xs) = xs
+unwrapValueEntry StringVar{} (BoolEntry _) = error "unwrapValue: incompatible type - Bool and String"
+unwrapValueEntry (EmbeddedVar ty _) (BoolEntry _) = error $ "unwrapValue: incompatible type - Bool and " ++ show (App (typeRep @Embedded) ty)
+
 unwrapValueEntry StringVar{} (StringEntry xs) = xs
 unwrapValueEntry IntVar{} (StringEntry _) = error "unwrapValue: incompatible type - String and Integer (or I)"
+unwrapValueEntry BoolVar{} (StringEntry _) = error "unwrapValue: incompatible type - String and Bool"
 unwrapValueEntry (EmbeddedVar ty _) (StringEntry _) = error $ "unwrapValue: incompatible type - String and " ++ show (App (typeRep @Embedded) ty)
 
-data Value = IntegerValue Integer | StringValue String deriving Show
+data Value = IntegerValue Integer | BoolValue Bool | StringValue String deriving Show
 
 showValue :: Value -> String
 showValue (IntegerValue i) = show i
+showValue (BoolValue b) = show b
 showValue (StringValue s) = s
 
 wrapValue :: Typeable a => a -> Value
@@ -104,6 +115,7 @@ wrapValue = wrapValue' where
   wrapValue' x =
     matchTypeOf x
       [ inCaseOf @Integer IntegerValue
+      , inCaseOf @Bool BoolValue
       , inCaseOf @String StringValue
       , inCaseOfApp @Embedded $ \HRefl (Embedded i) -> IntegerValue i
       , fallbackCase' $ error $ "wrapValue: unsupported type " ++ show (typeRep @a)
@@ -111,9 +123,11 @@ wrapValue = wrapValue' where
 
 unwrapValue :: Var a -> Value -> a
 unwrapValue IntVar{} (IntegerValue i) = i
+unwrapValue BoolVar{} (BoolValue b) = b
 unwrapValue StringVar{} (StringValue x) = x
 unwrapValue EmbeddedVar{} (IntegerValue i) = Embedded i
 unwrapValue x IntegerValue{} = error $ "unwrapValue: incompatible type - Integer and " ++ show (varTypeRep x)
+unwrapValue x BoolValue{} = error $ "unwrapValue: incompatible type - Bool and " ++ show (varTypeRep x)
 unwrapValue x StringValue{} = error $ "unwrapValue: incompatible type - String and " ++ show (varTypeRep x)
 
 readValue :: Var a -> String -> a
@@ -122,6 +136,9 @@ readValue = readValue' where
   readValue' IntVar{} x = case readMaybe x of
     Just i -> i
     Nothing -> error $ x ++ " - Integer"
+  readValue' BoolVar{} x = case readMaybe x of
+    Just i -> i
+    Nothing -> error $ x ++ " - Bool"
   readValue' StringVar{} x = x
   readValue' (EmbeddedVar (ty :: TypeRep a) _) x =
     case readMaybe @(Embedded a) x of
@@ -137,6 +154,9 @@ insertValue v k (ValueMap m sz)
     f (IntegerValue x) Nothing = Just $ IntegerEntry [(x,i)]
     f (IntegerValue x) (Just NoEntry) = Just $ IntegerEntry [(x,i)]
     f (IntegerValue x) (Just (IntegerEntry xs)) = Just $ IntegerEntry $ (x,i):xs
+    f (BoolValue x) Nothing = Just $ BoolEntry [(x,i)]
+    f (BoolValue x) (Just NoEntry) = Just $ BoolEntry [(x,i)]
+    f (BoolValue x) (Just (BoolEntry xs)) = Just $ BoolEntry $ (x,i):xs
     f (StringValue x) Nothing = Just $ StringEntry [(x,i)]
     f (StringValue x) (Just NoEntry) = Just $ StringEntry [(x,i)]
     f (StringValue x) (Just (StringEntry xs)) = Just $ StringEntry $ (x,i):xs
@@ -145,8 +165,11 @@ insertValue v k (ValueMap m sz)
 hasType :: Value -> SomeVar -> Bool
 hasType (IntegerValue _) (SomeVar IntVar{}) = True
 hasType (IntegerValue _) (SomeVar EmbeddedVar{}) = True
+hasType IntegerValue{} _ = False
+hasType (BoolValue _) (SomeVar BoolVar{}) = True
+hasType BoolValue{} _ = False
 hasType (StringValue _) (SomeVar StringVar{}) = True
-hasType _ _ = False
+hasType StringValue{} _ = False
 
 lookupInteger :: SomeVar -> ValueMap -> Maybe [(Integer,Int)]
 lookupInteger v m = do
@@ -154,6 +177,16 @@ lookupInteger v m = do
   case r of
     NoEntry -> Just []
     IntegerEntry xs -> Just xs
+    BoolEntry _ -> Nothing
+    StringEntry _ -> Nothing
+
+lookupBool :: SomeVar -> ValueMap -> Maybe [(Bool,Int)]
+lookupBool v m = do
+  r <- Map.lookup v $ valueMap m
+  case r of
+    NoEntry -> Just []
+    IntegerEntry _ -> Nothing
+    BoolEntry xs -> Just xs
     StringEntry _ -> Nothing
 
 lookupString :: SomeVar -> ValueMap -> Maybe [(String,Int)]
@@ -162,4 +195,5 @@ lookupString v m = do
   case r of
     NoEntry -> Just []
     IntegerEntry _ -> Nothing
+    BoolEntry _ -> Nothing
     StringEntry xs -> Just xs
