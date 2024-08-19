@@ -53,7 +53,7 @@ data Term (k :: TermKind) a where
   Le :: (Typeable a, Ord a) => Term k a -> Term k a -> Term k Bool
   And :: Term k Bool -> Term k Bool -> Term k Bool
   Or :: Term k Bool -> Term k Bool -> Term k Bool
-  IsIn :: Term k Integer -> Term k [Integer] -> Term k Bool
+  IsIn :: (Typeable a, Eq a) => Term k a -> Term k [a] -> Term k Bool
   Not :: Term k Bool -> Term k Bool
   Sum :: Num a => Term k [a] -> Term k a
   Product :: Num a => Term k [a] -> Term k a
@@ -394,7 +394,7 @@ toExpr (Lt (x :: Term k x) y) = value "(<)" ((<) :: x -> x -> Bool) :$ toExpr x 
 toExpr (Le (x :: Term k x) y) = value "(<=)" ((<=) :: x -> x -> Bool) :$ toExpr x :$ toExpr y
 toExpr (And x y) = value "(&&)" ((&&) :: Bool -> Bool -> Bool) :$ toExpr x :$ toExpr y
 toExpr (Or x y) = value "(||)" ((||) :: Bool -> Bool -> Bool) :$ toExpr x :$ toExpr y
-toExpr (IsIn x xs) = value "elem" (elem :: Integer -> [Integer] -> Bool) :$ toExpr x :$ toExpr xs
+toExpr (IsIn (x :: Term k x) xs) = value "elem" (elem :: x -> [x] -> Bool) :$ toExpr x :$ toExpr xs
 toExpr (Not x) = value "not" (not :: Bool -> Bool) :$ toExpr x
 toExpr (Length (xs :: Term k [b])) = value "length" (fromIntegral . length :: [b] -> Integer) :$ toExpr xs
 toExpr (Reverse (xs :: Term k [x])) = value "reverse" (reverse :: [x] -> [x]) :$ toExpr xs

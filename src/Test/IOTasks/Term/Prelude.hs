@@ -129,10 +129,10 @@ true = BoolLit True
 false :: Term k Bool
 false = BoolLit False
 
-isIn :: Term k Integer -> Term k [Integer] -> Term k Bool
+isIn :: (Typeable a, Eq a) => Term k a -> Term k [a] -> Term k Bool
 isIn = IsIn
 
-isNotIn :: Term k Integer -> Term k [Integer] -> Term k Bool
+isNotIn :: (Typeable a, Eq a) => Term k a -> Term k [a] -> Term k Bool
 isNotIn x xs = not' (x `isIn` xs)
 
 length' :: Typeable a => Term k [a] -> Term k Integer
