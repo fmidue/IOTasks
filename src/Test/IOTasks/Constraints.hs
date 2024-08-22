@@ -4,7 +4,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StandaloneDeriving #-}
 module Test.IOTasks.Constraints (
   SimpleConstraint(..),
   Constraint(..),
@@ -30,7 +29,7 @@ import Test.IOTasks.Term.Prelude (not')
 import Test.IOTasks.Internal.Specification
 import Test.IOTasks.OutputPattern (valueTerms)
 
-import Data.List (intersperse, sort)
+import Data.List (intersperse)
 import qualified Data.Map as Map
 import Data.Map (Map)
 import qualified Data.Set as Set (toList)
@@ -38,7 +37,6 @@ import Data.Maybe (catMaybes, mapMaybe)
 import Data.Tuple.Extra (fst3)
 import Data.Typeable
 import Data.Some
-import Test.QuickCheck
 
 data SimpleConstraint (t :: ConstraintType) where
   SimpleInput :: Typeable v => StorageType -> Var v -> ValueSet v -> SimpleConstraint 'Input
@@ -123,9 +121,6 @@ mergePaths [] ys = ys
 mergePaths (x:xs) (y:ys) = x:y:mergePaths xs ys
 
 type Path = [Some Constraint]
-
-type NumberOfInjectionPoints = Int
-type UsedInjectionPoints = [Int]
 
 completePath :: [Int] -> SimplePath -> Path
 completePath = addEnvToPath .: go 1 where

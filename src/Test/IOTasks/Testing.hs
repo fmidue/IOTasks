@@ -33,10 +33,7 @@ import Data.Bifunctor (first, Bifunctor (second))
 import Text.PrettyPrint hiding ((<>))
 import Control.Concurrent.Async
 import System.IO
-import Test.QuickCheck (generate, suchThat)
-import Control.Monad.IO.Class (MonadIO(liftIO))
-import Data.Express.Utils (nubSort, mapMaybe, catMaybes)
-import Data.Tuple.Extra (fst3)
+import Test.QuickCheck (generate)
 
 taskCheck :: IOrep () -> Specification -> IO ()
 taskCheck = taskCheckWith stdArgs

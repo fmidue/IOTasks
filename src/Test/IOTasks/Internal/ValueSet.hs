@@ -55,10 +55,6 @@ deriving instance Ord (ValueSet a)
 data VarRef a = Self | Other (Var a)
   deriving (Eq,Ord)
 
-mapVarRef :: (Var a -> Var b) -> VarRef a -> VarRef b
-mapVarRef _ Self = Self
-mapVarRef f (Other x) = Other (f x)
-
 hasVarRefs :: ValueSet a -> Bool
 hasVarRefs Every = False
 hasVarRefs None = False
