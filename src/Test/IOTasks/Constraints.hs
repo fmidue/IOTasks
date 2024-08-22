@@ -12,10 +12,10 @@ module Test.IOTasks.Constraints (
   ConstraintTree(..),
   constraintTree,
   SimplePath(..), simplePaths,
-  appendPath, addEnvToPath, canBeInjected,
+  appendPath, addEnvToPath, canBeInjected, injectionPoints,
   Path, SymbolicInfo(..),
   storedValues,
-  injectNegatives, completePath, partitionPath,
+  completePath, partitionPath,
   pathDepth,
   numberOfPaths,
   showSimplePath, showSimpleConstraint, showSomeSimpleConstraint,
@@ -124,11 +124,8 @@ mergePaths (x:xs) (y:ys) = x:y:mergePaths xs ys
 
 type Path = [Some Constraint]
 
-injectNegatives :: Int -> SimplePath -> Gen Path
-injectNegatives _ (ClosedPath cs) = pure $ addEnvToPath cs
-injectNegatives maxNeg p@OpenPath{} = do
-  is <- sort <$> vectorOf maxNeg (chooseInt (1,injectionPoints p))
-  pure $ completePath is p
+type NumberOfInjectionPoints = Int
+type UsedInjectionPoints = [Int]
 
 completePath :: [Int] -> SimplePath -> Path
 completePath = addEnvToPath .: go 1 where

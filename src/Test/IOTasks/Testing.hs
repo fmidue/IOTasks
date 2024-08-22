@@ -33,7 +33,10 @@ import Data.Bifunctor (first, Bifunctor (second))
 import Text.PrettyPrint hiding ((<>))
 import Control.Concurrent.Async
 import System.IO
-import Test.QuickCheck (generate)
+import Test.QuickCheck (generate, suchThat)
+import Control.Monad.IO.Class (MonadIO(liftIO))
+import Data.Express.Utils (nubSort, mapMaybe, catMaybes)
+import Data.Tuple.Extra (fst3)
 
 taskCheck :: IOrep () -> Specification -> IO ()
 taskCheck = taskCheckWith stdArgs
@@ -165,11 +168,12 @@ taskCheckWithOutcome Args{..} prog spec = do
 
         testInjected :: NumberOfInputs -> SimplePath -> IO (PathOutcome,NumberOfInputs,Overflows)
         testInjected n p = do
-          ps <- replicateM testsPerPath (generate $ injectNegatives maxNegative p)
+          injector <- mkPathInjector p solverTimeout solverMaxSeqLength avoidOverflows
+          ps <- replicateM testsPerPath (generate $ injectNegatives injector maxNegative)
           (out,n',o) <- pathLoop (n,0) ps
           case out of
             PathFailure{} -> do
-              smaller <- sequence [ generate $ injectNegatives m p | m <- [1..maxNegative] ]
+              smaller <- sequence [ generate $ injectNegatives injector m | m <- [1..maxNegative] ]
               (outShrink,n'',o') <- pathLoop (n',o) smaller
               pure $ case outShrink of
                 PathFailure{} -> (outShrink,n'',o')
@@ -326,7 +330,9 @@ taskCheckOn i p s = uncurry Outcome (go 0 0 i p s) where
 generateStaticTestSuite :: Args -> Specification -> IO [Inputs]
 generateStaticTestSuite Args{..} spec = do
   let simple = simplePaths maxIterationUnfold $ constraintTree spec
-  full <- concat <$> forM simple (\p -> replicateM testsPerPath (generate $ injectNegatives maxNegative p))
+  full <- concat <$> forM simple (\p -> do
+    injector <- mkPathInjector p solverTimeout solverMaxSeqLength avoidOverflows
+    replicateM testsPerPath (generate $ injectNegatives injector maxNegative))
   let sortedPaths = sortOn pathDepth full
   catSATs <$> forM sortedPaths (\p -> findPathInput solverTimeout p valueSize solverMaxSeqLength avoidOverflows)
 

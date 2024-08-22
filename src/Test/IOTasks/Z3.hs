@@ -11,7 +11,11 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE KindSignatures #-}
-module Test.IOTasks.Z3 (findPathInput, printPathScript, evalPathScript, satPaths, satPathsQ, isSatPath, SatResult(..), Timeout) where
+module Test.IOTasks.Z3 (
+  findPathInput, printPathScript, evalPathScript,
+  satPaths, satPathsQ, isSatPath, SatResult(..), Timeout,
+  PathInjector(..), mkPathInjector,
+  ) where
 
 import Test.IOTasks.Constraints
 import Test.IOTasks.Internal.ValueSet
@@ -22,7 +26,7 @@ import Test.IOTasks.ValueMap
 import Z3.Monad
 import Z3.Base (Goal)
 
-import Test.QuickCheck (generate)
+import Test.QuickCheck (generate, vectorOf, elements)
 
 import Control.Concurrent.STM
 
@@ -130,6 +134,34 @@ satPathsQ nVar to t maxUnfolds maxSeqLength checkOverflows q = do
       | nUnfolds < maxUnfolds = satPaths' (nUnfolds+1) nInputs to t (s,p,d) q
       | otherwise = pure ()
     satPaths' nUnfolds nInputs to (InjectionPoint c t) (s,p,d) q = satPaths' nUnfolds nInputs to t (s,p `appendPath` OpenPath [] c (ClosedPath []),d) q
+
+newtype PathInjector = PathInjector { injectNegatives :: Int -> Gen Path }
+
+mkPathInjector :: SimplePath -> Timeout -> Int -> Bool -> IO PathInjector
+mkPathInjector (ClosedPath cs) _ _ _ = pure . PathInjector . const . pure $ addEnvToPath cs
+mkPathInjector p@OpenPath{} to maxSeqLength checkOverflows = do
+  validPoints <- validInjectionPoints to p maxSeqLength checkOverflows
+  pure $ PathInjector $ \n -> do
+    is <- sort <$> vectorOf n (elements validPoints)
+    pure $ completePath is p
+
+validInjectionPoints :: Timeout -> SimplePath -> Int -> Bool -> IO [Int]
+validInjectionPoints to p maxSeqLength checkOverflows = searchPoints [1..injectionPoints p]
+  where
+    searchPoints xs
+      | n < 8 = fmap filterSATs $ forM xs $ \i -> (i,) <$> isSatPath to (completePath [i] p) maxSeqLength checkOverflows
+      | otherwise = do
+        res <- isSatPath to (completePath xs p) maxSeqLength checkOverflows
+        case res of
+          SAT () -> pure xs
+          _ ->
+            let (l,r) = splitAt (n `div` 2) xs
+            in liftA2 (++) (searchPoints l) (searchPoints r)
+      where n = length xs
+
+    filterSATs :: [(Int,SatResult ())] -> [Int]
+    filterSATs xs = [ i | (i,r) <- xs, r == SAT () ]
+
 
 data ValueGenerator where
   ValueGenerator :: Typeable v => (ValueMap -> Size -> Gen v) -> ValueGenerator
