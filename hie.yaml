@@ -1,0 +1,10 @@
+cradle:
+  stack:
+    - path: "./src"
+      component: "IOTasks:lib"
+
+    - path: "./test"
+      component: "IOTasks:test:IOTasks-test"
+
+    - path: "./examples"
+      component: "IOTasks:test:IOTasks-test"
