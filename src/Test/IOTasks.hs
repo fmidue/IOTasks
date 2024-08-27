@@ -38,7 +38,7 @@ module Test.IOTasks (
   not',
   (.&&.), (.||.),
   true, false,
-  -- ** Embedded literals
+  -- ** Embedded values
   embeddedLit,
   -- ** Simple list functions
   sum', product', length', reverse',

@@ -43,7 +43,7 @@ data Args
   -- | size of randomly generated input candidates (the solver might find bigger solutions)
   , valueSize :: Integer
   -- | maximum number of generated tests
-  , maxSuccess :: Int
+  , numberOfTests :: Int
   -- | maximum number of negative inputs per path (for 'InputMode' 'UntilValid')
   , maxNegative :: Int
   -- | print extra information
@@ -60,7 +60,7 @@ stdArgs :: Args
 stdArgs = Args
   { maxInputLength = Nothing
   , valueSize = 100
-  , maxSuccess = 100
+  , numberOfTests = 100
   , maxNegative = 5
   , terminalOutput = True
   , feedbackStyle = defaultFeedback
@@ -77,7 +77,7 @@ taskCheckOutcome = taskCheckWithOutcome stdArgs
 taskCheckWithOutcome :: Args -> IOrep () -> Specification -> IO Outcome
 taskCheckWithOutcome Args{..} prog spec  = do
   output <- newOutput stdout
-  (outcome, _to) <- foldM (\(o',to) n -> first (o' <>) <$> test output n to) (mempty,0) [0..maxSuccess-1]
+  (outcome, _to) <- foldM (\(o',to) n -> first (o' <>) <$> test output n to) (mempty,0) [0..numberOfTests-1]
   printP output $ printOutcomeWith feedbackStyle outcome
   pure outcome
 
