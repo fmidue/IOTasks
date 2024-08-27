@@ -30,6 +30,8 @@ import Data.Map (Map)
 import qualified Data.Map as Map (lookup)
 import Data.Maybe ( fromMaybe, mapMaybe, maybeToList )
 
+import Control.Applicative (liftA2) -- not redundant for base-4.17.x.x and below!
+
 import Test.IOTasks.Internal.Overflow
 import Test.IOTasks.ValueMap as ValueMap
 import Test.IOTasks.Var

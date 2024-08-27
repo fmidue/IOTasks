@@ -28,6 +28,7 @@ import Z3.Base (Goal)
 
 import Test.QuickCheck (generate, vectorOf, elements)
 
+import Control.Applicative (liftA2) -- not redundant for base-4.17.x.x and below!
 import Control.Concurrent.STM
 
 import Control.Monad
