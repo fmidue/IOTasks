@@ -128,3 +128,57 @@ test-suite IOTasks-test
     , type-match
     , z3
   default-language: Haskell2010
+
+benchmark Hangman-benchmark
+  type: exitcode-stdio-1.0
+  main-is: HangmanBench.hs
+  other-modules:
+      BasicExamplesSpec
+      BlowupSpec
+      BoolVariablesSpec
+      BranchingStrictnessSpec
+      EchoSpec
+      EmbeddedTypesSpec
+      ExactErrorSourceSpec
+      Examples
+      HangmanSpec
+      HiddenOverflowSpec
+      ModesSpec
+      NewlineSpec
+      OverflowSpec
+      PalindromeSpec
+      PingPongSpec
+      ProductConditionSpec
+      ReverseSpec
+      SanityChecksSpec
+      SumToZeroSpec
+      SymbolicPlusSpec
+      VariableMerging1Spec
+      VariableMerging2Spec
+      VariableNamesSpec
+      Paths_IOTasks
+  hs-source-dirs:
+      bench
+      examples
+  ghc-options: -Wall -Wmissing-export-lists -Wno-name-shadowing -Werror=incomplete-patterns -fdefer-typed-holes -threaded -rtsopts -with-rtsopts=-N -O2
+  build-depends:
+      IOTasks
+    , QuickCheck
+    , ansi-terminal
+    , async
+    , base >=4.7 && <5
+    , clock
+    , containers
+    , deepseq
+    , deriving-compat
+    , express
+    , extra
+    , hspec
+    , mtl
+    , parsec
+    , pretty
+    , some
+    , stm
+    , type-match
+    , z3
+  default-language: Haskell2010

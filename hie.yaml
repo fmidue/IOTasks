@@ -8,3 +8,6 @@ cradle:
 
     - path: "./examples"
       component: "IOTasks:test:IOTasks-test"
+
+    - path: "./bench/HangmanBench.hs"
+      component: "IOTasks:bench:Hangman-benchmark"

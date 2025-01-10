@@ -68,3 +68,18 @@ tests:
     - IOTasks
     - hspec
     - monad-loops
+
+benchmarks:
+  Hangman-benchmark:
+    main: HangmanBench.hs
+    source-dirs: [bench, examples]
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -O2
+    dependencies:
+    - IOTasks
+    - hspec
+    - deepseq
+    - clock
