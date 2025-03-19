@@ -40,7 +40,7 @@ data Args
   = Args
   -- | maximum length of input sequences, unbounded if 'Nothing'
   { maxInputLength :: Maybe Int
-  -- | absolute value of randomly generated values of in input sequences
+  -- | absolute value of randomly generated values in input sequences
   , inputRange :: Integer
   -- | maximum number of generated tests
   , numberOfTests :: Int
