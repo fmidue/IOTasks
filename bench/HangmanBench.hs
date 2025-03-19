@@ -20,7 +20,7 @@ main = do
   simpleTime "full test medium" $ testHangman medium 10
 
   putStrLn "searching for sat. paths"
-  forM_ [0..2] $ \i -> do
+  forM_ [4] $ \i -> do
     putStrLn $ unwords ["##",show (unfolds + i), "unfolds"]
     print =<< simpleTime "short word" (hangmanSatPaths short $ unfolds+i)
     print =<< simpleTime "medium word" (hangmanSatPaths medium $ unfolds+i)
