@@ -1,6 +1,8 @@
 name: Haddock to GitHub pages
 
 on:
+  workflow_dispatch:
+  
   workflow_run:
     workflows: ["Haskell CI (fast)"]
     branches: [ main ]
