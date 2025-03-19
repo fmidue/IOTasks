@@ -43,8 +43,8 @@ data Args
     -- | maximum number of iteration unfoldings when searching for satisfiable paths.
     --   (indirectly controls maximum path length)
   { maxIterationUnfold :: Int
-    -- | size of randomly generated input candidates (the solver might find bigger solutions)
-  , valueSize :: Integer
+    -- | absolute value of randomly generated candidates for input values (the solver might find bigger solutions)
+  , inputRange :: Integer
     -- | solver timeout in milliseconds
   , solverTimeout :: Int
     -- | maximum number of solver timeouts before giving up
@@ -69,7 +69,7 @@ data Args
 stdArgs :: Args
 stdArgs = Args
   { maxIterationUnfold = 25
-  , valueSize = 100
+  , inputRange = 100
   , solverTimeout = 1000 -- 1 sec
   , maxTimeouts = 3
   , testsPerPath = 5
@@ -180,7 +180,7 @@ taskCheckWithOutcome Args{..} prog spec = do
         pathLoop :: (NumberOfInputs,Overflows) -> [Path] -> IO (PathOutcome,NumberOfInputs,Overflows)
         pathLoop (n,o) [] = pure (PathSuccess,n,o)
         pathLoop (n,o) (p:ps) = do
-          nextInput <- findPathInput solverTimeout p valueSize solverMaxSeqLength avoidOverflows
+          nextInput <- findPathInput solverTimeout p inputRange solverMaxSeqLength avoidOverflows
           case nextInput of
             NotSAT -> reportUnsat >> pathLoop (n,o) ps
             Timeout -> pure (PathTimeout,n,o)
@@ -331,7 +331,7 @@ generateStaticTestSuite Args{..} spec = do
     injector <- mkPathInjector p solverTimeout solverMaxSeqLength avoidOverflows
     replicateM testsPerPath (generate $ injectNegatives injector maxNegative))
   let sortedPaths = sortOn pathDepth full
-  catSATs <$> forM sortedPaths (\p -> findPathInput solverTimeout p valueSize solverMaxSeqLength avoidOverflows)
+  catSATs <$> forM sortedPaths (\p -> findPathInput solverTimeout p inputRange solverMaxSeqLength avoidOverflows)
 
 catSATs :: [SatResult a] -> [a]
 catSATs [] = []

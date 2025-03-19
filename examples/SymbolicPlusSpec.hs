@@ -37,4 +37,4 @@ spec :: Spec
 spec =
   describe "taskCheck program addSpec" $
     it "succeeds" $
-      (taskCheckWithOutcome stdArgs{testsPerPath = 100, valueSize = 1000} program addSpec <&> isSuccess) `shouldReturn` True
+      (taskCheckWithOutcome stdArgs{testsPerPath = 100, inputRange = 1000} program addSpec <&> isSuccess) `shouldReturn` True

@@ -40,8 +40,8 @@ data Args
   = Args
   -- | maximum length of input sequences, unbounded if 'Nothing'
   { maxInputLength :: Maybe Int
-  -- | size of randomly generated input candidates (the solver might find bigger solutions)
-  , valueSize :: Integer
+  -- | absolute value of randomly generated values of in input sequences
+  , inputRange :: Integer
   -- | maximum number of generated tests
   , numberOfTests :: Int
   -- | maximum number of negative inputs per path (for 'InputMode' 'UntilValid')
@@ -59,7 +59,7 @@ data Args
 stdArgs :: Args
 stdArgs = Args
   { maxInputLength = Nothing
-  , valueSize = 100
+  , inputRange = 100
   , numberOfTests = 100
   , maxNegative = 5
   , terminalOutput = True
@@ -86,7 +86,7 @@ taskCheckWithOutcome Args{..} prog spec  = do
     test o n to
       | to > maxSearchTimeouts = pure (Outcome GaveUp NoHints,to)
       | otherwise = do
-        input <- generate $ genInput spec maxInputLength (Size valueSize (fromIntegral $ valueSize `div` 5)) maxNegative
+        input <- generate $ genInput spec maxInputLength (Size inputRange (fromIntegral $ inputRange `div` 5)) maxNegative
         mOutcome <- timeout (searchTimeout * 1000) $ do
           let outcome = runTest prog spec input
           seq (isSuccess outcome) $ pure outcome -- force outcome

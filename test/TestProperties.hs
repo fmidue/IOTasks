@@ -61,7 +61,7 @@ testCheapProperties = do
       \s ->
         let Random.Args{..} = Random.stdArgs
         in
-          forAll (genInput s maxInputLength (Size valueSize (fromIntegral $ valueSize `div` 5)) maxNegative)
+          forAll (genInput s maxInputLength (Size inputRange (fromIntegral $ inputRange `div` 5)) maxNegative)
             (\is -> all (isTerminatingN . flip runProgram is) (interpret s))
 
   context "string pattern matching" $ do
