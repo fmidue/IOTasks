@@ -43,7 +43,7 @@ data Args
     -- | maximum number of iteration unfoldings when searching for satisfiable paths.
     --   (indirectly controls maximum path length)
   { maxIterationUnfold :: Int
-    -- | absolute value of randomly generated candidates for input values (the solver might find bigger solutions)
+    -- | maximum absolute value of randomly generated candidates for input values (the solver might find bigger solutions)
   , inputRange :: Integer
     -- | solver timeout in milliseconds
   , solverTimeout :: Int
