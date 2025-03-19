@@ -1,6 +1,8 @@
 name: Haskell CI (fast)
 
 on:
+  workflow_dispatch:
+  
   push:
     branches: ['**']
     paths:
