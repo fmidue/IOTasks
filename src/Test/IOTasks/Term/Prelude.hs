@@ -153,10 +153,9 @@ listLit = ListLit
 embeddedLit :: (Embeddable a, Typeable a, Show a) => a -> Term k (Embedded a)
 embeddedLit = EmbeddedLit
 
--- TODO: improve signature?
-filter' :: (Integer -> Bool) -> Term k [Integer] -> Term 'PartiallyOpaque [Integer]
-filter' p (Opaque x vs ts) = Opaque (value "filter ?p" (filter p) :$ x) vs ts
-filter' p x = Opaque (value "filter ?p" (filter p) :$ toExpr x) (termVarExps x) (transparentSubterms x)
+-- do we still want to pre-define this?
+filter' :: Term k1 (Integer -> Bool) -> Term k2 [Integer] -> Term 'PartiallyOpaque [Integer]
+filter' = liftOpaque2 (filter, "filter")
 
 liftOpaqueValue :: Typeable a => (a, String) -> Term 'PartiallyOpaque a
 liftOpaqueValue (x,str) = Opaque (value str x) [] []
@@ -165,7 +164,7 @@ liftOpaque :: (Typeable a, Typeable b) => (a -> b, String) -> Term k a -> Term '
 liftOpaque (f,str) (Opaque x vs ts) = Opaque (value str f :$ x) vs ts
 liftOpaque (f,str) x = Opaque (value str f :$ toExpr x) (termVarExps x) (transparentSubterms x)
 
-liftOpaque2 :: (Typeable a, Typeable b, Typeable c) => (a -> b -> c, String) -> Term k a -> Term k b -> Term 'PartiallyOpaque c
+liftOpaque2 :: (Typeable a, Typeable b, Typeable c) => (a -> b -> c, String) -> Term k1 a -> Term k2 b -> Term 'PartiallyOpaque c
 liftOpaque2 (f,str) (Opaque x vx tx) (Opaque y vy ty) = Opaque (value str f :$ x :$ y) (vx ++ vy) (tx ++ ty)
 liftOpaque2 (f,str) (Opaque x vx tx) y = Opaque (value str f :$ x :$ toExpr y) (vx ++ termVarExps y) (tx ++ transparentSubterms y)
 liftOpaque2 (f,str) x (Opaque y vy ty) = Opaque (value str f :$ toExpr x :$ y) (termVarExps x ++ vy) (transparentSubterms x ++ ty)

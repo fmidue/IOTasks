@@ -28,7 +28,7 @@ specification =
   ) <>
   writeOutput [wildcard <> resultOf (length' $ filter' predicate $ allValues $ merge [x,y]) <> wildcard]
   where
-    predicate x = x > 0 && x `mod` 3 == 0
+    predicate = liftOpaqueValue (\x -> x > 0 && x `mod` 3 == 0, "<is positive and divisible by 3>")
     x = intVar "x"
     y = intVar "y"
 
