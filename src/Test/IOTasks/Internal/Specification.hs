@@ -115,7 +115,7 @@ writeOptionalOutput ts = WriteOutput Optional (Set.fromList ts) nop
 --
 -- > anyOptionalOutput = writeOptionalOutput [wildcard]
 anyOptionalOutput :: Specification
-anyOptionalOutput = writeOptionalOutput [Wildcard]
+anyOptionalOutput = writeOptionalOutput [wildcard]
 
 -- | Represents a branching structure in a specification.
 --
@@ -263,8 +263,8 @@ runSpecification' addLinebreaks spec inputs =
           | containsValue x e vs (readValue x i) -> RecSub i id (insertValue (wrapValue $ readValue x i) (someVar x) e,is)
           | otherwise -> case mode of
               AssumeValid -> error $ "invalid value: " ++ i ++ " is not an element of " ++ showValueSet vs
-              UntilValid ->  RecSame i (first (progWrite Optional (Set.singleton Wildcard) <>)) (e,is)
-              ElseAbort -> NoRec (foldr ((<>) . progRead) (((<>) . progRead) '\n' $ progWrite Optional (Set.singleton Wildcard)) i,NoOverflow)
+              UntilValid ->  RecSame i (first (progWrite Optional (Set.singleton wildcard) <>)) (e,is)
+              ElseAbort -> NoRec (foldr ((<>) . progRead) (((<>) . progRead) '\n' $ progWrite Optional (Set.singleton wildcard)) i,NoOverflow)
     )
     (\case
       NoRec r -> r

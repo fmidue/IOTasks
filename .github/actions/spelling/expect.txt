@@ -18,6 +18,7 @@ GADT
 gcompare
 GGT
 GHC
+grp
 hcat
 HLINT
 HRefl

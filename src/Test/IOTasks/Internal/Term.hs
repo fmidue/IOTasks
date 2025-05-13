@@ -15,8 +15,8 @@ module Test.IOTasks.Internal.Term (
   termVarExps, transparentSubterms,
   toExpr,
   showTerm, showIndexedTerm,
-  SomeTerm(..), withSomeTerm,
-  SomeTermK(..), withSomeTermK,
+  SomeTerm, someTerm, withSomeTerm,
+  SomeTermK, someTermK, withSomeTermK,
   castTerm,
   compareK,
   ) where
@@ -225,6 +225,9 @@ withSomeTermK (SomeTermK t) f = withSomeTerm t f
 --
 someTerm :: Typeable a => Term k a -> SomeTerm k
 someTerm = SomeTerm
+
+someTermK :: Typeable a => Term k a -> SomeTermK
+someTermK = SomeTermK . someTerm
 
 transparentSubterms :: Typeable a => Term k a -> [SomeTerm 'Transparent]
 transparentSubterms t@(Add x y) = maybeToList (someTerm <$> maybeTransparentTerm t) ++ transparentSubterms x ++ transparentSubterms y

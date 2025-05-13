@@ -14,7 +14,7 @@ module Test.IOTasks (
   isEmpty,
   ints, nats, bools, str,
   OutputPattern,
-  wildcard, text, resultOf,
+  wildcard, text, resultOf, decoratedResultOf,
   Varname, Var, intVar, boolVar, stringVar,
   pPrintSpecification,
   -- ** Embedding non-integer values

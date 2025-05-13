@@ -17,7 +17,7 @@ import Test.IOTasks.Random (genInput)
 import qualified Test.IOTasks.Random as Random (stdArgs, Args(..))
 import Test.IOTasks.ValueSet
 import Test.IOTasks.Trace (ordinaryTrace, isTerminatingN, normalizedTrace)
-import Test.IOTasks.OutputPattern (PatternKind(TraceP),(>:))
+import Test.IOTasks.OutputPattern (PatternKind(TraceP),(>:), nonEmptyWildcard)
 
 testExpensiveProperties :: Spec
 testExpensiveProperties = do
@@ -124,6 +124,7 @@ genPattern :: Gen (OutputPattern 'TraceP)
 genPattern = sized $ \size ->
   frequency $
     [ (1,pure wildcard)
+    , (1,pure nonEmptyWildcard)
     , (1,text <$> listOf1 (arbitraryPrintableChar `suchThat` (/= '_')))
     ] ++
     [ (4,liftA2 (<>) (resize 1 genPattern) (resize (size - 1) genPattern)) | size > 1

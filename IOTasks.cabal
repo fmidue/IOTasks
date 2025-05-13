@@ -92,6 +92,7 @@ test-suite IOTasks-test
       HiddenOverflowSpec
       ModesSpec
       NewlineSpec
+      NonEmptyWildcardSpec
       OverflowSpec
       PalindromeSpec
       PingPongSpec
@@ -145,6 +146,7 @@ benchmark Hangman-benchmark
       HiddenOverflowSpec
       ModesSpec
       NewlineSpec
+      NonEmptyWildcardSpec
       OverflowSpec
       PalindromeSpec
       PingPongSpec

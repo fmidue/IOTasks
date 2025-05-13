@@ -6,3 +6,4 @@ subterms
 ubuntu
 unfoldings
 linebreaks
+wildcards
