@@ -49,20 +49,20 @@ jobs:
     steps:
       - name: check-spelling
         id: spelling
-        uses: check-spelling/check-spelling@v0.0.21
+        uses: check-spelling/check-spelling@prerelease
         with:
           suppress_push_for_open_pull_request: 1
           checkout: true
           spell_check_this: check-spelling/spell-check-this@prerelease
           post_comment: 0
           experimental_apply_changes_via_bot: 1
-          dictionary_source_prefixes: '{"cspell": "https://raw.githubusercontent.com/check-spelling/cspell-dicts/v20220816/dictionaries/"}'
+          dictionary_source_prefixes: '{"cspell": "https://raw.githubusercontent.com/check-spelling/cspell-dicts/v20230509/dictionaries/"}'
           extra_dictionaries:
             cspell:filetypes/filetypes.txt
-            cspell:software-terms/src/software-terms.txt
-            cspell:companies/src/companies.txt
-            cspell:haskell/haskell.txt
-            cspell:html/html.txt
+            cspell:software-terms/dict/softwareTerms.txt
+            cspell:companies/dict/companies.txt
+            cspell:haskell/dict/haskell.txt
+            cspell:html/dict/html.txt
   comment:
     name: Report
     runs-on: ubuntu-latest
@@ -70,10 +70,11 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      actions: read
     if: (success() || failure()) && needs.spelling.outputs.followup
     steps:
       - name: comment
-        uses: check-spelling/check-spelling@v0.0.21
+        uses: check-spelling/check-spelling@prerelease
         with:
           checkout: true
           spell_check_this: check-spelling/spell-check-this@prerelease
@@ -96,7 +97,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: apply spelling updates
-        uses: check-spelling/check-spelling@v0.0.21
+        uses: check-spelling/check-spelling@prerelease
         with:
           experimental_apply_changes_via_bot: 1
           checkout: true
