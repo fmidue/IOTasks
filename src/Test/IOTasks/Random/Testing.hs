@@ -138,7 +138,7 @@ runTest :: IOrep () -> Specification -> Inputs -> Outcome
 runTest p spec i =
   let
     (specTrace,warn) = first normalizedTrace $ runSpecification spec i
-    progTrace = runProgram p i
+    progTrace = normalizedTrace $ runProgram p i
     o = case warn of
       OverflowOccurred -> OverflowHint 1
       _ -> mempty

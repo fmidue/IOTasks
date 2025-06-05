@@ -25,7 +25,7 @@ testExpensiveProperties = do
     prop "programs built from a spec don't go wrong on (solver based) inputs generated from the same spec" $
       \s -> ioProperty $ do
         is <- generateStaticTestSuite stdArgs s
-        pure $ all (\p -> all (isTerminatingN . runProgram p) is) (interpret s)
+        pure $ all (\p -> all (isTerminatingN . normalizedTrace . runProgram p) is) (interpret s)
 
     prop "inputs are never optional for a fixed input prefix (traces obtained from too less inputs never terminate)" $
       \s -> ioProperty $ do
@@ -62,7 +62,7 @@ testCheapProperties = do
         let Random.Args{..} = Random.stdArgs
         in
           forAll (genInput s maxInputLength (Size inputRange (fromIntegral $ inputRange `div` 5)) maxNegative)
-            (\is -> all (isTerminatingN . flip runProgram is) (interpret s))
+            (\is -> all (isTerminatingN . normalizedTrace . flip runProgram is) (interpret s))
 
   context "string pattern matching" $ do
     prop "wildcard >: x == True" $

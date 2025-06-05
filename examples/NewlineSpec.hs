@@ -23,6 +23,9 @@ stringP2 = putStrLn "A" >> putStrLn "B"
 stringP3 :: MonadTeletype m => m ()
 stringP3 = putStr "A" >> putStr "B"
 
+stringP4 :: MonadTeletype m => m ()
+stringP4 = putStrLn "A B"
+
 spec :: Spec
 spec =
   context "string/newline semantics" $ do
@@ -33,6 +36,8 @@ spec =
         (taskCheckOutcome stringP2 stringS1 <&> isSuccess) `shouldReturn` True
       it "is satisfied by stringP3" $
         (taskCheckOutcome stringP3 stringS1 <&> isSuccess) `shouldReturn` True
+      it "is satisfied by stringP4" $
+        (taskCheckOutcome stringP4 stringS1 <&> isSuccess) `shouldReturn` False
 
     describe "stringS2" $ do
       it "is satisfied by stringP1" $
@@ -41,3 +46,5 @@ spec =
         (taskCheckOutcome stringP2 stringS2 <&> isFailure) `shouldReturn` True
       it "is satisfied by stringP3" $
         (taskCheckOutcome stringP3 stringS2 <&> isSuccess) `shouldReturn` True
+      it "is satisfied by stringP4" $
+        (taskCheckOutcome stringP4 stringS2 <&> isSuccess) `shouldReturn` False

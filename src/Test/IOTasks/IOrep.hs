@@ -31,23 +31,19 @@ instance Applicative IOrep where
 instance Monad IOrep where
   (Return a) >>= g = g a
   (GetChar f) >>= g = GetChar (f >=> g)
-  (PutString s ma) >>= g = putString s (ma >>= g)
+  (PutString s ma) >>= g = PutString s (ma >>= g)
   return = pure
 
-putString :: String -> IOrep a -> IOrep a
-putString s (PutString s' m) = PutString (s++s') m
-putString s m = PutString s m
-
 instance MonadTeletype IOrep where
-  putChar c = putString [c] $ pure ()
-  putStr s = putString s $ pure ()
+  putChar c = PutString [c] $ pure ()
+  putStr s = PutString s $ pure ()
   getChar = GetChar pure
 
 type Line = String
 
-runProgram :: IOrep () -> [Line] -> NTrace
-runProgram (GetChar _) [] = NOutOfInputs
-runProgram (GetChar f) ("":is) = NProgRead '\n' $ runProgram (f '\n') is
-runProgram (GetChar f) ((c:cs):is) = NProgRead c $ runProgram (f c) (cs:is)
-runProgram (PutString n p') is = NProgWrite Mandatory (singleton $ Text n) $ runProgram p' is
-runProgram (Return ()) _ = NTerminate
+runProgram :: IOrep () -> [Line] -> AbstractTrace
+runProgram (GetChar _) [] = outOfInputs
+runProgram (GetChar f) ("":is) = progRead '\n' <> runProgram (f '\n') is
+runProgram (GetChar f) ((c:cs):is) = progRead c <> runProgram (f c) (cs:is)
+runProgram (PutString n p') is = progWrite Mandatory (singleton $ Text n) <> runProgram p' is
+runProgram (Return ()) _ = terminate
