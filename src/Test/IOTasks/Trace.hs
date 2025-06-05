@@ -11,7 +11,7 @@
 module Test.IOTasks.Trace (
   AbstractTrace,
   OptFlag(..),
-  progRead, progWrite,
+  progRead, progReadLine, progWrite,
   terminate, outOfInputs,
   Trace,
   ordinaryTrace,
@@ -130,6 +130,10 @@ instance Show1 f => Show (Trace' f) where
 
 progRead :: Char -> AbstractTrace
 progRead c = AbstractTrace $ ProgReadC c U :| []
+
+progReadLine :: String -> AbstractTrace
+progReadLine "" = error "progReadString: empty string"
+progReadLine (c:cs) = AbstractTrace $ ProgReadC c U :| map (`ProgReadC` U) (cs++['\n'])
 
 progWrite :: OptFlag -> Set (OutputPattern 'TraceP) -> AbstractTrace
 progWrite o ts = AbstractTrace $ ProgWriteC o ts U :| []
