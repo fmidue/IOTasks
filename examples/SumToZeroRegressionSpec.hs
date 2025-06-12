@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeApplications #-}
-module SumToZeroSpec where
+module SumToZeroRegressionSpec where
 import Prelude hiding
   (putChar,putStr,putStrLn,print,getChar,getLine,readLn)
 
@@ -7,33 +7,7 @@ import Test.Hspec
 import Test.IOTasks
 
 import Data.Functor ((<&>))
-
--- sum to 0
-sumToZeroSpec :: Specification
-sumToZeroSpec =
-  readInput x ints AssumeValid <>
-  tillExit (
-    readInput x ints AssumeValid <>
-    branch (valueBefore 1 x .+. currentValue x .==. intLit 0)
-      exit
-      nop
-    ) <>
-  writeOutput [resultOf $ length' $ allValues x]
-  where x = intVar "x"
-
-sumToZeroProg :: MonadTeletype m => m ()
-sumToZeroProg = do
-  x <- readLn @_ @Integer
-  go x 1
-  where
-    go x n = do
-      y <- readLn @_ @Integer
-      let n' = n+1
-      if x + y == 0
-        then print n'
-        else go y n'
-
--- verbose version
+import Test.IOTasks.Trace (isOutputMismatch)
 
 verboseSpec :: Specification
 verboseSpec =
@@ -56,8 +30,8 @@ verboseSpec =
     x = intVar "x"
     y = intVar "y"
 
-verboseProg :: MonadTeletype io => io ()
-verboseProg = go 0
+verboseWrongProg :: MonadTeletype io => io ()
+verboseWrongProg = go 0
   where
     go :: MonadTeletype io => Integer -> io ()
     go n = do
@@ -72,17 +46,16 @@ verboseProg = go 0
           putStr "Second number: "
           y <- readLn
           putStr ("The sum of " ++ show x ++ " and " ++ show y ++ " is: ")
-          print (x + y)
+          print (x + y + 1)
           go (n + 1)
 
 spec :: Spec
 spec = do
-  describe "taskCheck sumToZeroProg sumToZeroSpec" $
-    it "succeeds" $
-      (taskCheckOutcome sumToZeroProg sumToZeroSpec <&> isSuccess) `shouldReturn` True
-  describe "taskCheck sumToZeroProg verboseSpec" $
-    it "succeeds" $
-      (taskCheckOutcome verboseProg verboseSpec <&> isSuccess) `shouldReturn` True
-  describe "taskCheck verboseProg verboseSpec" $
-    it "succeeds" $
-      (taskCheckOutcome verboseProg verboseSpec <&> isSuccess) `shouldReturn` True
+  describe "taskCheck verboseWrongProg verboseSpec" $ do
+    it "should be rejected with an output mismatch" $
+      (taskCheckOutcome verboseWrongProg verboseSpec <&> isOutputMismatchOutcome) `shouldReturn` True
+
+isOutputMismatchOutcome :: Outcome -> Bool
+isOutputMismatchOutcome (Outcome (Failure _ _ _ match)  _) = isOutputMismatch match
+isOutputMismatchOutcome _ = False
+

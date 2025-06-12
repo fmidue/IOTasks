@@ -148,7 +148,7 @@ data MatchResult
   = MatchSuccessful
   | InputMismatch NTrace NTrace
   | OutputMismatch NTrace NTrace
-  | AlignmentMismatch NTrace (Maybe NTrace) NTrace
+  | AlignmentMismatch NTrace NTrace
   | TerminationMismatch NTrace (Maybe NTrace) NTrace
   deriving (Eq,Show)
 
@@ -183,7 +183,6 @@ choose _ MatchSuccessful = Right MatchSuccessful
 choose r _ = Left r
 
 addExpect :: NTrace -> (MatchResult,HasConsumed) -> (MatchResult,HasConsumed)
-addExpect s' (AlignmentMismatch t Nothing s,False) = (AlignmentMismatch t (Just s') s,False)
 addExpect s' (TerminationMismatch t Nothing s,False) = (TerminationMismatch t (Just s') s,False)
 addExpect _ r = r
 
@@ -202,9 +201,12 @@ covers s t = fst $ covers' s t
       | all (\j -> any (>: j) is) js = hasConsumed $ t1 `covers'` t2
       | otherwise = noConsume $ OutputMismatch s t
 
+    covers' (NProgWrite Optional is t1@NProgRead{}) t@(NProgWrite{}) =
+      -- avoid the alignment mismatch that would result from trying to skip the optional output
+      NProgWrite Mandatory is t1 `covers'` t
     covers' s@(NProgWrite Optional is t1) t =
       let
-        (r1,c1) = addExpect s (t1 `covers'` t)
+        (r1,c1) = addExpect s (t1 `covers'` t) -- cannot produce alignment mismatch!
         (r2,c2) = (NProgWrite Mandatory is t1 `covers'` t)
       in case choose r1 r2 of -- This is r1 <> r2 + bookkeeping for the consumption status
         Left _ -> (r1,c1)
@@ -217,7 +219,7 @@ covers s t = fst $ covers' s t
 
     covers' NOutOfInputs NOutOfInputs = (MatchSuccessful,True)
 
-    covers' s t = noConsume $ AlignmentMismatch s Nothing t
+    covers' s t = noConsume $ AlignmentMismatch s t
 
 noConsume :: MatchResult -> (MatchResult,HasConsumed)
 noConsume = (,False)
@@ -244,7 +246,7 @@ pPrintMatchResult' :: Bool -> (Doc -> Doc -> Doc) -> MatchResult -> Doc
 pPrintMatchResult' _ _ MatchSuccessful = text "MatchSuccessful"
 pPrintMatchResult' simple f (InputMismatch s t) = text "InputMismatch:" $$ nest 2 (reportMismatch simple f s Nothing t)
 pPrintMatchResult' simple f (OutputMismatch s t) = text "OutputMismatch:" $$ nest 2 (reportOutputMismatch simple f s t)
-pPrintMatchResult' simple f (AlignmentMismatch s s' t) = text "AlignmentMismatch:" $$ nest 2 (reportMismatch simple f s s' t)
+pPrintMatchResult' simple f (AlignmentMismatch s t) = text "AlignmentMismatch:" $$ nest 2 (reportMismatch simple f s Nothing t)
 pPrintMatchResult' simple f (TerminationMismatch s s' t) = text "TerminationMismatch:" $$ nest 2 (reportMismatch simple f s s' t)
 
 reportMismatch :: Bool -> (Doc -> Doc -> Doc) -> NTrace -> Maybe NTrace -> NTrace -> Doc

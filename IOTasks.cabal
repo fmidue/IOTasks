@@ -99,6 +99,7 @@ test-suite IOTasks-test
       ProductConditionSpec
       ReverseSpec
       SanityChecksSpec
+      SumToZeroRegressionSpec
       SumToZeroSpec
       SymbolicPlusSpec
       VariableMerging1Spec
@@ -153,6 +154,7 @@ benchmark Hangman-benchmark
       ProductConditionSpec
       ReverseSpec
       SanityChecksSpec
+      SumToZeroRegressionSpec
       SumToZeroSpec
       SymbolicPlusSpec
       VariableMerging1Spec
