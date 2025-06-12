@@ -1,4 +1,4 @@
-# IOTasks [![Haskell CI](https://github.com/fmidue/IOTasks/workflows/Haskell%20CI/badge.svg)](https://github.com/fmidue/IOTasks/actions?query=workflow%3A%22Haskell+CI%22+branch%3Amain)
+# IOTasks [![Haskell CI](https://github.com/fmidue/IOTasks/actions/workflows/haskell-push.yaml/badge.svg)](https://github.com/fmidue/IOTasks/actions/workflows/haskell-push.yaml)
 
 Examples for writing specifications can be found under [examples/](examples/) and in the online [demo](https://iotasks.eu).
 
