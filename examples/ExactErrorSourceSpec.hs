@@ -6,7 +6,7 @@ import Test.IOTasks
 
 import Test.Hspec
 import Data.Functor ((<&>))
-import Test.IOTasks.Trace
+import Test.IOTasks.Trace.Match (MatchResult, isOutputMismatch)
 
 specification :: Specification
 specification =

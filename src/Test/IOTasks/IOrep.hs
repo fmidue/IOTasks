@@ -2,18 +2,16 @@
 module Test.IOTasks.IOrep (
   IOrep , Line,
   runProgram,
+  runProgramClean,
   MonadTeletype(..),
   -- ** Re-exports from "System.IO"
   BufferMode(..), stdout,
   ) where
 import Prelude hiding (putChar,putStr,putStrLn,print,getChar,getLine,readLn)
 
-import Data.Set (singleton)
-
 import Control.Monad (ap, (>=>))
 
-import Test.IOTasks.Trace
-import Test.IOTasks.Internal.OutputPattern
+import Test.IOTasks.Trace.Class
 import Test.IOTasks.MonadTeletype
 
 import System.IO (BufferMode(..), stdout) -- for re-exports
@@ -39,11 +37,27 @@ instance MonadTeletype IOrep where
   putStr s = PutString s $ pure ()
   getChar = GetChar pure
 
-type Line = String
+-- runProgram p is = t iff is = inputSequence t
+runProgram :: Trace t => IOrep () -> [Line] -> t
+runProgram = run' id
 
-runProgram :: IOrep () -> [Line] -> AbstractTrace
-runProgram (GetChar _) [] = outOfInputs
-runProgram (GetChar f) ("":is) = progRead '\n' <> runProgram (f '\n') is
-runProgram (GetChar f) ((c:cs):is) = progRead c <> runProgram (f c) (cs:is)
-runProgram (PutString n p') is = progWrite Mandatory (singleton $ Text n) <> runProgram p' is
-runProgram (Return ()) _ = terminate
+-- runProgramClean p (inputSequence t) = t
+-- however, in general inputSequence (runProgramClean p is) = is does not hold
+-- (it still holds for programs without getChar -- including not hidden in any (external) definitions)
+
+-- | Run the program, but make write actions implicitly also read an implicit newline character if directly preceding reads have left exactly that newline character as the first element of the remaining input sequence.
+--
+-- This makes it so that programs like @getChar >> putStrLn "" >> getLine@ behave identical for input sequences @[char:line]@ and @[[char],line]@ allowing the use of the more intuitive second input sequence.
+runProgramClean :: Trace t => IOrep () -> [Line] -> t
+runProgramClean = run' cleanInputs
+  where
+      cleanInputs :: [[a]] -> [[a]]
+      cleanInputs ([]:xs) = xs
+      cleanInputs xs = xs
+
+run' :: Trace t => ([Line] -> [Line]) -> IOrep () -> [Line] -> t
+run' clean (GetChar _) [] = outOfInputs
+run' clean (GetChar f) ("":is) = progReadChar '\n' $ run' clean (f '\n') is
+run' clean (GetChar f) ((c:cs):is) = progReadChar c $ run' clean (f c) (cs:is)
+run' clean (PutString s p') is = progWriteStr s $ run' clean p' (clean is)
+run' _     (Return ()) _ = terminate

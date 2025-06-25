@@ -2,7 +2,6 @@ module BranchingStrictnessSpec where
 
 import Test.IOTasks
 import Test.Hspec
-import Test.IOTasks.Trace (ordinaryTrace)
 
 specification :: Specification
 specification =
@@ -19,4 +18,4 @@ spec =
     let
       (t1,_) = runSpecification specification ["1"]
       (t2,_) = runSpecification specification ["1","2"]
-    in ordinaryTrace t1 == ordinaryTrace t2
+    in t1 == t2

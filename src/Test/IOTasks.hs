@@ -51,7 +51,7 @@ module Test.IOTasks (
   -- * Programs
   MonadTeletype(..),
   IOrep, runProgram, Line,
-  Trace, covers,
+  NTracePlain, NTraceGeneralized, covers,
   -- * Testing
   taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs,
   Outcome(..), CoreOutcome(..), OutcomeHints(..), isSuccess, isFailure, overflowWarnings,

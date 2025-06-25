@@ -10,7 +10,7 @@ import Test.IOTasks.MonadTeletype as MTT
 import Test.IOTasks.Internal.Term
 import Test.IOTasks.Var (someVar)
 import Test.IOTasks.ValueSet
-import Test.IOTasks.Trace
+import Test.IOTasks.Trace (OptFlag(..))
 import Test.IOTasks.OutputPattern
 import Test.IOTasks.ValueMap
 

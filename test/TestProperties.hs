@@ -2,6 +2,8 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 module TestProperties (testCheapProperties, testExpensiveProperties) where
 
@@ -16,7 +18,7 @@ import Test.IOTasks.Specification (LoopBody(..))
 import Test.IOTasks.Random (genInput)
 import qualified Test.IOTasks.Random as Random (stdArgs, Args(..))
 import Test.IOTasks.ValueSet
-import Test.IOTasks.Trace (ordinaryTrace, isTerminatingN, normalizedTrace)
+import Test.IOTasks.Trace
 import Test.IOTasks.OutputPattern (PatternKind(TraceP),(>:), nonEmptyWildcard)
 
 testExpensiveProperties :: Spec
@@ -25,12 +27,12 @@ testExpensiveProperties = do
     prop "programs built from a spec don't go wrong on (solver based) inputs generated from the same spec" $
       \s -> ioProperty $ do
         is <- generateStaticTestSuite stdArgs s
-        pure $ all (\p -> all (isTerminatingN . normalizedTrace . runProgram p) is) (interpret s)
+        pure $ all (\p -> all (isTerminatingLineTrace . runProgram p) is) (interpret s)
 
     prop "inputs are never optional for a fixed input prefix (traces obtained from too less inputs never terminate)" $
       \s -> ioProperty $ do
         is <- filter (not . null) <$> generateStaticTestSuite stdArgs s
-        pure $ not (any (isTerminatingN . normalizedTrace . fst . runSpecification s) (init <$> is))
+        pure $ not (any (isTerminatingNTrace . fst . runSpecification s) (init <$> is))
 
     prop "tillExit s === tillExit (s <> tillExit s <> exit) " $
       \(LoopBody s i) -> testEquiv
@@ -62,7 +64,7 @@ testCheapProperties = do
         let Random.Args{..} = Random.stdArgs
         in
           forAll (genInput s maxInputLength (Size inputRange (fromIntegral $ inputRange `div` 5)) maxNegative)
-            (\is -> all (isTerminatingN . normalizedTrace . flip runProgram is) (interpret s))
+            (\is -> all (isTerminatingLineTrace . flip runProgram is) (interpret s))
 
   context "string pattern matching" $ do
     prop "wildcard >: x == True" $
@@ -110,6 +112,32 @@ testCheapProperties = do
         notEmpty <- not <$> isEmpty (intVar undefined) undefined ws
         pure $ notEmpty ==> forAll (valueOf @Integer (intVar undefined) undefined ws (Size 100 undefined)) $ not . initiallyContainsValue (vs \\ ws)
 
+  context "trace types" $ do
+    describe "LineTrace" $ do
+      generalTraceProperties @LineTrace
+
+    describe "NTracePlain" $ do
+      generalTraceProperties @NTracePlain
+
+    describe "NTraceGeneralized" $ do
+      generalTraceProperties @NTraceGeneralized
+
+generalTraceProperties :: forall t. (Trace t, Eq t) => Spec
+generalTraceProperties = do
+  prop "progReadLine adds a line break" $
+    \s -> progReadLine @t s terminate == foldr progReadChar terminate (s <> "\n")
+
+  prop "progReadLine can be split at linebreaks" $
+    \s t -> progReadLine @t s (progReadLine t terminate) == progReadLine (s <> "\n" <> t) terminate
+
+  prop "progWriteLine adds a line break" $
+    \s -> let t = progWriteLine @t s terminate
+      in t == progWriteStr (s <> "\n") terminate && t == foldr progWriteChar terminate (s <> "\n")
+
+  prop "progWriteLine can be split at linebreaks" $
+    \s t -> progWriteLine @t s (progWriteLine t terminate) == progWriteLine (s <> "\n" <> t) terminate
+
+
 testEquiv :: Specification -> Specification -> Property
 testEquiv s1 s2 = p1 Test.QuickCheck..&&. p2 where
   p1 = s1 `testAgainst` s2
@@ -118,7 +146,7 @@ testEquiv s1 s2 = p1 Test.QuickCheck..&&. p2 where
 testAgainst :: Specification -> Specification -> Property
 testAgainst x y = ioProperty $ do
   r <- generateStaticTestSuite stdArgs y
-  pure $ all (\i -> y `accept` ordinaryTrace (fst (runSpecification' False x i))) r
+  pure $ all (\i -> y `accept` (fst (runSpecification' False x i))) r
 
 genPattern :: Gen (OutputPattern 'TraceP)
 genPattern = sized $ \size ->

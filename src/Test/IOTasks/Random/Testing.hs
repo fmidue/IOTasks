@@ -101,47 +101,48 @@ taskCheckWithOutcome Args{..} prog spec  = do
 genInput :: Specification -> Maybe Int -> Size -> Int -> Gen Inputs
 genInput s depth sz maxNeg = do
   t <- genTrace s depth sz maxNeg
-  if isTerminating t
+  if isTerminatingNTrace t
     then pure $ inputSequence t
     else genInput s depth sz maxNeg -- repeat sampling until a terminating trace is found
 
-genTrace :: Specification -> Maybe Int -> Size -> Int -> Gen Trace
+genTrace :: Specification -> Maybe Int -> Size -> Int -> Gen NTraceGeneralized
 genTrace spec depth sz maxNeg =
   semSt
     (\x vs mode res (e,d,n) ->
-      (if maybe False (d >) depth then pure OutOfInputs
+      (if maybe False (d >) depth then pure outOfInputs
       else frequency $
         (5, do
           i <- valueOf x e vs sz
           t' <- subRes res (insertValue (wrapValue i) (someVar x) e,d+1,n)
-          pure $ foldr ProgRead t' (showResult i ++ "\n")
+          pure $ progReadLine (showResult i) t'
         ) :
         [(1, do
           i <- valueOf x e (complement vs) sz
           t' <- sameRes res (e,d+1,n+1)
-          pure $ foldr ProgRead t' (showResult i ++ "\n")
+          pure $ progReadLine (showResult i) t'
           )
         | mode == UntilValid && n < maxNeg
         ] ++
         [(1, do
           i <- valueOf x e (complement vs) sz
-          pure $ foldr ProgRead Terminate (showResult i ++ "\n")
+          pure $ progReadLine (showResult i) terminate
           )
         | mode == ElseAbort && n < maxNeg
         ]
     ))
-    (\o ts t' (e,_,_) -> ProgWrite o (Set.map (snd . evalPattern e) ts) <$> t')
+    (\o ts t' (e,_,_) -> genProgWrite (o, Set.map (snd . evalPattern e) ts) <$> t')
     (\c l r (e,_,_) -> if snd $ oEval e c then l else r)
     id
-    (pure Terminate)
+    (pure terminate)
     (emptyValueMap $ readVars spec,1,0)
     spec
 
 runTest :: IOrep () -> Specification -> Inputs -> Outcome
 runTest p spec i =
   let
-    (specTrace,warn) = first normalizedTrace $ runSpecification spec i
-    progTrace = normalizedTrace $ runProgram p i
+    (specTrace,warn) = runSpecification spec i
+    progTrace :: Trace t => t
+    progTrace = runProgram p i
     o = case warn of
       OverflowOccurred -> OverflowHint 1
       _ -> mempty

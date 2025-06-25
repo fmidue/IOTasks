@@ -7,7 +7,7 @@ import Test.Hspec
 import Test.IOTasks
 
 import Data.Functor ((<&>))
-import Test.IOTasks.Trace (isOutputMismatch)
+import Test.IOTasks.Trace.Match (isOutputMismatch)
 
 verboseSpec :: Specification
 verboseSpec =

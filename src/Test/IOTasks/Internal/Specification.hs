@@ -37,7 +37,6 @@ import Test.QuickCheck (Arbitrary(..))
 import Text.PrettyPrint hiding ((<>))
 import Data.GADT.Compare
 import Data.Functor.Classes (Ord1(liftCompare))
-import Control.Monad.State (evalState, MonadState (get, put))
 
 data Specification where
   ReadInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification -> Specification
@@ -247,10 +246,10 @@ hasIteration TillE{} = True
 hasIteration Nop = False
 hasIteration E = False
 
-runSpecification :: Specification -> [String] -> (AbstractTrace,OverflowWarning)
+runSpecification :: Specification -> [String] -> (NTraceGeneralized,OverflowWarning)
 runSpecification = runSpecification' True
 
-runSpecification' :: AddLinebreaks -> Specification -> [String] -> (AbstractTrace,OverflowWarning)
+runSpecification' :: AddLinebreaks -> Specification -> [String] -> (NTraceGeneralized,OverflowWarning)
 runSpecification' addLinebreaks spec inputs =
   semSt
     (\x (vs :: ValueSet v) mode res (e,ins) ->
@@ -259,17 +258,17 @@ runSpecification' addLinebreaks spec inputs =
         (i:is)
           | containsValue x e vs (readValue x i) ->
             let (t',w) = subRes res (insertValue (wrapValue $ readValue x i) (someVar x) e,is)
-            in (foldr ((<>) . progRead) (((<>) . progRead) '\n' t')  i,w)
+            in (foldr progReadChar (progReadChar '\n' t')  i,w)
           | otherwise -> case mode of
               AssumeValid -> error $ "invalid value: " ++ i ++ " is not an element of " ++ showValueSet vs
               UntilValid ->
-                let (t',w) = first (progWrite Optional (Set.singleton wildcard) <>) $ sameRes res (e,is)
-                in (foldr ((<>) . progRead) (((<>) . progRead) '\n' t') i,w)
-              ElseAbort -> (foldr ((<>) . progRead) (((<>) . progRead) '\n' $ progWrite Optional (Set.singleton wildcard)) i,NoOverflow)
+                let (t',w) = first (genProgWrite (Optional,Set.singleton wildcard)) $ sameRes res (e,is)
+                in (foldr progReadChar (progReadChar '\n' t') i,w)
+              ElseAbort -> (foldr progReadChar (progReadChar '\n' $ genProgWrite (Optional,Set.singleton wildcard) terminate) i,NoOverflow)
     )
     (\o ts (t',ww) (e,_) ->
       let (warn,os) = evalPatternSet' addLinebreaks e ts
-      in (progWrite o os <> t', warn <> ww)
+      in (genProgWrite (o,os) t', warn <> ww)
     )
     (\c l r (e,_) ->
       let (w,b) = oEval e c
@@ -350,28 +349,28 @@ showInputMode AssumeValid = ""
 showInputMode UntilValid = "↻"
 showInputMode ElseAbort = "↯"
 
-accept :: Specification -> Trace -> Bool
+accept :: Specification -> NTraceGeneralized -> Bool
 accept s_ t_ = accept' s_ k_I t_ d_I
   where
-    accept' :: Specification -> (Action -> Trace -> ValueMap -> Bool) -> Trace -> ValueMap -> Bool
+    accept' :: Specification -> (Action -> NTraceGeneralized -> ValueMap -> Bool) -> NTraceGeneralized -> ValueMap -> Bool
     accept' (ReadInput x (ty :: ValueSet a) AssumeValid s') k t d = case t of
-      ProgReadString v t' | containsValue x d ty val -> accept' s' k t' (insertValue (wrapValue val) (someVar x) d)
+      NProgRead v t' | containsValue x d ty val -> accept' s' k t' (insertValue (wrapValue val) (someVar x) d)
                           where val = readValue x v
       _ -> False
     accept' (ReadInput x (ty :: ValueSet a) ElseAbort s') k t d = case t of
-      ProgReadString v t'| containsValue x d ty val -> accept' s' k t' (insertValue (wrapValue val) (someVar x) d)
+      NProgRead v t'| containsValue x d ty val -> accept' s' k t' (insertValue (wrapValue val) (someVar x) d)
                          where val = readValue x v
-      ProgReadString v Terminate | not (containsValue x d ty (readValue x v)) -> True
+      NProgRead v NTerminate | not (containsValue x d ty (readValue x v)) -> True
       _ -> False
     accept' s@(ReadInput x (ty :: ValueSet a) UntilValid s') k t d = case t of
-      ProgReadString v t'
+      NProgRead v t'
         | containsValue x d ty val -> accept' s' k t' (insertValue (wrapValue val) (someVar x) d)
         | not (containsValue x d ty val) -> accept' s k t d
         where val = readValue x v
       _ -> False
     accept' (WriteOutput Optional os s') k t d = accept' (WriteOutput Mandatory os s') k t d || accept' s' k t d
     accept' (WriteOutput Mandatory os s') k t d =  case t of
-      ProgWrite Mandatory vs t' | vs `Set.isSubsetOf` snd (evalPatternSet d os) -> accept' s' k t' d
+      NProgWrite (Mandatory,vs) t' | vs `Set.isSubsetOf` snd (evalPatternSet d os) -> accept' s' k t' d
       _ -> False
     accept' (Branch c s1 s2 s') k t d
       | snd (oEval d c) = accept' (s1 <> s') k t d
@@ -383,8 +382,8 @@ accept s_ t_ = accept' s_ k_I t_ d_I
     accept' E k t d = k Exit t d
     accept' Nop k t d = k End t d
 
-    k_I :: Action -> Trace -> ValueMap -> Bool
-    k_I End Terminate _ = True
+    k_I :: Action -> NTraceGeneralized -> ValueMap -> Bool
+    k_I End NTerminate _ = True
     k_I End _ _ = False
     k_I Exit _ _ = error "ill-formed specification: exit marker at top-level"
     d_I :: ValueMap

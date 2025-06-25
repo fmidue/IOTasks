@@ -40,6 +40,8 @@ library
       Test.IOTasks.Term.Prelude
       Test.IOTasks.Testing
       Test.IOTasks.Trace
+      Test.IOTasks.Trace.Class
+      Test.IOTasks.Trace.Match
       Test.IOTasks.ValueMap
       Test.IOTasks.ValueSet
       Test.IOTasks.Var
@@ -53,6 +55,8 @@ library
       Test.IOTasks.Internal.SpecificationGenerator
       Test.IOTasks.Internal.Term
       Test.IOTasks.Internal.ValueSet
+      Test.IOTasks.Trace.NormalizedTrace
+      Test.IOTasks.Trace.LineTrace
   hs-source-dirs:
       src
   ghc-options: -Wall -Wmissing-export-lists -Wno-name-shadowing -Werror=incomplete-patterns -fdefer-typed-holes

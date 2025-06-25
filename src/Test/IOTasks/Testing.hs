@@ -28,7 +28,7 @@ import Control.Monad (when, forM, replicateM)
 
 import Data.List (sortOn)
 import Data.Functor (void)
-import Data.Bifunctor (first, Bifunctor (second))
+import Data.Bifunctor (second)
 
 import Text.PrettyPrint hiding ((<>))
 import Control.Concurrent.Async
@@ -200,8 +200,9 @@ taskCheckWithOutcome Args{..} prog spec = do
         testInput :: Inputs -> (PathOutcome,OverflowWarning)
         testInput input =
           let
-            (specTrace,warn) = first normalizedTrace $ runSpecification spec input
-            progTrace = normalizedTrace $ runProgram prog input
+            (specTrace,warn) = runSpecification spec input
+            progTrace :: Trace t => t
+            progTrace = runProgram prog input
           in case specTrace `covers` progTrace of
             result | isSuccessfulMatch result -> (PathSuccess,warn)
             failure -> (PathFailure input specTrace progTrace failure, warn)
@@ -219,8 +220,8 @@ taskCheckWithOutcome Args{..} prog spec = do
         reportUnsat = when terminalOutput $ putLnP output "unexpected unsat result in test case generation, maybe some value set is (conditionally) uninhabited"
 
 type Inputs = [Line]
-type ExpectedRun = NTrace
-type ActualRun = NTrace
+type ExpectedRun = NTraceGeneralized
+type ActualRun = LineTrace
 
 data Outcome = Outcome CoreOutcome OutcomeHints
   deriving (Eq, Show)
@@ -291,15 +292,15 @@ pPrintCoreOutcome simple f (Failure is et at r) = vcat
   [ text "*** Failure"
   , text ("Input sequence: "++ showInputs is)
   , text ("Expected run" ++ when simple " (simplified)" ++ ":") <+> showTraceHow et
-  , text "Actual run:" <+> showTraceNSimple' f at
+  , text "Actual run:" <+> printLineTrace' f at
   , text "Error:"
   , nest 2 (pPrintResult f r)
   ]
   where
     when b str = if b then str else ""
     (pPrintResult, showTraceHow)
-      | simple = (pPrintMatchResultSimple,showTraceNSimple' f)
-      | otherwise = (pPrintMatchResult,showTraceN' f)
+      | simple = (printMatchResultSimple,printNTraceGeneralizedSimple' f)
+      | otherwise = (printMatchResult,printNTraceGeneralized' f)
 
 showInputs :: Inputs -> String
 showInputs = unwords . map ('?':)
@@ -314,8 +315,9 @@ taskCheckOn i p s = uncurry Outcome (go 0 0 i p s) where
   go n o [] _ _ = (Success n, overflowHint o)
   go n o (i:is) prog spec =
     let
-      (specTrace,warn) = first normalizedTrace $ runSpecification spec i
-      progTrace = normalizedTrace $ runProgram prog i
+      (specTrace,warn) = runSpecification spec i
+      progTrace :: Trace t => t
+      progTrace = runProgram prog i
       o' = if warn == OverflowOccurred then o+1 else o
     in case specTrace `covers` progTrace of
       result | isSuccessfulMatch result -> go (n+1) o' is prog spec
