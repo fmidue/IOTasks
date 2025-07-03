@@ -1,11 +1,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE DeriveFunctor #-}
 module Test.IOTasks.Internal.Specification (
   Specification(..),
   readInput, writeOutput, writeOptionalOutput, anyOptionalOutput,
@@ -14,7 +11,7 @@ module Test.IOTasks.Internal.Specification (
   readVars, hasIteration,
   pPrintSpecification,
   InputMode(..),
-  sem, semM, RecStruct(..),
+  sem, semSt, semSt', RecRes(..),
   accept, Action(..),
   LoopBody(..),
   ) where
@@ -31,7 +28,6 @@ import Test.IOTasks.Internal.SpecificationGenerator
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Data.List (nub,intersperse, intersect)
-import Data.Functor.Identity (runIdentity,Identity(..))
 import Data.Bifunctor (first, second)
 import Data.Either (isLeft, isRight, lefts)
 
@@ -41,6 +37,7 @@ import Test.QuickCheck (Arbitrary(..))
 import Text.PrettyPrint hiding ((<>))
 import Data.GADT.Compare
 import Data.Functor.Classes (Ord1(liftCompare))
+import Control.Monad.State (evalState, MonadState (get, put))
 
 data Specification where
   ReadInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification -> Specification
@@ -255,89 +252,86 @@ runSpecification = runSpecification' True
 
 runSpecification' :: AddLinebreaks -> Specification -> [String] -> (AbstractTrace,OverflowWarning)
 runSpecification' addLinebreaks spec inputs =
-  sem
-    (\(e,ins) x (vs :: ValueSet v) mode ->
+  semSt
+    (\x (vs :: ValueSet v) mode res (e,ins) ->
       case ins of
-        [] -> NoRec (outOfInputs,NoOverflow)
+        [] -> (outOfInputs,NoOverflow)
         (i:is)
-          | containsValue x e vs (readValue x i) -> RecSub i id (insertValue (wrapValue $ readValue x i) (someVar x) e,is)
+          | containsValue x e vs (readValue x i) ->
+            let (t',w) = subRes res (insertValue (wrapValue $ readValue x i) (someVar x) e,is)
+            in (foldr ((<>) . progRead) (((<>) . progRead) '\n' t')  i,w)
           | otherwise -> case mode of
               AssumeValid -> error $ "invalid value: " ++ i ++ " is not an element of " ++ showValueSet vs
-              UntilValid ->  RecSame i (first (progWrite Optional (Set.singleton wildcard) <>)) (e,is)
-              ElseAbort -> NoRec (foldr ((<>) . progRead) (((<>) . progRead) '\n' $ progWrite Optional (Set.singleton wildcard)) i,NoOverflow)
+              UntilValid ->
+                let (t',w) = first (progWrite Optional (Set.singleton wildcard) <>) $ sameRes res (e,is)
+                in (foldr ((<>) . progRead) (((<>) . progRead) '\n' t') i,w)
+              ElseAbort -> (foldr ((<>) . progRead) (((<>) . progRead) '\n' $ progWrite Optional (Set.singleton wildcard)) i,NoOverflow)
     )
-    (\case
-      NoRec r -> r
-      RecSub i () (t',w) -> (foldr ((<>) . progRead) (((<>) . progRead) '\n' t')  i,w)
-      RecSame i () (t',w) -> (foldr ((<>) . progRead) (((<>) . progRead) '\n' t') i,w)
-      RecBoth{} -> error "runSpecification: impossible"
-    )
-    (\(e,_) o ts (t',ww) ->
+    (\o ts (t',ww) (e,_) ->
       let (warn,os) = evalPatternSet' addLinebreaks e ts
       in (progWrite o os <> t', warn <> ww)
     )
-    (\(e,_) c l r ->
+    (\c l r (e,_) ->
       let (w,b) = oEval e c
       in if b
         then second (<> w) l
         else second (<> w) r
     )
-    (const id)
     id
     (terminate,NoOverflow)
     (emptyValueMap $ readVars spec,inputs)
     spec
 
-data RecStruct p x a r = NoRec r | RecSub p x a | RecSame p x a | RecBoth p x a a
+data RecRes a = RecRes { sameRes, subRes :: a }
+  deriving (Eq,Ord,Show,Functor)
 
-sem :: forall st p a.
-  (forall v. (Typeable v,Read v,Show v) => st -> Var v -> ValueSet v -> InputMode -> RecStruct p (a->a) st a) -> (RecStruct p () a a -> a) ->
-  (forall k. st -> OptFlag -> Set (OutputPattern k) -> a -> a) ->
-  (st -> Term 'Transparent Bool -> a -> a -> a) ->
-  (Action -> a -> a) ->
-  (a -> a) ->
-  a ->
-  st -> Specification -> a
-sem f f' g h i j z st s = runIdentity $ semM
-  (\a b c d -> Identity $ f a b c d)
-  (Identity . f')
-  (\a b c -> Identity . g a b c . runIdentity)
-  (\a b c d -> Identity $ h a b (runIdentity c) (runIdentity d))
-  (\a b -> Identity $ i a (runIdentity b))
-  (Identity . j . runIdentity)
-  (pure z)
-  st
-  s
+sem :: forall a.
+  -- handle readInput
+  (forall v. (Typeable v,Read v,Show v) => Var v -> ValueSet v -> InputMode -> RecRes a -> a)
+  -- handle writeOutput
+  -> (forall k. OptFlag -> Set (OutputPattern k) -> a -> a)
+  -- handle branch
+  -> (Term 'Transparent Bool -> a -> a -> a)
+  -- handle starting a new iteration round
+  -> (a -> a)
+  -- handle specification end
+  -> a
+  -> Specification -> a
+sem f g h i z = semSt
+  (\x vs mode r () -> f x vs mode (fmap ($ ()) r))
+  (\o ts r () -> g o ts r)
+  (\c rl rr () -> h c rl rr)
+  i
+  z
+  ()
 
-semM :: forall m st p a. Monad m =>
-  (forall v. (Typeable v,Read v,Show v) => st -> Var v -> ValueSet v -> InputMode -> m (RecStruct p (a->a) st a)) -> (RecStruct p () a a -> m a) ->
-  (forall k. st -> OptFlag -> Set (OutputPattern k) -> m a -> m a) ->
-  (st -> Term 'Transparent Bool -> m a -> m a -> m a) ->
-  (Action -> m a -> m a) ->
-  (m a -> m a) ->
-  m a ->
-  st -> Specification -> m a
-semM f f' g h i j z s_I spec = sem' s_I spec k_I where
-  sem' :: st -> Specification -> (Action ->  st -> m a) -> m a
-  sem' st s@(ReadInput x vs mode s') k =
-    do
-      let mStruct = f st x vs mode
-      struct <- mStruct
-      f' =<< case struct of
-        NoRec r -> pure $ NoRec r
-        RecSub p r st' -> RecSub p () . r <$> sem' st' s' k
-        RecSame p r st' -> RecSame p () . r <$> sem' st' s k
-        RecBoth p r st' st'' -> RecBoth p () . r <$> sem' st' s' k <*> sem' st'' s k
-  sem' st (WriteOutput o ts s') k = g st o ts $ sem' st s' k
-  sem' st (Branch c l r s') k = h st c (sem' st (l <> s') k) (sem' st (r <> s') k)
-  sem' st (TillE s s') k = j $ sem' st s k'
+semSt :: forall st a.
+  -- handle readInput
+  (forall v. (Typeable v,Read v,Show v) => Var v -> ValueSet v -> InputMode -> RecRes (st -> a) -> st -> a)
+  -- handle writeOutput
+  -> (forall k. OptFlag -> Set (OutputPattern k) -> a -> st -> a)
+  -- handle branch
+  -> (Term 'Transparent Bool -> a -> a -> st -> a)
+  -- handle starting a new iteration round
+  -> (a -> a)
+  -- handle specification end
+  -> a
+  -- initial state
+  -> st
+  -> Specification -> a
+semSt f g h i z s_I _spec = sem' s_I _spec k_I where
+  sem' :: st -> Specification -> (Action -> st -> a) -> a
+  sem' st (WriteOutput o ts s') k = g o ts (sem' st s' k) st
+  sem' st s@(ReadInput x vs mode s') k = f x vs mode (RecRes {sameRes = \st' -> sem' st' s k, subRes = \st' -> sem' st' s' k}) st
+  sem' st (Branch c l r s') k = h c (sem' st (l <> s') k) (sem' st (r <> s') k) st
+  sem' st (TillE s s') k = i $ sem' st s k'
     where
-      k' End st = i End $ sem' st s k'
-      k' Exit st = i Exit $ sem' st s' k
+      k' End st = i $ sem' st s k'
+      k' Exit st = sem' st s' k
   sem' st Nop k = k End st
   sem' st E k = k Exit st
 
-  k_I :: Action ->  st -> m a
+  k_I :: Action -> st -> a
   k_I End _ = z
   k_I Exit _ = error "ill-formed specification: exit marker at top-level"
 

@@ -63,29 +63,22 @@ data ConstraintTree where
 constraintTree :: Specification -> ConstraintTree
 constraintTree =
   sem
-    (\() x vs mode ->
+    (\x vs mode res ->
       let
-        p = (SimpleInput KeepInput x vs
-            ,SimpleInput DropInput x (complement vs)
-            , mode)
-      in RecSub p id ()
+        vsP = SimpleInput KeepInput x vs
+        vsN = SimpleInput DropInput x (complement vs)
+        t' = subRes res
+      in case mode of
+        AssumeValid -> Assert vsP t'
+        UntilValid -> InjectionPoint vsN $ Assert vsP t'
+        ElseAbort -> Choice
+          (Assert vsN Empty)
+          (Assert vsP t')
     )
-    (\case
-      RecSub (vsP,_, AssumeValid) () s' -> Assert vsP s'
-      RecSub (vsP,vsN, UntilValid) () s' -> InjectionPoint vsN $ Assert vsP s'
-      RecSub (vsP,vsN, ElseAbort) () s' -> Choice
-        (Assert vsN Empty)
-        (Assert vsP s')
-      RecBoth{} -> error "constraintTree: impossible"
-      NoRec _ -> error "constraintTree: impossible"
-      RecSame{} -> error "constraintTree: impossible"
-    )
-    (\() _ ps t -> Assert (SimpleOverflow (catMaybes $ [ castTerm @Integer t | p <- Set.toList ps, vt <- valueTerms p, t <- withSomeTermK vt transparentSubterms])) t)
-    (\() c l r -> Assert (SimpleOverflow (mapMaybe (castTerm @Integer) $ transparentSubterms c)) $ Choice (Assert (SimpleCondition c) l) (Assert (SimpleCondition (not' c)) r))
-    (\case {End -> Unfold ; Exit -> id})
+    (\_ ps t -> Assert (SimpleOverflow (catMaybes $ [ castTerm @Integer t | p <- Set.toList ps, vt <- valueTerms p, t <- withSomeTermK vt transparentSubterms])) t)
+    (\c l r -> Assert (SimpleOverflow (mapMaybe (castTerm @Integer) $ transparentSubterms c)) $ Choice (Assert (SimpleCondition c) l) (Assert (SimpleCondition (not' c)) r))
     Unfold
     Empty
-    ()
 
 data SimplePath where
   ClosedPath :: [Some SimpleConstraint] -> SimplePath

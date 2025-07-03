@@ -1,11 +1,7 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 module Test.IOTasks.Interpreter (interpret) where
 
 import Prelude hiding (readLn,putStrLn)
-
-import Control.Monad.State
 
 import qualified Data.Set as Set
 
@@ -27,54 +23,48 @@ import Test.IOTasks.ValueMap
 interpret :: MonadTeletype m => Specification -> [m ()]
 interpret s = do
   collapsed <- collapseChoice s
-  pure $ flip evalStateT (emptyValueMap [] :: ValueMap) $
-    sem
-      -- (\() x (vs :: ValueSet v) m -> RecSub (someVar x,wrapValue . readValue @v, \var m -> (containsValue var m vs . unwrapValue),m) id ())
-      (\() x (vs :: ValueSet v) m -> RecSub (someVar x,wrapValue . readValue x, \vMap -> containsValue x vMap vs . unwrapValue x,m) id ())
-      (\case
-        RecSub (x,readF,_,AssumeValid) () p' -> do
-          v <- lift (readF <$> MTT.getLine)
-          modify $ insertValue v x
-          p'
-        RecSub (x,readF,vsContains,ElseAbort) () p' -> do
-          v <- lift (readF <$> MTT.getLine)
-          vMap <- get
-          if vsContains vMap v
-            then do
-              modify $ insertValue v x
-              p'
-            else lift $ MTT.putStrLn "abort: invalid input value"
-        RecSub (x,readF,vsContains,UntilValid) () p' -> do
-          let readLoop = do
-                v <- lift (readF <$> MTT.getLine)
-                vMap <- get
-                if vsContains vMap v then pure v else lift (putStrLn "invalid value, try again") >> readLoop
-          v <- readLoop
-          modify $ insertValue v x
-          p'
-        NoRec{} -> error "interpret: impossible"
-        RecSame{} -> error "interpret: impossible"
-        RecBoth{} -> error "interpret: impossible")
-      (\_ opt ts p' -> case opt of
-        Mandatory -> do
+  pure $
+    semSt
+      (\x (vs :: ValueSet v) m res e ->
+        let
+          xVar = someVar x
+          readF = wrapValue . readValue x
+          vsContains vMap = containsValue x vMap vs . unwrapValue x
+          p' = subRes res
+        in case m of
+          AssumeValid -> do
+            v <- readF <$> MTT.getLine
+            p' $ insertValue v xVar e
+          ElseAbort -> do
+            v <- readF <$> MTT.getLine
+            if vsContains e v
+              then do
+                p' $ insertValue v xVar e
+              else MTT.putStrLn "abort: invalid input value"
+          UntilValid -> do
+            let readLoop = do
+                  v <- readF <$> MTT.getLine
+                  if vsContains e v then pure v else putStrLn "invalid value, try again" >> readLoop
+            v <- readLoop
+            p' $ insertValue v xVar e
+      )
+      (\opt ts p' e -> case opt of
+        Mandatory ->
           if Set.size ts == 1
             then do
-              e <- get
-              lift $ putStrLn $ showPattern $ snd $ evalPattern e (Set.elemAt 0 ts)
+              putStrLn $ showPattern $ snd $ evalPattern e (Set.elemAt 0 ts)
               p'
             else error "interpret: impossible (due to collapseChoice)"
         Optional -> error "interpret: impossible (due to collapseChoice)"
       )
-      (\_ cond pl pr -> do
-        e <- get
+      (\cond pl pr e ->
         if snd $ oEval e cond
           then pl
           else pr
       )
-      (const id)
       id
       (pure ())
-      ()
+      (emptyValueMap $ readVars collapsed)
       collapsed
 
 collapseChoice :: Specification -> [Specification]

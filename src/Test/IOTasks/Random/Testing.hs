@@ -1,5 +1,4 @@
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE LambdaCase #-}
 module Test.IOTasks.Random.Testing (
   taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome,
   Args (..), stdArgs,
@@ -30,7 +29,6 @@ import Test.QuickCheck (Gen, generate, frequency)
 import System.IO (stdout)
 import System.Timeout (timeout)
 import Control.Monad (when, foldM)
-import Debug.Trace (traceShowId)
 import Test.IOTasks.Internal.Term (showResult)
 
 taskCheck :: IOrep () -> Specification -> IO ()
@@ -109,26 +107,31 @@ genInput s depth sz maxNeg = do
 
 genTrace :: Specification -> Maybe Int -> Size -> Int -> Gen Trace
 genTrace spec depth sz maxNeg =
-  semM
-    (\(e,d,n) x vs mode ->
-      (if maybe False (d >) depth then pure $ NoRec OutOfInputs
-      else do
-        frequency $
-            (5, valueOf x e vs sz >>= (\i -> pure $ RecSub (showResult i) id (insertValue (wrapValue i) (someVar x) e,d+1,n)))
-          : [(1, valueOf x e (complement vs) sz >>= (\i -> pure $ RecSame (showResult i) id (e,d+1,n+1))) | mode == UntilValid && n < maxNeg]
-          ++ [(1, valueOf x e (complement vs) sz >>= (\i -> pure $ NoRec $ foldr ProgRead Terminate (show i ++ "\n"))) | mode == ElseAbort && n < maxNeg]
+  semSt
+    (\x vs mode res (e,d,n) ->
+      (if maybe False (d >) depth then pure OutOfInputs
+      else frequency $
+        (5, do
+          i <- valueOf x e vs sz
+          t' <- subRes res (insertValue (wrapValue i) (someVar x) e,d+1,n)
+          pure $ foldr ProgRead t' (showResult i ++ "\n")
+        ) :
+        [(1, do
+          i <- valueOf x e (complement vs) sz
+          t' <- sameRes res (e,d+1,n+1)
+          pure $ foldr ProgRead t' (showResult i ++ "\n")
+          )
+        | mode == UntilValid && n < maxNeg
+        ] ++
+        [(1, do
+          i <- valueOf x e (complement vs) sz
+          pure $ foldr ProgRead Terminate (showResult i ++ "\n")
+          )
+        | mode == ElseAbort && n < maxNeg
+        ]
     ))
-    (pure . \case
-      NoRec r -> r
-      RecSub i () t' -> do
-        foldr ProgRead t' (i ++ "\n")
-      RecSame i () t' -> do
-        foldr ProgRead t' (i ++ "\n")
-      RecBoth{} -> error "genTrace: impossible"
-    )
-    (\(e,_,_) o ts t' -> ProgWrite o (Set.map (snd . evalPattern e) ts) <$> t')
-    (\(e,_,_) c l r -> if snd $ oEval e c then l else r)
-    (const id)
+    (\o ts t' (e,_,_) -> ProgWrite o (Set.map (snd . evalPattern e) ts) <$> t')
+    (\c l r (e,_,_) -> if snd $ oEval e c then l else r)
     id
     (pure Terminate)
     (emptyValueMap $ readVars spec,1,0)
