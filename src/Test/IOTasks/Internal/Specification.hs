@@ -11,7 +11,7 @@ module Test.IOTasks.Internal.Specification (
   readVars, hasIteration,
   pPrintSpecification,
   InputMode(..),
-  sem, semSt, semSt', RecRes(..),
+  sem, semSt, RecRes(..),
   accept, Action(..),
   LoopBody(..),
   ) where
