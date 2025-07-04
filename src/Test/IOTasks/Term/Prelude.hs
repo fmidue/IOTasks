@@ -19,7 +19,7 @@ module Test.IOTasks.Term.Prelude (
   embeddedLit,
   -- * Simple list functions
   sum', product', length', reverse',
-  isIn, isNotIn,
+  elem', notElem',
   listLit,
   -- * Complexer list functions
   filter',
@@ -129,11 +129,11 @@ true = BoolLit True
 false :: Term k Bool
 false = BoolLit False
 
-isIn :: (Typeable a, Eq a) => Term k a -> Term k [a] -> Term k Bool
-isIn = IsIn
+elem' :: (Typeable a, Eq a) => Term k a -> Term k [a] -> Term k Bool
+elem' = IsIn
 
-isNotIn :: (Typeable a, Eq a) => Term k a -> Term k [a] -> Term k Bool
-isNotIn x xs = not' (x `isIn` xs)
+notElem' :: (Typeable a, Eq a) => Term k a -> Term k [a] -> Term k Bool
+notElem' x xs = not' (x `elem'` xs)
 
 length' :: Typeable a => Term k [a] -> Term k Integer
 length' = Length

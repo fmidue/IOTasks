@@ -42,7 +42,7 @@ module Test.IOTasks.Random (
   embeddedLit,
   -- ** Simple list functions
   sum', product', length', reverse',
-  isIn, isNotIn,
+  elem', notElem',
   listLit,
   -- ** Complexer list functions
   filter',

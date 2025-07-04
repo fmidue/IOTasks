@@ -42,7 +42,7 @@ module Test.IOTasks (
   embeddedLit,
   -- ** Simple list functions
   sum', product', length', reverse',
-  isIn, isNotIn,
+  elem', notElem',
   listLit,
   -- ** Complexer list functions
   filter',

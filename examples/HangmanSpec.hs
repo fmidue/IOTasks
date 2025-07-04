@@ -13,13 +13,13 @@ hangmanSpec word = tillExit (
      branch (winCond $ allValues g) (writeOutput [text "correct!"] <> exit) mempty
   <> writeOutput [text "Game state:"  <> wildcard]
   <> readInput g digits AssumeValid
-  <> branch ((currentValue g `isIn` listLit word) .&&. (currentValue g `isNotIn` valuesBefore 1 g))
+  <> branch ((currentValue g `elem'` listLit word) .&&. (currentValue g `notElem'` valuesBefore 1 g))
     (writeOptionalOutput [text "good guess!"])
     (writeOptionalOutput [text "wrong guess!"])
   )
   where
     winCond :: Term k [Integer] -> Term k Bool
-    winCond g = foldr (\a b -> intLit a `isIn` g .&&. b) true word
+    winCond g = foldr (\a b -> intLit a `elem'` g .&&. b) true word
     g = intVar "g"
 
 digits :: ValueSet Integer
