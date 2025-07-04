@@ -6,7 +6,7 @@
 module TestProperties (testCheapProperties, testExpensiveProperties) where
 
 import Test.Hspec
-import Test.Hspec.QuickCheck (prop)
+import Test.Hspec.QuickCheck (prop, modifyMaxSuccess)
 import Test.QuickCheck hiding (isSuccess, stdArgs, Args)
 
 import Control.Monad.Loops (allM)
@@ -67,12 +67,12 @@ testCheapProperties = do
   context "string pattern matching" $ do
     prop "wildcard >: x == True" $
       forAll genPattern $ \p -> wildcard >: p
-    prop "reflexivity of >:" $
+    modifyMaxSuccess (*100) $ prop "reflexivity of >:" $
       forAll genPattern $ \p -> p >: p
-    prop "transitivity of >:" $ --improve?
+    modifyMaxSuccess (*100) $ prop "transitivity of >:" $ --improve?
        --improve?
       forAll ((,,) <$> genPattern <*> genPattern <*> genPattern) $ \(x,y,z) -> not (not (x >: z) && (x >: y) && (y >: z))
-    prop "antisymmetry of >:" $
+    modifyMaxSuccess (*100) $ prop "antisymmetry of >:" $
       forAll ((,) <$> genPattern <*> genPattern) $ \(x,y) -> (x==y) || not (x >: y && y >: x)
 
     prop "adding a wildcard results in a more general pattern" $

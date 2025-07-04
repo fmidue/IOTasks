@@ -187,6 +187,13 @@ showPatternSimple p =
 
 -- | coverage relation on patterns
 (>:) :: OutputPattern 'TraceP -> OutputPattern 'TraceP -> Bool
+-- band-aid fix for problems with coverage via parsing
+(Text " ") >: (Wildcard MaybeEmpty) = False
+(Text "_") >: (Wildcard NonEmpty) = False
+(Sequence (Text " ") (Wildcard MaybeEmpty)) >: (Wildcard MaybeEmpty) = False
+(Sequence (Wildcard MaybeEmpty) (Text " ")) >: (Wildcard MaybeEmpty) = False
+(Sequence (Text "_") (Wildcard MaybeEmpty)) >: (Wildcard NonEmpty) = False
+(Sequence (Wildcard MaybeEmpty) (Text "_")) >: (Wildcard NonEmpty) = False
 p >: q = isRight $ parse (patternParser p <> eof) "" $ showPatternInternal q
 
 -- hack to allow coverage check through parsing
