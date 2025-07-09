@@ -24,7 +24,7 @@ instance Show LineTrace where
     where
       show' (ReadLine' s t) = "progReadLine " <> show s <> addDollar t <> show t
       show' (WriteLine' s t) = "progWriteLine " <> show s <> addDollar t <> show t
-      show' Terminate = "termintate"
+      show' Terminate = "terminate"
       show' OutOfInputs = "outOfInputs"
 
       addDollar ReadLine'{} = " $ "
