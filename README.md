@@ -2,6 +2,8 @@
 
 Examples for writing specifications can be found under [examples/](examples/) and in the online [demo](https://iotasks.eu).
 
+A collection of specifications for exercise tasks can be found under [https://github.com/fmidue/IOTasks-collection](https://github.com/fmidue/IOTasks-collection).
+
 ## Documentation
 Main branch: [Haddock Documentation](https://fmidue.github.io/IOTasks)
 
