@@ -1,14 +1,17 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module Test.IOTasks.Trace.LineTrace (
   LineTrace,
   pattern ReadLine, pattern WriteLine, pattern LTerminate, pattern LOutOfInputs,
   isTerminatingLineTrace,
-  printLineTrace, printLineTrace',
   ) where
 
 import Test.IOTasks.Trace.Class
+import Test.IOTasks.Trace.PrettyPrint (PrettyPrintTrace(..))
 
 import Text.PrettyPrint hiding ((<>))
 
@@ -74,14 +77,13 @@ isTerminatingLineTrace (WriteLine' _ t) = isTerminatingLineTrace t
 isTerminatingLineTrace Terminate = True
 isTerminatingLineTrace OutOfInputs = False
 
-printLineTrace :: LineTrace -> Doc
-printLineTrace = printLineTrace' ($+$)
+instance PrettyPrintTrace LineTrace String where
+  defaultConcat = ($+$)
 
-printLineTrace' :: (Doc -> Doc -> Doc) -> LineTrace -> Doc
-printLineTrace' f (ReadLine' s t) = f ("?" <> text (show s)) (printLineTrace' f t)
-printLineTrace' f (WriteLine' s t) = f ("!" <> text (show s)) (printLineTrace' f t)
-printLineTrace' _ Terminate = "stop"
-printLineTrace' _ OutOfInputs = "excess-input-command"
+  printDeep simple printA f (ReadLine' s t) = f (printA s) (printDeep simple printA f t)
+  printDeep simple printA f (WriteLine' s t) = f (printA s) (printDeep simple printA f t)
+  printDeep _ _ _ Terminate = "stop"
+  printDeep _ _ _ OutOfInputs = "excess-input-command"
 
 {-# COMPLETE  ReadLine, WriteLine, LTerminate, LOutOfInputs #-}
 pattern ReadLine :: String -> LineTrace -> LineTrace

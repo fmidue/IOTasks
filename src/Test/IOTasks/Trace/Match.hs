@@ -5,6 +5,7 @@ import Test.IOTasks.Trace.NormalizedTrace
 import Test.IOTasks.Trace.Class (genProgWrite)
 import Test.IOTasks.OutputPattern ((>:))
 import qualified Test.IOTasks.OutputPattern as Pattern (text)
+import Test.IOTasks.Trace.PrettyPrint
 
 import Text.PrettyPrint hiding ((<>))
 import Data.Bifunctor (second)
@@ -106,18 +107,20 @@ pPrintMatchResult' simple f (TerminationMismatch s s' t) = text "TerminationMism
 reportMismatch :: Bool -> (Doc -> Doc -> Doc) -> NTraceGeneralized -> Maybe NTraceGeneralized -> NTracePlain -> Doc
 reportMismatch simple f s s' t = vcat
   [ text "Expected:"
-  , nest 2 (maybe mempty ((`f` text "or") . printTraceHead) s' <+> printTraceHead s)
+  , nest 2 (maybe mempty ((`f` text "or") . printTraceHeadHow) s' <+> printTraceHeadHow s)
   , text "Got:"
-  , nest 2 (printNTracePlainHead t)
+  , nest 2 (printTraceHeadHow t)
   ]
   where
-    printTraceHead
-      | simple = printNTraceGeneralizedHeadSimple
-      | otherwise = printNTraceGeneralizedHead
+    printTraceHeadHow :: PrettyPrintTrace t a => t -> Doc
+    printTraceHeadHow
+      | simple = printTraceHeadSimple
+      | otherwise = printTraceHead
 
 reportOutputMismatch :: Bool -> (Doc -> Doc -> Doc) -> NTraceGeneralized -> NTracePlain -> Doc
-reportOutputMismatch simple f s t = printNTracePlainHead t `f` text "is not covered by" `f` printTraceHead s
+reportOutputMismatch simple f s t = printTraceHeadHow t `f` text "is not covered by" `f` printTraceHeadHow s
   where
-    printTraceHead
-      | simple = printNTraceGeneralizedHeadSimple
-      | otherwise = printNTraceGeneralizedHead
+    printTraceHeadHow :: PrettyPrintTrace t a => t -> Doc
+    printTraceHeadHow
+      | simple = printTraceHeadSimple
+      | otherwise = printTraceHead

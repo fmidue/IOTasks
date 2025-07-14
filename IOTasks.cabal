@@ -41,7 +41,9 @@ library
       Test.IOTasks.Testing
       Test.IOTasks.Trace
       Test.IOTasks.Trace.Class
+      Test.IOTasks.Trace.DirectTrace
       Test.IOTasks.Trace.Match
+      Test.IOTasks.Trace.PrettyPrint
       Test.IOTasks.ValueMap
       Test.IOTasks.ValueSet
       Test.IOTasks.Var

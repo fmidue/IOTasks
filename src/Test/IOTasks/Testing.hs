@@ -292,15 +292,15 @@ pPrintCoreOutcome simple f (Failure is et at r) = vcat
   [ text "*** Failure"
   , text ("Input sequence: "++ showInputs is)
   , text ("Expected run" ++ when simple " (simplified)" ++ ":") <+> showTraceHow et
-  , text "Actual run:" <+> printLineTrace' f at
+  , text "Actual run:" <+> printTrace' f at
   , text "Error:"
   , nest 2 (pPrintResult f r)
   ]
   where
     when b str = if b then str else ""
     (pPrintResult, showTraceHow)
-      | simple = (printMatchResultSimple,printNTraceGeneralizedSimple' f)
-      | otherwise = (printMatchResult,printNTraceGeneralized' f)
+      | simple = (printMatchResultSimple,printTraceSimple' f)
+      | otherwise = (printMatchResult,printTrace' f)
 
 showInputs :: Inputs -> String
 showInputs = unwords . map ('?':)

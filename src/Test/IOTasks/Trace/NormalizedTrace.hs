@@ -11,10 +11,7 @@ module Test.IOTasks.Trace.NormalizedTrace (
   NormalizedTrace,
   OptFlag(..),
   isTerminatingNTrace,
-  pattern NProgRead, pattern NProgWrite, pattern NTerminate, pattern NOutOfInputs,
-  printNTracePlain, printNTracePlain', printNTracePlainHead,
-  printNTraceGeneralized, printNTraceGeneralized', printNTraceGeneralizedSimple, printNTraceGeneralizedSimple',
-  printNTraceGeneralizedHead, printNTraceGeneralizedHeadSimple,
+  pattern NProgRead, pattern NProgWrite, pattern NTerminate, pattern NOutOfInputs
   ) where
 
 import Test.IOTasks.Trace.Class
@@ -27,6 +24,7 @@ import Data.Bifunctor (second)
 import Text.PrettyPrint (Doc)
 import qualified Text.PrettyPrint as PP
 import Data.Monoid (Endo(..))
+import Test.IOTasks.Trace.PrettyPrint
 
 data NormalizedTrace a
   = NTrace (Maybe (NTraceWrite a)) (NTraceInner a) (Maybe NTraceRead) NTraceFinal
@@ -177,56 +175,29 @@ pattern NOutOfInputs <- TraceEnd OutOfInputs
 pattern TraceEnd :: NTraceFinal -> NormalizedTrace a
 pattern TraceEnd fin <- NTrace Nothing EmptyNTrace Nothing fin
 
-printNTracePlain :: NTracePlain -> Doc
-printNTracePlain = printNTracePlain' (PP.<+>)
-
--- | like 'printNTracePlain' but trace steps are combined with the user supplied function
-printNTracePlain' :: (Doc -> Doc -> Doc) -> NTracePlain -> Doc
-printNTracePlain' = showDeep False (\s -> "!" <> PP.text (show s))
-
-printNTracePlainHead :: NTracePlain -> Doc
-printNTracePlainHead = printNTracePlain' const
-
-printNTraceGeneralized :: NTraceGeneralized -> Doc
-printNTraceGeneralized = printNTraceGeneralized' (PP.<+>)
-
--- | like 'printNTraceGeneralized' but trace steps are combined with the user supplied function
-printNTraceGeneralized' :: (Doc -> Doc -> Doc) -> NTraceGeneralized -> Doc
-printNTraceGeneralized' =
-  showDeep False
-    (\case
-      (Optional,ts) -> "(!{"<> printSet ts <> "})"
-      (Mandatory,ts) -> "!{"<> printSet ts <> "}"
-    )
-    where printSet ts = PP.doubleQuotes $ PP.hcat (PP.punctuate "," (PP.text . showPattern <$> Set.toList ts))
-
-printNTraceGeneralizedSimple :: NTraceGeneralized -> Doc
-printNTraceGeneralizedSimple = printNTraceGeneralizedSimple' (PP.<+>)
-
--- | like 'printNTraceGeneralizedSimple' but trace steps are combined with the user supplied function
-printNTraceGeneralizedSimple' :: (Doc -> Doc -> Doc) -> NTraceGeneralized -> Doc
-printNTraceGeneralizedSimple' =
-  showDeep True
-    (\case
+instance PrettyPrintWrite (OptFlag, Set (OutputPattern 'TraceP)) where
+  printA True = -- simple
+    \case
       (Optional,_) -> mempty -- omit optional outputs in simplified version
       (Mandatory,ts) -> "!\""<> head (PP.text . showPatternSimple <$> Set.toList ts) <> "\""
+  printA False --regular
+    = \case
+      (Optional,ts) -> "(!{"<> printSet ts <> "})"
+      (Mandatory,ts) -> "!{"<> printSet ts <> "}"
+      where
+        printSet :: Set (OutputPattern 'TraceP) -> Doc
+        printSet ts = PP.hcat (PP.punctuate "," (PP.doubleQuotes . PP.text . showPattern <$> Set.toList ts))
+
+instance PrettyPrintWrite a => PrettyPrintTrace (NormalizedTrace a) a where
+  defaultConcat = (PP.<+>)
+  printDeep simpleRead printA f = foldrNTrace
+    (\case
+      Terminate -> "stop"
+      OutOfInputs -> "excess-input-command"
     )
-
-printNTraceGeneralizedHead :: NTraceGeneralized -> Doc
-printNTraceGeneralizedHead = printNTraceGeneralized' const
-
-printNTraceGeneralizedHeadSimple :: NTraceGeneralized -> Doc
-printNTraceGeneralizedHeadSimple = printNTraceGeneralizedSimple' const
-
-showDeep :: Bool -> (a -> Doc) -> (Doc -> Doc -> Doc) -> NormalizedTrace a -> Doc
-showDeep simpleRead printA f = foldrNTrace
-  (\case
-    Terminate -> "stop"
-    OutOfInputs -> "excess-input-command"
-  )
-  (\(NTraceRead s) ->
-    let ls = lines s
-    in appEndo $ foldMap (\l -> Endo $ f ("?" <> PP.text (show (l <> if simpleRead then "" else "\n")))) ls
-  )
-  (\(NTraceWrite x) -> f $ printA x
-  )
+    (\(NTraceRead s) ->
+      let ls = lines s
+      in appEndo $ foldMap (\l -> Endo $ f ("?" <> PP.text (show (l <> if simpleRead then "" else "\n")))) ls
+    )
+    (\(NTraceWrite x) -> f $ printA x
+    )
