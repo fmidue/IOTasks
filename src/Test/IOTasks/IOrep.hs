@@ -37,7 +37,6 @@ instance MonadTeletype IOrep where
   putStr s = PutString s $ pure ()
   getChar = GetChar pure
 
--- runProgram p is = t iff is = inputSequence t
 runProgram :: Trace t => IOrep () -> [Line] -> t
 runProgram = run' id
 
