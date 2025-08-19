@@ -79,7 +79,7 @@ isTerminatingLineTrace OutOfInputs = False
 instance PrettyPrintTrace LineTrace where
   defaultConcat = ($+$)
 
-  printDeep simple printA f (ReadLine' s t) = f (printA s) (printDeep simple printA f t)
+  printDeep simple printA f (ReadLine' s t) = f (text $ "?" <> s) (printDeep simple printA f t)
   printDeep simple printA f (WriteLine' s t) = f (printA s) (printDeep simple printA f t)
   printDeep _ _ _ Terminate = "stop"
   printDeep _ _ _ OutOfInputs = "excess-input-command"
