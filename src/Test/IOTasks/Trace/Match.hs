@@ -112,7 +112,7 @@ reportMismatch simple f s s' t = vcat
   , nest 2 (printTraceHeadHow t)
   ]
   where
-    printTraceHeadHow :: PrettyPrintTrace t a => t -> Doc
+    printTraceHeadHow :: PrettyPrintTrace t => t -> Doc
     printTraceHeadHow
       | simple = printTraceHeadSimple
       | otherwise = printTraceHead
@@ -120,7 +120,7 @@ reportMismatch simple f s s' t = vcat
 reportOutputMismatch :: Bool -> (Doc -> Doc -> Doc) -> NTraceGeneralized -> NTracePlain -> Doc
 reportOutputMismatch simple f s t = printTraceHeadHow t `f` text "is not covered by" `f` printTraceHeadHow s
   where
-    printTraceHeadHow :: PrettyPrintTrace t a => t -> Doc
+    printTraceHeadHow :: PrettyPrintTrace t => t -> Doc
     printTraceHeadHow
       | simple = printTraceHeadSimple
       | otherwise = printTraceHead

@@ -1,7 +1,6 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 module Test.IOTasks.Trace.LineTrace (
@@ -77,7 +76,7 @@ isTerminatingLineTrace (WriteLine' _ t) = isTerminatingLineTrace t
 isTerminatingLineTrace Terminate = True
 isTerminatingLineTrace OutOfInputs = False
 
-instance PrettyPrintTrace LineTrace String where
+instance PrettyPrintTrace LineTrace where
   defaultConcat = ($+$)
 
   printDeep simple printA f (ReadLine' s t) = f (printA s) (printDeep simple printA f t)

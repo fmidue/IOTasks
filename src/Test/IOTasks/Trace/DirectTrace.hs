@@ -3,7 +3,6 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE LambdaCase #-}
 module Test.IOTasks.Trace.DirectTrace where
 
 import Test.IOTasks.Trace.Class
@@ -89,7 +88,7 @@ inputSequence' (Write _ t) = inputSequence' t
 inputSequence' Terminate = []
 inputSequence' OutOfInputs = []
 
-instance PrettyPrintWrite a => PrettyPrintTrace (DirectTrace a) a where
+instance PrettyPrintWrite a => PrettyPrintTrace (DirectTrace a) where
   printDeep simple printA f (ReadStr s t) = f ("?" <> PP.text (show s)) (printDeep simple printA f t)
   printDeep simple printA f (Write s t) = f (printA s) (printDeep simple printA f t)
   printDeep _ _ _ Terminate = "stop"

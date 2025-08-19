@@ -188,7 +188,7 @@ instance PrettyPrintWrite (OptFlag, Set (OutputPattern 'TraceP)) where
         printSet :: Set (OutputPattern 'TraceP) -> Doc
         printSet ts = PP.hcat (PP.punctuate "," (PP.doubleQuotes . PP.text . showPattern <$> Set.toList ts))
 
-instance PrettyPrintWrite a => PrettyPrintTrace (NormalizedTrace a) a where
+instance PrettyPrintWrite a => PrettyPrintTrace (NormalizedTrace a) where
   defaultConcat = (PP.<+>)
   printDeep simpleRead printA f = foldrNTrace
     (\case
