@@ -6,6 +6,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Test.IOTasks.Constraints (
   SimpleConstraint(..),
+  StorageType(..),
   Constraint(..),
   ConstraintType(..),
   ConstraintTree(..),
