@@ -1,6 +1,6 @@
 # IOTasks [![Haskell CI](https://github.com/fmidue/IOTasks/actions/workflows/haskell-push.yaml/badge.svg)](https://github.com/fmidue/IOTasks/actions/workflows/haskell-push.yaml)
 
-Examples for writing specifications can be found under [examples/](examples/) and in the online [demo](https://iotasks.eu).
+Examples for writing specifications can be found under [examples/](examples/) and in the online [demo](https://iotasks.fmi.uni-due.de).
 
 A collection of specifications for exercise tasks can be found under [https://github.com/fmidue/IOTasks-collection](https://github.com/fmidue/IOTasks-collection).
 
