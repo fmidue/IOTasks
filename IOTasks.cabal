@@ -39,6 +39,7 @@ library
       Test.IOTasks.Term
       Test.IOTasks.Term.Prelude
       Test.IOTasks.Testing
+      Test.IOTasks.Testing.UnitTests
       Test.IOTasks.Trace
       Test.IOTasks.Trace.Class
       Test.IOTasks.Trace.DirectTrace
