@@ -54,8 +54,6 @@ library:
     - Test.IOTasks.Internal.SpecificationGenerator
     - Test.IOTasks.Internal.Term
     - Test.IOTasks.Internal.ValueSet
-    - Test.IOTasks.Trace.NormalizedTrace
-    - Test.IOTasks.Trace.LineTrace
 
 tests:
   IOTasks-test:
