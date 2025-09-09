@@ -43,7 +43,7 @@ data SimpleOutcome where
 
 -- TODO: de-duplicate (pPrintCoreOutcome)
 printSimpleOutcomeWith :: FeedbackStyle -> SimpleOutcome -> Doc
-printSimpleOutcomeWith _ (Passed n) = "+++ OK, passed" <> PP.text (show n)
+printSimpleOutcomeWith _ (Passed n) = "+++ OK, passed" PP.<+> PP.text (show n) PP.<+> PP.text "tests"
 printSimpleOutcomeWith (FeedbackStyle simple traceStyle) (Failed is expected actual) = PP.vcat
   [ "*** Failure"
   , PP.text ("Input sequence: "++ showInputs is)
