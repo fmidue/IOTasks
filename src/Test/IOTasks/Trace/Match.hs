@@ -84,6 +84,7 @@ covers s t = fst $ covers' s t
 
     covers' NTerminate NTerminate = (MatchSuccessful,True)
     covers' s@NTerminate t = noConsume $ MatchFailed (TerminationMismatch Nothing) s t
+    covers' s t@NTerminate = noConsume $ MatchFailed (TerminationMismatch Nothing) s t
 
     covers' NOutOfInputs NOutOfInputs = (MatchSuccessful,True)
 
