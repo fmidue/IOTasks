@@ -12,10 +12,14 @@ import Data.Bifunctor (second)
 
 data MatchResult
   = MatchSuccessful
-  | InputMismatch NTraceGeneralized NTracePlain
-  | OutputMismatch NTraceGeneralized NTracePlain
-  | AlignmentMismatch NTraceGeneralized NTracePlain
-  | TerminationMismatch NTraceGeneralized (Maybe NTraceGeneralized) NTracePlain
+  | MatchFailed MatchFailure NTraceGeneralized NTracePlain
+  deriving (Eq,Show)
+
+data MatchFailure
+  = InputMismatch
+  | OutputMismatch
+  | AlignmentMismatch
+  | TerminationMismatch (Maybe NTraceGeneralized)
   deriving (Eq,Show)
 
 isSuccessfulMatch :: MatchResult -> Bool
@@ -23,19 +27,19 @@ isSuccessfulMatch MatchSuccessful = True
 isSuccessfulMatch _ = False
 
 isInputMismatch :: MatchResult -> Bool
-isInputMismatch InputMismatch{} = True
+isInputMismatch (MatchFailed InputMismatch _ _) = True
 isInputMismatch _ = False
 
 isOutputMismatch :: MatchResult -> Bool
-isOutputMismatch OutputMismatch{} = True
+isOutputMismatch (MatchFailed OutputMismatch _ _) = True
 isOutputMismatch _ = False
 
 isAlignmentMismatch :: MatchResult -> Bool
-isAlignmentMismatch AlignmentMismatch{} = True
+isAlignmentMismatch (MatchFailed AlignmentMismatch _ _) = True
 isAlignmentMismatch _ = False
 
 isTerminationMismatch :: MatchResult -> Bool
-isTerminationMismatch TerminationMismatch{} = True
+isTerminationMismatch (MatchFailed TerminationMismatch{} _ _) = True
 isTerminationMismatch _ = False
 
 instance Semigroup MatchResult where
@@ -49,7 +53,7 @@ choose _ MatchSuccessful = Right MatchSuccessful
 choose r _ = Left r
 
 addExpect :: NTraceGeneralized -> (MatchResult,HasConsumed) -> (MatchResult,HasConsumed)
-addExpect s' (TerminationMismatch t Nothing s,False) = (TerminationMismatch t (Just s') s,False)
+addExpect s' (MatchFailed (TerminationMismatch Nothing) t s ,False) = (MatchFailed (TerminationMismatch (Just s')) t s,False)
 addExpect _ r = r
 
 type HasConsumed = Bool
@@ -61,11 +65,11 @@ covers s t = fst $ covers' s t
     covers' :: NTraceGeneralized -> NTracePlain -> (MatchResult, HasConsumed)
     covers' s@(NProgRead i t1) t@(NProgRead j t2)
       | i == j = hasConsumed $ t1 `covers'` t2
-      | otherwise = noConsume $ InputMismatch s t
+      | otherwise = noConsume $ MatchFailed InputMismatch s t
 
     covers' s@(NProgWrite (Mandatory,is) t1) t@(NProgWrite j t2)
       | any (>: Pattern.text j) is = hasConsumed $ t1 `covers'` t2
-      | otherwise = noConsume $ OutputMismatch s t
+      | otherwise = noConsume $ MatchFailed OutputMismatch s t
 
     covers' (NProgWrite (Optional,is) t1@NProgRead{}) t@(NProgWrite{}) =
       -- avoid the alignment mismatch that would result from trying to skip the optional output
@@ -79,11 +83,11 @@ covers s t = fst $ covers' s t
         Right _ -> (r2,c2)
 
     covers' NTerminate NTerminate = (MatchSuccessful,True)
-    covers' s@NTerminate t = noConsume $ TerminationMismatch s Nothing t
+    covers' s@NTerminate t = noConsume $ MatchFailed (TerminationMismatch Nothing) s t
 
     covers' NOutOfInputs NOutOfInputs = (MatchSuccessful,True)
 
-    covers' s t = noConsume $ AlignmentMismatch s t
+    covers' s t = noConsume $ MatchFailed AlignmentMismatch s t
 
 noConsume :: MatchResult -> (MatchResult,HasConsumed)
 noConsume = (,False)
@@ -99,10 +103,10 @@ printMatchResultSimple = pPrintMatchResult' True
 
 pPrintMatchResult' :: Bool -> (Doc -> Doc -> Doc) -> MatchResult -> Doc
 pPrintMatchResult' _ _ MatchSuccessful = text "MatchSuccessful"
-pPrintMatchResult' simple f (InputMismatch s t) = text "InputMismatch:" $$ nest 2 (reportMismatch simple f s Nothing t)
-pPrintMatchResult' simple f (OutputMismatch s t) = text "OutputMismatch:" $$ nest 2 (reportOutputMismatch simple f s t)
-pPrintMatchResult' simple f (AlignmentMismatch s t) = text "AlignmentMismatch:" $$ nest 2 (reportMismatch simple f s Nothing t)
-pPrintMatchResult' simple f (TerminationMismatch s s' t) = text "TerminationMismatch:" $$ nest 2 (reportMismatch simple f s s' t)
+pPrintMatchResult' simple f (MatchFailed InputMismatch s t) = text "InputMismatch:" $$ nest 2 (reportMismatch simple f s Nothing t)
+pPrintMatchResult' simple f (MatchFailed OutputMismatch s t) = text "OutputMismatch:" $$ nest 2 (reportOutputMismatch simple f s t)
+pPrintMatchResult' simple f (MatchFailed AlignmentMismatch s t) = text "AlignmentMismatch:" $$ nest 2 (reportMismatch simple f s Nothing t)
+pPrintMatchResult' simple f (MatchFailed (TerminationMismatch s') s t) = text "TerminationMismatch:" $$ nest 2 (reportMismatch simple f s s' t)
 
 reportMismatch :: Bool -> (Doc -> Doc -> Doc) -> NTraceGeneralized -> Maybe NTraceGeneralized -> NTracePlain -> Doc
 reportMismatch simple f s s' t = vcat
