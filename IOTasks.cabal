@@ -39,14 +39,16 @@ library
       Test.IOTasks.Term
       Test.IOTasks.Term.Prelude
       Test.IOTasks.Testing
-      Test.IOTasks.Testing.UnitTests
       Test.IOTasks.Trace
       Test.IOTasks.Trace.Class
       Test.IOTasks.Trace.DirectTrace
+      Test.IOTasks.Trace.Generated
       Test.IOTasks.Trace.LineTrace
       Test.IOTasks.Trace.Match
       Test.IOTasks.Trace.NormalizedTrace
       Test.IOTasks.Trace.PrettyPrint
+      Test.IOTasks.UnitTests.Generated
+      Test.IOTasks.UnitTests.Simple
       Test.IOTasks.ValueMap
       Test.IOTasks.ValueSet
       Test.IOTasks.Var

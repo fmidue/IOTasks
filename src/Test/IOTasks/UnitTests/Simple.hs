@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GADTs #-}
-module Test.IOTasks.Testing.UnitTests (
+module Test.IOTasks.UnitTests.Simple (
   checkSimple, checkSimpleWith,
   checkSimpleOutcome, checkSimpleWithOutcome,
   checkGeneralized, checkGeneralizedWith,
