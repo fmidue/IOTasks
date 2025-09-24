@@ -30,7 +30,7 @@ module Test.IOTasks (
   valueBefore, valuesBefore,
   MergedVars, merge,
   -- ** Arithmetic functions
-  (.+.), (.-.), (.*.),
+  (.+.), (.-.), (.*.), div', mod',
   intLit,
   -- ** Comparison functions
   (.==.), (./=.), (.>.), (.>=.), (.<.), (.<=.),

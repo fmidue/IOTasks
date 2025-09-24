@@ -7,7 +7,7 @@ module Test.IOTasks.Term.Prelude (
   currentValue, allValues,
   valueBefore, valuesBefore,
   -- * Arithmetic functions
-  (.+.), (.-.), (.*.),
+  (.+.), (.-.), (.*.), div', mod',
   intLit,
   -- * Comparison functions
   (.==.), (./=.), (.>.), (.>=.), (.<.), (.<=.),
@@ -86,6 +86,22 @@ legalVar (x:xs) = isAlphaNum x && all (\c -> isAlphaNum c || c == '_' || c == '\
 
 (.*.) :: Term k Integer -> Term k Integer -> Term k Integer
 (.*.) = Mul
+
+-- Note: We ensure the second argument is positive for div and mod. SMT solvers
+-- use a different definition of div/mod than Haskell (euclidian vs. flooring).
+-- For positive d values both definitions agree. Allowing only constant values
+-- for d also ensures the solver cannot choose values where the defintions
+-- disagree. (See R.T. Boute, "The Euclidean Definition of the Functions div and
+-- mod" for details)
+div' :: Term k Integer -> Integer -> Term k Integer
+div' t d
+  | d > 0 = Div t d
+  | otherwise = error "div': second argument must be positive"
+
+mod' :: Term k Integer -> Integer -> Term k Integer
+mod' t d
+  | d > 0 = Mod t d
+  | otherwise = error "mod': second argument must be positive"
 
 intLit :: Integer -> Term k Integer
 intLit = IntLit . fromInteger

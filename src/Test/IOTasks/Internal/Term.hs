@@ -23,6 +23,7 @@ module Test.IOTasks.Internal.Term (
 
 import Data.Express (Expr((:$)), var, val, value, (//-), evl, vars, isVar, showExpr)
 import Data.Function (on)
+import Data.Functor ((<&>))
 import Data.Kind (Type)
 import Data.List ( nub, intercalate, sortBy, intercalate )
 import Data.List.Extra (maximumOn)
@@ -48,6 +49,8 @@ data Term (k :: TermKind) a where
   Add :: Num a => Term k a -> Term k a -> Term k a
   Sub :: Num a => Term k a -> Term k a -> Term k a
   Mul :: Num a => Term k a -> Term k a -> Term k a
+  Div :: Term k Integer -> Integer -> Term k Integer
+  Mod :: Term k Integer -> Integer -> Term k Integer
   Equals :: (Typeable a, Eq a) => Term k a -> Term k a -> Term k Bool
   Gt :: (Typeable a, Ord a) => Term k a -> Term k a -> Term k Bool
   Ge :: (Typeable a, Ord a) => Term k a -> Term k a -> Term k Bool
@@ -74,6 +77,8 @@ termVarExps :: Typeable a => Term k a -> [[SomeVar]]
 termVarExps (Add x y) = termVarExps x ++ termVarExps y
 termVarExps (Sub x y) = termVarExps x ++ termVarExps y
 termVarExps (Mul x y) = termVarExps x ++ termVarExps y
+termVarExps (Div x _) = termVarExps x
+termVarExps (Mod x _) = termVarExps x
 termVarExps (Equals x y) = termVarExps x ++ termVarExps y
 termVarExps (Gt x y) = termVarExps x ++ termVarExps y
 termVarExps (Ge x y) = termVarExps x ++ termVarExps y
@@ -100,6 +105,8 @@ instance EffectEval (Term k) where
   pureEval f _ (Add x y) = liftA2 (+) (f x) (f y)
   pureEval f _ (Sub x y) = liftA2 (-) (f x) (f y)
   pureEval f _ (Mul x y) = liftA2 (*) (f x) (f y)
+  pureEval f _ (Div x y) = f x <&> (`div` y)
+  pureEval f _ (Mod x y) = f x <&> (`mod` y)
   pureEval f _ (Equals x y) = liftA2 (==) (f x) (f y)
   pureEval f _ (Gt x y) = liftA2 (>) (f x) (f y)
   pureEval f _ (Ge x y) = liftA2 (>=) (f x) (f y)
@@ -128,6 +135,8 @@ evalI :: ValueMap -> Term k Integer -> Either (SubCheck (Term k) I) I
 evalI e (Add x y) = liftA2 (+) (evalI e x) (evalI e y)
 evalI e (Sub x y) = liftA2 (-) (evalI e x) (evalI e y)
 evalI e (Mul x y) = liftA2 (*) (evalI e x) (evalI e y)
+evalI e (Div x y) = evalI e x <&> (`div` fromInteger y)
+evalI e (Mod x y) = evalI e x <&> (`mod` fromInteger y)
 evalI e (Sum xs) = Right $ sum $ evalIs e xs
 evalI e (Product xs) = Right $ product $ evalIs e xs
 evalI e (Length (xs :: Term k [a])) =
@@ -180,6 +189,8 @@ showTerm' :: Typeable a => Term k a -> Maybe (Map SomeVar (Int,[Int])) -> String
 showTerm' (Add x y) m = showBinary "+" x y m
 showTerm' (Sub x y) m = showBinary "-" x y m
 showTerm' (Mul x y) m = showBinary "*" x y m
+showTerm' (Div x y) m = unwords [showTerm' x m, "div", show y]
+showTerm' (Mod x y) m = unwords [showTerm' x m, "mod", show y]
 showTerm' (Equals x y) m = showBinary "==" x y m
 showTerm' (Gt x y) m = showBinary ">" x y m
 showTerm' (Ge x y) m = showBinary ">=" x y m
@@ -233,6 +244,8 @@ transparentSubterms :: Typeable a => Term k a -> [SomeTerm 'Transparent]
 transparentSubterms t@(Add x y) = maybeToList (someTerm <$> maybeTransparentTerm t) ++ transparentSubterms x ++ transparentSubterms y
 transparentSubterms t@(Sub x y) = maybeToList (someTerm <$> maybeTransparentTerm t) ++ transparentSubterms x ++ transparentSubterms y
 transparentSubterms t@(Mul x y) = maybeToList (someTerm <$> maybeTransparentTerm t) ++ transparentSubterms x ++ transparentSubterms y
+transparentSubterms t@(Div x _) = maybeToList (someTerm <$> maybeTransparentTerm t) ++ transparentSubterms x
+transparentSubterms t@(Mod x _) = maybeToList (someTerm <$> maybeTransparentTerm t) ++ transparentSubterms x
 transparentSubterms t@(Equals x y) = maybeToList (someTerm <$> maybeTransparentTerm t) ++ transparentSubterms x ++ transparentSubterms y
 transparentSubterms t@(Gt x y) = maybeToList (someTerm <$> maybeTransparentTerm t) ++ transparentSubterms x ++ transparentSubterms y
 transparentSubterms t@(Ge x y) = maybeToList (someTerm <$> maybeTransparentTerm t) ++ transparentSubterms x ++ transparentSubterms y
@@ -259,6 +272,8 @@ maybeTransparentTerm Opaque{} = Nothing
 maybeTransparentTerm (Add x y) = Add <$> maybeTransparentTerm x <*> maybeTransparentTerm y
 maybeTransparentTerm (Sub x y) = Sub <$> maybeTransparentTerm x <*> maybeTransparentTerm y
 maybeTransparentTerm (Mul x y) = Mul <$> maybeTransparentTerm x <*> maybeTransparentTerm y
+maybeTransparentTerm (Div x y) = maybeTransparentTerm x <&> (`Div` y)
+maybeTransparentTerm (Mod x y) = maybeTransparentTerm x <&> (`Mod` y)
 maybeTransparentTerm (Equals x y) = Equals <$> maybeTransparentTerm x <*> maybeTransparentTerm y
 maybeTransparentTerm (Gt x y) = Gt <$> maybeTransparentTerm x <*> maybeTransparentTerm y
 maybeTransparentTerm (Ge x y) = Ge <$> maybeTransparentTerm x <*> maybeTransparentTerm y
@@ -392,6 +407,8 @@ toExpr :: Typeable a => Term k a -> Expr
 toExpr (Add x y) = value "(+)" ((+) :: Integer -> Integer -> Integer) :$ toExpr x :$ toExpr y
 toExpr (Sub x y) = value "(-)" ((-) :: Integer -> Integer -> Integer) :$ toExpr x :$ toExpr y
 toExpr (Mul x y) = value "(*)" ((*) :: Integer -> Integer -> Integer) :$ toExpr x :$ toExpr y
+toExpr (Div x y) = value "div" (div :: Integer -> Integer -> Integer) :$ toExpr x :$ val y
+toExpr (Mod x y) = value "mod" (div :: Integer -> Integer -> Integer) :$ toExpr x :$ val y
 toExpr (Equals (x :: Term k x) y) = value "(==)" ((==) :: x -> x -> Bool) :$ toExpr x :$ toExpr y
 toExpr (Gt (x :: Term k x) y) = value "(>)" ((>) :: x -> x -> Bool) :$ toExpr x :$ toExpr y
 toExpr (Ge (x :: Term k x) y) = value "(>=)" ((>=) :: x -> x -> Bool) :$ toExpr x :$ toExpr y

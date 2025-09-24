@@ -310,6 +310,12 @@ z3Predicate goal (Sub x y) e vars = z3PredicateBinary goal x y e vars $ binary {
 z3Predicate goal (Mul x y) e vars = z3PredicateBinary goal x y e vars $ binary {
   binaryNoList = \a b -> mkMul [a,b]
 }
+z3Predicate goal (Div x y) e vars = z3PredicateUnary goal x e vars $ unary {
+  unaryNoList = \a -> mkDiv a =<< mkIntNum y
+}
+z3Predicate goal (Mod x y) e vars = z3PredicateUnary goal x e vars $ unary {
+  unaryNoList = \a -> mkMod a =<< mkIntNum y
+}
 z3Predicate goal (Equals x y) e vars = z3PredicateBinary goal x y e vars $ binary {
   binaryNoList = mkEq,
   binaryListAB = compareSymbolic (Strict EQ)
