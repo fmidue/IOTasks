@@ -8,6 +8,7 @@
 module Test.IOTasks.Internal.OutputPattern (
   PatternKind (..),
   OutputPattern(..),
+  WildcardType(..),
   convert,
   wildcard, nonEmptyWildcard, text, resultOf,
   decoratedResultOf,

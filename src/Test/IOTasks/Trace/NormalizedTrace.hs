@@ -11,7 +11,8 @@ module Test.IOTasks.Trace.NormalizedTrace (
   NormalizedTrace,
   OptFlag(..),
   isTerminatingNTrace,
-  pattern NProgRead, pattern NProgWrite, pattern NTerminate, pattern NOutOfInputs
+  pattern NProgRead, pattern NProgWrite, pattern NTerminate, pattern NOutOfInputs,
+  toPlainTraces,
   ) where
 
 import Test.IOTasks.Trace.Class
@@ -25,6 +26,7 @@ import Text.PrettyPrint (Doc)
 import qualified Text.PrettyPrint as PP
 import Data.Monoid (Endo(..))
 import Test.IOTasks.Trace.PrettyPrint
+import Test.IOTasks.Internal.OutputPattern (OutputPattern(..), WildcardType (..))
 
 data NormalizedTrace a
   = NTrace (Maybe (NTraceWrite a)) (NTraceInner a) (Maybe NTraceRead) NTraceFinal
@@ -201,3 +203,21 @@ instance PrettyPrintWrite a => PrettyPrintTrace (NormalizedTrace a) where
     )
     (\(NTraceWrite x) -> f $ printA x
     )
+
+toPlainTraces :: Trace t => NTraceGeneralized -> [t]
+toPlainTraces (NProgRead s t) = progReadLine s <$> toPlainTraces t
+toPlainTraces (NProgWrite (Mandatory,xs) t) =
+  [ progWriteStr w t' | w <- ws , t' <- toPlainTraces t]
+  where ws = concatMap minimalWords $ Set.toList xs
+toPlainTraces (NProgWrite (Optional,xs) t) =
+  toPlainTraces t ++ [ progWriteStr w t' | w <- ws , t' <- toPlainTraces t]
+  where ws = concatMap minimalWords $ Set.toList xs
+toPlainTraces NTerminate = [terminate]
+toPlainTraces NOutOfInputs = [outOfInputs]
+
+minimalWords :: OutputPattern 'TraceP -> [String]
+minimalWords (Wildcard NonEmpty) = [" "]
+minimalWords (Wildcard MaybeEmpty) = [""]
+minimalWords (Text s) = [s]
+minimalWords (Sequence x y) = [ wx <> wy | wx <- minimalWords x, wy <- minimalWords y ]
+minimalWords (FeedbackGroupE _ xs) = concatMap minimalWords xs
