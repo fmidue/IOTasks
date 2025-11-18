@@ -12,6 +12,7 @@ module Test.IOTasks.Internal.OutputPattern (
   convert,
   wildcard, nonEmptyWildcard, text, resultOf,
   decoratedResultOf,
+  canBeEmpty,
   valueTerms,
   showPattern, showPatternSimple,
   evalPattern,
@@ -138,6 +139,16 @@ instance Semigroup (OutputPattern k) where
 
 instance Monoid (OutputPattern k) where
   mempty = Text ""
+
+canBeEmpty :: OutputPattern k -> Bool
+canBeEmpty (Wildcard MaybeEmpty) = True
+canBeEmpty (Wildcard NonEmpty) = False
+canBeEmpty (Text "") = False
+canBeEmpty (Text _) = False
+canBeEmpty (Sequence x y) = canBeEmpty x && canBeEmpty y
+canBeEmpty (ResultOf _) = False
+canBeEmpty (FeedbackGroupE _ ps) = any canBeEmpty ps
+canBeEmpty (FeedbackGroupU _ _ ps) = any canBeEmpty ps
 
 valueTerms :: OutputPattern k -> [SomeTermK]
 valueTerms (Wildcard _) = []

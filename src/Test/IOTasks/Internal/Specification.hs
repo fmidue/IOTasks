@@ -100,7 +100,9 @@ readInput = readInput' where
   readInput' x vs m = ReadInput x vs m nop
 
 writeOutput :: [OutputPattern k] -> Specification
-writeOutput ts = WriteOutput Mandatory (Set.fromList ts) nop
+writeOutput ts = WriteOutput isOptional (Set.fromList ts) nop
+  where
+    isOptional = if any canBeEmpty ts then Optional else Mandatory
 
 writeOptionalOutput :: [OutputPattern k] -> Specification
 writeOptionalOutput ts = WriteOutput Optional (Set.fromList ts) nop
