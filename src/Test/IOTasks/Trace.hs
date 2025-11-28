@@ -2,6 +2,7 @@
 module Test.IOTasks.Trace (
   -- * Trace class
   Trace(..),
+  ConcreteTrace(..),
   GeneralizedTrace(..),
 
   -- * DirectTrace

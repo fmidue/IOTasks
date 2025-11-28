@@ -141,7 +141,7 @@ runTest :: IOrep () -> Specification -> Inputs -> Outcome
 runTest p spec i =
   let
     (specTrace,warn) = runSpecification spec i
-    progTrace :: Trace t => t
+    progTrace :: ConcreteTrace t => t
     progTrace = runProgram p i
     o = case warn of
       OverflowOccurred -> OverflowHint 1

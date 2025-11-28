@@ -37,7 +37,7 @@ instance MonadTeletype IOrep where
   putStr s = PutString s $ pure ()
   getChar = GetChar pure
 
-runProgram :: Trace t => IOrep () -> [Line] -> t
+runProgram :: ConcreteTrace t => IOrep () -> [Line] -> t
 runProgram = run' id
 
 -- runProgramClean p (inputSequence t) = t
@@ -47,15 +47,15 @@ runProgram = run' id
 -- | Run the program, but make write actions implicitly also read an implicit newline character if directly preceding reads have left exactly that newline character as the first element of the remaining input sequence.
 --
 -- This makes it so that programs like @getChar >> putStrLn "" >> getLine@ behave identical for input sequences @[char:line]@ and @[[char],line]@ allowing the use of the more intuitive second input sequence.
-runProgramClean :: Trace t => IOrep () -> [Line] -> t
+runProgramClean :: ConcreteTrace t => IOrep () -> [Line] -> t
 runProgramClean = run' cleanInputs
   where
       cleanInputs :: [[a]] -> [[a]]
       cleanInputs ([]:xs) = xs
       cleanInputs xs = xs
 
-run' :: Trace t => ([Line] -> [Line]) -> IOrep () -> [Line] -> t
-run' clean (GetChar _) [] = outOfInputs
+run' :: ConcreteTrace t => ([Line] -> [Line]) -> IOrep () -> [Line] -> t
+run' _     (GetChar _) [] = outOfInputs
 run' clean (GetChar f) ("":is) = progReadChar '\n' $ run' clean (f '\n') is
 run' clean (GetChar f) ((c:cs):is) = progReadChar c $ run' clean (f c) (cs:is)
 run' clean (PutString s p') is = progWriteStr s $ run' clean p' (clean is)

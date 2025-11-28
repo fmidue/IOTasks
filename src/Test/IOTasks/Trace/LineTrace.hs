@@ -61,6 +61,7 @@ instance Trace LineTrace where
   terminate :: LineTrace
   terminate = Terminate
 
+instance ConcreteTrace LineTrace where
   outOfInputs :: LineTrace
   outOfInputs = OutOfInputs
 

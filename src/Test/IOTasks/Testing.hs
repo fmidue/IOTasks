@@ -205,7 +205,7 @@ taskCheckWithOutcome Args{..} prog spec = do
         testInput input =
           let
             (specTrace,warn) = runSpecification spec input
-            progTrace :: Trace t => t
+            progTrace :: ConcreteTrace t => t
             progTrace = runProgram prog input
           in case specTrace `covers` progTrace of
             result | isSuccessfulMatch result -> (PathSuccess,warn)
@@ -320,7 +320,7 @@ taskCheckOn i p s = uncurry Outcome (go 0 0 i p s) where
   go n o (i:is) prog spec =
     let
       (specTrace,warn) = runSpecification spec i
-      progTrace :: Trace t => t
+      progTrace :: ConcreteTrace t => t
       progTrace = runProgram prog i
       o' = if warn == OverflowOccurred then o+1 else o
     in case specTrace `covers` progTrace of

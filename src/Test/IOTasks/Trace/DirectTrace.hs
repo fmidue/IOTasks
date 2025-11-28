@@ -45,6 +45,8 @@ instance Trace (DirectTrace String) where
   progWriteStr = progWrite'
 
   terminate = terminate'
+
+instance ConcreteTrace (DirectTrace String) where
   outOfInputs = outOfInputs'
 
   inputSequence = inputSequence'
@@ -56,6 +58,8 @@ instance Trace (DirectTrace (OptFlag, Set (OutputPattern 'TraceP))) where
   progWriteStr = progWrite' . liftString
 
   terminate = terminate'
+
+instance ConcreteTrace (DirectTrace (OptFlag, Set (OutputPattern 'TraceP))) where
   outOfInputs = outOfInputs'
 
   inputSequence = inputSequence'

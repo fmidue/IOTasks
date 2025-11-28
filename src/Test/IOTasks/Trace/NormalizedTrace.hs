@@ -81,6 +81,8 @@ instance Trace (NormalizedTrace String) where
   progReadChar = progReadChar'
   progWriteStr = progWrite' (<>)
   terminate = terminate'
+
+instance ConcreteTrace (NormalizedTrace String) where
   outOfInputs = outOfInputs'
   inputSequence = inputSequence'
 
@@ -97,6 +99,8 @@ instance Trace (NormalizedTrace (OptFlag, Set (OutputPattern 'TraceP))) where
   progWriteStr = genProgWrite . liftString
   progWriteLine = genProgWriteLine . liftString
   terminate = terminate'
+
+instance ConcreteTrace (NormalizedTrace (OptFlag, Set (OutputPattern 'TraceP))) where
   outOfInputs = outOfInputs'
   inputSequence = inputSequence'
 
@@ -204,7 +208,7 @@ instance PrettyPrintWrite a => PrettyPrintTrace (NormalizedTrace a) where
     (\(NTraceWrite x) -> f $ printA x
     )
 
-toPlainTraces :: Trace t => NTraceGeneralized -> [t]
+toPlainTraces :: ConcreteTrace t => NTraceGeneralized -> [t]
 toPlainTraces (NProgRead s t) = progReadLine s <$> toPlainTraces t
 toPlainTraces (NProgWrite (Mandatory,xs) t) =
   [ progWriteStr w t' | w <- ws , t' <- toPlainTraces t]

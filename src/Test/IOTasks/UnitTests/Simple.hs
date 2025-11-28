@@ -17,11 +17,14 @@ import Test.IOTasks.Trace.Match
 
 import Control.Monad
 
+import Text.PrettyPrint (Doc)
 import qualified Text.PrettyPrint as PP
+
 import Test.IOTasks.Testing (FeedbackStyle(..), CoreOutcome(..), printOutcomeWith, OutcomeHints(..), Outcome(..), defaultFeedback, Inputs, TraceStyle(..))
 import Test.IOTasks.IOrep
 import Test.IOTasks.Internal.Output
-import Text.PrettyPrint (Doc)
+import Test.IOTasks.Trace.Class
+
 
 data Args
   = Args
@@ -71,16 +74,16 @@ isSimpleFailure :: SimpleOutcome -> Bool
 isSimpleFailure Passed{} = False
 isSimpleFailure Failed{} = True
 
-checkSimple :: (Eq t, Trace t, PrettyPrintTrace t) => IOrep () -> [t] -> IO ()
+checkSimple :: (Eq t, ConcreteTrace t, PrettyPrintTrace t) => IOrep () -> [t] -> IO ()
 checkSimple = checkSimpleWith stdArgs
 
-checkSimpleWith :: (Eq t, Trace t, PrettyPrintTrace t) => Args -> IOrep () -> [t] -> IO ()
+checkSimpleWith :: (Eq t, ConcreteTrace t, PrettyPrintTrace t) => Args -> IOrep () -> [t] -> IO ()
 checkSimpleWith args p ts = void $ checkSimpleWithOutcome args p ts
 
-checkSimpleOutcome :: (Eq t, Trace t, PrettyPrintTrace t) => IOrep () -> [t] -> IO SimpleOutcome
+checkSimpleOutcome :: (Eq t, ConcreteTrace t, PrettyPrintTrace t) => IOrep () -> [t] -> IO SimpleOutcome
 checkSimpleOutcome = checkSimpleWithOutcome stdArgs
 
-checkSimpleWithOutcome :: (Eq t, Trace t, PrettyPrintTrace t) => Args -> IOrep () -> [t] -> IO SimpleOutcome
+checkSimpleWithOutcome :: (Eq t, ConcreteTrace t, PrettyPrintTrace t) => Args -> IOrep () -> [t] -> IO SimpleOutcome
 checkSimpleWithOutcome Args{..} p ts = do
   output <- newOutput stdout
   out <- testRunner output 0 ts
@@ -118,7 +121,7 @@ checkGeneralizedWithOutcome Args{..} p ts = do
     testRunner output n (testCase:ts) =
       let
         is = inputSequence testCase
-        progTrace :: Trace t => t
+        progTrace :: ConcreteTrace t => t
         progTrace = runProgram p is
       in do
         when terminalOutput (putT output (concat ["(",show n," tests)"]) >> oFlush output)

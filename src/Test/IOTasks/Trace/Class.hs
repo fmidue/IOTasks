@@ -15,9 +15,10 @@ class Monoid t => Trace t where
   progWriteLine :: String -> t -> t
   progWriteLine c = progWriteStr $ c <> "\n"
 
-  outOfInputs :: t
   terminate :: t
 
+class Trace t => ConcreteTrace t where
+  outOfInputs :: t
   inputSequence :: t -> [Line]
 
 type Line = String
