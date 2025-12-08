@@ -143,7 +143,9 @@ mkPathInjector (ClosedPath cs) _ _ _ = pure . PathInjector . const . pure $ addE
 mkPathInjector p@OpenPath{} to maxSeqLength checkOverflows = do
   validPoints <- validInjectionPoints to p maxSeqLength checkOverflows
   pure $ PathInjector $ \n -> do
-    is <- sort <$> vectorOf n (elements validPoints)
+    is <- case validPoints of
+      [] -> pure []
+      _ -> sort <$> vectorOf n (elements validPoints)
     pure $ completePath is p
 
 validInjectionPoints :: Timeout -> SimplePath -> Int -> Bool -> IO [Int]
