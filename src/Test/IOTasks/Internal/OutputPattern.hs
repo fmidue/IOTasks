@@ -143,7 +143,7 @@ instance Monoid (OutputPattern k) where
 canBeEmpty :: OutputPattern k -> Bool
 canBeEmpty (Wildcard MaybeEmpty) = True
 canBeEmpty (Wildcard NonEmpty) = False
-canBeEmpty (Text "") = False
+-- note: the implicit case (Text "") = False in the pattern below is deliberate
 canBeEmpty (Text _) = False
 canBeEmpty (Sequence x y) = canBeEmpty x && canBeEmpty y
 canBeEmpty (ResultOf _) = False
