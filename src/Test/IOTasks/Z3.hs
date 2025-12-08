@@ -20,7 +20,7 @@ module Test.IOTasks.Z3 (
 import Test.IOTasks.Constraints
 import Test.IOTasks.Internal.ValueSet
 import Test.IOTasks.Internal.Term
-import Test.IOTasks.Var (Var(..), SomeVar, pattern SomeVar, pattern Var, VarExp(..), someVar, Embeddable (..), varname)
+import Test.IOTasks.Var (Var(..), SomeVar, pattern SomeVar, pattern Var, VarExp(..), someVar, Embeddable(..), varname, Embedded(..))
 import Test.IOTasks.ValueMap
 
 import Z3.Monad
@@ -500,6 +500,8 @@ listASTs _ (ListLit xs) _ _ =
   matchType @a
     [ inCaseOfE' @Integer $ \HRefl -> Right <$> mapM (mkIntNum . toInteger) xs
     , inCaseOfE' @Char $ \HRefl -> Left <$> mkString xs
+    , inCaseOfE' @String $ \HRefl -> Right <$> mapM mkString xs
+    , inCaseOfApp' @Embedded $ \HRefl -> Right <$> mapM (\(Embedded i) -> mkIntNum i) xs
     , fallbackCase' $ error $ "list literal of unsupported type " ++ show (typeRep @[a])
     ]
 listASTs _ (All x n) e vars = pure . Right $ lookupList (weaveVariables x n e) vars
