@@ -34,7 +34,7 @@ import Test.IOTasks.Var (Var (..), SomeVar (..), someVar, intVar, Embedded (Embe
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
-import Data.List (nub)
+import Data.List (nub, sort)
 
 data ValueSet a where
   Union :: ValueSet a -> ValueSet a -> ValueSet a
@@ -79,7 +79,26 @@ singleton :: Integer -> ValueSet Integer
 singleton = Eq
 
 fromList :: [Integer] -> ValueSet Integer
-fromList = foldr (union . singleton) empty
+fromList = foldr (union . intervalConstraint) empty . optimizeList . sort
+  where
+    intervalConstraint :: Either Integer (Integer,Integer) -> ValueSet Integer
+    intervalConstraint (Left i) = Eq i
+    intervalConstraint (Right (i,j)) = GreaterThan (i-1) `intersection` LessThan (j+1)
+
+-- ASUMPTION: xs is sorted
+optimizeList :: [Integer] -> [Either Integer (Integer,Integer)]
+optimizeList = go Nothing where
+  go :: Maybe (Integer,Maybe Integer) -> [Integer] -> [Either Integer (Integer,Integer)]
+  go Nothing [] = []
+  go (Just (i, Nothing)) [] = [Left i]
+  go (Just (i, Just j)) [] = [Right (i,j)]
+  go Nothing (x:xs) = go (Just (x, Nothing)) xs
+  go (Just (i, Nothing)) (x:xs)
+    | x == i+1 = go (Just (i,Just x)) xs
+    | otherwise = Left i : go (Just (x,Nothing)) xs
+  go (Just (i, Just j)) (x:xs)
+    | x == j+1 = go (Just (i,Just x)) xs
+    | otherwise = Right (i,j) : go (Just (x,Nothing)) xs
 
 unique :: ValueSet a -> ValueSet a
 unique vs = CurrentlyNotIn Self `intersection` vs
