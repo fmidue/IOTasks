@@ -159,8 +159,8 @@ containsEmbeddedValue Every _ = True
 containsEmbeddedValue None _ = False
 containsEmbeddedValue (Union a b) v = containsEmbeddedValue a v || containsEmbeddedValue b v
 containsEmbeddedValue (Intersection a b) v = containsEmbeddedValue a v && containsEmbeddedValue b v
-containsEmbeddedValue (GreaterThan i) (Embedded n) = i > n
-containsEmbeddedValue (LessThan i) (Embedded n) = i < n
+containsEmbeddedValue (GreaterThan i) (Embedded n) = n > i
+containsEmbeddedValue (LessThan i) (Embedded n) = n < i
 containsEmbeddedValue (Eq i) (Embedded n) = i == n
 containsEmbeddedValue CurrentlyIn{} _ = error "not allowed"
 containsEmbeddedValue CurrentlyNotIn{} _ = error "not allowed"
