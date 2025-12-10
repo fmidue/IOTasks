@@ -98,16 +98,19 @@ canBeInjected :: SimplePath -> Bool
 canBeInjected ClosedPath{} = False
 canBeInjected OpenPath{} = True
 
--- paths n t returns all terminating paths in t that use at most n unfoldings of iterations
-simplePaths :: Int -> ConstraintTree -> [SimplePath]
-simplePaths _ Empty = [ClosedPath []]
-simplePaths n _ | n < 0 = []
-simplePaths n (Choice lt rt) = mergePaths (simplePaths n lt) (simplePaths n rt)
-simplePaths n (Assert c t) = prependPath (Some c) <$> simplePaths n t
-simplePaths n (InjectionPoint c t) = OpenPath [] c <$> simplePaths n t
-simplePaths n (Unfold t)
-  | n > 0 = simplePaths (n-1) t
-  | otherwise = []
+-- paths m n t returns all terminating paths in t that use at least m and at most n unfoldings of iterations
+simplePaths :: Int -> Int -> ConstraintTree -> [SimplePath]
+simplePaths m n = go 0 where
+  go u Empty
+    | u >= m = [ClosedPath []]
+    | otherwise = []
+  go u _ | u > n = []
+  go u (Choice lt rt) = mergePaths (go u lt) (go u rt)
+  go u (Assert c t) = prependPath (Some c) <$> go u t
+  go u (InjectionPoint c t) = OpenPath [] c <$> go u t
+  go u (Unfold t)
+    | u < n = go (u+1) t
+    | otherwise = []
 
 mergePaths :: [SimplePath] -> [SimplePath] -> [SimplePath]
 mergePaths xs [] = xs

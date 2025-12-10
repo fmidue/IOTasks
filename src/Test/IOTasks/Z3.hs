@@ -86,15 +86,15 @@ updateContext NotSAT _ (LastNotSAT _) = RequirePruningCheck
 updateContext _ _ RequirePruningCheck = error "updateContext: should not happen"
 
 type PrefixPath = [Some SimpleConstraint]
-satPaths :: Int -> Int -> ConstraintTree -> Int -> Bool -> IO [SimplePath]
-satPaths maxUnfolds to t maxSeqLength checkOverflows = do
+satPaths :: (Int,Int) -> Int -> ConstraintTree -> Int -> Bool -> IO [SimplePath]
+satPaths (minUnfolds,maxUnfolds) to t maxSeqLength checkOverflows = do
   q <- atomically newTQueue
   nVar <- newTVarIO Nothing
-  satPathsQ nVar to t maxUnfolds maxSeqLength checkOverflows q
+  satPathsQ nVar to t (minUnfolds,maxUnfolds) maxSeqLength checkOverflows q
   map fromJust . init <$> atomically (flushTQueue q)
 
-satPathsQ :: TVar (Maybe Int) -> Int -> ConstraintTree -> Int -> Int -> Bool -> TQueue (Maybe SimplePath) -> IO ()
-satPathsQ nVar to t maxUnfolds maxSeqLength checkOverflows q = do
+satPathsQ :: TVar (Maybe Int) -> Int -> ConstraintTree -> (Int,Int) -> Int -> Bool -> TQueue (Maybe SimplePath) -> IO ()
+satPathsQ nVar to t (minUnfolds,maxUnfolds) maxSeqLength checkOverflows q = do
   evalStateT (satPaths' 0 0 to t ([],ClosedPath [],0) q) NoContext
   atomically $ writeTQueue q Nothing
   where
@@ -103,11 +103,13 @@ satPathsQ nVar to t maxUnfolds maxSeqLength checkOverflows q = do
     -- to: solver timeout
     -- (s,d,e): current prefix path, depth of current position in the tree (d =/= path length), current symbolic environment
     satPaths' :: Int -> Int -> Int -> ConstraintTree -> (PrefixPath,SimplePath,Int) -> TQueue (Maybe SimplePath) -> StateT SearchContext IO ()
-    satPaths' _ _ to Empty (_,p,d) q = do
-      let basePath = completePath [] p
-      res <- lift $ isSatPath to basePath maxSeqLength checkOverflows
-      modify $ updateContext res d
-      when (res == SAT ()) $ lift $ atomically $ writeTQueue q $ Just p
+    satPaths' nUnfolds _ to Empty (_,p,d) q
+      | nUnfolds < minUnfolds = pure ()
+      | otherwise = do
+        let basePath = completePath [] p
+        res <- lift $ isSatPath to basePath maxSeqLength checkOverflows
+        modify $ updateContext res d
+        when (res == SAT ()) $ lift $ atomically $ writeTQueue q $ Just p
     satPaths' nUnfolds nInputs to (Choice l r) (s,p,d) q = do
       satPaths' nUnfolds nInputs to l (s,p,d+1) q
       ctx <- get

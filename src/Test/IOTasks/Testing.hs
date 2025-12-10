@@ -43,6 +43,9 @@ data Args
     -- | maximum number of iteration unfoldings when searching for satisfiable paths.
     --   (indirectly controls maximum path length)
   { maxIterationUnfold :: Int
+    -- | minimum number of iteration unfoldings when searching for satisfiable paths.
+    --   (indirectly controls minimum path length)
+  , minIterationUnfold :: Int
     -- | maximum absolute value of randomly generated candidates for input values (the solver might find bigger solutions)
   , inputRange :: Integer
     -- | solver timeout in milliseconds
@@ -69,6 +72,7 @@ data Args
 stdArgs :: Args
 stdArgs = Args
   { maxIterationUnfold = 25
+  , minIterationUnfold = 0
   , inputRange = 100
   , solverTimeout = 1000 -- 1 sec
   , maxTimeouts = 3
@@ -99,7 +103,7 @@ taskCheckWithOutcome Args{..} prog spec = do
   nVar <- newTVarIO Nothing
 
   (_,(coreOut,satPaths,nInputs,timeouts,overflows)) <- concurrently
-    (satPathsQ nVar solverTimeout (constraintTree spec) maxIterationUnfold solverMaxSeqLength avoidOverflows q)
+    (satPathsQ nVar solverTimeout (constraintTree spec) (minIterationUnfold, maxIterationUnfold) solverMaxSeqLength avoidOverflows q)
     (testProcedure output nVar q)
 
   let out = Outcome coreOut (if overflows == 0 then NoHints else OverflowHint overflows)
@@ -328,7 +332,7 @@ taskCheckOn i p s = uncurry Outcome (go 0 0 i p s) where
 
 generateStaticTestSuite :: Args -> Specification -> IO [Inputs]
 generateStaticTestSuite Args{..} spec = do
-  let simple = simplePaths maxIterationUnfold $ constraintTree spec
+  let simple = simplePaths minIterationUnfold maxIterationUnfold $ constraintTree spec
   full <- concat <$> forM simple (\p -> do
     injector <- mkPathInjector p solverTimeout solverMaxSeqLength avoidOverflows
     replicateM testsPerPath (generate $ injectNegatives injector maxNegative))
