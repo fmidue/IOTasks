@@ -85,7 +85,7 @@ fromList = foldr (union . intervalConstraint) empty . optimizeList . sort
     intervalConstraint (Left i) = Eq i
     intervalConstraint (Right (i,j)) = GreaterThan (i-1) `intersection` LessThan (j+1)
 
--- ASUMPTION: xs is sorted
+-- ASSUMPTION: xs is sorted
 optimizeList :: [Integer] -> [Either Integer (Integer,Integer)]
 optimizeList = go Nothing where
   go :: Maybe (Integer,Maybe Integer) -> [Integer] -> [Either Integer (Integer,Integer)]

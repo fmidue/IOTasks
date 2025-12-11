@@ -90,7 +90,7 @@ legalVar (x:xs) = isAlphaNum x && all (\c -> isAlphaNum c || c == '_' || c == '\
 -- Note: We ensure the second argument is positive for div and mod. SMT solvers
 -- use a different definition of div/mod than Haskell (euclidian vs. flooring).
 -- For positive d values both definitions agree. Allowing only constant values
--- for d also ensures the solver cannot choose values where the defintions
+-- for d also ensures the solver cannot choose values where the definitions
 -- disagree. (See R.T. Boute, "The Euclidean Definition of the Functions div and
 -- mod" for details)
 div' :: Term k Integer -> Integer -> Term k Integer
