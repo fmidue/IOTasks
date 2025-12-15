@@ -15,6 +15,7 @@ module Test.IOTasks.Term.Prelude (
   not',
   (.&&.), (.||.),
   true, false,
+  and', or',
   -- * embedded values
   embeddedLit,
   -- * Simple list functions
@@ -144,6 +145,12 @@ true = BoolLit True
 
 false :: Term k Bool
 false = BoolLit False
+
+and' :: Foldable t => t (Term k Bool) -> Term k Bool
+and' = foldr (.&&.) true
+
+or' :: Foldable t => t (Term k Bool) -> Term k Bool
+or' = foldr (.||.) false
 
 elem' :: (Typeable a, Eq a) => Term k a -> Term k [a] -> Term k Bool
 elem' = IsIn

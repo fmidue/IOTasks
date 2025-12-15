@@ -38,6 +38,7 @@ module Test.IOTasks (
   not',
   (.&&.), (.||.),
   true, false,
+  and', or',
   -- ** Embedded values
   embeddedLit,
   -- ** Simple list functions
