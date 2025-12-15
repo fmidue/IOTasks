@@ -75,15 +75,14 @@ isSatPath t p maxSeqLength checkOverflows = do
 
 data ScriptMode = WithSoft | WithoutSoft
 
-data SearchContext = NoContext | LastNotSAT Int | RequirePruningCheck
+data SearchContext = NoContext | RequirePruningCheck
 
 -- depth is currently not used to trigger pruning
-updateContext :: SatResult a -> Int -> SearchContext -> SearchContext
-updateContext (SAT _) _ _ = NoContext
-updateContext Timeout _ _ = NoContext
-updateContext NotSAT d NoContext = LastNotSAT d
-updateContext NotSAT _ (LastNotSAT _) = RequirePruningCheck
-updateContext _ _ RequirePruningCheck = error "updateContext: should not happen"
+updateContext :: SatResult a -> SearchContext -> SearchContext
+updateContext (SAT _) _ = NoContext
+updateContext Timeout _ = NoContext
+updateContext NotSAT NoContext = RequirePruningCheck
+updateContext _ RequirePruningCheck = error "updateContext: should not happen"
 
 type PrefixPath = [Some SimpleConstraint]
 satPaths :: (Int,Int) -> Int -> ConstraintTree -> Int -> Bool -> IO [SimplePath]
@@ -95,48 +94,56 @@ satPaths (minUnfolds,maxUnfolds) to t maxSeqLength checkOverflows = do
 
 satPathsQ :: TVar (Maybe Int) -> Int -> ConstraintTree -> (Int,Int) -> Int -> Bool -> TQueue (Maybe SimplePath) -> IO ()
 satPathsQ nVar to t (minUnfolds,maxUnfolds) maxSeqLength checkOverflows q = do
-  evalStateT (satPaths' 0 0 to t ([],ClosedPath [],0) q) NoContext
+  evalStateT (satPaths' 0 0 to t ([],ClosedPath []) q) NoContext
   atomically $ writeTQueue q Nothing
   where
     -- nUnfolds: number of Unfolds on current path
     -- nInputs: number of inputs on current path (path length)
     -- to: solver timeout
-    -- (s,d,e): current prefix path, depth of current position in the tree (d =/= path length), current symbolic environment
-    satPaths' :: Int -> Int -> Int -> ConstraintTree -> (PrefixPath,SimplePath,Int) -> TQueue (Maybe SimplePath) -> StateT SearchContext IO ()
-    satPaths' nUnfolds _ to Empty (_,p,d) q
+    -- (s,p): current prefix path and actual path
+    --
+    -- pruning strategy:
+    --  on UNSAT path enter pruning mode
+    --  if in pruning mode after searching left branch of Choice, check prefix path
+    --    if UNSAT: prune right branch, stay in pruning mode
+    --    if SAT: leave pruning mode, continue search with right branch
+    satPaths' :: Int -> Int -> Int -> ConstraintTree -> (PrefixPath,SimplePath) -> TQueue (Maybe SimplePath) -> StateT SearchContext IO ()
+    satPaths' nUnfolds _ to Empty (_,p) q
       | nUnfolds < minUnfolds = pure ()
       | otherwise = do
         let basePath = completePath [] p
         res <- lift $ isSatPath to basePath maxSeqLength checkOverflows
-        modify $ updateContext res d
+        modify $ updateContext res
         when (res == SAT ()) $ lift $ atomically $ writeTQueue q $ Just p
-    satPaths' nUnfolds nInputs to (Choice l r) (s,p,d) q = do
-      satPaths' nUnfolds nInputs to l (s,p,d+1) q
+    satPaths' nUnfolds nInputs to (Choice l r) (s,p) q = do
+      satPaths' nUnfolds nInputs to l (s,p) q
       ctx <- get
       case ctx of
         RequirePruningCheck -> do
           let prefix = addEnvToPath $ reverse s
           res <- lift $ isSatPath to prefix maxSeqLength checkOverflows
           case res of
-            NotSAT -> pure ()
+            NotSAT ->
+              -- Note that this does not reset the context.
+              pure ()
             Timeout -> do
               put NoContext
-              satPaths' nUnfolds nInputs to r (s,p,d+1) q
+              satPaths' nUnfolds nInputs to r (s,p) q
             SAT () -> do
               put NoContext
-              satPaths' nUnfolds nInputs to r (s,p,d+1) q
+              satPaths' nUnfolds nInputs to r (s,p) q
         _ -> do
-          satPaths' nUnfolds nInputs to r (s,p,d+1) q
-    satPaths' nUnfolds nInputs to (Assert c@SimpleInput{} t) (s,p,d) q = do
+          satPaths' nUnfolds nInputs to r (s,p) q
+    satPaths' nUnfolds nInputs to (Assert c@SimpleInput{} t) (s,p) q = do
       currentMaxPathLength <- lift $ readTVarIO nVar
       case currentMaxPathLength of
         Just len | nInputs >= len -> pure ()
-        _ -> satPaths' nUnfolds (nInputs+1) to t (Some c:s,p `appendPath` ClosedPath [Some c],d+1) q -- stores constraints in reversed order
-    satPaths' nUnfolds nInputs to (Assert c t) (s,p,d) q = satPaths' nUnfolds nInputs to t (Some c:s,p `appendPath` ClosedPath [Some c],d+1) q -- stores constraints in reversed order
-    satPaths' nUnfolds nInputs to (Unfold t) (s,p,d) q
-      | nUnfolds < maxUnfolds = satPaths' (nUnfolds+1) nInputs to t (s,p,d) q
+        _ -> satPaths' nUnfolds (nInputs+1) to t (Some c:s,p `appendPath` ClosedPath [Some c]) q -- stores constraints in reversed order
+    satPaths' nUnfolds nInputs to (Assert c t) (s,p) q = satPaths' nUnfolds nInputs to t (Some c:s,p `appendPath` ClosedPath [Some c]) q -- stores constraints in reversed order
+    satPaths' nUnfolds nInputs to (Unfold t) (s,p) q
+      | nUnfolds < maxUnfolds = satPaths' (nUnfolds+1) nInputs to t (s,p) q
       | otherwise = pure ()
-    satPaths' nUnfolds nInputs to (InjectionPoint c t) (s,p,d) q = satPaths' nUnfolds nInputs to t (s,p `appendPath` OpenPath [] c (ClosedPath []),d) q
+    satPaths' nUnfolds nInputs to (InjectionPoint c t) (s,p) q = satPaths' nUnfolds nInputs to t (s,p `appendPath` OpenPath [] c (ClosedPath [])) q
 
 newtype PathInjector = PathInjector { injectNegatives :: Int -> Gen Path }
 
