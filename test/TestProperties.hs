@@ -125,17 +125,17 @@ testCheapProperties = do
 generalTraceProperties :: forall t. (Trace t, Eq t) => Spec
 generalTraceProperties = do
   prop "progReadLine adds a line break" $
-    \s -> progReadLine @t s terminate == foldr progReadChar terminate (s <> "\n")
+    \(NonEmpty s) -> progReadLine @t s terminate == foldr progReadChar terminate (s <> "\n")
 
   prop "progReadLine can be split at linebreaks" $
-    \s t -> progReadLine @t s (progReadLine t terminate) == progReadLine (s <> "\n" <> t) terminate
+    \(NonEmpty s) (NonEmpty t) -> progReadLine @t s (progReadLine t terminate) == progReadLine (s <> "\n" <> t) terminate
 
   prop "progWriteLine adds a line break" $
-    \s -> let t = progWriteLine @t s terminate
+    \(NonEmpty s) -> let t = progWriteLine @t s terminate
       in t == progWriteStr (s <> "\n") terminate && t == foldr progWriteChar terminate (s <> "\n")
 
   prop "progWriteLine can be split at linebreaks" $
-    \s t -> progWriteLine @t s (progWriteLine t terminate) == progWriteLine (s <> "\n" <> t) terminate
+    \(NonEmpty s) (NonEmpty t) -> progWriteLine @t s (progWriteLine t terminate) == progWriteLine (s <> "\n" <> t) terminate
 
 
 testEquiv :: Specification -> Specification -> Property

@@ -12,6 +12,7 @@ module Test.IOTasks.Internal.OutputPattern (
   convert,
   wildcard, nonEmptyWildcard, text, resultOf,
   decoratedResultOf,
+  emptyPattern,
   canBeEmpty,
   valueTerms,
   showPattern, showPatternSimple,
@@ -44,6 +45,7 @@ data OutputPattern (k :: PatternKind) where
   Text :: String -> OutputPattern k
   Sequence :: OutputPattern k -> OutputPattern k -> OutputPattern k
   ResultOf :: forall (tk :: TermKind) a. (Typeable a, Show a) => Term tk a -> OutputPattern 'SpecificationP
+  EmptyPattern :: OutputPattern k
   -- 'unevaluated' feedback group
   FeedbackGroupU :: forall (tk :: TermKind) a. (Typeable a, Show a) => Term tk a -> (a -> String) -> [OutputPattern 'SpecificationP] -> OutputPattern 'SpecificationP
   -- feedback group with constant feedback message
@@ -60,6 +62,7 @@ convert (Wildcard b) = Wildcard b
 convert (Text s) = Text s
 convert (Sequence x y) = Sequence (convert x) (convert y)
 convert (ResultOf t) = ResultOf t
+convert EmptyPattern = EmptyPattern
 convert (FeedbackGroupU t f grp) = FeedbackGroupU t f grp
 convert (FeedbackGroupE str grp) = FeedbackGroupE str $ map convert grp
 
@@ -70,10 +73,15 @@ nonEmptyWildcard :: OutputPattern k
 nonEmptyWildcard = Wildcard NonEmpty
 
 text :: String -> OutputPattern k
-text = Text
+text str
+  | not $ null str = Text str
+  | otherwise = error "text: empty string (use emptyPattern instead)"
 
 resultOf :: (Typeable a, Show a) => Term tk a -> OutputPattern 'SpecificationP
 resultOf = ResultOf
+
+emptyPattern :: OutputPattern k
+emptyPattern = EmptyPattern
 
 -- | Mandatory decoration of some term's result
 --
@@ -90,14 +98,14 @@ decoratedResultOf t = patternGroup t
 
 patternGroup :: (Typeable a, Show a) => Term tk a -> (a -> String) -> (OutputPattern 'SpecificationP -> [OutputPattern 'SpecificationP]) -> OutputPattern 'SpecificationP
 patternGroup t f ps
-  | all (null . valueTerms) (ps mempty) = FeedbackGroupU t f (ps $ resultOf t)
+  | all (null . valueTerms) (ps emptyPattern) = FeedbackGroupU t f (ps $ resultOf t)
   | otherwise = error "patternGroup: patterns contain terms not specified in the first argument"
 
 instance Eq (OutputPattern k) where
   x == y = compare x y == EQ
 
 -- syntactic ordering (to put OutputPatterns in Sets)
--- Wildcard < Text < Sequence < ResultOf < FeedbackGroupU < FeedbackGroupE
+-- EmptyPattern < Wildcard < Text < Sequence < ResultOf < FeedbackGroupU < FeedbackGroupE
 instance Ord (OutputPattern k) where
   compare (Wildcard t) (Wildcard u) = compare t u
   compare (Text s) (Text t) = compare s t
@@ -107,9 +115,12 @@ instance Ord (OutputPattern k) where
       GLT -> LT
       GEQ -> compareK t u
       GGT -> GT
+  compare EmptyPattern EmptyPattern = EQ
   compare (FeedbackGroupU _ _ grp1) (FeedbackGroupU _ _ grp2) = compare grp1 grp2 -- ASSUMPTION: groups are uniquely determined by their patterns
   compare (FeedbackGroupE x grp1) (FeedbackGroupE y grp2) = compare (x,grp1) (y,grp2)
   --
+  compare EmptyPattern _ = LT     -- EmptyPattern < {Wildcard,Text,Sequence,ResultOf,FeedbackGroup}
+  compare _ EmptyPattern = GT     -- {Wildcard,Text,Sequence,ResultOf,FeedbackGroup} > EmptyPattern
   compare (Wildcard _) _ = LT     -- Wildcard < {Text,Sequence,ResultOf,FeedbackGroup}
   compare _ (Wildcard _) = GT     -- {Text,Sequence,ResultOf,FeedbackGroup} > Wildcard
   compare Text{} _ = LT           -- Text < {Sequence,ResultOf,FeedbackGroup}
@@ -131,14 +142,14 @@ instance Semigroup WildcardType where
 instance Semigroup (OutputPattern k) where
   Wildcard t <> Wildcard u = Wildcard (t <> u)
   Wildcard t <> Sequence (Wildcard u) y = Sequence (Wildcard (t <> u)) y
-  Text "" <> y = y
-  x <> Text "" = x
+  EmptyPattern <> y = y
+  x <> EmptyPattern = x
   Text s <> Text t = Text $ s ++ t
   Sequence x y <> z = Sequence x $ y <> z
   x <> y = Sequence x y
 
 instance Monoid (OutputPattern k) where
-  mempty = Text ""
+  mempty = EmptyPattern
 
 canBeEmpty :: OutputPattern k -> Bool
 canBeEmpty (Wildcard MaybeEmpty) = True
@@ -147,6 +158,7 @@ canBeEmpty (Wildcard NonEmpty) = False
 canBeEmpty (Text _) = False
 canBeEmpty (Sequence x y) = canBeEmpty x && canBeEmpty y
 canBeEmpty (ResultOf _) = False
+canBeEmpty EmptyPattern = True
 canBeEmpty (FeedbackGroupE _ ps) = any canBeEmpty ps
 canBeEmpty (FeedbackGroupU _ _ ps) = any canBeEmpty ps
 
@@ -155,6 +167,7 @@ valueTerms (Wildcard _) = []
 valueTerms Text{} = []
 valueTerms (Sequence x y) = valueTerms x ++ valueTerms y
 valueTerms (ResultOf t) = [someTermK t]
+valueTerms EmptyPattern = []
 valueTerms (FeedbackGroupU _ _ grp) = concatMap valueTerms grp
 valueTerms (FeedbackGroupE _ grp) = concatMap valueTerms grp
 
@@ -163,6 +176,7 @@ evalPattern _ (Wildcard t) = (NoOverflow, Wildcard t)
 evalPattern _ (Text s) = (NoOverflow, Text s)
 evalPattern e (Sequence x y) = evalPattern e x <> evalPattern e y
 evalPattern e (ResultOf t) = second (Text . showResult) $ oEval e t
+evalPattern _ EmptyPattern = (NoOverflow,EmptyPattern)
 evalPattern e (FeedbackGroupE str grp) = FeedbackGroupE str `second` traverse (evalPattern e) grp
 evalPattern e (FeedbackGroupU t f grp) = FeedbackGroupE str `second` traverse (evalPattern e) grp
   where
@@ -188,6 +202,7 @@ showPattern (Wildcard MaybeEmpty) = "<anything>"
 showPattern (Text s) = foldr showLitChar "" s
 showPattern (Sequence x y) = showPattern x ++ showPattern y
 showPattern (ResultOf t) = show t
+showPattern EmptyPattern = ""
 showPattern (FeedbackGroupU _ _ grp) = "<unevaluated group: " <> show (map showPattern grp) <> ">"
 showPattern (FeedbackGroupE str _) = str
 
@@ -215,7 +230,8 @@ showPatternInternal (Wildcard NonEmpty) = "_"
 showPatternInternal (Wildcard MaybeEmpty) = " "
 showPatternInternal (Text s) = s
 showPatternInternal (Sequence x y) = showPatternInternal x ++ showPatternInternal y
-showPatternInternal _ = error "showPatternInternal: not intended"
+showPatternInternal EmptyPattern = ""
+showPatternInternal FeedbackGroupE{} = error "showPatternInternal: not intended"
 
 patternParser :: OutputPattern 'TraceP -> Parsec String () ()
 patternParser (Wildcard NonEmpty) = void $ many (whitespace <|> nonPrintable) >> printableNonWhitespace >> patternParser wildcard
@@ -224,6 +240,7 @@ patternParser (Text s) = void $ string s
 patternParser (Sequence (Wildcard NonEmpty) q) = many (whitespace <|> nonPrintable) >> printableNonWhitespace >> patternParser (wildcard <> q)
 patternParser p@(Sequence (Wildcard MaybeEmpty) q) = try (anyChar >> patternParser p) <|> patternParser q
 patternParser (Sequence p q) = patternParser p >> patternParser q
+patternParser EmptyPattern = pure ()
 patternParser (FeedbackGroupE _ grp) = choice $ map (try . patternParser) grp
 
 printableNonWhitespace :: Parsec String () Char

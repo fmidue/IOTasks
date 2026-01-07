@@ -224,4 +224,5 @@ minimalWords (Wildcard NonEmpty) = [" "]
 minimalWords (Wildcard MaybeEmpty) = [""]
 minimalWords (Text s) = [s]
 minimalWords (Sequence x y) = [ wx <> wy | wx <- minimalWords x, wy <- minimalWords y ]
+minimalWords EmptyPattern = []
 minimalWords (FeedbackGroupE _ xs) = concatMap minimalWords xs
