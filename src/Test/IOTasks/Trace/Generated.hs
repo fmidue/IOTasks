@@ -9,17 +9,13 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DerivingVia #-}
 module Test.IOTasks.Trace.Generated
-  -- * Traces with randomly instantiated variables
   ( AbstractTrace
   , AbstractTrace'
   , SomeVarSet, (<|)
-  , AbstractRead(progReadAbstract)
-  , generateTrace
-  , var
-  -- * Traces with SMT-solvable constraints
-  , ConstrainedTrace
-  , ConstrainedTrace'
+  , progReadAbstract
   , valueConstraint
+  , var
+  , generateTrace
   , solveTrace
   ) where
 
@@ -46,19 +42,14 @@ import Test.IOTasks.Z3
 import Test.IOTasks.Trace (Trace (terminate, progReadLine, progWriteLine, progReadChar), GeneralizedTrace (genProgWriteLine, genProgWrite))
 import Test.IOTasks.Internal.OutputPattern (OutputPattern, PatternKind (..), text, evalPatternSet)
 
-type AbstractTrace = AbstractTrace' (OptFlag, Set (OutputPattern 'SpecificationP))
-newtype AbstractTrace' a = AbstractTrace { abstractStructure :: AbstractTraceStructure 'NoConstraints a}
-  deriving (Semigroup,Monoid) via (AbstractTraceStructure 'NoConstraints a)
-
-data AbstractTraceStructure (k :: TraceFlavor) a where
-  AbstractRead :: SomeVarSet -> AbstractTraceStructure k a -> AbstractTraceStructure k a
-  ConcreteRead :: String -> AbstractTraceStructure k a -> AbstractTraceStructure k a
-  ValueConstraint :: Term 'Transparent Bool -> AbstractTraceStructure 'WithConstraints a -> AbstractTraceStructure 'WithConstraints a
-  WriteAT :: a -> AbstractTraceStructure k a -> AbstractTraceStructure k a
-  WriteLineAT :: a -> AbstractTraceStructure k a -> AbstractTraceStructure k a
-  TerminateAT :: AbstractTraceStructure k a
-
-data TraceFlavor = NoConstraints | WithConstraints
+type AbstractTrace = AbstractTrace' (OptFlag, Set (OutputPattern SpecificationP))
+data AbstractTrace' a where
+  AbstractRead :: SomeVarSet -> AbstractTrace' a -> AbstractTrace' a
+  ConcreteRead :: String -> AbstractTrace' a -> AbstractTrace' a
+  ValueConstraint :: Term 'Transparent Bool -> AbstractTrace' a -> AbstractTrace' a
+  WriteAT :: a -> AbstractTrace' a -> AbstractTrace' a
+  WriteLineAT :: a -> AbstractTrace' a -> AbstractTrace' a
+  TerminateAT :: AbstractTrace' a
 
 data SomeVarSet where
   SomeVarSet :: (Typeable a, Show a) => Var a -> ValueSet a -> SomeVarSet
@@ -70,16 +61,10 @@ data SomeVarSet where
 var :: Typeable a => Var a -> Term 'Transparent a
 var = currentValue
 
-liftAbstract :: (AbstractTraceStructure 'NoConstraints a -> AbstractTraceStructure 'NoConstraints a) -> AbstractTrace' a -> AbstractTrace' a
-liftAbstract f = AbstractTrace . f . abstractStructure
+progReadAbstract :: SomeVarSet -> AbstractTrace' a -> AbstractTrace' a
+progReadAbstract = AbstractRead
 
-class Trace t => AbstractRead t where
-  progReadAbstract :: SomeVarSet -> t -> t
-
-instance AbstractRead (AbstractTrace' (OptFlag, Set (OutputPattern 'SpecificationP))) where
-  progReadAbstract = liftAbstract . AbstractRead
-
-instance Semigroup (AbstractTraceStructure k a) where
+instance Semigroup (AbstractTrace' a) where
   TerminateAT <> t = t
   t <> TerminateAT = t
   AbstractRead i t <> t' = AbstractRead i (t <> t')
@@ -88,27 +73,32 @@ instance Semigroup (AbstractTraceStructure k a) where
   WriteAT o t <> t' = WriteAT o (t <> t')
   WriteLineAT o t <> t' = WriteLineAT o (t <> t')
 
-instance Monoid (AbstractTraceStructure k a) where
+instance Monoid (AbstractTrace' a) where
   mempty = TerminateAT
 
 instance Trace (AbstractTrace' (OptFlag, Set (OutputPattern 'SpecificationP))) where
-  progReadChar = liftAbstract . ConcreteRead . pure
-  progReadLine = liftAbstract . ConcreteRead
-  progWriteLine = liftAbstract . WriteAT . (Mandatory,) . Set.singleton . text
-  terminate = AbstractTrace TerminateAT
+  progReadChar = ConcreteRead . pure
+  progReadLine = ConcreteRead
+  progWriteLine = WriteAT . (Mandatory,) . Set.singleton . text
+  terminate = TerminateAT
 
 instance GeneralizedTrace AbstractTrace' (OptFlag, Set (OutputPattern 'SpecificationP)) where
-  genProgWrite = liftAbstract . WriteAT
-  genProgWriteLine = liftAbstract . WriteLineAT
+  genProgWrite = WriteAT
+  genProgWriteLine = WriteLineAT
 
+-- | random search for variable assignments
+--   (generation will loop forever on unsatisfiable constraints)
 generateTrace :: Size -> AbstractTrace -> Gen NTraceGeneralized
-generateTrace sz (AbstractTrace t) = genTrace `orErrorFrom` checkInputVariables "generateTrace" t
+generateTrace sz t = genTrace `orErrorFrom` checkInputVariables "generateTrace" t
   where
+    constraints = traceValueConstraints t
     genTrace = do
       m <- genValueMap sz (traceInputVariables t)
-      pure $ instantiateTrace m t
+      if all (snd . oEval m) constraints
+        then pure $ instantiateTrace m t
+        else genTrace
 
-instantiateTrace :: ValueMap -> AbstractTraceStructure k (OptFlag, Set (OutputPattern 'SpecificationP)) -> NTraceGeneralized
+instantiateTrace :: ValueMap -> AbstractTrace -> NTraceGeneralized
 instantiateTrace m (ConcreteRead x t) = progReadLine x $ instantiateTrace m t
 instantiateTrace m (AbstractRead (SomeVarSet x vs) t) =
   case oEval m (var x) of
@@ -127,7 +117,7 @@ instantiateTrace m (ValueConstraint c t) =
     (_,False) -> error $ "valueMap does not satisfy condition " ++ showTerm c
 instantiateTrace _ TerminateAT = terminate
 
-checkInputVariables :: String -> AbstractTraceStructure k a -> Maybe String
+checkInputVariables :: String -> AbstractTrace' a -> Maybe String
 checkInputVariables fn = reportDuplicates . Map.filter (>1) . countVariables
   where
     reportDuplicates :: Map SomeVar Int -> Maybe String
@@ -135,7 +125,7 @@ checkInputVariables fn = reportDuplicates . Map.filter (>1) . countVariables
       | Map.null m = Nothing
       | otherwise = Just $ concat [fn,": duplicate variables: ", show $ Map.keys m]
 
-    countVariables :: AbstractTraceStructure k a -> Map SomeVar Int
+    countVariables :: AbstractTrace' a -> Map SomeVar Int
     countVariables =
         Map.fromListWith (+)
           . map (\(SomeVarSet x _) -> (someVar x,1))
@@ -144,7 +134,7 @@ checkInputVariables fn = reportDuplicates . Map.filter (>1) . countVariables
 orErrorFrom :: a -> Maybe String -> a
 orErrorFrom = (`maybe` error )
 
-traceInputVariables :: AbstractTraceStructure k a -> [SomeVarSet]
+traceInputVariables :: AbstractTrace' a -> [SomeVarSet]
 traceInputVariables (ConcreteRead _ t) = traceInputVariables t
 traceInputVariables (AbstractRead vs t) = vs : traceInputVariables t
 traceInputVariables (WriteAT _ t) = traceInputVariables t
@@ -152,7 +142,7 @@ traceInputVariables (ValueConstraint _ t) = traceInputVariables t
 traceInputVariables (WriteLineAT _ t) = traceInputVariables t
 traceInputVariables TerminateAT = []
 
-traceValueConstraints :: AbstractTraceStructure k a -> [Term 'Transparent Bool]
+traceValueConstraints :: AbstractTrace' a -> [Term 'Transparent Bool]
 traceValueConstraints (ConcreteRead _ t) = traceValueConstraints t
 traceValueConstraints (AbstractRead _ t) = traceValueConstraints t
 traceValueConstraints (WriteAT _ t) = traceValueConstraints t
@@ -168,31 +158,12 @@ genValueMap size = foldM addNextValue (emptyValueMap [])
       v <- valueOf x m vs size
       pure $ insertValue (wrapValue v) (someVar x) m
 
-type ConstrainedTrace = ConstrainedTrace' (OptFlag, Set (OutputPattern 'SpecificationP))
-newtype ConstrainedTrace' a = ConstrainedTrace { constrainedStructure :: AbstractTraceStructure 'WithConstraints a}
-    deriving (Semigroup,Monoid) via (AbstractTraceStructure 'WithConstraints a)
+valueConstraint :: Term 'Transparent Bool -> AbstractTrace' a -> AbstractTrace' a
+valueConstraint = ValueConstraint
 
-liftConstrained :: (AbstractTraceStructure 'WithConstraints a -> AbstractTraceStructure 'WithConstraints a) -> ConstrainedTrace' a -> ConstrainedTrace' a
-liftConstrained f = ConstrainedTrace . f . constrainedStructure
-
-valueConstraint :: Term 'Transparent Bool -> ConstrainedTrace -> ConstrainedTrace
-valueConstraint = liftConstrained . ValueConstraint
-
-instance AbstractRead (ConstrainedTrace' (OptFlag, Set (OutputPattern 'SpecificationP))) where
-  progReadAbstract = liftConstrained . AbstractRead
-
-instance Trace (ConstrainedTrace' (OptFlag, Set (OutputPattern 'SpecificationP))) where
-  progReadChar = liftConstrained . ConcreteRead . pure
-  progReadLine = liftConstrained . ConcreteRead
-  progWriteLine = liftConstrained . WriteAT . (Mandatory,) . Set.singleton . text
-  terminate = ConstrainedTrace TerminateAT
-
-instance GeneralizedTrace ConstrainedTrace' (OptFlag, Set (OutputPattern 'SpecificationP)) where
-  genProgWrite = liftConstrained . WriteAT
-  genProgWriteLine = liftConstrained . WriteLineAT
-
-solveTrace :: Size -> Timeout -> ConstrainedTrace -> IO NTraceGeneralized
-solveTrace (Size bnd len) to (ConstrainedTrace t) = do
+-- | search for variable assignments using an SMT solver
+solveTrace :: Size -> Timeout -> AbstractTrace -> IO NTraceGeneralized
+solveTrace (Size bnd len) to t = do
   let
     xs = traceInputVariables t
     inputs = map (\(SomeVarSet x vs) -> Some $ SimpleInput KeepInput x vs) xs

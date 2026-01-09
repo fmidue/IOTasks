@@ -1,9 +1,12 @@
 {-# LANGUAGE RecordWildCards #-}
 module Test.IOTasks.UnitTests.Generated
-( checkAbstract, checkAbstractWith
-, checkAbstractOutcome, checkAbstractWithOutcome
+-- * Testing with random-search-based instantiation
+( checkRandom, checkRandomWith
+, checkRandomOutcome, checkRandomWithOutcome
+-- * Testing with SMT-solver-based instantiation
 , checkConstrained, checkConstrainedWith
 , checkConstrainedOutcome, checkConstrainedWithOutcome
+-- * Testing parameters
 , Args(..), stdArgs,
 ) where
 
@@ -42,30 +45,30 @@ stdArgs = Args
   , feedbackStyle = defaultFeedback
   }
 
-checkAbstract :: IOrep () -> [AbstractTrace] -> IO ()
-checkAbstract = checkAbstractWith stdArgs
+checkRandom :: IOrep () -> [AbstractTrace] -> IO ()
+checkRandom = checkRandomWith stdArgs
 
-checkAbstractOutcome :: IOrep () -> [AbstractTrace] -> IO CoreOutcome
-checkAbstractOutcome = checkAbstractWithOutcome stdArgs
+checkRandomOutcome :: IOrep () -> [AbstractTrace] -> IO CoreOutcome
+checkRandomOutcome = checkRandomWithOutcome stdArgs
 
-checkAbstractWith :: Args -> IOrep () -> [AbstractTrace] -> IO ()
-checkAbstractWith args p = void . checkAbstractWithOutcome args p
+checkRandomWith :: Args -> IOrep () -> [AbstractTrace] -> IO ()
+checkRandomWith args p = void . checkRandomWithOutcome args p
 
-checkAbstractWithOutcome :: Args -> IOrep () -> [AbstractTrace] -> IO CoreOutcome
-checkAbstractWithOutcome Args{..} p ts = do
+checkRandomWithOutcome :: Args -> IOrep () -> [AbstractTrace] -> IO CoreOutcome
+checkRandomWithOutcome Args{..} p ts = do
   suite <- generate (concat <$> mapM (vectorOf testsPerTrace . generateTrace (Size inputRange sequenceLength)) ts)
   checkGeneralizedWithOutcome (Simple.Args terminalOutput feedbackStyle) p suite
 
-checkConstrained :: IOrep () -> [ConstrainedTrace] -> IO ()
+checkConstrained :: IOrep () -> [AbstractTrace] -> IO ()
 checkConstrained = checkConstrainedWith stdArgs
 
-checkConstrainedOutcome :: IOrep () -> [ConstrainedTrace] -> IO CoreOutcome
+checkConstrainedOutcome :: IOrep () -> [AbstractTrace] -> IO CoreOutcome
 checkConstrainedOutcome = checkConstrainedWithOutcome stdArgs
 
-checkConstrainedWith :: Args -> IOrep () -> [ConstrainedTrace] -> IO ()
+checkConstrainedWith :: Args -> IOrep () -> [AbstractTrace] -> IO ()
 checkConstrainedWith args p = void . checkConstrainedWithOutcome args p
 
-checkConstrainedWithOutcome :: Args -> IOrep () -> [ConstrainedTrace] -> IO CoreOutcome
+checkConstrainedWithOutcome :: Args -> IOrep () -> [AbstractTrace] -> IO CoreOutcome
 checkConstrainedWithOutcome Args{..} p ts = do
   suite <- concat <$> mapM (replicateM testsPerTrace . solveTrace (Size inputRange sequenceLength) 1000) ts
   checkGeneralizedWithOutcome (Simple.Args terminalOutput feedbackStyle) p suite
