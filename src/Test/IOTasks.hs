@@ -5,10 +5,13 @@ module Test.IOTasks (
   writeOutput, writeOptionalOutput, anyOptionalOutput, branch, tillExit, exit, nop, while, whileNot, repeatUntil, doWhile,
   InputMode(..),
   ValueSet,
-  empty, complete, singleton, fromList,
+  empty, complete,
+  singleton, fromList,
+  singletonStr, fromListStr,
   lessThan, greaterThan,
   union, intersection,
   (\\), with, without,
+  withStr, withoutStr,
   complement,
   unique, notInVar,
   isEmpty,
@@ -39,6 +42,8 @@ module Test.IOTasks (
   (.&&.), (.||.),
   true, false,
   and', or',
+  -- ** String values
+  strLit,
   -- ** Embedded values
   embeddedLit,
   -- ** Simple list functions

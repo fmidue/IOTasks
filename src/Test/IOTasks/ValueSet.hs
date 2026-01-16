@@ -1,9 +1,12 @@
 module Test.IOTasks.ValueSet (
   ValueSet,
-  empty, complete, singleton, fromList,
+  empty, complete,
+  singleton, fromList,
+  singletonStr, fromListStr,
   union, intersection,
   lessThan, greaterThan,
   (\\), with, without,
+  withStr, withoutStr,
   complement,
   unique, notInVar,
   embed, embedFromList,

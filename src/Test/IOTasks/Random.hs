@@ -39,6 +39,8 @@ module Test.IOTasks.Random (
   (.&&.), (.||.),
   true, false,
   and', or',
+  -- ** String values
+  strLit,
   -- ** Embedded values
   embeddedLit,
   -- ** Simple list functions

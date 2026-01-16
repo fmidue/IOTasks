@@ -60,6 +60,7 @@ data Embedded a where
   Embedded :: (Show a, Embeddable a) => Integer -> Embedded a
 
 deriving instance Eq (Embedded a)
+deriving instance Ord (Embedded a)
 instance Show a => Show (Embedded a) where
   show (Embedded i) = "Embedded (asInteger "++ show @a (asOriginal i) ++ ")"
 

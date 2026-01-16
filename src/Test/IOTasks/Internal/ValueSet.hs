@@ -6,10 +6,13 @@
 {-# LANGUAGE RankNTypes #-}
 module Test.IOTasks.Internal.ValueSet (
   ValueSet(..),
-  empty, complete, singleton, fromList,
+  empty, complete,
+  singleton, fromList,
+  singletonStr, fromListStr,
   lessThan, greaterThan,
   union, intersection,
   (\\), with, without,
+  withStr, withoutStr,
   complement,
   unique, notInVar,
   embed, embedFromList,
@@ -41,16 +44,19 @@ data ValueSet a where
   Intersection :: ValueSet a -> ValueSet a -> ValueSet a
   GreaterThan :: Integer -> ValueSet Integer
   LessThan :: Integer -> ValueSet Integer
-  Eq :: Integer -> ValueSet Integer
+  EqInt :: Integer -> ValueSet Integer
   CurrentlyIn :: VarRef a -> ValueSet a
   CurrentlyNotIn :: VarRef a -> ValueSet a
+
+  EqStr :: String -> ValueSet String
+  NotStr :: String -> ValueSet String
 
   Every :: ValueSet a
   None :: ValueSet a
   Embed :: Embeddable a => ValueSet Integer -> ValueSet (Embedded a)
 
-deriving instance Eq (ValueSet a)
-deriving instance Ord (ValueSet a)
+deriving instance Eq a => Eq (ValueSet a)
+deriving instance Ord a => Ord (ValueSet a)
 
 data VarRef a = Self | Other (Var a)
   deriving (Eq,Ord)
@@ -60,7 +66,9 @@ hasVarRefs Every = False
 hasVarRefs None = False
 hasVarRefs GreaterThan{} = False
 hasVarRefs LessThan{} = False
-hasVarRefs Eq{} = False
+hasVarRefs EqInt{} = False
+hasVarRefs EqStr{} = False
+hasVarRefs NotStr{} = False
 hasVarRefs (Embed vs) = hasVarRefs vs
 hasVarRefs CurrentlyIn{} = True
 hasVarRefs CurrentlyNotIn{} = True
@@ -76,13 +84,16 @@ complete :: ValueSet a
 complete = Every
 
 singleton :: Integer -> ValueSet Integer
-singleton = Eq
+singleton = EqInt
+
+singletonStr :: String -> ValueSet String
+singletonStr = EqStr
 
 fromList :: [Integer] -> ValueSet Integer
 fromList = foldr (union . intervalConstraint) empty . optimizeList . sort
   where
     intervalConstraint :: Either Integer (Integer,Integer) -> ValueSet Integer
-    intervalConstraint (Left i) = Eq i
+    intervalConstraint (Left i) = EqInt i
     intervalConstraint (Right (i,j)) = GreaterThan (i-1) `intersection` LessThan (j+1)
 
 -- ASSUMPTION: xs is sorted
@@ -99,6 +110,9 @@ optimizeList = go Nothing where
   go (Just (i, Just j)) (x:xs)
     | x == j+1 = go (Just (i,Just x)) xs
     | otherwise = Right (i,j) : go (Just (x,Nothing)) xs
+
+fromListStr :: [String] -> ValueSet String
+fromListStr = foldr (flip withStr) empty
 
 unique :: ValueSet a -> ValueSet a
 unique vs = CurrentlyNotIn Self `intersection` vs
@@ -120,7 +134,7 @@ intersection = Intersection
 
 -- | The '(\\)' operator computes set difference.
 -- It returns a 'ValueSet' containing all integers of the first set that are not present in the second set.
-(\\) :: ValueSet Integer -> ValueSet Integer -> ValueSet Integer
+(\\) :: ValueSet a -> ValueSet a -> ValueSet a
 (\\) xs = (xs `intersection`) . complement
 
 without :: ValueSet Integer -> Integer -> ValueSet Integer
@@ -128,6 +142,12 @@ without vs = (vs \\) . singleton
 
 with :: ValueSet Integer -> Integer -> ValueSet Integer
 with vs = (vs `union`) . singleton
+
+withoutStr :: ValueSet String -> String -> ValueSet String
+withoutStr vs = (vs \\) . singletonStr
+
+withStr :: ValueSet String -> String -> ValueSet String
+withStr vs = (vs `union`) . singletonStr
 
 embed ::  Embeddable a => ValueSet Integer -> ValueSet (Embedded a)
 embed vs
@@ -138,11 +158,13 @@ embedFromList :: Embeddable a => [a] -> ValueSet (Embedded a)
 embedFromList = embed . fromList . map asInteger
 
 complement :: ValueSet a -> ValueSet a
-complement (GreaterThan n) = LessThan n `union` Eq n
-complement (LessThan n) =  GreaterThan n `union` Eq n
+complement (GreaterThan n) = LessThan n `union` EqInt n
+complement (LessThan n) =  GreaterThan n `union` EqInt n
 complement (Intersection va vb) = Union (complement va) (complement vb)
 complement (Union va vb) = Intersection (complement va) (complement vb)
-complement (Eq n) = GreaterThan n `union` LessThan n
+complement (EqInt n) = GreaterThan n `union` LessThan n
+complement (EqStr str) = NotStr str
+complement (NotStr str) = EqStr str
 complement (CurrentlyIn x) = CurrentlyNotIn x
 complement (CurrentlyNotIn x) = CurrentlyIn x
 complement Every = None
@@ -158,7 +180,9 @@ containsValue x m (Union vs1 vs2) n = containsValue x m vs1  n || containsValue 
 containsValue x m (Intersection vs1 vs2) n = containsValue x m vs1 n && containsValue x m vs2 n
 containsValue _ _ (GreaterThan i) n = n > i
 containsValue _ _ (LessThan i) n = n < i
-containsValue _ _ (Eq i) n = i == n
+containsValue _ _ (EqInt i) n = i == n
+containsValue _ _ (EqStr str) x = str == x
+containsValue _ _ (NotStr str) x = str /= x
 containsValue x m (CurrentlyIn Self) n = withVarEq x $ n `elem` valuesIn x m
 containsValue _ m (CurrentlyIn (Other y)) n = withVarEq y $ n `elem` valuesIn y m
 containsValue x m (CurrentlyNotIn Self) n = withVarEq x $ n `notElem` valuesIn x m
@@ -180,7 +204,7 @@ containsEmbeddedValue (Union a b) v = containsEmbeddedValue a v || containsEmbed
 containsEmbeddedValue (Intersection a b) v = containsEmbeddedValue a v && containsEmbeddedValue b v
 containsEmbeddedValue (GreaterThan i) (Embedded n) = n > i
 containsEmbeddedValue (LessThan i) (Embedded n) = n < i
-containsEmbeddedValue (Eq i) (Embedded n) = i == n
+containsEmbeddedValue (EqInt i) (Embedded n) = i == n
 containsEmbeddedValue CurrentlyIn{} _ = error "not allowed"
 containsEmbeddedValue CurrentlyNotIn{} _ = error "not allowed"
 
@@ -230,7 +254,9 @@ valueOfIntOrEmbedded f g h x m vs sz =
     range (Intersection x y) r = range x r `Set.intersection` range y r
     range (GreaterThan n) r = Set.filter (>n) r
     range (LessThan n) r = Set.filter (<n) r
-    range (Eq n) r = Set.filter (==n) r
+    range (EqInt n) r = Set.filter (==n) r
+    range (EqStr _) _ = error "valueOfIntOrEmbedded: should not happen"
+    range (NotStr _) _ = error "valueOfIntOrEmbedded: should not happen"
     range (CurrentlyIn Self) r = Set.filter (\v -> f v `elem` valuesIn (g x) m) r
     range (CurrentlyIn (Other y)) r = Set.filter (\v -> f v `elem` valuesIn (g $ varname y) m) r
     range (CurrentlyNotIn Self) r = Set.filter (\v -> f v `notElem` valuesIn (g x) m) r
@@ -267,6 +293,8 @@ data Str = FromThese [String] | NotThese [String]
 reduceStringSet :: Var String -> ValueMap -> ValueSet String -> Str
 reduceStringSet _ _ Every = NotThese []
 reduceStringSet _ _ None = FromThese []
+reduceStringSet _ _ (EqStr str) = FromThese [str]
+reduceStringSet _ _ (NotStr str) = NotThese [str]
 reduceStringSet x m (CurrentlyIn Self) = FromThese (valuesIn x m)
 reduceStringSet _ m (CurrentlyIn (Other y)) = FromThese (valuesIn y m)
 reduceStringSet x m (CurrentlyNotIn Self) = NotThese (valuesIn x m)
@@ -292,7 +320,9 @@ showValueSet = go where
   showValueSet' (Intersection vs1 vs2) = concat ["(",showValueSet' vs1,") /\\ (", showValueSet' vs2,")"]
   showValueSet' (GreaterThan n) = "v > " ++ show n
   showValueSet' (LessThan n) = "v < " ++ show n
-  showValueSet' (Eq n) = "v == " ++ show n
+  showValueSet' (EqInt n) = "v == " ++ show n
+  showValueSet' (EqStr str) = "v == " ++ show str
+  showValueSet' (NotStr str) = "v /= " ++ show str
   showValueSet' (CurrentlyIn ref) = "currentlyIn " ++ showVarRef ref
   showValueSet' (CurrentlyNotIn ref) = "currentlyNotIn " ++ showVarRef ref
   showValueSet' Every = "true"
@@ -305,7 +335,7 @@ showValueSet = go where
 -- basic ValueSets
 ints, nats :: ValueSet Integer
 ints = Every
-nats = Eq 0 `Union` GreaterThan 0
+nats = EqInt 0 `Union` GreaterThan 0
 
 bools :: ValueSet Bool
 bools = complete
@@ -338,7 +368,9 @@ z3ValueSetConstraint var m (Intersection x y) xVar = do
   mkAnd [cx,cy]
 z3ValueSetConstraint _ _ (GreaterThan n) xVar = mkIntNum n >>= mkGt xVar
 z3ValueSetConstraint _ _ (LessThan n) xVar = mkIntNum n >>= mkLt xVar
-z3ValueSetConstraint _ _ (Eq n) xVar = mkIntNum n >>= mkEq xVar
+z3ValueSetConstraint _ _ (EqInt n) xVar = mkIntNum n >>= mkEq xVar
+z3ValueSetConstraint _ _ (EqStr str) xVar = mkString str >>= mkEq xVar
+z3ValueSetConstraint _ _ (NotStr str) xVar = mkString str >>= mkEq xVar >>= mkNot
 z3ValueSetConstraint var m (CurrentlyIn Self) xVar = do
   let xs = fromMaybe [] $ Map.lookup (someVar var) m
   mkOr =<< sequence [ mkEq xVar x | x <- xs, x /= xVar]

@@ -16,6 +16,8 @@ module Test.IOTasks.Term.Prelude (
   (.&&.), (.||.),
   true, false,
   and', or',
+  -- * string values
+  strLit,
   -- * embedded values
   embeddedLit,
   -- * Simple list functions
@@ -172,6 +174,9 @@ product' = Product
 
 listLit :: (Show a, Typeable a) => [a] -> Term k [a]
 listLit = ListLit
+
+strLit :: String -> Term k String
+strLit = listLit
 
 embeddedLit :: (Embeddable a, Typeable a, Show a) => a -> Term k (Embedded a)
 embeddedLit = EmbeddedLit
