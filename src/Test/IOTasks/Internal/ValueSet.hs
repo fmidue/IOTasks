@@ -14,7 +14,7 @@ module Test.IOTasks.Internal.ValueSet (
   (\\), with, without,
   withStr, withoutStr,
   complement,
-  unique, notInVar,
+  unique, notInVar, inVar,
   embed, embedFromList,
   isEmpty,
   containsValue, initiallyContainsValue,
@@ -120,6 +120,9 @@ unique vs = CurrentlyNotIn Self `intersection` vs
 
 notInVar :: VarExp e => ValueSet a -> e a -> ValueSet a
 notInVar vs e = CurrentlyNotIn (Other $ NonEmpty.fromList $ toVarList e) `intersection` vs
+
+inVar :: VarExp e => e a -> ValueSet a
+inVar e = CurrentlyIn (Other $ NonEmpty.fromList $ toVarList e)
 
 greaterThan :: Integer -> ValueSet Integer
 greaterThan = GreaterThan
