@@ -32,12 +32,14 @@ import Type.Reflection
 import Test.QuickCheck
 
 import Z3.Monad
-import Test.IOTasks.ValueMap (ValueMap, lookupInteger, emptyValueMap, lookupBool, lookupString)
-import Test.IOTasks.Var (Var (..), SomeVar (..), someVar, intVar, Embedded (Embedded), Embeddable (..), Varname, varname)
+import Test.IOTasks.ValueMap (ValueMap, emptyValueMap, sortedEntries, ValueEntry (IntegerEntry, NoEntry, BoolEntry, StringEntry))
+import Test.IOTasks.Var (Var (..), SomeVar (..), someVar, intVar, Embedded (Embedded), Embeddable (..), Varname, varname, VarExp (toVarList))
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import Data.List (nub, sort)
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NonEmpty
 
 data ValueSet a where
   Union :: ValueSet a -> ValueSet a -> ValueSet a
@@ -47,7 +49,6 @@ data ValueSet a where
   EqInt :: Integer -> ValueSet Integer
   CurrentlyIn :: VarRef a -> ValueSet a
   CurrentlyNotIn :: VarRef a -> ValueSet a
-
   EqStr :: String -> ValueSet String
   NotStr :: String -> ValueSet String
 
@@ -58,7 +59,7 @@ data ValueSet a where
 deriving instance Eq a => Eq (ValueSet a)
 deriving instance Ord a => Ord (ValueSet a)
 
-data VarRef a = Self | Other (Var a)
+data VarRef a = Self | Other (NonEmpty (Var a))
   deriving (Eq,Ord)
 
 hasVarRefs :: ValueSet a -> Bool
@@ -117,8 +118,8 @@ fromListStr = foldr (flip withStr) empty
 unique :: ValueSet a -> ValueSet a
 unique vs = CurrentlyNotIn Self `intersection` vs
 
-notInVar :: ValueSet a -> Var a -> ValueSet a
-notInVar vs y = CurrentlyNotIn (Other y) `intersection` vs
+notInVar :: VarExp e => ValueSet a -> e a -> ValueSet a
+notInVar vs e = CurrentlyNotIn (Other $ NonEmpty.fromList $ toVarList e) `intersection` vs
 
 greaterThan :: Integer -> ValueSet Integer
 greaterThan = GreaterThan
@@ -183,13 +184,13 @@ containsValue _ _ (LessThan i) n = n < i
 containsValue _ _ (EqInt i) n = i == n
 containsValue _ _ (EqStr str) x = str == x
 containsValue _ _ (NotStr str) x = str /= x
-containsValue x m (CurrentlyIn Self) n = withVarEq x $ n `elem` valuesIn x m
-containsValue _ m (CurrentlyIn (Other y)) n = withVarEq y $ n `elem` valuesIn y m
-containsValue x m (CurrentlyNotIn Self) n = withVarEq x $ n `notElem` valuesIn x m
-containsValue _ m (CurrentlyNotIn (Other y)) n = withVarEq y $ n `notElem` valuesIn y m
+containsValue x m (CurrentlyIn Self) n = withVarEq x $ n `elem` valuesInVar x m
+containsValue _ m (CurrentlyIn (Other ys)) n = withVarEq (NonEmpty.head ys) $ n `elem` valuesInVars ys m
+containsValue x m (CurrentlyNotIn Self) n = withVarEq x $ n `notElem` valuesInVar x m
+containsValue _ m (CurrentlyNotIn (Other ys)) n = withVarEq (NonEmpty.head ys) $  n `notElem` valuesInVars ys m
 containsValue _ _ Every _ = True
 containsValue _ _ None _ = False
-containsValue _ _ (Embed vs) v = containsEmbeddedValue vs v
+containsValue x m (Embed vs) v = containsEmbeddedValue x m vs v
 
 withVarEq :: Var a -> (Eq a => r) -> r
 withVarEq IntVar{} x = x
@@ -197,34 +198,43 @@ withVarEq BoolVar{} x = x
 withVarEq StringVar{} x = x
 withVarEq EmbeddedVar{} x = x
 
-containsEmbeddedValue :: ValueSet Integer -> Embedded a -> Bool
-containsEmbeddedValue Every _ = True
-containsEmbeddedValue None _ = False
-containsEmbeddedValue (Union a b) v = containsEmbeddedValue a v || containsEmbeddedValue b v
-containsEmbeddedValue (Intersection a b) v = containsEmbeddedValue a v && containsEmbeddedValue b v
-containsEmbeddedValue (GreaterThan i) (Embedded n) = n > i
-containsEmbeddedValue (LessThan i) (Embedded n) = n < i
-containsEmbeddedValue (EqInt i) (Embedded n) = i == n
-containsEmbeddedValue CurrentlyIn{} _ = error "not allowed"
-containsEmbeddedValue CurrentlyNotIn{} _ = error "not allowed"
+containsEmbeddedValue :: Var (Embedded a) -> ValueMap -> ValueSet Integer -> Embedded a -> Bool
+containsEmbeddedValue _ _ Every _ = True
+containsEmbeddedValue _ _ None _ = False
+containsEmbeddedValue x m (Union a b) v = containsEmbeddedValue x m a v || containsEmbeddedValue x m b v
+containsEmbeddedValue x m (Intersection a b) v = containsEmbeddedValue x m a v && containsEmbeddedValue x m b v
+containsEmbeddedValue _ _ (GreaterThan i) (Embedded n) = n > i
+containsEmbeddedValue _ _ (LessThan i) (Embedded n) = n < i
+containsEmbeddedValue _ _ (EqInt i) (Embedded n) = i == n
+containsEmbeddedValue x m (CurrentlyIn Self) n = withVarEq x $ n `elem` valuesInVar x m
+containsEmbeddedValue _ m (CurrentlyIn (Other ys)) (Embedded n) = withVarEq (NonEmpty.head ys) $ n `elem` valuesInVars ys m
+containsEmbeddedValue x m (CurrentlyNotIn Self) n = withVarEq x $ n `notElem` valuesInVar x m
+containsEmbeddedValue _ m (CurrentlyNotIn (Other ys)) (Embedded n) = withVarEq (NonEmpty.head ys) $ n `notElem` valuesInVars ys m
 
-valuesIn :: Var a -> ValueMap -> [a]
-valuesIn x@IntVar{} env =
-  case lookupInteger (someVar x) env of
-    Just values -> map fst values
-    Nothing -> error $ unwords ["cannot find values for variable", show x , "in", show env, "(perhaps you misspelled a variable name)"]
-valuesIn x@(EmbeddedVar (ty :: TypeRep x) _) env =
-  case lookupInteger (withTypeable ty $ someVar x) env of
-    Just values -> map (Embedded . fst) values
-    Nothing -> error $ unwords ["cannot find values for variable", show x , "in", show env, "(perhaps you misspelled a variable name)"]
-valuesIn x@BoolVar{} env =
-  case lookupBool (someVar x) env of
-    Just values -> map fst values
-    Nothing -> error $ unwords ["cannot find values for variable", show x , "in", show env, "(perhaps you misspelled a variable name)"]
-valuesIn x@StringVar{} env =
-  case lookupString (someVar x) env of
-    Just values -> map fst values
-    Nothing -> error $ unwords ["cannot find values for variable", show x , "in", show env, "(perhaps you misspelled a variable name)"]
+valuesInVar :: Var a -> ValueMap -> [a]
+valuesInVar = valuesInVars . NonEmpty.singleton
+
+valuesInVars :: NonEmpty (Var a) -> ValueMap -> [a]
+valuesInVars xs@(IntVar{} :| _) env =
+  case sortedEntries (NonEmpty.toList xs) env of
+    IntegerEntry values -> map fst values
+    NoEntry -> []
+    _ -> error "valuesIn: impossible (type error)"
+valuesInVars xs@(EmbeddedVar ty _ :| _) env =
+  case withTypeable ty $ sortedEntries (NonEmpty.toList xs) env of
+    IntegerEntry values -> map (Embedded . fst) values
+    NoEntry -> []
+    _ -> error "valuesIn: impossible (type error)"
+valuesInVars xs@(BoolVar{} :| _) env =
+  case sortedEntries (NonEmpty.toList xs) env of
+    BoolEntry values -> map fst values
+    NoEntry -> []
+    _ -> error "valuesIn: impossible (type error)"
+valuesInVars xs@(StringVar{} :| _) env =
+  case sortedEntries (NonEmpty.toList xs) env of
+    StringEntry values -> map fst values
+    NoEntry -> []
+    _ -> error "valuesIn: impossible (type error)"
 
 
 initiallyContainsValue ::  ValueSet Integer -> Integer -> Bool
@@ -257,10 +267,10 @@ valueOfIntOrEmbedded f g h x m vs sz =
     range (EqInt n) r = Set.filter (==n) r
     range (EqStr _) _ = error "valueOfIntOrEmbedded: should not happen"
     range (NotStr _) _ = error "valueOfIntOrEmbedded: should not happen"
-    range (CurrentlyIn Self) r = Set.filter (\v -> f v `elem` valuesIn (g x) m) r
-    range (CurrentlyIn (Other y)) r = Set.filter (\v -> f v `elem` valuesIn (g $ varname y) m) r
-    range (CurrentlyNotIn Self) r = Set.filter (\v -> f v `notElem` valuesIn (g x) m) r
-    range (CurrentlyNotIn (Other y)) r = Set.filter (\v -> f v `notElem` valuesIn (g $ varname y) m) r
+    range (CurrentlyIn Self) r = Set.filter (\v -> f v `elem` valuesInVar (g x) m) r
+    range (CurrentlyIn (Other ys)) r = Set.filter (\v -> f v `elem` valuesInVars (NonEmpty.map (g . varname) ys) m) r
+    range (CurrentlyNotIn Self) r = Set.filter (\v -> f v `notElem` valuesInVar (g x) m) r
+    range (CurrentlyNotIn (Other ys)) r = Set.filter (\v -> f v `notElem` valuesInVars (NonEmpty.map (g . varname) ys) m) r
     range Every r = r
     range None _ = Set.empty
     range (Embed vs) r = range vs r
@@ -274,10 +284,10 @@ valueOfBool x m vs =
     range :: ValueSet Bool -> Set Bool -> Set Bool
     range (Union x y) r = range x r `Set.union` range y r
     range (Intersection x y) r = range x r `Set.intersection` range y r
-    range (CurrentlyIn Self) r = Set.filter (\v -> v `elem` valuesIn x m) r
-    range (CurrentlyIn (Other y)) r = Set.filter (\v -> v `elem` valuesIn y m) r
-    range (CurrentlyNotIn Self) r = Set.filter (\v -> v `notElem` valuesIn x m) r
-    range (CurrentlyNotIn (Other y)) r = Set.filter (\v -> v `notElem` valuesIn y m) r
+    range (CurrentlyIn Self) r = Set.filter (\v -> v `elem` valuesInVar x m) r
+    range (CurrentlyIn (Other ys)) r = Set.filter (\v -> v `elem` valuesInVars ys m) r
+    range (CurrentlyNotIn Self) r = Set.filter (\v -> v `notElem` valuesInVar x m) r
+    range (CurrentlyNotIn (Other ys)) r = Set.filter (\v -> v `notElem` valuesInVars ys m) r
     range Every r = r
     range None _ = Set.empty
 
@@ -295,10 +305,10 @@ reduceStringSet _ _ Every = NotThese []
 reduceStringSet _ _ None = FromThese []
 reduceStringSet _ _ (EqStr str) = FromThese [str]
 reduceStringSet _ _ (NotStr str) = NotThese [str]
-reduceStringSet x m (CurrentlyIn Self) = FromThese (valuesIn x m)
-reduceStringSet _ m (CurrentlyIn (Other y)) = FromThese (valuesIn y m)
-reduceStringSet x m (CurrentlyNotIn Self) = NotThese (valuesIn x m)
-reduceStringSet _ m (CurrentlyNotIn (Other y)) = NotThese (valuesIn y m)
+reduceStringSet x m (CurrentlyIn Self) = FromThese (valuesInVar x m)
+reduceStringSet _ m (CurrentlyIn (Other ys)) = FromThese (valuesInVars ys m)
+reduceStringSet x m (CurrentlyNotIn Self) = NotThese (valuesInVar x m)
+reduceStringSet _ m (CurrentlyNotIn (Other ys)) = NotThese (valuesInVars ys m)
 reduceStringSet x m (Union a b) = case (reduceStringSet x m a, reduceStringSet x m b) of
   (FromThese xs, FromThese ys) -> FromThese (xs ++ ys)
   (FromThese xs, NotThese ys) -> NotThese [ y | y <- ys, y `notElem` xs ]
@@ -325,6 +335,8 @@ showValueSet = go where
   showValueSet' (NotStr str) = "v /= " ++ show str
   showValueSet' (CurrentlyIn ref) = "currentlyIn " ++ showVarRef ref
   showValueSet' (CurrentlyNotIn ref) = "currentlyNotIn " ++ showVarRef ref
+  -- showValueSet' (CurrentlyInVarList xs) = "currentlyInVarList " ++ show (NonEmpty.toList xs)
+  -- showValueSet' (CurrentlyNotInVarList xs) = "currentlyNotInVarList " ++ show (NonEmpty.toList xs)
   showValueSet' Every = "true"
   showValueSet' None = "false"
   showValueSet' (Embed vs) = "Embed " ++ showValueSet' vs
@@ -374,14 +386,14 @@ z3ValueSetConstraint _ _ (NotStr str) xVar = mkString str >>= mkEq xVar >>= mkNo
 z3ValueSetConstraint var m (CurrentlyIn Self) xVar = do
   let xs = fromMaybe [] $ Map.lookup (someVar var) m
   mkOr =<< sequence [ mkEq xVar x | x <- xs, x /= xVar]
-z3ValueSetConstraint _ m (CurrentlyIn (Other y)) xVar = do
-  let xs = fromMaybe [] $ Map.lookup (someVar y) m
+z3ValueSetConstraint _ m (CurrentlyIn (Other ys)) xVar = do
+  let xs = maybe [] (concat . NonEmpty.toList) $ traverse ((`Map.lookup` m) . someVar) ys
   mkOr =<< sequence [ mkEq xVar x | x <- xs, x /= xVar]
 z3ValueSetConstraint var m (CurrentlyNotIn Self) xVar = do
   let xs = fromMaybe [] $ Map.lookup (someVar var) m
   mkAnd =<< sequence [ mkNot =<< mkEq xVar x | x <- xs, x /= xVar]
-z3ValueSetConstraint _ m (CurrentlyNotIn (Other y)) xVar = do
-  let xs = fromMaybe [] $ Map.lookup (someVar y) m
+z3ValueSetConstraint _ m (CurrentlyNotIn (Other ys)) xVar = do
+  let xs = maybe [] (concat . NonEmpty.toList) $ traverse ((`Map.lookup` m) . someVar) ys
   mkAnd =<< sequence [ mkNot =<< mkEq xVar x | x <- xs, x /= xVar]
 z3ValueSetConstraint x@(EmbeddedVar (_ :: TypeRep x) _) m Every xVar = z3ValueSetConstraint x m (Embed $ fromList (embeddingRange @x)) xVar
 z3ValueSetConstraint _ _ Every _ = mkTrue

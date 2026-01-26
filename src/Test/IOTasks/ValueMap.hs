@@ -65,8 +65,11 @@ combinedEntries x m = foldr combineEntries NoEntry $ mapMaybe ((`Map.lookup` val
     combineEntries NoEntry y = y
     combineEntries x NoEntry = x
     combineEntries (IntegerEntry xs) (IntegerEntry ys) = IntegerEntry $ xs ++ ys
+    combineEntries IntegerEntry{} _ = error "combinedEntries: impossible"
     combineEntries (StringEntry xs) (StringEntry ys) = StringEntry $ xs ++ ys
-    combineEntries _ _ = error "combinedEntries: impossible"
+    combineEntries StringEntry{} _ = error "combinedEntries: impossible"
+    combineEntries (BoolEntry xs) (BoolEntry ys) = BoolEntry $ xs ++ ys
+    combineEntries BoolEntry{} _ = error "combinedEntries: impossible"
 
 -- TODO: before combining each entry is already sorted, switch to merge sort?
 sortedEntries :: Typeable a => [Var a] -> ValueMap -> ValueEntry
