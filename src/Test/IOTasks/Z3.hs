@@ -14,6 +14,7 @@
 module Test.IOTasks.Z3 (
   findPathInput, printPathScript, evalPathScript,
   satPaths, satPathsQ, isSatPath, SatResult(..), Timeout,
+  ExplorationResult(..),
   PathInjector(..), mkPathInjector,
   ) where
 
@@ -85,14 +86,21 @@ updateContext NotSAT NoContext = RequirePruningCheck
 updateContext _ RequirePruningCheck = error "updateContext: should not happen"
 
 type PrefixPath = [Some SimpleConstraint]
-satPaths :: (Int,Int) -> Int -> ConstraintTree -> Int -> Bool -> IO [SimplePath]
+satPaths :: (Int,Int) -> Int -> ConstraintTree -> Int -> Bool -> IO ([SimplePath],Int)
 satPaths (minUnfolds,maxUnfolds) to t maxSeqLength checkOverflows = do
   q <- atomically newTQueue
   nVar <- newTVarIO Nothing
   satPathsQ nVar to t (minUnfolds,maxUnfolds) maxSeqLength checkOverflows q
-  map fromJust . init <$> atomically (flushTQueue q)
+  foldr combineResults ([],0) <$> atomically (flushTQueue q)
+  where
+    combineResults :: Maybe ExplorationResult -> ([SimplePath],Int) -> ([SimplePath],Int)
+    combineResults (Just (SatPath p)) (ps,n) = (p : ps,n)
+    combineResults (Just TimeoutOccurred) (ps,n) = (ps,n+1)
+    combineResults Nothing (ps,n) = (ps,n)
 
-satPathsQ :: TVar (Maybe Int) -> Int -> ConstraintTree -> (Int,Int) -> Int -> Bool -> TQueue (Maybe SimplePath) -> IO ()
+data ExplorationResult = SatPath SimplePath | TimeoutOccurred
+
+satPathsQ :: TVar (Maybe Int) -> Int -> ConstraintTree -> (Int,Int) -> Int -> Bool -> TQueue (Maybe ExplorationResult) -> IO ()
 satPathsQ nVar to t (minUnfolds,maxUnfolds) maxSeqLength checkOverflows q = do
   evalStateT (satPaths' 0 0 to t ([],ClosedPath []) q) NoContext
   atomically $ writeTQueue q Nothing
@@ -107,14 +115,17 @@ satPathsQ nVar to t (minUnfolds,maxUnfolds) maxSeqLength checkOverflows q = do
     --  if in pruning mode after searching left branch of Choice, check prefix path
     --    if UNSAT: prune right branch, stay in pruning mode
     --    if SAT: leave pruning mode, continue search with right branch
-    satPaths' :: Int -> Int -> Int -> ConstraintTree -> (PrefixPath,SimplePath) -> TQueue (Maybe SimplePath) -> StateT SearchContext IO ()
+    satPaths' :: Int -> Int -> Int -> ConstraintTree -> (PrefixPath,SimplePath) -> TQueue (Maybe ExplorationResult) -> StateT SearchContext IO ()
     satPaths' nUnfolds _ to Empty (_,p) q
       | nUnfolds < minUnfolds = pure ()
       | otherwise = do
         let basePath = completePath [] p
         res <- lift $ isSatPath to basePath maxSeqLength checkOverflows
         modify $ updateContext res
-        when (res == SAT ()) $ lift $ atomically $ writeTQueue q $ Just p
+        case res of
+          SAT () -> lift $ atomically $ writeTQueue q $ Just $ SatPath p
+          Timeout -> lift $ atomically $ writeTQueue q $ Just TimeoutOccurred
+          NotSAT -> pure ()
     satPaths' nUnfolds nInputs to (Choice l r) (s,p) q = do
       satPaths' nUnfolds nInputs to l (s,p) q
       ctx <- get

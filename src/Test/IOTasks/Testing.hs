@@ -118,7 +118,7 @@ taskCheckWithOutcome Args{..} prog spec = do
   pure out
 
   where
-    testProcedure :: Output -> TVar (Maybe Int) -> TQueue (Maybe SimplePath) -> IO (CoreOutcome,SatPaths,NumberOfInputs,Timeouts,Overflows)
+    testProcedure :: Output -> TVar (Maybe Int) -> TQueue (Maybe ExplorationResult) -> IO (CoreOutcome,SatPaths,NumberOfInputs,Timeouts,Overflows)
     testProcedure output nVar q = mainLoop (0,0,0,0) Nothing
       where
         mainLoop :: (SatPaths,NumberOfInputs,Timeout,Overflows) -> Maybe CoreOutcome -> IO (CoreOutcome,SatPaths,NumberOfInputs,Timeouts,Overflows)
@@ -133,7 +133,8 @@ taskCheckWithOutcome Args{..} prog spec = do
             Nothing -> case mFailure of
               Just failure -> pure (failure,nP,n,t,o)
               Nothing -> pure (Success n,nP,n,t,o)
-            Just p
+            Just TimeoutOccurred -> mainLoop (nP,n,t+1,o) mFailure
+            Just (SatPath p)
               | maybe False (pathDepth (completePath [] p) >) currentMaxPathLength -> mainLoop (nP,n,t,o) mFailure -- skip this path
               | otherwise -> do
                 (outPlain,n',oPlain) <- testPlain n p
