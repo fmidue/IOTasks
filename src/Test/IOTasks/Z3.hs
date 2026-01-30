@@ -525,7 +525,7 @@ listASTs _ (ListLit xs) _ _ =
     , fallbackCase' $ error $ "list literal of unsupported type " ++ show (typeRep @[a])
     ]
 listASTs _ (All x n) e vars = pure . Right $ lookupList (weaveVariables x n e) vars
-listASTs _ (Current x n) e vars = pure . Left . head $ lookupList (weaveVariables x n e) vars
+listASTs _ (Current x n) e vars = pure . Left . last $ lookupList (weaveVariables x n e) vars
 listASTs _ Add{} _ _ = error "lists should not have a Num instance"
 listASTs _ Sub{} _ _ = error "lists should not have a Num instance"
 listASTs _ Mul{} _ _ = error "lists should not have a Num instance"
