@@ -105,17 +105,12 @@ simplePaths m n = go 0 where
     | u >= m = [ClosedPath []]
     | otherwise = []
   go u _ | u > n = []
-  go u (Choice lt rt) = mergePaths (go u lt) (go u rt)
+  go u (Choice lt rt) = go u lt ++ go u rt
   go u (Assert c t) = prependPath (Some c) <$> go u t
   go u (InjectionPoint c t) = OpenPath [] c <$> go u t
   go u (Unfold t)
     | u < n = go (u+1) t
     | otherwise = []
-
-mergePaths :: [SimplePath] -> [SimplePath] -> [SimplePath]
-mergePaths xs [] = xs
-mergePaths [] ys = ys
-mergePaths (x:xs) (y:ys) = x:y:mergePaths xs ys
 
 type Path = [Some Constraint]
 
