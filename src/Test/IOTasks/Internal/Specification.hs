@@ -13,6 +13,7 @@ module Test.IOTasks.Internal.Specification (
   InputMode(..),
   sem, semSt, RecRes(..),
   accept, Action(..),
+  isRelevantInput,
   LoopBody(..),
   ) where
 
@@ -361,7 +362,7 @@ accept s_ t_ = accept' s_ k_I t_ d_I
       _ -> False
     accept' (ReadInput x (ty :: ValueSet a) ElseAbort s') k t d = case t of
       NProgRead v t'| containsValue x d ty val -> accept' s' k t' (insertValue (wrapValue val) (someVar x) d)
-                         where val = readValue x v
+                          where val = readValue x v
       NProgRead v NTerminate | not (containsValue x d ty (readValue x v)) -> True
       _ -> False
     accept' s@(ReadInput x (ty :: ValueSet a) UntilValid s') k t d = case t of
@@ -390,6 +391,22 @@ accept s_ t_ = accept' s_ k_I t_ d_I
     k_I Exit _ _ = error "ill-formed specification: exit marker at top-level"
     d_I :: ValueMap
     d_I = emptyValueMap $ readVars s_
+
+
+-- turn accept into an input sequence validator
+isRelevantInput :: Specification -> [String] -> Bool
+isRelevantInput s is =
+  accept
+    (removeWriteOutput s) -- don't check for correct outputs
+    (foldr progReadLine terminate is) -- inputs only trace
+  where
+    removeWriteOutput :: Specification -> Specification
+    removeWriteOutput (ReadInput x ty m s') = ReadInput x ty m (removeWriteOutput s')
+    removeWriteOutput (WriteOutput _ _ s') = removeWriteOutput s'
+    removeWriteOutput (Branch c s1 s2 s') = Branch c (removeWriteOutput s1) (removeWriteOutput s2) (removeWriteOutput s')
+    removeWriteOutput (TillE bdy s') = TillE (removeWriteOutput bdy) (removeWriteOutput s')
+    removeWriteOutput E = E
+    removeWriteOutput Nop = Nop
 
 -- generators
 instance Arbitrary Specification where

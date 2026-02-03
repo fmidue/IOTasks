@@ -7,7 +7,7 @@ module Test.IOTasks.Specification (
   readVars, hasIteration,
   pPrintSpecification,
   InputMode(..),
-  accept,
+  accept, isRelevantInput,
   LoopBody(..),
   ) where
 
