@@ -5,6 +5,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
+{-# LANGUAGE GADTs #-}
 module TestProperties (testCheapProperties, testExpensiveProperties) where
 
 import Test.Hspec
@@ -14,12 +15,19 @@ import Test.QuickCheck hiding (isSuccess, stdArgs, Args)
 import Control.Monad.Loops (allM)
 
 import Test.IOTasks
-import Test.IOTasks.Specification (LoopBody(..))
+import Test.IOTasks.Specification (isRelevantInput,LoopBody(..))
 import Test.IOTasks.Random (genInput)
 import qualified Test.IOTasks.Random as Random (stdArgs, Args(..))
 import Test.IOTasks.ValueSet
 import Test.IOTasks.Trace
 import Test.IOTasks.OutputPattern (PatternKind(TraceP),(>:), nonEmptyWildcard)
+import Test.IOTasks.Z3 (satPaths, isSatPath, SatResult (SAT))
+import Test.IOTasks.Constraints (constraintTree, pathDepth, completePath, Path, Constraint (InputConstraint, ConditionConstraint))
+import SumToZeroSpec (sumToZeroSpec)
+import Data.Some (Some(Some))
+import Type.Match (matchType, inCaseOfE', fallbackCase')
+import Data.Typeable ((:~~:)(HRefl))
+import Control.Monad (filterM)
 
 testExpensiveProperties :: Spec
 testExpensiveProperties = do
@@ -52,9 +60,28 @@ testExpensiveProperties = do
 
 testCheapProperties :: Spec
 testCheapProperties = do
+  context "testing with fixed specifications" $ do
+    prop "input generation can find all relevant inputs" $
+      let s = sumToZeroSpec -- simple spec with no negative inputs, but non-trivial constraints
+      in forAll
+        (listOf (chooseInteger (-100,100))
+          `suchThat`
+          \is -> length is <= 25 &&isRelevantInput s (map show is))
+        (\is -> ioProperty $ do
+          paths <- map (completePath []) . fst <$> satPaths (0,25) 1000 (constraintTree s) 10 False
+          (1 ==) . length
+            <$> filterM (\p -> do
+              res <- isSatPath 1000 p 10 False
+              pure (length is == pathDepth p && res == SAT ())
+            ) paths
+        )
+
   context "testing with random specifications" $ do
     prop "programs built from a spec satisfy that spec" $
       \s -> allM (\p -> isSuccess <$> taskCheckWithOutcome stdArgs{terminalOutput=False,maxIterationUnfold=15,testsPerPath=5} p s) (interpret s) `shouldReturn` True
+
+    prop "relate input generation and accept-based relevant inputs" $
+      \s -> all (isRelevantInput s) <$> generateStaticTestSuite stdArgs s `shouldReturn` True
 
     prop "relate runSpecification based semantics to accept (cf FLOPS 2020)" $
       \s -> testAgainst s s
@@ -71,8 +98,8 @@ testCheapProperties = do
       forAll genPattern $ \p -> wildcard >: p
     modifyMaxSuccess (*100) $ prop "reflexivity of >:" $
       forAll genPattern $ \p -> p >: p
-    modifyMaxSuccess (*100) $ prop "transitivity of >:" $ --improve?
-       --improve?
+    modifyMaxSuccess (*100) $ prop "transitivity of >:" $
+      --improve?
       forAll ((,,) <$> genPattern <*> genPattern <*> genPattern) $ \(x,y,z) -> not (not (x >: z) && (x >: y) && (y >: z))
     modifyMaxSuccess (*100) $ prop "antisymmetry of >:" $
       forAll ((,) <$> genPattern <*> genPattern) $ \(x,y) -> (x==y) || not (x >: y && y >: x)
@@ -121,6 +148,20 @@ testCheapProperties = do
 
     describe "NTraceGeneralized" $ do
       generalTraceProperties @NTraceGeneralized
+
+assertInputSequence :: [Integer] -> Path -> Path
+assertInputSequence [] ((Some InputConstraint{}):_) = error "out of inputs"
+assertInputSequence [] [] = []
+assertInputSequence (_:_) [] = error "too many inputs"
+assertInputSequence (i:is) (c@(Some (InputConstraint (var :: Var a,_) _ m)):p) =
+  let
+    new = matchType @a
+      [inCaseOfE' @Integer $ \HRefl -> Some (ConditionConstraint (currentValue var .==. intLit i) m)
+      , fallbackCase' $ error "only integers allowed"
+      ]
+  in c : new : assertInputSequence is p
+assertInputSequence is (c:p) = c : assertInputSequence is p
+
 
 generalTraceProperties :: forall t. (Trace t, Eq t) => Spec
 generalTraceProperties = do
