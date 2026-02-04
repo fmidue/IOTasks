@@ -3,6 +3,7 @@ module Test.IOTasks.OutputPattern (
   OutputPattern,
   wildcard, nonEmptyWildcard, text, resultOf, decoratedResultOf, emptyPattern,
   valueTerms,
+  canBeEmpty,
   showPattern, showPatternSimple,
   evalPattern,
   (>:),
