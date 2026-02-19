@@ -4,6 +4,8 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TupleSections #-}
 module Test.IOTasks.Internal.ValueSet (
   ValueSet(..),
   empty, complete,
@@ -14,7 +16,7 @@ module Test.IOTasks.Internal.ValueSet (
   (\\), with, without,
   withStr, withoutStr,
   complement,
-  unique, notInVar, inVar,
+  unique, notYetIn, alreadyIn, differentFromLast,
   embed, embedFromList,
   isEmpty,
   containsValue, initiallyContainsValue,
@@ -32,14 +34,16 @@ import Type.Reflection
 import Test.QuickCheck
 
 import Z3.Monad
-import Test.IOTasks.ValueMap (ValueMap, emptyValueMap, sortedEntries, ValueEntry (IntegerEntry, NoEntry, BoolEntry, StringEntry))
+import Test.IOTasks.ValueMap (ValueMap, emptyValueMap, sortedEntries, ValueEntry (IntegerEntry, NoEntry, BoolEntry, StringEntry),  traverseValueEntries)
 import Test.IOTasks.Var (Var (..), SomeVar (..), someVar, intVar, Embedded (Embedded), Embeddable (..), Varname, varname, VarExp (toVarList))
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe)
+import Data.Maybe (maybeToList)
 import Data.List (nub, sort)
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
+import Data.List.Extra (maximumOn)
+import Data.Functor ((<&>))
 
 data ValueSet a where
   Union :: ValueSet a -> ValueSet a -> ValueSet a
@@ -49,6 +53,8 @@ data ValueSet a where
   EqInt :: Integer -> ValueSet Integer
   CurrentlyIn :: VarRef a -> ValueSet a
   CurrentlyNotIn :: VarRef a -> ValueSet a
+  DifferentFromLast :: VarRef a -> ValueSet a
+  SameAsLast :: VarRef a -> ValueSet a
   EqStr :: String -> ValueSet String
   NotStr :: String -> ValueSet String
 
@@ -73,6 +79,8 @@ hasVarRefs NotStr{} = False
 hasVarRefs (Embed vs) = hasVarRefs vs
 hasVarRefs CurrentlyIn{} = True
 hasVarRefs CurrentlyNotIn{} = True
+hasVarRefs DifferentFromLast{} = True
+hasVarRefs SameAsLast{} = True
 hasVarRefs (Union x y) = hasVarRefs x || hasVarRefs y
 hasVarRefs (Intersection x y) = hasVarRefs x || hasVarRefs y
 
@@ -118,11 +126,14 @@ fromListStr = foldr (flip withStr) empty
 unique :: ValueSet a -> ValueSet a
 unique vs = CurrentlyNotIn Self `intersection` vs
 
-notInVar :: VarExp e => ValueSet a -> e a -> ValueSet a
-notInVar vs e = CurrentlyNotIn (Other $ NonEmpty.fromList $ toVarList e) `intersection` vs
+notYetIn :: VarExp e => ValueSet a -> e a -> ValueSet a
+notYetIn vs e = CurrentlyNotIn (Other $ NonEmpty.fromList $ toVarList e) `intersection` vs
 
-inVar :: VarExp e => e a -> ValueSet a
-inVar e = CurrentlyIn (Other $ NonEmpty.fromList $ toVarList e)
+alreadyIn :: VarExp e => e a -> ValueSet a
+alreadyIn e = CurrentlyIn (Other $ NonEmpty.fromList $ toVarList e)
+
+differentFromLast :: VarExp e => ValueSet a -> e a -> ValueSet a
+differentFromLast vs e = DifferentFromLast (Other $ NonEmpty.fromList $ toVarList e) `intersection` vs
 
 greaterThan :: Integer -> ValueSet Integer
 greaterThan = GreaterThan
@@ -171,6 +182,8 @@ complement (EqStr str) = NotStr str
 complement (NotStr str) = EqStr str
 complement (CurrentlyIn x) = CurrentlyNotIn x
 complement (CurrentlyNotIn x) = CurrentlyIn x
+complement (DifferentFromLast x) = SameAsLast x
+complement (SameAsLast x) = DifferentFromLast x
 complement Every = None
 complement None = Every
 complement (Embed vs) = embedComplement (Embed vs)
@@ -191,6 +204,10 @@ containsValue x m (CurrentlyIn Self) n = withVarEq x $ n `elem` valuesInVar x m
 containsValue _ m (CurrentlyIn (Other ys)) n = withVarEq (NonEmpty.head ys) $ n `elem` valuesInVars ys m
 containsValue x m (CurrentlyNotIn Self) n = withVarEq x $ n `notElem` valuesInVar x m
 containsValue _ m (CurrentlyNotIn (Other ys)) n = withVarEq (NonEmpty.head ys) $  n `notElem` valuesInVars ys m
+containsValue x m (DifferentFromLast Self) n = withVarEq x $ Just n /= lastValueOfVar x m
+containsValue _ m (DifferentFromLast (Other ys)) n = withVarEq (NonEmpty.head ys) $ Just n /= lastValueOfVars ys m
+containsValue x m (SameAsLast Self) n = withVarEq x $ Just n == lastValueOfVar x m
+containsValue _ m (SameAsLast (Other ys)) n = withVarEq (NonEmpty.head ys) $ Just n == lastValueOfVars ys m
 containsValue _ _ Every _ = True
 containsValue _ _ None _ = False
 containsValue x m (Embed vs) v = containsEmbeddedValue x m vs v
@@ -213,6 +230,20 @@ containsEmbeddedValue x m (CurrentlyIn Self) n = withVarEq x $ n `elem` valuesIn
 containsEmbeddedValue _ m (CurrentlyIn (Other ys)) (Embedded n) = withVarEq (NonEmpty.head ys) $ n `elem` valuesInVars ys m
 containsEmbeddedValue x m (CurrentlyNotIn Self) n = withVarEq x $ n `notElem` valuesInVar x m
 containsEmbeddedValue _ m (CurrentlyNotIn (Other ys)) (Embedded n) = withVarEq (NonEmpty.head ys) $ n `notElem` valuesInVars ys m
+containsEmbeddedValue x m (SameAsLast Self) n = withVarEq x $ Just n == lastValueOfVar x m
+containsEmbeddedValue _ m (SameAsLast (Other ys)) (Embedded n) = withVarEq (NonEmpty.head ys) $ Just n == lastValueOfVars ys m
+containsEmbeddedValue x m (DifferentFromLast Self) n = withVarEq x $ Just n /= lastValueOfVar x m
+containsEmbeddedValue _ m (DifferentFromLast (Other ys)) (Embedded n) = withVarEq (NonEmpty.head ys) $ Just n /= lastValueOfVars ys m
+
+lastValueOfVar :: Var a -> ValueMap -> Maybe a
+lastValueOfVar x m = case valuesInVar x m of
+  [] -> Nothing
+  xs -> Just $ last xs
+
+lastValueOfVars :: NonEmpty (Var a) -> ValueMap -> Maybe a
+lastValueOfVars x m = case valuesInVars x m of
+  [] -> Nothing
+  xs -> Just $ last xs
 
 valuesInVar :: Var a -> ValueMap -> [a]
 valuesInVar = valuesInVars . NonEmpty.singleton
@@ -274,6 +305,10 @@ valueOfIntOrEmbedded f g h x m vs sz =
     range (CurrentlyIn (Other ys)) r = Set.filter (\v -> f v `elem` valuesInVars (NonEmpty.map (g . varname) ys) m) r
     range (CurrentlyNotIn Self) r = Set.filter (\v -> f v `notElem` valuesInVar (g x) m) r
     range (CurrentlyNotIn (Other ys)) r = Set.filter (\v -> f v `notElem` valuesInVars (NonEmpty.map (g . varname) ys) m) r
+    range (SameAsLast Self) r = Set.filter (\v -> Just (f v) == lastValueOfVar (g x) m) r
+    range (SameAsLast (Other ys)) r = Set.filter (\v -> Just (f v) == lastValueOfVars (NonEmpty.map (g . varname) ys) m) r
+    range (DifferentFromLast Self) r = Set.filter (\v -> Just (f v) /= lastValueOfVar (g x) m) r
+    range (DifferentFromLast (Other ys)) r = Set.filter (\v -> Just (f v) /= lastValueOfVars (NonEmpty.map (g . varname) ys) m) r
     range Every r = r
     range None _ = Set.empty
     range (Embed vs) r = range vs r
@@ -291,6 +326,10 @@ valueOfBool x m vs =
     range (CurrentlyIn (Other ys)) r = Set.filter (\v -> v `elem` valuesInVars ys m) r
     range (CurrentlyNotIn Self) r = Set.filter (\v -> v `notElem` valuesInVar x m) r
     range (CurrentlyNotIn (Other ys)) r = Set.filter (\v -> v `notElem` valuesInVars ys m) r
+    range (SameAsLast Self) r = Set.filter (\v -> Just v == lastValueOfVar x m) r
+    range (SameAsLast (Other ys)) r = Set.filter (\v -> Just v == lastValueOfVars ys m) r
+    range (DifferentFromLast Self) r = Set.filter (\v -> Just v /= lastValueOfVar x m) r
+    range (DifferentFromLast (Other ys)) r = Set.filter (\v -> Just v /= lastValueOfVars ys m) r
     range Every r = r
     range None _ = Set.empty
 
@@ -312,6 +351,10 @@ reduceStringSet x m (CurrentlyIn Self) = FromThese (valuesInVar x m)
 reduceStringSet _ m (CurrentlyIn (Other ys)) = FromThese (valuesInVars ys m)
 reduceStringSet x m (CurrentlyNotIn Self) = NotThese (valuesInVar x m)
 reduceStringSet _ m (CurrentlyNotIn (Other ys)) = NotThese (valuesInVars ys m)
+reduceStringSet x m (SameAsLast Self) = FromThese $ maybeToList $ lastValueOfVar x m
+reduceStringSet _ m (SameAsLast (Other ys)) = FromThese $ maybeToList $ lastValueOfVars ys m
+reduceStringSet x m (DifferentFromLast Self) = NotThese $ maybeToList $ lastValueOfVar x m
+reduceStringSet _ m (DifferentFromLast (Other ys)) = NotThese $ maybeToList $ lastValueOfVars ys m
 reduceStringSet x m (Union a b) = case (reduceStringSet x m a, reduceStringSet x m b) of
   (FromThese xs, FromThese ys) -> FromThese (xs ++ ys)
   (FromThese xs, NotThese ys) -> NotThese [ y | y <- ys, y `notElem` xs ]
@@ -338,8 +381,8 @@ showValueSet = go where
   showValueSet' (NotStr str) = "v /= " ++ show str
   showValueSet' (CurrentlyIn ref) = "currentlyIn " ++ showVarRef ref
   showValueSet' (CurrentlyNotIn ref) = "currentlyNotIn " ++ showVarRef ref
-  -- showValueSet' (CurrentlyInVarList xs) = "currentlyInVarList " ++ show (NonEmpty.toList xs)
-  -- showValueSet' (CurrentlyNotInVarList xs) = "currentlyNotInVarList " ++ show (NonEmpty.toList xs)
+  showValueSet' (SameAsLast ref) = "sameAsLast " ++ showVarRef ref
+  showValueSet' (DifferentFromLast ref) = "differentFromLast " ++ showVarRef ref
   showValueSet' Every = "true"
   showValueSet' None = "false"
   showValueSet' (Embed vs) = "Embed " ++ showValueSet' vs
@@ -362,17 +405,26 @@ str = Every
 -- | Check if a given 'ValueSet' of integers is empty.
 --
 -- This function uses an external SMT solver to check the constraints defined by the 'ValueSet'.
-isEmpty :: Var Integer -> Map SomeVar [AST] -> ValueSet Integer -> IO Bool
+isEmpty :: Var Integer -> ValueMap -> ValueSet Integer -> IO Bool
 isEmpty var m vs = evalZ3 $ do
   x <- mkIntVar =<< mkStringSymbol "x"
-  assert =<< z3ValueSetConstraint var m vs x
+  astMap <- mkASTMap
+  assert =<< z3ValueSetConstraint var astMap vs x
   res <- check
   pure $ case res of
     Sat -> False
     Unsat -> True
     Undef -> error "isEmpty: could not solve SMT constraints"
+  where
+    mkASTMap :: Z3 (Map SomeVar [(AST,Int)])
+    mkASTMap = traverseValueEntries m $ \case
+      BoolEntry xs -> mapM (\(b,i) -> mkBool b <&> (,i)) xs
+      IntegerEntry xs -> mapM (\(b,i) -> mkInteger b <&> (,i)) xs
+      StringEntry xs -> mapM (\(b,i) -> mkString b <&> (,i)) xs
+      NoEntry -> pure []
 
-z3ValueSetConstraint :: MonadZ3 z3 => Typeable a => Var a -> Map SomeVar [AST] -> ValueSet a -> AST -> z3 AST
+
+z3ValueSetConstraint :: MonadZ3 z3 => Typeable a => Var a -> Map SomeVar [(AST,Int)] -> ValueSet a -> AST -> z3 AST
 z3ValueSetConstraint var m (Union x y) xVar = do
   cx <- z3ValueSetConstraint var m x xVar
   cy <- z3ValueSetConstraint var m y xVar
@@ -387,18 +439,40 @@ z3ValueSetConstraint _ _ (EqInt n) xVar = mkIntNum n >>= mkEq xVar
 z3ValueSetConstraint _ _ (EqStr str) xVar = mkString str >>= mkEq xVar
 z3ValueSetConstraint _ _ (NotStr str) xVar = mkString str >>= mkEq xVar >>= mkNot
 z3ValueSetConstraint var m (CurrentlyIn Self) xVar = do
-  let xs = fromMaybe [] $ Map.lookup (someVar var) m
+  let xs = maybe [] (map fst) (Map.lookup (someVar var) m)
   mkOr =<< sequence [ mkEq xVar x | x <- xs, x /= xVar]
 z3ValueSetConstraint _ m (CurrentlyIn (Other ys)) xVar = do
-  let xs = maybe [] (concat . NonEmpty.toList) $ traverse ((`Map.lookup` m) . someVar) ys
+  let xs = maybe [] (map fst . concat . NonEmpty.toList) $ traverse ((`Map.lookup` m) . someVar) ys
   mkOr =<< sequence [ mkEq xVar x | x <- xs, x /= xVar]
 z3ValueSetConstraint var m (CurrentlyNotIn Self) xVar = do
-  let xs = fromMaybe [] $ Map.lookup (someVar var) m
+  let xs = maybe [] (map fst) $ Map.lookup (someVar var) m
   mkAnd =<< sequence [ mkNot =<< mkEq xVar x | x <- xs, x /= xVar]
 z3ValueSetConstraint _ m (CurrentlyNotIn (Other ys)) xVar = do
-  let xs = maybe [] (concat . NonEmpty.toList) $ traverse ((`Map.lookup` m) . someVar) ys
+  let xs = maybe [] (map fst . concat . NonEmpty.toList) $ traverse ((`Map.lookup` m) . someVar) ys
   mkAnd =<< sequence [ mkNot =<< mkEq xVar x | x <- xs, x /= xVar]
+z3ValueSetConstraint var m (SameAsLast Self) xVar =
+  case lookupLastAST (someVar var) m of
+    Just x -> mkEq xVar x
+    Nothing -> error $ "no values for " ++ show var ++ " found! (you are probably specifying inputs to be from an empty set)"
+z3ValueSetConstraint _ m (SameAsLast (Other ys)) xVar =
+  case lookupLastsAST (NonEmpty.map someVar ys) m of
+    Just x -> mkNot =<< mkEq xVar x
+    Nothing -> error $ "no values for " ++ show ys ++ " found! (you are probably specifying inputs to be from an empty set)"
+z3ValueSetConstraint var m (DifferentFromLast Self) xVar =
+  case lookupLastAST (someVar var) m of
+    Just x -> mkNot =<< mkEq xVar x
+    Nothing -> mkTrue
+z3ValueSetConstraint _ m (DifferentFromLast (Other ys)) xVar =
+  case lookupLastsAST (NonEmpty.map someVar ys) m of
+    Just x -> mkNot =<< mkEq xVar x
+    Nothing -> mkTrue
 z3ValueSetConstraint x@(EmbeddedVar (_ :: TypeRep x) _) m Every xVar = z3ValueSetConstraint x m (Embed $ fromList (embeddingRange @x)) xVar
 z3ValueSetConstraint _ _ Every _ = mkTrue
 z3ValueSetConstraint _ _ None _ = mkFalse
 z3ValueSetConstraint (EmbeddedVar _ x) m (Embed vs) xVar = z3ValueSetConstraint (intVar x) m vs xVar
+
+lookupLastAST :: SomeVar -> Map SomeVar [(AST,Int)] -> Maybe AST
+lookupLastAST x m = fst . maximumOn snd <$> Map.lookup x m
+
+lookupLastsAST :: NonEmpty SomeVar -> Map SomeVar [(AST,Int)] -> Maybe AST
+lookupLastsAST xs m = fst . maximumOn snd . concat . NonEmpty.toList <$> traverse (`Map.lookup` m) xs

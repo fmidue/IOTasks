@@ -11,6 +11,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE NamedFieldPuns #-}
 module Test.IOTasks.Z3 (
   findPathInput, printPathScript, evalPathScript,
   satPaths, satPathsQ, isSatPath, SatResult(..), Timeout,
@@ -38,7 +39,7 @@ import Control.Monad.State
 import Data.Maybe (catMaybes, fromMaybe, mapMaybe, fromJust)
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Tuple.Extra (fst3, thd3)
+import Data.Tuple.Extra (thd3)
 
 import Data.List as List
 import Test.QuickCheck.Gen (Gen)
@@ -192,6 +193,14 @@ data ValueGenerator where
 withGeneratedValue :: (forall v. Typeable v => v -> r) -> ValueGenerator -> ValueMap -> Size -> IO r
 withGeneratedValue f (ValueGenerator g) m sz = f <$> generate (g m sz)
 
+data VarRecord = VarRecord
+  { var :: (SomeVar, Int)
+  , varAST :: AST
+  , timeStep :: Int
+  , isNegative :: Bool
+  , valueGenerator :: ValueGenerator
+  }
+
 pathScript :: Path -> ScriptMode -> Bool -> Z3R (SatResult [String], String)
 pathScript path mode checkOverflows = do
   let (tyConstr,predConstr,overflowConstr) = partitionPath path
@@ -200,23 +209,29 @@ pathScript path mode checkOverflows = do
   vars <- forM tyConstr $
     \(InputConstraint (iVar@(Var (x,_)),i) (vs :: ValueSet v) e) -> do
       var <- mkFreshVar (x ++ show i) =<< mkSortFor iVar
-      let r = maybe 0 (maximum . chronology) $ Map.lookup (someVar iVar) e
-      pure (((someVar iVar,i),var,r),ValueGenerator $ \m -> valueOf iVar m vs)
+      pure $ VarRecord
+        { var = (someVar iVar,i)
+        , varAST = var
+        , timeStep = maybe 0 (maximum . chronology) $ Map.lookup (someVar iVar) e
+        , isNegative = i `elem` maybe [] negativeIndices (Map.lookup (someVar iVar) e)
+        , valueGenerator = ValueGenerator $ \m -> valueOf iVar m vs
+        }
 
   forM_ tyConstr $
-    \(InputConstraint (iVar,i) (vs :: ValueSet v) e) -> do
-      let varASTs = Map.fromListWith (++) $ concatMap (\(((var,j),ast,_),_) -> [ (var,[ast]) | j <= ix var e]) vars
-      let var = fromMaybe (error "impossible") $ List.lookup (someVar iVar, i) $ map (dropThd . fst) vars
+    \(InputConstraint (iVar,i) (vs :: ValueSet v) _) -> do
+      let (var,t) = fromMaybe (error "impossible") $ List.lookup (someVar iVar, i) $ map (\VarRecord{..} -> (var,(varAST,timeStep))) vars
+      let varASTs = Map.fromListWith (++) $ concatMap (\VarRecord{var=(x,_), varAST, isNegative, timeStep} -> [ (x,[(varAST,timeStep)]) | timeStep < t, not isNegative]) vars
+
       constraint <- z3ValueSetConstraint iVar varASTs vs var
       goalAssert goal constraint
   forM_ predConstr $
     \(ConditionConstraint t e) ->
-        goalAssert goal =<< z3Predicate goal t e (map (dropThd . fst) vars)
+        goalAssert goal =<< z3Predicate goal t e (map (\VarRecord{..} -> (var,varAST)) vars)
 
   when checkOverflows $
     forM_ overflowConstr $
       \(OverflowConstraints ts e) ->
-        forM_ ts (\t -> assertOverflowChecks goal t e (map (dropThd . fst) vars))
+        forM_ ts (\t -> assertOverflowChecks goal t e (map (\VarRecord{..} -> (var,varAST)) vars))
 
   -- simplify and assert goal
   simplifyTactic <- mkTactic "simplify"
@@ -237,26 +252,23 @@ pathScript path mode checkOverflows = do
   mRes <- case result of
     Sat -> do
       model <- lift optimizeGetModel
-      SAT . catMaybes <$> mapM (\(((var,_),ast,_),_) -> evalAST model (var,ast)) vars
+      SAT . catMaybes <$> mapM (\VarRecord{var=(x,_),varAST} -> evalAST model (x,varAST)) vars
     Unsat -> do
       pure NotSAT
     Undef -> pure Timeout
   pure (mRes,str)
 
-dropThd :: (a,b,c) -> (a,b)
-dropThd (x,y,_) = (x,y)
-
-generateSuggestions :: [(((SomeVar, Int), AST, Int), ValueGenerator)] -> Z3R [(AST, Value)]
+generateSuggestions :: [VarRecord] -> Z3R [(AST, Value)]
 generateSuggestions vars = do
   -- make sure variables are ordered correctly, otherwise we construct the wrong ValueMap
   let
-    sortedVars = sortOn (thd3 . fst) vars
-    baseVars = map (fst . fst3 . fst) sortedVars
+    sortedVars = sortOn timeStep vars
+    baseVars = map (fst . var) sortedVars
   ImplicitParameter {..} <- ask
   flip evalStateT (emptyValueMap baseVars) $
-    forM vars $ \(((var,_),ast,_),gen) -> do
+    forM vars $ \VarRecord{var=(var,_), varAST, valueGenerator} -> do
       vMap <- get
-      (ast,val) <- liftIO $ withGeneratedValue (\v -> (ast,wrapValue v)) gen vMap (Size valueSizeParameter (maxSeqLengthParameter `div` 2))
+      (ast,val) <- liftIO $ withGeneratedValue (\v -> (varAST,wrapValue v)) valueGenerator vMap (Size valueSizeParameter (maxSeqLengthParameter `div` 2))
       modify (insertValue val var)
       pure (ast,val)
 

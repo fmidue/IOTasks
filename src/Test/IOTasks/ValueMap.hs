@@ -15,6 +15,7 @@ module Test.IOTasks.ValueMap (
   ValueEntry(..),
   withValueEntry,
   unwrapValueEntry,
+  traverseValueEntries,
   lookupInteger, lookupBool, lookupString,
   ) where
 
@@ -39,6 +40,9 @@ emptyValueMap xs = ValueMap (Map.fromList ((,NoEntry) <$> xs)) 0
 
 lookup :: SomeVar -> ValueMap -> Maybe ValueEntry
 lookup k = Map.lookup k . valueMap
+
+traverseValueEntries :: Applicative f => ValueMap -> (ValueEntry -> f a) -> f (Map SomeVar a)
+traverseValueEntries (ValueMap m _) f = traverse f m
 
 -- if there is a unique type for all Varnames in the list and it is the same for all names return the TypeRep of that type
 varnameTypeRep :: [Varname] -> ValueMap -> Maybe SomeTypeRep

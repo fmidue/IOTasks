@@ -13,7 +13,7 @@ module Test.IOTasks (
   (\\), with, without,
   withStr, withoutStr,
   complement,
-  unique, notInVar, inVar,
+  unique, notYetIn, alreadyIn, differentFromLast,
   isEmpty,
   ints, nats, bools, str,
   OutputPattern,
