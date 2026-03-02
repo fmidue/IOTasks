@@ -28,6 +28,8 @@ import Data.Some (Some(Some))
 import Type.Match (matchType, inCaseOfE', fallbackCase')
 import Data.Typeable ((:~~:)(HRefl))
 import Control.Monad (filterM)
+import Test.IOTasks.ValueMap (emptyValueMap)
+import Test.IOTasks.Var (someVar)
 
 testExpensiveProperties :: Spec
 testExpensiveProperties = do
@@ -122,8 +124,11 @@ testCheapProperties = do
 
     prop "valueOf generates values from the set" $
       \vs -> ioProperty $ do
-        notEmpty <- not <$> isEmpty (intVar undefined) undefined vs
-        pure $ notEmpty ==> forAll (valueOf @Integer (intVar undefined) undefined vs (Size 100 undefined)) $ initiallyContainsValue vs
+        let
+          x = intVar "x"
+          valueMap = emptyValueMap [someVar $ intVar "x"]
+        notEmpty <- not <$> isEmpty x valueMap vs
+        pure $ notEmpty ==> forAll (valueOf x valueMap vs (Size 100 undefined)) $ initiallyContainsValue vs
 
     prop "a value is either in a ValueSet or in it's complement" $
       \vs -> forAll (vectorOf 100 $ arbitrary @Integer) $ \xs -> all (\x -> (vs `initiallyContainsValue` x) /= (complement vs `initiallyContainsValue` x)) xs
@@ -134,10 +139,13 @@ testCheapProperties = do
     prop "without removes an element from a ValueSet" $
       \vs x -> not $ (vs `without` x) `initiallyContainsValue` x
 
-    prop "vs \\ ws removes all elements of ws from vs" $
+    prop "vs \\\\ ws removes all elements of ws from vs" $
       \vs ws -> ioProperty $ do
-        notEmpty <- not <$> isEmpty (intVar undefined) undefined ws
-        pure $ notEmpty ==> forAll (valueOf @Integer (intVar undefined) undefined ws (Size 100 undefined)) $ not . initiallyContainsValue (vs \\ ws)
+        let
+          x = intVar "x"
+          valueMap = emptyValueMap [someVar $ intVar "x"]
+        notEmpty <- not <$> isEmpty x valueMap ws
+        pure $ notEmpty ==> forAll (valueOf x valueMap ws (Size 100 undefined)) $ not . initiallyContainsValue (vs \\ ws)
 
   context "trace types" $ do
     describe "LineTrace" $ do
