@@ -44,6 +44,7 @@ import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.List.Extra (maximumOn)
 import Data.Functor ((<&>))
+import Control.Monad ((<=<))
 
 data ValueSet a where
   Union :: ValueSet a -> ValueSet a -> ValueSet a
@@ -96,7 +97,8 @@ singleton :: Integer -> ValueSet Integer
 singleton = EqInt
 
 singletonStr :: String -> ValueSet String
-singletonStr = EqStr
+singletonStr "" = error "singletonStr: empty string"
+singletonStr s = EqStr s
 
 fromList :: [Integer] -> ValueSet Integer
 fromList = foldr (union . intervalConstraint) empty . optimizeList . sort
@@ -202,7 +204,7 @@ containsValue _ _ (GreaterThan i) n = n > i
 containsValue _ _ (LessThan i) n = n < i
 containsValue _ _ (EqInt i) n = i == n
 containsValue _ _ (EqStr str) x = str == x
-containsValue _ _ (NotStr str) x = str /= x
+containsValue _ _ (NotStr str) x = x /= "" && str /= x
 containsValue x m (CurrentlyIn Self) n = withVarEq x $ n `elem` valuesInVar x m
 containsValue _ m (CurrentlyIn (Other ys)) n = withVarEq (NonEmpty.head ys) $ n `elem` valuesInVars ys m
 containsValue x m (CurrentlyNotIn Self) n = withVarEq x $ n `notElem` valuesInVar x m
@@ -381,7 +383,7 @@ showValueSet = go where
   showValueSet' (LessThan n) = "v < " ++ show n
   showValueSet' (EqInt n) = "v == " ++ show n
   showValueSet' (EqStr str) = "v == " ++ show str
-  showValueSet' (NotStr str) = "v /= " ++ show str
+  showValueSet' (NotStr str) = "v /= " ++ show str ++ " (v non-empty)"
   showValueSet' (CurrentlyIn ref) = "currentlyIn " ++ showVarRef ref
   showValueSet' (CurrentlyNotIn ref) = "currentlyNotIn " ++ showVarRef ref
   showValueSet' (SameAsLast ref) = "sameAsLast " ++ showVarRef ref
@@ -426,7 +428,6 @@ isEmpty var m vs = evalZ3 $ do
       StringEntry xs -> mapM (\(b,i) -> mkString b <&> (,i)) xs
       NoEntry -> pure []
 
-
 z3ValueSetConstraint :: MonadZ3 z3 => Typeable a => Var a -> Map SomeVar [(AST,Int)] -> ValueSet a -> AST -> z3 AST
 z3ValueSetConstraint var m (Union x y) xVar = do
   cx <- z3ValueSetConstraint var m x xVar
@@ -439,8 +440,8 @@ z3ValueSetConstraint var m (Intersection x y) xVar = do
 z3ValueSetConstraint _ _ (GreaterThan n) xVar = mkIntNum n >>= mkGt xVar
 z3ValueSetConstraint _ _ (LessThan n) xVar = mkIntNum n >>= mkLt xVar
 z3ValueSetConstraint _ _ (EqInt n) xVar = mkIntNum n >>= mkEq xVar
-z3ValueSetConstraint _ _ (EqStr str) xVar = mkString str >>= mkEq xVar
-z3ValueSetConstraint _ _ (NotStr str) xVar = mkString str >>= mkEq xVar >>= mkNot
+z3ValueSetConstraint _ _ (EqStr str) xVar = mkAnd =<< mapM (mkNot <=< mkEq xVar <=< mkString) ["", str]
+z3ValueSetConstraint _ _ (NotStr str) xVar = mkAnd =<< mapM (mkNot <=< mkEq xVar <=< mkString) ["", str]
 z3ValueSetConstraint var m (CurrentlyIn Self) xVar = do
   let xs = maybe [] (map fst) (Map.lookup (someVar var) m)
   mkOr =<< sequence [ mkEq xVar x | x <- xs, x /= xVar]
