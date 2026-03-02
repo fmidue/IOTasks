@@ -8,7 +8,7 @@ module Test.IOTasks.ValueSet (
   (\\), with, without,
   withStr, withoutStr,
   complement,
-  unique, notYetIn, alreadyIn, differentFromLast,
+  unique, notYetIn, alreadyIn, differentFromLast, repeatLast,
   embed, embedFromList,
   isEmpty,
   containsValue, initiallyContainsValue,

@@ -16,7 +16,7 @@ module Test.IOTasks.Internal.ValueSet (
   (\\), with, without,
   withStr, withoutStr,
   complement,
-  unique, notYetIn, alreadyIn, differentFromLast,
+  unique, notYetIn, alreadyIn, differentFromLast, repeatLast,
   embed, embedFromList,
   isEmpty,
   containsValue, initiallyContainsValue,
@@ -134,6 +134,9 @@ alreadyIn e = CurrentlyIn (Other $ NonEmpty.fromList $ toVarList e)
 
 differentFromLast :: VarExp e => ValueSet a -> e a -> ValueSet a
 differentFromLast vs e = DifferentFromLast (Other $ NonEmpty.fromList $ toVarList e) `intersection` vs
+
+repeatLast :: VarExp e => e a -> ValueSet a
+repeatLast e = SameAsLast (Other $ NonEmpty.fromList $ toVarList e)
 
 greaterThan :: Integer -> ValueSet Integer
 greaterThan = GreaterThan
