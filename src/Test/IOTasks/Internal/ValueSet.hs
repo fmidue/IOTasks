@@ -440,8 +440,12 @@ z3ValueSetConstraint var m (Intersection x y) xVar = do
 z3ValueSetConstraint _ _ (GreaterThan n) xVar = mkIntNum n >>= mkGt xVar
 z3ValueSetConstraint _ _ (LessThan n) xVar = mkIntNum n >>= mkLt xVar
 z3ValueSetConstraint _ _ (EqInt n) xVar = mkIntNum n >>= mkEq xVar
-z3ValueSetConstraint _ _ (EqStr str) xVar = mkAnd =<< mapM (mkNot <=< mkEq xVar <=< mkString) ["", str]
-z3ValueSetConstraint _ _ (NotStr str) xVar = mkAnd =<< mapM (mkNot <=< mkEq xVar <=< mkString) ["", str]
+z3ValueSetConstraint _ _ (EqStr str) xVar = do
+  x <- mkNot =<< mkEq xVar =<< mkString ""
+  y <- mkEq xVar =<< mkString str
+  mkAnd [x,y]
+z3ValueSetConstraint _ _ (NotStr str) xVar =
+  mkAnd =<< mapM (mkNot <=< mkEq xVar <=< mkString) ["", str]
 z3ValueSetConstraint var m (CurrentlyIn Self) xVar = do
   let xs = maybe [] (map fst) (Map.lookup (someVar var) m)
   mkOr =<< sequence [ mkEq xVar x | x <- xs, x /= xVar]
