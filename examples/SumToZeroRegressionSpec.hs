@@ -21,11 +21,11 @@ verboseSpec =
   where
     readX =
       anyOptionalOutput <>
-      readInput x ints AssumeValid
+      readInput x allInts AssumeValid
 
     readY =
       anyOptionalOutput <>
-      readInput y ints AssumeValid
+      readInput y allInts AssumeValid
 
     x = intVar "x"
     y = intVar "y"

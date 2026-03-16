@@ -12,18 +12,18 @@ import Data.Functor ((<&>))
 specification :: Specification
 specification =
   anyOptionalOutput <>
-  readInput x ints AssumeValid <>
+  readInput x allInts AssumeValid <>
   anyOptionalOutput <>
-  readInput y ints AssumeValid <>
+  readInput y allInts AssumeValid <>
   tillExit (
     branch (currentValue x .+. currentValue y .==. intLit 0 )
       exit
       (anyOptionalOutput <>
-       readInput x ints AssumeValid <>
+       readInput x allInts AssumeValid <>
         branch (currentValue x .+. currentValue y .==. intLit 0 )
           exit
           (anyOptionalOutput <>
-           readInput y ints AssumeValid)
+           readInput y allInts AssumeValid)
     )
   ) <>
   writeOutput [wildcard <> resultOf (length' $ filter' predicate $ allValues $ merge [x,y]) <> wildcard]

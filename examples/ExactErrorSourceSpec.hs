@@ -11,7 +11,7 @@ import Test.IOTasks.Trace.Match (MatchResult, isOutputMismatch)
 specification :: Specification
 specification =
   anyOptionalOutput <>
-  readInput (intVar "x") ints AssumeValid <>
+  readInput (intVar "x") allInts AssumeValid <>
   writeOutput [text "A"]
 
 main :: MonadTeletype io => io ()

@@ -21,9 +21,9 @@ emptyPrint = putStrLn ""
 
 decoratedSpec :: Specification
 decoratedSpec =
-  readInput x ints AssumeValid <>
-  readInput x ints AssumeValid <>
-  readInput x ints AssumeValid <>
+  readInput x allInts AssumeValid <>
+  readInput x allInts AssumeValid <>
+  readInput x allInts AssumeValid <>
   writeOutput [decoratedResultOf (sum' $ allValues x)]
   where
     x = intVar "x"

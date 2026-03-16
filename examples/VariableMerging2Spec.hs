@@ -11,16 +11,16 @@ import Data.Functor ((<&>))
 -- variable merging
 specification :: Specification
 specification =
-  readInput x ints AssumeValid <>
-  readInput y ints AssumeValid <>
+  readInput x allInts AssumeValid <>
+  readInput y allInts AssumeValid <>
   branch (currentValue y .>. intLit 0)
-    (readInput x ints AssumeValid <>
-    readInput x ints AssumeValid)
-    (readInput y ints AssumeValid)
+    (readInput x allInts AssumeValid <>
+    readInput x allInts AssumeValid)
+    (readInput y allInts AssumeValid)
     <>
   branch (currentValue (merge [x,y]) .>. intLit 5)
-    (readInput z ints AssumeValid)
-    (readInput y ints AssumeValid)
+    (readInput z allInts AssumeValid)
+    (readInput y allInts AssumeValid)
     <>
   writeOutput [resultOf $ currentValue $ merge [x,z]] <>
   writeOutput [resultOf $ length' $ allValues $ merge [x,y,z]] <>

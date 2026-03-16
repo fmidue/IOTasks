@@ -13,7 +13,7 @@ overflowSpec :: Specification
 overflowSpec =
   readInput n nats UntilValid <>
   whileNot (length' (allValues x) .==. currentValue n)
-    (writeOptionalOutput [resultOf $ currentValue n .-. length' (allValues x)] <> readInput x ints AssumeValid) <>
+    (writeOptionalOutput [resultOf $ currentValue n .-. length' (allValues x)] <> readInput x allInts AssumeValid) <>
   writeOutput [resultOf $ product' $ allValues x]
   where
     n = intVar "n"

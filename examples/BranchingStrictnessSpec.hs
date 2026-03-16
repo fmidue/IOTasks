@@ -5,7 +5,7 @@ import Test.Hspec
 
 specification :: Specification
 specification =
-  readInput x ints AssumeValid <>
+  readInput x allInts AssumeValid <>
   branch (currentValue x .==. intLit 1)
     nop
     (readInput x undefined undefined) -- cannot be completely undefined as we do one complete traversal for the initial variable environment

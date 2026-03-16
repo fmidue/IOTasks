@@ -39,15 +39,15 @@ shrinkSpec (TillE s s') = [dropE s, s']
 -- generator for simple specifications
 simpleSpec :: Gen Specification
 simpleSpec = do
-  i <- input [(intVar "n",ints,AssumeValid)]
-  l <- loop [(intVar "xs",ints,AssumeValid)] (progressCondition [(intVar "xs",ints)] [intVar "n"])
+  i <- input [(intVar "n",allInts,AssumeValid)]
+  l <- loop [(intVar "xs",allInts,AssumeValid)] (progressCondition [(intVar "xs",allInts)] [intVar "n"])
   p <- outputOneof (intTerm [intVar "xs", intVar "y"] [intVar "n"])
   pure $ i <> l <> p
 
 -- generator for standalone loop bodies
 loopBodyGen :: Gen (Specification,Specification)
 loopBodyGen = do
-  s <- loopBody [(intVar "xs",ints,AssumeValid)] (progressCondition [(intVar "xs",ints)] [intVar "n"])
+  s <- loopBody [(intVar "xs",allInts,AssumeValid)] (progressCondition [(intVar "xs",allInts)] [intVar "n"])
   return (s, readInput (intVar "n") nats AssumeValid)
 
 -- basic generators

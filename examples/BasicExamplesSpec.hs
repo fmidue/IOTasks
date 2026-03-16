@@ -13,7 +13,7 @@ import Data.Functor((<&>))
 -- basic choice between two sets of outputs
 spec1 :: Specification
 spec1 =
-  readInput x ints AssumeValid <>
+  readInput x allInts AssumeValid <>
   readInput y nats AssumeValid <>
   branch (currentValue x .>. currentValue y)
     (writeOutput [wildcard <> resultOf (currentValue x .+. currentValue y) <> wildcard , resultOf (currentValue x .-. currentValue y) <> wildcard] )
@@ -35,7 +35,7 @@ spec2 :: Specification
 spec2 =
   readInput n nats AssumeValid <>
   whileNot (sum' (allValues x) .>. currentValue n)
-  (readInput x ints AssumeValid) <>
+  (readInput x allInts AssumeValid) <>
   writeOutput [resultOf $ length' $ allValues x]
   where
     n = intVar "n"
@@ -58,7 +58,7 @@ spec3 :: Specification
 spec3 =
   readInput n nats UntilValid <>
   whileNot (length' (allValues x) .==. currentValue n)
-    (writeOptionalOutput [resultOf $ currentValue n .-. length' (allValues x)] <> readInput x ints AssumeValid) <>
+    (writeOptionalOutput [resultOf $ currentValue n .-. length' (allValues x)] <> readInput x allInts AssumeValid) <>
   writeOutput [resultOf $ sum' $ allValues x]
   where
     n = intVar "n"

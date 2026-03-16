@@ -23,8 +23,10 @@ module Test.IOTasks.Internal.ValueSet (
   showValueSet,
   valueOf,
   Size(..),
-  ints, nats, bools, str,
+  allInts, nats, bools, str,
   z3ValueSetConstraint,
+  -- deprecated
+  ints, notInVar
   ) where
 
 import Data.Set (Set)
@@ -130,6 +132,10 @@ unique vs = CurrentlyNotIn Self `intersection` vs
 
 notYetIn :: VarExp e => ValueSet a -> e a -> ValueSet a
 notYetIn vs e = CurrentlyNotIn (Other $ NonEmpty.fromList $ toVarList e) `intersection` vs
+
+{-# DEPRECATED notInVar "Use 'notYetIn' instead" #-}
+notInVar :: VarExp e => ValueSet a -> e a -> ValueSet a
+notInVar = notYetIn
 
 alreadyIn :: VarExp e => e a -> ValueSet a
 alreadyIn e = CurrentlyIn (Other $ NonEmpty.fromList $ toVarList e)
@@ -396,8 +402,8 @@ showValueSet = go where
   showVarRef (Other y) = show y
 
 -- basic ValueSets
-ints, nats :: ValueSet Integer
-ints = Every
+allInts, nats :: ValueSet Integer
+allInts = Every
 nats = EqInt 0 `Union` GreaterThan 0
 
 bools :: ValueSet Bool
@@ -405,6 +411,10 @@ bools = complete
 
 str :: ValueSet String
 str = Every
+
+{-# DEPRECATED ints "Use 'allInts' instead" #-}
+ints :: ValueSet Integer
+ints = allInts
 
 --
 -- | Check if a given 'ValueSet' of integers is empty.

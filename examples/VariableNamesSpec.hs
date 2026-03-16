@@ -16,7 +16,7 @@ import Data.Functor ((<&>))
 
 specification :: Specification
 specification =
-  readInput x ints AssumeValid <>
+  readInput x allInts AssumeValid <>
   writeOutput [resultOf $ liftOpaque (f,"f") $ currentValue x]
   where
     x = intVar "myVariable"

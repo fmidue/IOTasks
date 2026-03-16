@@ -13,8 +13,8 @@ module Test.IOTasks.Trace.Generated
   , AbstractTrace'
   , SomeVarSet, (<|)
   , progReadAbstract
-  , valueConstraint
-  , var
+  , withValueConstraints
+  , value
   , generateTrace
   , solveTrace
   ) where
@@ -58,8 +58,8 @@ data SomeVarSet where
 (<|) = SomeVarSet
 
 -- | alias for 'currentValue' with a name more inline with the usage when constructing 'AbstractTrace' and 'ConstrainedTrace' values
-var :: Typeable a => Var a -> Term 'Transparent a
-var = currentValue
+value :: Typeable a => Var a -> Term 'Transparent a
+value = currentValue
 
 progReadAbstract :: SomeVarSet -> AbstractTrace' a -> AbstractTrace' a
 progReadAbstract = AbstractRead
@@ -101,7 +101,7 @@ generateTrace sz t = genTrace `orErrorFrom` checkInputVariables "generateTrace" 
 instantiateTrace :: ValueMap -> AbstractTrace -> NTraceGeneralized
 instantiateTrace m (ConcreteRead x t) = progReadLine x $ instantiateTrace m t
 instantiateTrace m (AbstractRead (SomeVarSet x vs) t) =
-  case oEval m (var x) of
+  case oEval m (value x) of
     (_,v)
       | not (containsValue x m vs v) -> error $ concat ["value for ", show x, " is not in ", showValueSet vs]
       | otherwise -> progReadLine (show v) $ instantiateTrace m t
@@ -157,6 +157,9 @@ genValueMap size = foldM addNextValue (emptyValueMap [])
     addNextValue m (SomeVarSet x vs) = do
       v <- valueOf x m vs size
       pure $ insertValue (wrapValue v) (someVar x) m
+
+withValueConstraints :: AbstractTrace' a -> [Term 'Transparent Bool] -> AbstractTrace' a
+withValueConstraints t cs = t <> foldr valueConstraint t cs
 
 valueConstraint :: Term 'Transparent Bool -> AbstractTrace' a -> AbstractTrace' a
 valueConstraint = ValueConstraint

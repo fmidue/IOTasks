@@ -17,7 +17,9 @@ module Test.IOTasks.ValueSet (
   valueOf,
   Size(..),
   -- | = standard value sets
-  ints, nats, bools, str,
+  allInts, nats, bools, str,
+  -- | = Deprecated
+  ints, notInVar
   ) where
 
 import Test.IOTasks.Internal.ValueSet

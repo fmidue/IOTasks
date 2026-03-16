@@ -12,7 +12,7 @@ module Test.IOTasks.Random (
   complement,
   unique, notYetIn, alreadyIn, differentFromLast,
   isEmpty,
-  ints, nats, bools, str,
+  allInts, nats, bools, str,
   OutputPattern,
   wildcard, text, resultOf, decoratedResultOf, emptyPattern,
   Varname, Var, intVar, boolVar, stringVar,
@@ -64,6 +64,8 @@ module Test.IOTasks.Random (
   genInput, taskCheckOn,
   -- * Interpreter
   interpret,
+  -- | * Deprecated
+  ints, notInVar
   ) where
 
 import Test.IOTasks hiding (taskCheck, taskCheckWith, taskCheckOutcome, taskCheckWithOutcome, Args(..), stdArgs)

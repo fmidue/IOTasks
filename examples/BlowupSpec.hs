@@ -12,7 +12,7 @@ specification :: Specification
 specification = tillExit $
   branch (sum' (allValues x) .>. intLit 0)
     exit
-    ( readInput x ints AssumeValid <>
+    ( readInput x allInts AssumeValid <>
       branch (currentValue x .>. intLit 0)
         (writeOutput [text "1"])
         (writeOutput [text "0"])

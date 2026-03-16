@@ -11,9 +11,9 @@ import Data.Functor ((<&>))
 -- sum to 0
 sumToZeroSpec :: Specification
 sumToZeroSpec =
-  readInput x ints AssumeValid <>
+  readInput x allInts AssumeValid <>
   tillExit (
-    readInput x ints AssumeValid <>
+    readInput x allInts AssumeValid <>
     branch (valueBefore 1 x .+. currentValue x .==. intLit 0)
       exit
       nop
@@ -47,11 +47,11 @@ verboseSpec =
   where
     readX =
       anyOptionalOutput <>
-      readInput x ints AssumeValid
+      readInput x allInts AssumeValid
 
     readY =
       anyOptionalOutput <>
-      readInput y ints AssumeValid
+      readInput y allInts AssumeValid
 
     x = intVar "x"
     y = intVar "y"
