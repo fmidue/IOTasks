@@ -8,6 +8,8 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Test.IOTasks.Trace.Generated
   ( AbstractTrace
   , AbstractTrace'
@@ -158,8 +160,8 @@ genValueMap size = foldM addNextValue (emptyValueMap [])
       v <- valueOf x m vs size
       pure $ insertValue (wrapValue v) (someVar x) m
 
-withValueConstraints :: AbstractTrace' a -> [Term 'Transparent Bool] -> AbstractTrace' a
-withValueConstraints t cs = t <> foldr valueConstraint t cs
+withValueConstraints :: Trace (AbstractTrace' a) => AbstractTrace' a -> [Term 'Transparent Bool] -> AbstractTrace' a
+withValueConstraints t cs = t <> foldr valueConstraint terminate cs
 
 valueConstraint :: Term 'Transparent Bool -> AbstractTrace' a -> AbstractTrace' a
 valueConstraint = ValueConstraint
