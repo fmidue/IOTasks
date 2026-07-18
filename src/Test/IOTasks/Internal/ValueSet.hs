@@ -65,8 +65,8 @@ data ValueSet a where
   None :: ValueSet a
   Embed :: Embeddable a => ValueSet Integer -> ValueSet (Embedded a)
 
-deriving instance Eq a => Eq (ValueSet a)
-deriving instance Ord a => Ord (ValueSet a)
+deriving instance Eq (ValueSet a)
+deriving instance Ord (ValueSet a)
 
 data VarRef a = Self | Other (NonEmpty (Var a))
   deriving (Eq,Ord)

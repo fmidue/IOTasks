@@ -20,7 +20,7 @@ import Type.Reflection (Typeable)
 import Text.PrettyPrint (Doc)
 
 data Specification where
-  ReadInput :: (Typeable a,Read a,Show a, Ord a) => Var a -> ValueSet a -> InputMode -> Specification -> Specification
+  ReadInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification -> Specification
   WriteOutput :: OptFlag -> Set (OutputPattern k) -> Specification -> Specification
   Branch :: Term 'Transparent Bool -> Specification -> Specification -> Specification -> Specification
   TillE :: Specification -> Specification -> Specification
@@ -32,7 +32,7 @@ data InputMode = AssumeValid | UntilValid | ElseAbort
 instance Semigroup Specification
 instance Monoid Specification
 
-readInput :: (Typeable a,Read a,Show a,Ord a) => Var a -> ValueSet a -> InputMode -> Specification
+readInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification
 writeOutput :: [OutputPattern k] -> Specification
 writeOptionalOutput :: [OutputPattern k] -> Specification
 anyOptionalOutput :: Specification

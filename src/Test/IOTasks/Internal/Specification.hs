@@ -40,7 +40,7 @@ import Data.GADT.Compare
 import Data.Functor.Classes (Ord1(liftCompare))
 
 data Specification where
-  ReadInput :: (Typeable a,Read a,Show a, Ord a) => Var a -> ValueSet a -> InputMode -> Specification -> Specification
+  ReadInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification -> Specification
   WriteOutput :: OptFlag -> Set (OutputPattern k) -> Specification -> Specification
   Branch :: Term 'Transparent Bool -> Specification -> Specification -> Specification -> Specification
   TillE :: Specification -> Specification -> Specification
@@ -95,9 +95,9 @@ instance Semigroup Specification where
 instance Monoid Specification where
   mempty = nop
 
-readInput :: (Typeable a,Read a,Show a,Ord a) => Var a -> ValueSet a -> InputMode -> Specification
+readInput :: (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification
 readInput = readInput' where
-  readInput' :: forall a. (Typeable a,Read a,Show a,Ord a) => Var a -> ValueSet a -> InputMode -> Specification
+  readInput' :: forall a. (Typeable a,Read a,Show a) => Var a -> ValueSet a -> InputMode -> Specification
   readInput' x vs m = ReadInput x vs m nop
 
 writeOutput :: [OutputPattern k] -> Specification
